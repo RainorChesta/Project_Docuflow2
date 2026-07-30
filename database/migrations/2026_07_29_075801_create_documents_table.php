@@ -11,20 +11,17 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('document_versions', function (Blueprint $table) {
+        Schema::create('documents', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('document_id')->constrained()->cascadeOnDelete();
-            $table->integer('version_number');
-            $table->longText('content');
-            $table->foreignId('author_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->string('author_name');
-            $table->string('status')->default('pending');
-            $table->foreignId('reviewer_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->text('review_notes')->nullable();
-            $table->timestamp('reviewed_at')->nullable();
+            $table->string('document_number')->unique();
+            $table->string('title');
+            $table->foreignId('division_id')->constrained();
+            $table->foreignId('owner_id')->constrained('users');
+            $table->boolean('is_public')->default(false);
+            $table->unsignedBigInteger('current_version_id')->nullable();
             $table->timestamps();
 
-            $table->index(['document_id', 'status']);
+            $table->index(['division_id', 'is_public']);
         });
     }
 

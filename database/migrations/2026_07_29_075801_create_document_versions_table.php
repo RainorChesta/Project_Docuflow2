@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('document_versions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('document_id')->constrained()->cascadeOnDelete();
+            $table->unsignedBigInteger('document_id');
             $table->integer('version_number');
             $table->longText('content');
             $table->foreignId('author_id')->nullable()->constrained('users')->nullOnDelete();

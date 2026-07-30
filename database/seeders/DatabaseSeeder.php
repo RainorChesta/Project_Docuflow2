@@ -21,5 +21,13 @@ class DatabaseSeeder extends Seeder
             'name' => 'Test User',
             'email' => 'test@example.com',
         ]);
+
+        User::factory()->create([
+            'name' => 'Admin',
+            'email' => 'admin@dokuflow.test',
+            'password' => bcrypt('admin123'),
+            'system_role' => 'admin',
+            'is_active' => true,
+        ]);
     }
 }

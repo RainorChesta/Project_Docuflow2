@@ -18,7 +18,7 @@ return new class extends Migration
             $table->foreignId('division_id')->constrained();
             $table->foreignId('owner_id')->constrained('users');
             $table->boolean('is_public')->default(false);
-            $table->foreignId('current_version_id')->nullable()->constrained('document_versions')->nullOnDelete();
+            $table->unsignedBigInteger('current_version_id')->nullable();
             $table->timestamps();
 
             $table->index(['division_id', 'is_public']);
@@ -30,6 +30,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('documents');
+        Schema::dropIfExists('document_versions');
     }
 };

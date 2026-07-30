@@ -1,23 +1,27 @@
 <x-app-layout>
     <x-slot name="header">Create Division</x-slot>
 
-    <div class="py-12">
-        <div class="max-w-xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
+    <div class="py-6">
+        <div class="max-w-xl mx-auto">
+            <div class="card bg-base-100 border border-base-300 shadow-sm p-6">
                 <form method="POST" action="{{ route('admin.divisions.store') }}">
                     @csrf
-                    <div class="mb-4">
-                        <label for="code" class="block text-sm font-medium text-gray-700">Code</label>
-                        <input type="text" name="code" id="code" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" maxlength="10" required>
-                        @error('code') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                    <div class="form-control w-full mb-4">
+                        <label for="code" class="label">
+                            <span class="label-text font-medium">Code</span>
+                        </label>
+                        <input type="text" name="code" id="code" class="input input-bordered w-full" maxlength="10" required>
+                        @error('code') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                     </div>
-                    <div class="mb-4">
-                        <label for="name" class="block text-sm font-medium text-gray-700">Name</label>
-                        <input type="text" name="name" id="name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
-                        @error('name') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                    <div class="form-control w-full mb-4">
+                        <label for="name" class="label">
+                            <span class="label-text font-medium">Name</span>
+                        </label>
+                        <input type="text" name="name" id="name" class="input input-bordered w-full" required>
+                        @error('name') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                     </div>
                     <div class="flex justify-end">
-                        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Create</button>
+                        <button type="submit" class="btn btn-primary">Create</button>
                     </div>
                 </form>
             </div>

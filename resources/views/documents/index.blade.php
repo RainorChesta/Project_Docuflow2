@@ -1,48 +1,53 @@
 <x-app-layout>
     <x-slot name="header">My Documents</x-slot>
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="mb-4">
-                <a href="{{ route('documents.create') }}" class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700">
+    <div class="py-6">
+        <div class="max-w-7xl mx-auto">
+            <div class="mb-4 flex gap-2">
+                <a href="{{ route('documents.create') }}" class="btn btn-primary">
                     + New Document
                 </a>
             </div>
 
             @if(session('success'))
-                <div class="mb-4 p-4 bg-green-100 text-green-800 rounded">{{ session('success') }}</div>
+                <div class="alert alert-success mb-4">
+                    <span>{{ session('success') }}</span>
+                </div>
             @endif
 
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6">
-                    @forelse($documents as $doc)
-                        <div class="border-b py-3 flex items-center justify-between">
-                            <div>
-                                <a href="{{ route('documents.show', $doc) }}" class="text-blue-600 hover:underline font-medium">
-                                    {{ $doc->title }}
-                                </a>
-                                <p class="text-sm text-gray-500">
-                                    {{ $doc->document_number }}
-                                    @if($doc->is_public) <span class="text-green-600">· Public</span> @endif
-                                    · {{ $doc->division->code }}
-                                    · {{ $doc->owner->name }}
-                                </p>
+            <div class="card bg-base-100 border border-base-300 shadow-sm">
+                <div class="card-body p-0">
+                    <div class="divide-y divide-base-200">
+                        @forelse($documents as $doc)
+                            <div class="px-6 py-4 flex items-center justify-between">
+                                <div>
+                                    <a href="{{ route('documents.show', $doc) }}" class="link link-primary font-medium">
+                                        {{ $doc->title }}
+                                    </a>
+                                    <p class="text-sm text-base-content/60">
+                                        {{ $doc->document_number }}
+                                        @if($doc->is_public) <span class="text-success">· Public</span> @endif
+                                        · {{ $doc->division->code }}
+                                        · {{ $doc->owner->name }}
+                                    </p>
+                                </div>
+                                <div class="text-sm text-base-content/60">
+                                    @if($doc->currentVersion)
+                                        v{{ $doc->currentVersion->version_number }}
+                                    @else
+                                        <span class="text-warning">Pending</span>
+                                    @endif
+                                </div>
                             </div>
-                            <div class="text-sm text-gray-500">
-                                @if($doc->currentVersion)
-                                    v{{ $doc->currentVersion->version_number }}
-                                @else
-                                    <span class="text-yellow-600">Pending</span>
-                                @endif
-                            </div>
-                        </div>
-                    @empty
-                        <p class="text-gray-500">No documents found.</p>
-                    @endforelse
-
-                    <div class="mt-4">
-                        {{ $documents->links() }}
+                        @empty
+                            <div class="p-6 text-base-content/60">No documents found.</div>
+                        @endforelse
                     </div>
+                    @if($documents->hasPages())
+                        <div class="p-4 border-t border-base-200">
+                            {{ $documents->links() }}
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>
