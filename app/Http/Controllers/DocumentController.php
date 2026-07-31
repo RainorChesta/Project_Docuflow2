@@ -19,18 +19,44 @@ class DocumentController extends Controller
         protected AuditService $auditService,
     ) {}
 
-    public function index(): View
+    public function index(Request $request): View
     {
         $user = auth()->user();
-        $documents = Document::with('owner', 'division', 'currentVersion')
+
+        $query = Document::with('owner', 'division', 'currentVersion')
             ->where(function ($q) use ($user) {
                 $q->where('division_id', $user->division_id)
                   ->orWhere('is_public', true);
-            })
-            ->latest()
-            ->paginate(15);
+            });
 
-        return view('documents.index', compact('documents'));
+        if ($search = $request->get('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                  ->orWhere('document_number', 'like', "%{$search}%");
+            });
+        }
+
+        if ($divisionId = $request->get('division_id')) {
+            $query->where('division_id', $divisionId);
+        }
+
+        if ($status = $request->get('status')) {
+            if ($status === 'active') {
+                $query->whereHas('currentVersion', fn($q) => $q->where('status', 'active'));
+            } elseif ($status === 'pending') {
+                $query->whereDoesntHave('currentVersion')
+                    ->orWhereHas('versions', fn($q) => $q->where('status', 'pending'));
+            } elseif ($status === 'draft') {
+                $query->whereDoesntHave('versions');
+            }
+        }
+
+        $documents = $query->latest()->paginate(15)->withQueryString();
+        $divisions = auth()->user()->isAdmin()
+            ? Division::all()
+            : Division::where('id', auth()->user()->division_id)->get();
+
+        return view('documents.index', compact('documents', 'divisions'));
     }
 
     public function create(): View
