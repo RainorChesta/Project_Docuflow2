@@ -84,7 +84,7 @@ class DocumentController extends Controller
             'document_number' => $doc->document_number,
         ]);
 
-        return redirect()->route('documents.show', $doc)->with('success', 'Document created.');
+        return redirect()->route('documents.edit', $doc)->with('success', 'Document created.');
     }
 
     public function show(Document $document): View
