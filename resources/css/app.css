@@ -32,7 +32,7 @@
     --border: 1px;
   }
 
-  .dark {
+  [data-theme="dark"] {
     --color-base-100: oklch(0.28 0.04 250);
     --color-base-200: oklch(0.2 0.04 260);
     --color-base-300: oklch(0.35 0.04 250);
