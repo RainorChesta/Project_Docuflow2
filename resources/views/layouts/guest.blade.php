@@ -13,8 +13,8 @@
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700&display=swap" rel="stylesheet" />
 
-        {{-- Flash-prevention: set data-theme before CSS renders. Default = follow OS, user toggle overrides --}}
-        <script>(function(){var t=localStorage.getItem('theme'),d=t?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-theme',d?'dark':'light')})()</script>
+        {{-- Flash-prevention: set data-theme before CSS renders. No stored choice = follow OS live --}}
+        <script>(function(){var t=localStorage.getItem('theme:v2'),m=window.matchMedia('(prefers-color-scheme: dark)'),d=t?t==='dark':m.matches;document.documentElement.setAttribute('data-theme',d?'dark':'light');m.addEventListener('change',function(){if(!localStorage.getItem('theme:v2'))document.documentElement.setAttribute('data-theme',m.matches?'dark':'light')})})()</script>
 
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])

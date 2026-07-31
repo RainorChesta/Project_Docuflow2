@@ -7,14 +7,21 @@ window.Alpine = Alpine;
 Alpine.start();
 
 // ─── Theme Toggle ───────────────────────────────────────────────
+// No stored key = follow OS live. Manual light/dark persists and overrides OS.
 (function() {
-    const KEY = 'theme';
+    const KEY = 'theme:v2';
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
 
-    // effective theme: explicit user choice, or fallback to OS (Windows) preference
+    // stored choice, or 'auto' when nothing stored
+    function pref() {
+        return localStorage.getItem(KEY) || 'auto';
+    }
+
+    // effective theme for rendering: explicit choice, else OS preference
     function eff() {
-        var t = localStorage.getItem(KEY);
-        if (t === 'light' || t === 'dark') return t;
-        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        var p = pref();
+        if (p !== 'auto') return p;
+        return mq.matches ? 'dark' : 'light';
     }
 
     function apply(t) {
@@ -25,14 +32,17 @@ Alpine.start();
         var e = eff();
         document.getElementById('themeIconSun')?.classList.toggle('hidden', e !== 'light');
         document.getElementById('themeIconMoon')?.classList.toggle('hidden', e !== 'dark');
+        document.getElementById('themeIconAuto')?.classList.toggle('hidden', pref() !== 'auto');
+        document.getElementById('themeToggleBtn')?.setAttribute('aria-label', 'Theme: ' + e + (pref() === 'auto' ? ' (auto)' : ''));
     }
 
     function markActive() {
-        var p = localStorage.getItem(KEY);
+        var p = pref();
         document.querySelectorAll('.theme-option').forEach(function(el) {
             var isActive = el.dataset.themeValue === p;
             el.classList.toggle('bg-primary/10', isActive);
             el.classList.toggle('text-primary', isActive);
+            el.setAttribute('aria-pressed', isActive ? 'true' : 'false');
         });
     }
 
@@ -41,17 +51,19 @@ Alpine.start();
         syncIcon();
         markActive();
 
-        // OS change → re-evaluate (no-op when user has explicit choice)
-        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
-            apply(eff());
+        // OS theme change → follow live unless user picked a manual theme
+        mq.addEventListener('change', function() {
+            if (pref() === 'auto') {
+                apply(eff());
+                syncIcon();
+            }
         });
 
         document.querySelectorAll('.theme-option').forEach(function(btn) {
             btn.addEventListener('click', function() {
                 var v = this.dataset.themeValue;
-                // click the active option again → reset to auto-follow OS
                 if (localStorage.getItem(KEY) === v) {
-                    localStorage.removeItem(KEY);
+                    localStorage.removeItem(KEY); // re-click active → back to following OS
                 } else {
                     localStorage.setItem(KEY, v);
                 }
