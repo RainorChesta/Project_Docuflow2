@@ -1,5 +1,4 @@
 
-
 import Alpine from 'alpinejs';
 import './jodit';
 import { initJoditEditor } from './jodit';
@@ -36,11 +35,11 @@ Alpine.start();
     }
 
     function syncIcon() {
-        var e = eff();
-        document.getElementById('themeIconSun')?.classList.toggle('hidden', e !== 'light');
-        document.getElementById('themeIconMoon')?.classList.toggle('hidden', e !== 'dark');
-        document.getElementById('themeIconAuto')?.classList.toggle('hidden', pref() !== 'auto');
-        document.getElementById('themeToggleBtn')?.setAttribute('aria-label', 'Theme: ' + e + (pref() === 'auto' ? ' (auto)' : ''));
+        var a = pref() === 'auto', e = eff();
+        document.getElementById('themeIconSun')?.classList.toggle('hidden', a || e !== 'light');
+        document.getElementById('themeIconMoon')?.classList.toggle('hidden', a || e !== 'dark');
+        document.getElementById('themeIconAuto')?.classList.toggle('hidden', !a);
+        document.getElementById('themeToggleBtn')?.setAttribute('aria-label', 'Theme: ' + (a ? 'system (' + e + ')' : e));
     }
 
     function markActive() {
@@ -69,8 +68,8 @@ Alpine.start();
         document.querySelectorAll('.theme-option').forEach(function(btn) {
             btn.addEventListener('click', function() {
                 var v = this.dataset.themeValue;
-                if (localStorage.getItem(KEY) === v) {
-                    localStorage.removeItem(KEY); // re-click active → back to following OS
+                if (v === 'auto' || localStorage.getItem(KEY) === v) {
+                    localStorage.removeItem(KEY); // system / re-click active → follow OS
                 } else {
                     localStorage.setItem(KEY, v);
                 }
