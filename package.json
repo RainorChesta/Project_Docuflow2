@@ -14,5 +14,8 @@
         "laravel-vite-plugin": "^3.1",
         "tailwindcss": "^4.3.3",
         "vite": "^8.0.0"
+    },
+    "dependencies": {
+        "jodit": "^4.13.10"
     }
 }

@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\DivisionController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\ApprovalController;
 use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\JoditController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ShareLinkController;
 use Illuminate\Support\Facades\Route;
@@ -14,6 +15,9 @@ Route::get('/', function () {
 
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', fn() => view('dashboard'))->name('dashboard');
+
+    // Jodit image upload
+    Route::post('/jodit-upload', [JoditController::class, 'upload'])->name('jodit.upload');
 
     // Documents
     Route::resource('documents', DocumentController::class)->except(['edit', 'update']);
