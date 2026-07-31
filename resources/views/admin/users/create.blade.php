@@ -53,8 +53,3 @@
         </div>
     </div>
 </x-app-layout>
-                </form>
-            </div>
-        </div>
-    </div>
-</x-app-layout>

@@ -1,3 +1,4 @@
+@import "jodit/es2018/jodit.min.css";
 @import "tailwindcss";
 @plugin "daisyui";
 
@@ -38,4 +39,20 @@
     --color-base-300: oklch(0.35 0.04 250);
     --color-base-content: oklch(0.98 0.005 250);
   }
+}
+
+/* Jodit editor — override DaisyUI base-content color leak */
+.jodit-wysiwyg,
+.jodit-wysiwyg * {
+    color: #000 !important;
+}
+.jodit-wysiwyg {
+    background: #fff !important;
+}
+.jodit-wysiwyg a {
+    color: #1a73e8 !important;
+}
+/* Keep placeholder visible */
+.jodit-wysiwyg[contenteditable]:empty:before {
+    color: #888 !important;
 }
