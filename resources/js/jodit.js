@@ -11,11 +11,23 @@ export function initJoditEditor(selector, overrides = {}) {
 
     const editor = Jodit.make(ta, {
         height: 600,
+        width: '100%',
         language: 'id',
         toolbarButtonSize: 'middle',
         toolbarAdaptive: true,
-        toolbarSticky: true,
-        toolbarStickyOffset: 64,
+        toolbarSticky: false,
+
+        // Konten tampil seperti halaman kertas terpisah
+        style: {
+            maxWidth: '800px',
+            margin: '0 auto',
+            padding: '48px 56px',
+            background: '#fff',
+            backgroundImage: 'repeating-linear-gradient(to bottom, transparent 0, transparent 1123px, #d1d5db 1123px, #d1d5db 1125px)',
+            border: '2px solid #6b7280',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+            minHeight: '400px',
+        },
 
         link: {
             followOnDblClick: true,
