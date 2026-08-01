@@ -93,4 +93,31 @@ class ShareLinkController extends Controller
 
         return redirect()->route('shared.documents', $token)->with('success', 'Edit saved. Pending approval.');
     }
+
+    public function discard(string $token): RedirectResponse
+    {
+        $link = DocumentAccessLink::where('token', $token)->firstOrFail();
+
+        if ($link->isExpired() || $link->role !== 'editor') {
+            abort(403);
+        }
+
+        $document = $link->document;
+
+        $versionService = app(\App\Services\VersionService::class);
+        $discarded = $versionService->discardPending($document);
+
+        $auditService = app(\App\Services\AuditService::class);
+        if ($discarded) {
+            $auditService->log(null, 'version.discarded_via_link', 'document_version', $discarded->id, [
+                'document_id' => $document->id,
+                'version_number' => $discarded->version_number,
+                'link_token' => $token,
+            ]);
+        }
+
+        return redirect()->route('shared.documents', $token)->with('success', $discarded
+            ? 'Versi pending v' . $discarded->version_number . ' di-discard.'
+            : 'Tidak ada versi pending untuk di-discard.');
+    }
 }

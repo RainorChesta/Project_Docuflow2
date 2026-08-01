@@ -24,6 +24,8 @@ class DocumentController extends Controller
         $user = auth()->user();
 
         $query = Document::with('owner', 'division', 'currentVersion')
+            // Only show documents already approved by the head; pending ones are hidden.
+            ->whereHas('currentVersion')
             ->where(function ($q) use ($user) {
                 $q->where('division_id', $user->division_id)
                   ->orWhere('is_public', true);
@@ -100,7 +102,7 @@ class DocumentController extends Controller
     {
         $this->authorize('update', $document);
 
-        $document->load('currentVersion');
+        $document->load('currentVersion', 'versions');
 
         return view('documents.edit', compact('document'));
     }
@@ -113,6 +115,7 @@ class DocumentController extends Controller
             'content' => 'required|string',
         ]);
 
+        // savePending updates the existing pending version in place — no new version.
         $version = $this->versionService->savePending($document, $validated['content'], auth()->user());
 
         $this->auditService->log(auth()->user(), 'version.created', 'document_version', $version->id, [
@@ -120,7 +123,29 @@ class DocumentController extends Controller
             'version_number' => $version->version_number,
         ]);
 
-        return redirect()->route('documents.show', $document)->with('success', 'Edit saved. Pending approval.');
+        $message = $version->wasRecentlyCreated
+            ? 'Edit saved. Pending approval.'
+            : 'Versi v' . $version->version_number . ' diperbarui (tetap menunggu approval).';
+
+        return redirect()->route('documents.show', $document)->with('success', $message);
+    }
+
+    public function discard(Request $request, Document $document): RedirectResponse
+    {
+        $this->authorize('update', $document);
+
+        $discarded = $this->versionService->discardPending($document);
+
+        if ($discarded) {
+            $this->auditService->log(auth()->user(), 'version.discarded', 'document_version', $discarded->id, [
+                'document_id' => $document->id,
+                'version_number' => $discarded->version_number,
+            ]);
+        }
+
+        return redirect()->route('documents.show', $document)->with('success', $discarded
+            ? 'Versi pending v' . $discarded->version_number . ' di-discard.'
+            : 'Tidak ada versi pending untuk di-discard.');
     }
 
     public function togglePublic(Document $document): RedirectResponse

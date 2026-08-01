@@ -55,6 +55,30 @@
                     </div>
                 </div>
             @endif
+
+            {{-- Pending version warning: saving updates the pending version in place --}}
+            @php
+                $pending = $document->versions->first(fn($v) => $v->status === 'pending' && !$v->discarded_at);
+            @endphp
+            @if($pending)
+                <div class="max-w-6xl mx-auto px-6 pb-3">
+                    <div class="alert alert-warning shadow-sm">
+                        <div class="flex items-center justify-between gap-4 w-full">
+                            <div class="flex items-center gap-2 text-sm">
+                                <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                <span>
+                                    Ada versi pending (v{{ $pending->version_number }}) yang belum di-review.
+                                    <strong>Save akan memperbarui versi pending tersebut (tanpa versi baru).</strong>
+                                </span>
+                            </div>
+                            <form method="POST" action="{{ route('documents.discard', $document) }}" class="shrink-0">
+                                @csrf
+                                <button type="submit" class="btn btn-outline btn-warning btn-sm">Discard pending (v{{ $pending->version_number }})</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            @endif
         </div>
 
         {{-- Canvas / Dokumen --}}
@@ -75,6 +99,9 @@
 
                     <p class="text-center text-xs text-base-content/50 mt-4">
                         Save akan membuat versi baru yang menunggu approval Head.
+                        @if($pending ?? null)
+                            Versi pending yang ada akan diperbarui (bukan versi baru).
+                        @endif
                     </p>
                 </div>
             </form>

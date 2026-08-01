@@ -11,17 +11,53 @@ class VersionService
 {
     public function savePending(Document $document, string $content, User $author): DocumentVersion
     {
-        $versionNumber = ($document->versions()->max('version_number') ?? 0) + 1;
+        return DB::transaction(function () use ($document, $content, $author) {
+            // Pending version already exists → update it in place, keep the same version number.
+            $pending = $document->versions()->pending()
+                ->whereNull('discarded_at')
+                ->orderBy('version_number', 'desc')
+                ->first();
 
-        $version = $document->versions()->create([
-            'version_number' => $versionNumber,
-            'content' => \Purifier::clean($content),
-            'author_id' => $author->id,
-            'author_name' => $author->name,
-            'status' => 'pending',
-        ]);
+            if ($pending) {
+                $pending->update([
+                    'content' => \Purifier::clean($content),
+                    'author_id' => $author->id,
+                    'author_name' => $author->name,
+                ]);
 
-        return $version;
+                return $pending;
+            }
+
+            $versionNumber = ($document->versions()->max('version_number') ?? 0) + 1;
+
+            $version = $document->versions()->create([
+                'version_number' => $versionNumber,
+                'content' => \Purifier::clean($content),
+                'author_id' => $author->id,
+                'author_name' => $author->name,
+                'status' => 'pending',
+            ]);
+
+            return $version;
+        });
+    }
+
+    /**
+     * Discard the newest pending version. The previous pending version
+     * (if any) becomes pending again.
+     */
+    public function discardPending(Document $document): ?DocumentVersion
+    {
+        $pending = $document->versions()->pending()
+            ->whereNull('discarded_at')
+            ->orderBy('version_number', 'desc')
+            ->first();
+
+        if ($pending) {
+            $pending->update(['status' => 'discarded', 'discarded_at' => now()]);
+        }
+
+        return $pending;
     }
 
     public function approve(DocumentVersion $version, User $reviewer, ?string $notes = null): void

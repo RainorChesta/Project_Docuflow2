@@ -23,6 +23,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('documents', DocumentController::class)->except(['edit', 'update']);
     Route::get('/documents/{document}/edit', [DocumentController::class, 'edit'])->name('documents.edit');
     Route::put('/documents/{document}/save', [DocumentController::class, 'save'])->name('documents.save');
+    Route::post('/documents/{document}/discard', [DocumentController::class, 'discard'])->name('documents.discard');
     Route::post('/documents/{document}/toggle-public', [DocumentController::class, 'togglePublic'])->name('documents.toggle-public');
 
     // Approvals
@@ -50,5 +51,6 @@ Route::middleware('auth')->group(function () {
 // Shared link access (no auth required)
 Route::get('/share/{token}', [ShareLinkController::class, 'access'])->name('shared.documents');
 Route::post('/share/{token}/save', [ShareLinkController::class, 'save'])->name('shared.documents.save');
+Route::post('/share/{token}/discard', [ShareLinkController::class, 'discard'])->name('shared.documents.discard');
 
 require __DIR__.'/auth.php';
