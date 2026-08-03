@@ -1,5 +1,5 @@
 <!-- Left Sidebar -->
-<aside class="w-60 bg-base-100 border-r border-base-300 flex flex-col shrink-0 min-h-screen">
+<aside class="w-60 bg-base-100 border-r border-base-300 flex flex-col shrink-0 h-screen sticky top-0">
     <!-- Logo -->
     <div class="h-16 px-4 flex items-center border-b border-base-300">
         <a href="{{ route('dashboard') }}" class="flex items-center gap-2.5">
@@ -64,6 +64,13 @@
                   {{ request()->routeIs('admin.users.*') ? 'bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" /></svg>
             Users
+        </a>
+
+        <a href="{{ route('admin.retention.edit') }}"
+           class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150
+                  {{ request()->routeIs('admin.retention.*') ? 'bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            Retention
         </a>
         @endcan
     </nav>

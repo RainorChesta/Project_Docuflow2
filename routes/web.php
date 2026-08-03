@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\DivisionController;
+use App\Http\Controllers\Admin\RetentionController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\DocumentTypeController;
 use App\Http\Controllers\ApprovalController;
@@ -25,6 +26,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('documents', DocumentController::class)->except(['edit', 'update']);
     Route::get('/documents/{document}/edit', [DocumentController::class, 'edit'])->name('documents.edit');
     Route::get('/documents/{document}/preview', [DocumentController::class, 'preview'])->name('documents.preview');
+    Route::get('/documents/{document}/preview-content', [DocumentController::class, 'previewContent'])->name('documents.preview-content');
     Route::put('/documents/{document}/save', [DocumentController::class, 'save'])->name('documents.save');
     Route::put('/documents/{document}/save-draft', [DocumentController::class, 'saveDraft'])->name('documents.save-draft');
     Route::patch('/documents/{document}/visibility', [DocumentController::class, 'updateVisibility'])->name('documents.update-visibility');
@@ -45,6 +47,8 @@ Route::middleware('auth')->group(function () {
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::resource('divisions', DivisionController::class);
         Route::resource('users', UserController::class);
+        Route::get('/retention', [RetentionController::class, 'edit'])->name('retention.edit');
+        Route::put('/retention', [RetentionController::class, 'update'])->name('retention.update');
         Route::resource('document-types', DocumentTypeController::class);
     });
 
