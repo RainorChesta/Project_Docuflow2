@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -30,6 +31,28 @@ class User extends Authenticatable
     public function division(): BelongsTo
     {
         return $this->belongsTo(Division::class);
+    }
+
+    /**
+     * All divisions the user belongs to (primary + additional via pivot).
+     */
+    public function divisions(): BelongsToMany
+    {
+        return $this->belongsToMany(Division::class)->withTimestamps();
+    }
+
+    /**
+     * IDs of every division the user is a member of.
+     */
+    public function allDivisionIds(): array
+    {
+        $ids = $this->divisions()->pluck('divisions.id')->all();
+
+        if ($this->division_id) {
+            $ids[] = $this->division_id;
+        }
+
+        return array_values(array_unique($ids));
     }
 
     public function documents(): HasMany

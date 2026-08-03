@@ -12,7 +12,7 @@
                             <label for="title" class="label">
                                 <span class="label-text font-medium">Title</span>
                             </label>
-                            <input type="text" name="title" id="title" class="input input-bordered w-full" required>
+                            <input type="text" name="title" id="title" class="input input-bordered w-full" required autofocus>
                             @error('title') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                         </div>
 
@@ -23,7 +23,9 @@
                             <select name="division_id" id="division_id" class="select select-bordered w-full" required>
                                 <option value="">Select division...</option>
                                 @foreach($divisions as $div)
-                                    <option value="{{ $div->id }}">{{ $div->code }} - {{ $div->name }}</option>
+                                    <option value="{{ $div->id }}" {{ old('division_id') == $div->id ? 'selected' : '' }}>
+                                        {{ $div->code }} - {{ $div->name }}
+                                    </option>
                                 @endforeach
                             </select>
                             @error('division_id') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror

@@ -8,7 +8,7 @@
                     <div class="flex items-center justify-between mb-4">
                         <div>
                             <h2 class="text-xl font-bold">{{ $document->title }}</h2>
-                            <p class="text-sm text-base-content/60">{{ $document->document_number }} · {{ $document->division->code }}</p>
+                            <p class="text-sm text-base-content/60">{{ $document->document_number }} · {{ $document->division?->code ?? '—' }}</p>
                         </div>
                         <span class="badge {{ $link->role === 'editor' ? 'badge-primary' : 'badge-ghost' }}">
                             {{ ucfirst($link->role) }} access
