@@ -12,7 +12,7 @@
                 <div class="card-body">
                     <div class="flex justify-between items-center mb-4 pb-4 border-b border-base-300">
                         <div class="text-sm">
-                            <div><span class="text-base-content/60">Division:</span> {{ $document->division->code }}</div>
+                            <div><span class="text-base-content/60">Division:</span> {{ $document->division?->code ?? '—' }}</div>
                             <div><span class="text-base-content/60">Owner:</span> {{ $document->owner->name }}</div>
                         </div>
                         <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm">Back to Edit</a>

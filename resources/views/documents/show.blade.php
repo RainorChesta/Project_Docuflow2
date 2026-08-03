@@ -20,7 +20,7 @@
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                         <div>
                             <span class="text-base-content/60">Division</span>
-                            <p class="font-medium">{{ $document->division->code }}</p>
+                            <p class="font-medium">{{ $document->division?->code ?? '—' }}</p>
                         </div>
                         <div>
                             <span class="text-base-content/60">Owner</span>
@@ -29,8 +29,16 @@
                         <div>
                             <span class="text-base-content/60">Status</span>
                             <p class="font-medium">
+                                @php
+                                    $hasDraft = $document->versions->contains('status', 'draft');
+                                    $pendingVersion = $document->versions->firstWhere('status', 'pending');
+                                @endphp
                                 @if($document->currentVersion)
                                     Active (v{{ $document->currentVersion->version_number }})
+                                @elseif($pendingVersion)
+                                    <span class="text-warning">Pending approval (v{{ $pendingVersion->version_number }})</span>
+                                @elseif($hasDraft)
+                                    <span class="text-warning">Draft</span>
                                 @else
                                     <span class="text-warning">Pending first approval</span>
                                 @endif
@@ -39,17 +47,41 @@
                         <div>
                             <span class="text-base-content/60">Visibility</span>
                             <p class="font-medium">
-                                @can('update', $document)
-                                    <form method="POST" action="{{ route('documents.toggle-public', $document) }}" class="inline">
-                                        @csrf
-                                        <button type="submit" class="{{ $document->is_public ? 'text-success' : 'text-base-content/60' }} hover:underline">
-                                            {{ $document->is_public ? 'Public' : 'Division only' }}
-                                        </button>
-                                    </form>
+                                @if($document->isGeneral())
+                                    <span class="text-success">General</span>
+                                @elseif($document->isPersonal())
+                                    <span class="text-info">Personal</span>
                                 @else
-                                    {{ $document->is_public ? 'Public' : 'Division only' }}
-                                @endcan
+                                    <span>{{ $document->division?->code ?? 'Division' }} only</span>
+                                @endif
                             </p>
+                            @can('update', $document)
+                                <div class="mt-2">
+                                    <details class="dropdown">
+                                        <summary class="btn btn-ghost btn-xs">Change scope</summary>
+                                        <form method="POST" action="{{ route('documents.update-visibility', $document) }}"
+                                              class="menu p-4 bg-base-100 border border-base-300 shadow-lg rounded-box w-64 space-y-2">
+                                            @csrf
+                                            @method('PATCH')
+                                            <select name="visibility" class="select select-bordered select-sm w-full">
+                                                <option value="general" {{ $document->isGeneral() ? 'selected' : '' }}>General (public)</option>
+                                                <option value="division" {{ $document->isDivision() ? 'selected' : '' }}>Division</option>
+                                                <option value="personal" {{ $document->isPersonal() ? 'selected' : '' }}>Personal</option>
+                                            </select>
+                                            <select name="division_id" class="select select-bordered select-sm w-full"
+                                                    {{ $document->isDivision() ? '' : 'disabled' }}>
+                                                <option value="">Select division...</option>
+                                                @foreach($divisions ?? [] as $div)
+                                                    <option value="{{ $div->id }}" {{ $document->division_id === $div->id ? 'selected' : '' }}>
+                                                        {{ $div->code }} - {{ $div->name }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                            <button type="submit" class="btn btn-primary btn-xs w-full">Save</button>
+                                        </form>
+                                    </details>
+                                </div>
+                            @endcan
                         </div>
                     </div>
                 </div>
@@ -99,9 +131,15 @@
             <!-- Actions -->
             <div class="flex gap-2 mb-6">
                 @can('update', $document)
-                    <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm">
-                        Edit Document
-                    </a>
+                    @if($hasDraft && !$pendingVersion && !$document->currentVersion)
+                        <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm">
+                            Edit Draft
+                        </a>
+                    @else
+                        <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm">
+                            Edit Document
+                        </a>
+                    @endif
                 @endcan
 
                 @can('update', $document)

@@ -60,6 +60,32 @@ class VersionService
         return $pending;
     }
 
+    public function saveDraft(Document $document, string $content, User $author): DocumentVersion
+    {
+        // Draft terbaru = v1 yang dibuat saat create. Update kontennya, tetap draft.
+        $version = $document->versions()->latest('version_number')->first();
+
+        if ($version && $version->status === 'draft') {
+            $version->update([
+                'content' => \Purifier::clean($content),
+                'author_name' => $author->name,
+            ]);
+
+            return $version;
+        }
+
+        // Fallback: buat versi draft baru
+        $versionNumber = ($document->versions()->max('version_number') ?? 0) + 1;
+
+        return $document->versions()->create([
+            'version_number' => $versionNumber,
+            'content' => \Purifier::clean($content),
+            'author_id' => $author->id,
+            'author_name' => $author->name,
+            'status' => 'draft',
+        ]);
+    }
+
     public function approve(DocumentVersion $version, User $reviewer, ?string $notes = null): void
     {
         DB::transaction(function () use ($version, $reviewer, $notes) {

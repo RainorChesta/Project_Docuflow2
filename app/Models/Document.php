@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Document extends Model
 {
     protected $fillable = [
-        'document_number', 'title', 'division_id', 'owner_id',
+        'document_number', 'title', 'visibility', 'division_id', 'owner_id',
         'is_public', 'current_version_id',
     ];
 
@@ -18,6 +19,25 @@ class Document extends Model
         return [
             'is_public' => 'boolean',
         ];
+    }
+
+    public const VISIBILITY_GENERAL = 'general';
+    public const VISIBILITY_DIVISION = 'division';
+    public const VISIBILITY_PERSONAL = 'personal';
+
+    public function isGeneral(): bool
+    {
+        return $this->visibility === self::VISIBILITY_GENERAL;
+    }
+
+    public function isDivision(): bool
+    {
+        return $this->visibility === self::VISIBILITY_DIVISION;
+    }
+
+    public function isPersonal(): bool
+    {
+        return $this->visibility === self::VISIBILITY_PERSONAL;
     }
 
     public function division(): BelongsTo
@@ -53,5 +73,59 @@ class Document extends Model
     public function scopePending($query)
     {
         return $query->whereHas('versions', fn($q) => $q->where('status', 'pending'));
+    }
+
+    /**
+     * General (public) documents — visible to every authenticated user.
+     */
+    public function scopeGeneral(Builder $query): Builder
+    {
+        return $query->where('visibility', self::VISIBILITY_GENERAL);
+    }
+
+    /**
+     * Division-scoped documents the given user may see (Dokumen Divisi tab).
+     */
+    public function scopeDivision(Builder $query, User $user): Builder
+    {
+        $divisionIds = $user->allDivisionIds();
+
+        if (empty($divisionIds)) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where('visibility', self::VISIBILITY_DIVISION)
+            ->whereIn('division_id', $divisionIds);
+    }
+
+    /**
+     * Documents the given user is allowed to see (row-level visibility).
+     * Admin sees everything. Regular users see: general docs, own docs
+     * (any scope), and division docs of any division they belong to.
+     */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        if ($user->isAdmin()) {
+            return $query;
+        }
+
+        $divisionIds = $user->allDivisionIds();
+
+        return $query->where(function (Builder $q) use ($user, $divisionIds) {
+            $q->where('visibility', self::VISIBILITY_GENERAL)
+                ->orWhere('owner_id', $user->id)
+                ->orWhere(function (Builder $sub) use ($divisionIds) {
+                    $sub->where('visibility', self::VISIBILITY_DIVISION)
+                        ->whereIn('division_id', $divisionIds);
+                });
+        });
+    }
+
+    /**
+     * Documents owned by the given user (My Documents tab).
+     */
+    public function scopeOwnedBy(Builder $query, User $user): Builder
+    {
+        return $query->where('owner_id', $user->id);
     }
 }
