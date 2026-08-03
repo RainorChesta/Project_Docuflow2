@@ -76,7 +76,9 @@ class DocumentController extends Controller
             ? Division::all()
             : Division::whereIn('id', $user->allDivisionIds())->get();
 
-        return view('documents.index', compact('documents', 'divisions', 'type'));
+        $documentTypes = DocumentType::orderBy('name')->get();
+
+        return view('documents.index', compact('documents', 'divisions', 'documentTypes', 'type'));
     }
 
     public function create(): View
@@ -84,8 +86,8 @@ class DocumentController extends Controller
         $divisions = auth()->user()->isAdmin()
             ? Division::all()
             : Division::whereIn('id', auth()->user()->allDivisionIds())->get();
-
-        return view('documents.create', compact('documentTypes'));
+             $documentTypes = DocumentType::all(); 
+        return view('documents.create', compact('divisions','documentTypes'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -95,6 +97,7 @@ class DocumentController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'document_type_id' => 'required|exists:document_types,id',
+            'division_id' => 'required|exists:divisions,id',
         ]);
 
         // Documents created here are always division-scoped; scope is

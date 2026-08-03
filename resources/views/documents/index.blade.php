@@ -4,27 +4,28 @@
     <div class="py-6">
         <div class="max-w-7xl mx-auto">
             <div class="mb-4 flex items-center justify-between gap-2">
-            <div class="mb-4 flex items-center justify-between">
-                <h2 class="font-semibold text-base-content">
+                <h2 class="font-semibold text-base-content text-lg">
                     @if($type === 'general') General Dokumen
                     @elseif($type === 'mine') My Documents
                     @else Dokumen Divisi
                     @endif
                 </h2>
-                <a href="{{ route('documents.create') }}" class="btn btn-primary">
-                    + New Document
-                </a>
-
-                <form method="GET" class="flex gap-2">
-                    <select name="document_type_id" class="select select-bordered select-sm" onchange="this.form.submit()">
-                        <option value="">Semua tipe</option>
-                        @foreach($documentTypes as $type)
-                            <option value="{{ $type->id }}" {{ request('document_type_id') == $type->id ? 'selected' : '' }}>
-                                {{ $type->code }} - {{ $type->name }}
-                            </option>
-                        @endforeach
-                    </select>
-                </form>
+                <div class="flex items-center gap-2">
+                    <form method="GET">
+                        <input type="hidden" name="type" value="{{ $type }}">
+                        <select name="document_type_id" class="select select-bordered select-sm" onchange="this.form.submit()">
+                            <option value="">Semua tipe</option>
+                            @foreach($documentTypes as $dt)
+                                <option value="{{ $dt->id }}" {{ request('document_type_id') == $dt->id ? 'selected' : '' }}>
+                                    {{ $dt->code }} - {{ $dt->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </form>
+                    <a href="{{ route('documents.create') }}" class="btn btn-primary btn-sm">
+                        + New Document
+                    </a>
+                </div>
             </div>
 
             <form method="GET" action="{{ route('documents.index') }}" class="mb-4 flex gap-2">
@@ -72,13 +73,13 @@
                                         $hasPending = $doc->versions->contains('status', 'pending');
                                     @endphp
                                     @if($doc->currentVersion)
-                                        v{{ $doc->currentVersion->version_number }}
+                                        <span class="badge badge-success badge-sm">v{{ $doc->currentVersion->version_number }}</span>
                                     @elseif($hasPending)
-                                        <span class="text-warning">Pending</span>
+                                        <span class="badge badge-warning badge-sm">Pending</span>
                                     @elseif($hasDraft)
                                         <span class="badge badge-warning badge-sm">Draft</span>
                                     @else
-                                        <span class="text-warning">Pending</span>
+                                        <span class="badge badge-ghost badge-sm">No version</span>
                                     @endif
                                     @if($doc->owner_id === auth()->id() && $hasDraft && !$hasPending && !$doc->currentVersion)
                                         <a href="{{ route('documents.edit', $doc) }}" class="btn btn-ghost btn-xs">Edit</a>
