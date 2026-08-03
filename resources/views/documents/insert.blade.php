@@ -73,7 +73,7 @@
                             id="jodit-editor"
                             data-upload-url="{{ route('jodit.upload') }}"
                             data-csrf-token="{{ csrf_token() }}"
-                        >{{ $document->currentVersion->content ?? '' }}</textarea>
+                        >{{ $document->displayVersion()->content ?? '' }}</textarea>
                     </div>
 
                     <p class="text-center text-xs text-base-content/50 mt-4">

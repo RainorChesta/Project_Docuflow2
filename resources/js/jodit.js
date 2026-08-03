@@ -17,17 +17,30 @@ export function initJoditEditor(selector, overrides = {}) {
         toolbarAdaptive: false,   // jangan sembunyikan tombol ke menu "…" — semua tombol selalu tampil
         toolbarSticky: false,
 
-        // Konten tampil seperti halaman kertas terpisah
-        style: {
-            maxWidth: '800px',
-            margin: '0 auto',
-            padding: '48px 56px',
-            background: '#fff',
-            backgroundImage: 'repeating-linear-gradient(to bottom, transparent 0, transparent 1123px, #d1d5db 1123px, #d1d5db 1125px)',
-            border: '2px solid #6b7280',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            minHeight: '400px',
-        },
+        // Konten tampil seperti halaman kertas terpisah.
+        // Pakai iframeStyle (bukan style) supaya paper look ikut diterapkan
+        // ke dokumen iframe editor DAN dialog preview bawaan Jodit
+        // (previewBox memanggil generateDocumentStructure.iframe, jadi
+        // iframeStyle ter-inject di sana juga — preview dan editor selalu konsisten).
+        iframeStyle: [
+            'html { margin:0; padding:0; background:#e5e7eb; }',
+            'body {',
+            '  box-sizing:border-box;',
+            '  width:794px;',
+            '  margin:0 auto;',
+            '  padding:48px 56px;',
+            '  background:#fff;',
+            '  min-height:1123px;',
+            '  border:2px solid #6b7280;',
+            '  border-top:none;',
+            '  box-shadow:0 1px 3px rgba(0,0,0,0.1);',
+            '  background-image:repeating-linear-gradient(to bottom, transparent 0, transparent 1100px, #d1d5db 1100px, #d1d5db 1106px);',
+            '}',
+            // Style tabel default Jodit — wajib dipertahankan karena iframeStyle
+            // mengganti total bawaan (yang punya border th/td).
+            'table { width:100%; border:none; border-collapse:collapse; empty-cells:show; max-width:100%; }',
+            'th, td { padding:2px 5px; border:1px solid #ccc; }',
+        ].join('\n'),
 
         link: {
             followOnDblClick: true,

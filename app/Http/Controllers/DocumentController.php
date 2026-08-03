@@ -199,7 +199,7 @@ class DocumentController extends Controller
             ]);
         }
 
-        return redirect()->route('documents.show', $document)->with('success', $discarded
+        return redirect()->route('documents.index', ['type' => 'mine'])->with('success', $discarded
             ? 'Versi pending v' . $discarded->version_number . ' di-discard.'
             : 'Tidak ada versi pending untuk di-discard.');
     }

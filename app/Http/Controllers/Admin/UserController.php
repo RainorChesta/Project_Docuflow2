@@ -7,7 +7,6 @@ use App\Models\Division;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
 
 class UserController extends Controller
@@ -38,7 +37,8 @@ class UserController extends Controller
             'is_active' => 'boolean',
         ]);
 
-        $validated['password'] = Hash::make($validated['password']);
+        // password di-hash otomatis oleh cast 'hashed' di model
+        unset($validated['password_confirmation']);
 
         User::create($validated);
 
@@ -64,11 +64,8 @@ class UserController extends Controller
             'is_active' => 'boolean',
         ]);
 
-        if ($validated['password'] ?? false) {
-            $validated['password'] = Hash::make($validated['password']);
-        } else {
-            unset($validated['password']);
-        }
+        // password di-hash otomatis oleh cast 'hashed' di model
+        unset($validated['password_confirmation']);
 
         $user->update($validated);
 

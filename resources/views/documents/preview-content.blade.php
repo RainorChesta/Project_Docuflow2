@@ -1,7 +1,5 @@
 @if($document->displayVersion())
-    <div class="prose max-w-none">
-        {!! $document->displayVersion()->content !!}
-    </div>
+    @include('documents._paper', ['content' => $document->displayVersion()->content])
 @else
     <p class="text-base-content/60 italic">Belum ada konten yang disetujui.</p>
 @endif

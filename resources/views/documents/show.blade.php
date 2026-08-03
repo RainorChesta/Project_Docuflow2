@@ -104,12 +104,10 @@
 
             <!-- Content -->
             <div class="card bg-base-100 border border-base-300 shadow-sm mb-6">
-                <div class="card-body">
+                <div class="card-body p-0">
                     @php $display = $document->displayVersion(); @endphp
                     @if($display)
-                        <div class="prose max-w-none">
-                            {!! $display->content !!}
-                        </div>
+                        @include('documents._paper', ['content' => $display->content])
                     @else
                         <p class="text-base-content/60 italic">No approved content yet.</p>
                     @endif

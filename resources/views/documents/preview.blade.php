@@ -20,9 +20,7 @@
 
                     <div id="live-preview-content">
                         @if($document->displayVersion())
-                            <div class="prose max-w-none">
-                                {!! $document->displayVersion()->content !!}
-                            </div>
+                            @include('documents._paper', ['content' => $document->displayVersion()->content])
                         @else
                             <p class="text-base-content/60 italic">No approved content yet.</p>
                         @endif
@@ -37,7 +35,21 @@
 
                             function render(html) {
                                 if (html && html.trim().length) {
-                                    target.innerHTML = '<div class="prose max-w-none">' + html + '</div>';
+                                    // Bungkus dengan struktur yang SAMA PERSIS seperti partial _paper:
+                                    // .doku-paper-scope > .doku-paper, karena semua CSS kertas A4
+                                    // (garis pembatas halaman, font, padding) di-scope lewat
+                                    // selector ".doku-paper-scope .doku-paper". Kalau wrapper
+                                    // scope ini hilang, style-nya nggak ke-apply sama sekali.
+                                    const scope = document.createElement('div');
+                                    scope.className = 'doku-paper-scope';
+
+                                    const paper = document.createElement('div');
+                                    paper.className = 'doku-paper';
+                                    paper.innerHTML = html;
+
+                                    scope.appendChild(paper);
+                                    target.innerHTML = '';
+                                    target.appendChild(scope);
                                 }
                             }
 

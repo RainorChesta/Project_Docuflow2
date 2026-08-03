@@ -41,9 +41,8 @@ class DocumentPolicy
     {
         if ($user->isAdmin()) return true;
 
-        // Owner boleh discard dokumen yang masih draft
+        // Owner boleh hapus dokumen selama belum punya versi approved (active).
         return $user->id === $document->owner_id
-            && $document->versions()->where('status', 'draft')->exists()
-            && !$document->versions()->whereIn('status', ['active', 'pending'])->exists();
+            && !$document->versions()->where('status', 'active')->exists();
     }
 }

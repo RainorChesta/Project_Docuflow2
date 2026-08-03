@@ -61,15 +61,21 @@ class Document extends Model
     }
 
     /**
-     * Version to display: approved current version, else latest pending (not discarded).
+     * Version to display: approved current version, else latest non-discarded
+     * (draft menang atas pending — draft = kerjaan terakhir user di editor).
      */
     public function displayVersion(): ?DocumentVersion
     {
-        return $this->currentVersion
-            ?? $this->versions
-                ->filter(fn($v) => $v->status === 'pending' && !$v->discarded_at)
-                ->sortByDesc('version_number')
-                ->first();
+        if ($this->currentVersion) {
+            return $this->currentVersion;
+        }
+
+        $versions = $this->versions
+            ->filter(fn($v) => !$v->discarded_at)
+            ->sortByDesc('version_number');
+
+        return $versions->first(fn($v) => $v->status === 'draft')
+            ?? $versions->first(fn($v) => $v->status === 'pending');
     }
 
     public function versions(): HasMany

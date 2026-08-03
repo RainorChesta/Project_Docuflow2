@@ -3,7 +3,7 @@
 
     <div class="py-6">
         <div class="max-w-7xl mx-auto">
-            @include('documents._header', ['title' => 'General Dokumen'])
+            @include('documents._header', ['title' => 'General Dokumen', 'showCreate' => false])
 
             @include('documents._search')
 

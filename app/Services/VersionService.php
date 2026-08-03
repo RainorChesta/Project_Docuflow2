@@ -19,6 +19,10 @@ class VersionService
                 ->first();
 
             if ($pending) {
+                // Draft lama jadi usang saat konten dikirim ke approval — buang.
+                // (Draft = kerjaan belum dikirim; save = resmi dikirim ke approval.)
+                $document->versions()->where('status', 'draft')->delete();
+
                 $pending->update([
                     'content' => \Purifier::clean($content),
                     'author_id' => $author->id,
@@ -29,6 +33,9 @@ class VersionService
             }
 
             $versionNumber = ($document->versions()->max('version_number') ?? 0) + 1;
+
+            // Draft lama jadi usang saat konten dikirim ke approval — buang.
+            $document->versions()->where('status', 'draft')->delete();
 
             $version = $document->versions()->create([
                 'version_number' => $versionNumber,

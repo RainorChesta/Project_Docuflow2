@@ -6,6 +6,15 @@
             <div class="card bg-base-100 border border-base-300 shadow-sm p-6">
                 <form method="POST" action="{{ route('admin.users.update', $user) }}">
                     @csrf @method('PUT')
+                    @if($errors->any())
+                        <div class="alert alert-error mb-4">
+                            <ul class="text-sm">
+                                @foreach($errors->all() as $error)
+                                    <li>{{ $error }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
                     <div class="form-control w-full mb-4">
                         <label for="name" class="label"><span class="label-text font-medium">Name</span></label>
                         <input type="text" name="name" id="name" value="{{ old('name', $user->name) }}" class="input input-bordered w-full" required>
