@@ -45,6 +45,11 @@ class Document extends Model
         return $this->belongsTo(Division::class);
     }
 
+    public function documentType(): BelongsTo
+    {
+        return $this->belongsTo(DocumentType::class);
+    }
+
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_id');

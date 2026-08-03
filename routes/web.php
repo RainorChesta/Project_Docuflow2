@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\DivisionController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\DocumentTypeController;
 use App\Http\Controllers\ApprovalController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
@@ -44,6 +45,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::resource('divisions', DivisionController::class);
         Route::resource('users', UserController::class);
+        Route::resource('document-types', DocumentTypeController::class);
     });
 
     // Profile

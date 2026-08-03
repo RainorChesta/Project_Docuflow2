@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Document;
 use App\Models\Division;
+use App\Models\DocumentType;
 use App\Services\AuditService;
 use App\Services\DocumentService;
 use App\Services\VersionService;
@@ -54,6 +55,10 @@ class DocumentController extends Controller
             $query->where('division_id', $divisionId);
         }
 
+        if ($documentTypeId = $request->get('document_type_id')) {
+            $query->where('document_type_id', $documentTypeId);
+        }
+
         if ($status = $request->get('status')) {
             if ($status === 'active') {
                 $query->whereHas('currentVersion', fn($q) => $q->where('status', 'active'));
@@ -80,7 +85,7 @@ class DocumentController extends Controller
             ? Division::all()
             : Division::whereIn('id', auth()->user()->allDivisionIds())->get();
 
-        return view('documents.create', compact('divisions'));
+        return view('documents.create', compact('documentTypes'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -89,7 +94,7 @@ class DocumentController extends Controller
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'division_id' => 'required|exists:divisions,id',
+            'document_type_id' => 'required|exists:document_types,id',
         ]);
 
         // Documents created here are always division-scoped; scope is
@@ -117,7 +122,7 @@ class DocumentController extends Controller
     {
         $this->authorize('view', $document);
 
-        $document->load('owner', 'division', 'currentVersion', 'versions.author');
+        $document->load('owner', 'division', 'documentType', 'currentVersion', 'versions.author');
 
         $divisions = auth()->user()->isAdmin()
             ? Division::all()
@@ -139,7 +144,7 @@ class DocumentController extends Controller
     {
         $this->authorize('view', $document);
 
-        $document->load('owner', 'division', 'currentVersion');
+        $document->load('owner', 'division', 'documentType', 'currentVersion');
 
         return view('documents.preview', compact('document'));
     }
