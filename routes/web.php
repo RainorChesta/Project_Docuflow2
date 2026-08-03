@@ -27,6 +27,8 @@ Route::middleware('auth')->group(function () {
     Route::put('/documents/{document}/save', [DocumentController::class, 'save'])->name('documents.save');
     Route::put('/documents/{document}/save-draft', [DocumentController::class, 'saveDraft'])->name('documents.save-draft');
     Route::patch('/documents/{document}/visibility', [DocumentController::class, 'updateVisibility'])->name('documents.update-visibility');
+    Route::post('/documents/{document}/discard', [DocumentController::class, 'discard'])->name('documents.discard');
+    Route::post('/documents/{document}/toggle-public', [DocumentController::class, 'togglePublic'])->name('documents.toggle-public');
 
     // Approvals
     Route::get('/approvals', [ApprovalController::class, 'index'])->name('approvals.index');
@@ -53,5 +55,6 @@ Route::middleware('auth')->group(function () {
 // Shared link access (no auth required)
 Route::get('/share/{token}', [ShareLinkController::class, 'access'])->name('shared.documents');
 Route::post('/share/{token}/save', [ShareLinkController::class, 'save'])->name('shared.documents.save');
+Route::post('/share/{token}/discard', [ShareLinkController::class, 'discard'])->name('shared.documents.discard');
 
 require __DIR__.'/auth.php';

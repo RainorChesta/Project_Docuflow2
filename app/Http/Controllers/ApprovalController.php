@@ -20,6 +20,7 @@ class ApprovalController extends Controller
     {
         $user = auth()->user();
         $pendingVersions = DocumentVersion::where('status', 'pending')
+            ->whereNull('discarded_at')
             ->whereHas('document', fn($q) => $q->where('division_id', $user->division_id))
             ->with('document', 'author')
             ->latest()

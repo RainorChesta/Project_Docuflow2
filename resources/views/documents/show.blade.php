@@ -91,7 +91,15 @@
             @php $pendingVersion = $document->versions->firstWhere('status', 'pending'); @endphp
             @if($pendingVersion)
                 <div class="alert alert-warning mb-4 flex justify-between items-center">
-                    <span>Pending approval (v{{ $pendingVersion->version_number }})</span>
+                    <div class="flex items-center gap-3">
+                        <span>Pending approval (v{{ $pendingVersion->version_number }})</span>
+                        @can('update', $document)
+                            <form method="POST" action="{{ route('documents.discard', $document) }}" class="inline">
+                                @csrf
+                                <button class="btn btn-outline btn-warning btn-xs">Discard</button>
+                            </form>
+                        @endcan
+                    </div>
                     @can('approve', $document)
                     <div class="flex gap-2">
                         <form method="POST" action="{{ route('approvals.approve', [$document, $pendingVersion]) }}" class="inline">
@@ -202,6 +210,8 @@
                                     <span class="badge badge-success badge-sm ml-2">Active</span>
                                 @elseif($version->status === 'pending')
                                     <span class="badge badge-warning badge-sm ml-2">Pending</span>
+                                @elseif($version->status === 'discarded' || $version->discarded_at)
+                                    <span class="badge badge-neutral badge-sm ml-2">Discarded</span>
                                 @elseif($version->status === 'rejected')
                                     <span class="badge badge-error badge-sm ml-2">Rejected</span>
                                 @endif
