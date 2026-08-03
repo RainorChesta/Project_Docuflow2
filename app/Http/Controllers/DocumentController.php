@@ -27,22 +27,16 @@ class DocumentController extends Controller
         // Tab selection: general | mine | division
         $type = $request->get('type', 'general');
 
-        $query = Document::with('owner', 'division', 'currentVersion', 'versions');
+        $query = Document::with('owner', 'division', 'documentType', 'currentVersion', 'versions');
 
-        if ($type === 'general') {
-            $query->general();
-        } elseif ($type === 'mine') {
+        if ($type === 'mine') {
             $query->ownedBy($user);
-        } else {
+        } elseif ($type === 'division') {
             $query->division($user);
+        } else {
+            $type = 'general';
+            $query->general();
         }
-        $query = Document::with('owner', 'division', 'currentVersion')
-            // Only show documents already approved by the head; pending ones are hidden.
-            ->whereHas('currentVersion')
-            ->where(function ($q) use ($user) {
-                $q->where('division_id', $user->division_id)
-                  ->orWhere('is_public', true);
-            });
 
         if ($search = $request->get('search')) {
             $query->where(function ($q) use ($search) {
@@ -76,36 +70,48 @@ class DocumentController extends Controller
             ? Division::all()
             : Division::whereIn('id', $user->allDivisionIds())->get();
 
-        return view('documents.index', compact('documents', 'divisions', 'type'));
+        $documentTypes = DocumentType::orderBy('name')->get();
+
+        return view('documents.index', compact('documents', 'divisions', 'documentTypes', 'type'));
     }
 
     public function create(): View
     {
-        $divisions = auth()->user()->isAdmin()
-            ? Division::all()
-            : Division::whereIn('id', auth()->user()->allDivisionIds())->get();
+        $user = auth()->user();
+        $documentTypes = DocumentType::orderBy('name')->get();
 
-        return view('documents.create', compact('documentTypes'));
+        // Admin tidak terikat divisi manapun, jadi harus pilih manual.
+        $divisions = $user->isAdmin() ? Division::all() : collect();
+
+        return view('documents.create', compact('documentTypes', 'divisions'));
     }
 
     public function store(Request $request): RedirectResponse
     {
         $this->authorize('create', Document::class);
 
-        $validated = $request->validate([
+        $user = auth()->user();
+
+        $rules = [
             'title' => 'required|string|max:255',
             'document_type_id' => 'required|exists:document_types,id',
-        ]);
+        ];
 
-        // Documents created here are always division-scoped; scope is
-        // changed later from the document's own settings.
-        $validated['visibility'] = Document::VISIBILITY_DIVISION;
-
-        // Users may only assign documents to divisions they belong to.
-        if (!auth()->user()->isAdmin()
-            && !in_array((int) $validated['division_id'], auth()->user()->allDivisionIds(), true)) {
-            abort(403, 'You cannot create documents in this division.');
+        if ($user->isAdmin()) {
+            // Admin wajib pilih divisi karena tidak terikat divisi manapun.
+            $rules['division_id'] = 'required|exists:divisions,id';
+        } elseif (!$user->division_id) {
+            return back()->with('error', 'Akun kamu belum terhubung ke divisi manapun. Hubungi admin untuk mengatur divisi terlebih dahulu.');
         }
+
+        $validated = $request->validate($rules);
+
+        // User biasa: divisi otomatis dari akunnya. Admin: pakai pilihan dari form.
+        $validated['division_id'] = $user->isAdmin()
+            ? $validated['division_id']
+            : $user->division_id;
+
+        $validated['visibility'] = Document::VISIBILITY_DIVISION;
 
         $doc = $this->documentService->create($validated, auth()->id());
 

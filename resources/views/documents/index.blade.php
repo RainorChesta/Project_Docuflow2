@@ -4,7 +4,6 @@
     <div class="py-6">
         <div class="max-w-7xl mx-auto">
             <div class="mb-4 flex items-center justify-between gap-2">
-            <div class="mb-4 flex items-center justify-between">
                 <h2 class="font-semibold text-base-content">
                     @if($type === 'general') General Dokumen
                     @elseif($type === 'mine') My Documents
@@ -14,13 +13,22 @@
                 <a href="{{ route('documents.create') }}" class="btn btn-primary">
                     + New Document
                 </a>
+            </div>
+
+            <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <div class="tabs tabs-boxed">
+                    <a href="{{ route('documents.index', ['type' => 'general']) }}" class="tab {{ $type === 'general' ? 'tab-active' : '' }}">General</a>
+                    <a href="{{ route('documents.index', ['type' => 'mine']) }}" class="tab {{ $type === 'mine' ? 'tab-active' : '' }}">My Documents</a>
+                    <a href="{{ route('documents.index', ['type' => 'division']) }}" class="tab {{ $type === 'division' ? 'tab-active' : '' }}">Dokumen Divisi</a>
+                </div>
 
                 <form method="GET" class="flex gap-2">
+                    <input type="hidden" name="type" value="{{ $type }}">
                     <select name="document_type_id" class="select select-bordered select-sm" onchange="this.form.submit()">
                         <option value="">Semua tipe</option>
-                        @foreach($documentTypes as $type)
-                            <option value="{{ $type->id }}" {{ request('document_type_id') == $type->id ? 'selected' : '' }}>
-                                {{ $type->code }} - {{ $type->name }}
+                        @foreach($documentTypes as $docType)
+                            <option value="{{ $docType->id }}" {{ request('document_type_id') == $docType->id ? 'selected' : '' }}>
+                                {{ $docType->code }} - {{ $docType->name }}
                             </option>
                         @endforeach
                     </select>
@@ -32,7 +40,7 @@
                 <input type="text" name="search" value="{{ request('search') }}" placeholder="Search title or number..."
                        class="input input-bordered input-sm flex-1">
                 <button type="submit" class="btn btn-neutral btn-sm">Search</button>
-                @if(request('search') || request('status') || request('division_id'))
+                @if(request('search') || request('status') || request('division_id') || request('document_type_id'))
                     <a href="{{ route('documents.index', ['type' => $type]) }}" class="btn btn-ghost btn-sm">Clear</a>
                 @endif
             </form>

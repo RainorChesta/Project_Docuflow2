@@ -11,7 +11,7 @@ class Document extends Model
 {
     protected $fillable = [
         'document_number', 'title', 'visibility', 'division_id', 'owner_id',
-        'is_public', 'current_version_id',
+        'document_type_id', 'is_public', 'current_version_id',
     ];
 
     protected function casts(): array
