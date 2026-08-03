@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Document;
 use App\Models\Division;
+use App\Models\DocumentType;
 use App\Services\AuditService;
 use App\Services\DocumentService;
 use App\Services\VersionService;
@@ -23,7 +24,7 @@ class DocumentController extends Controller
     {
         $user = auth()->user();
 
-        $query = Document::with('owner', 'division', 'currentVersion')
+        $query = Document::with('owner', 'division', 'documentType', 'currentVersion')
             ->where(function ($q) use ($user) {
                 $q->where('division_id', $user->division_id)
                   ->orWhere('is_public', true);
@@ -40,6 +41,10 @@ class DocumentController extends Controller
             $query->where('division_id', $divisionId);
         }
 
+        if ($documentTypeId = $request->get('document_type_id')) {
+            $query->where('document_type_id', $documentTypeId);
+        }
+
         if ($status = $request->get('status')) {
             if ($status === 'active') {
                 $query->whereHas('currentVersion', fn($q) => $q->where('status', 'active'));
@@ -52,20 +57,21 @@ class DocumentController extends Controller
         }
 
         $documents = $query->latest()->paginate(15)->withQueryString();
+
         $divisions = auth()->user()->isAdmin()
             ? Division::all()
             : Division::where('id', auth()->user()->division_id)->get();
 
-        return view('documents.index', compact('documents', 'divisions'));
+        $documentTypes = DocumentType::orderBy('name')->get();
+
+        return view('documents.index', compact('documents', 'divisions', 'documentTypes'));
     }
 
     public function create(): View
     {
-        $divisions = auth()->user()->isAdmin()
-            ? Division::all()
-            : Division::where('id', auth()->user()->division_id)->get();
+        $documentTypes = DocumentType::orderBy('name')->get();
 
-        return view('documents.create', compact('divisions'));
+        return view('documents.create', compact('documentTypes'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -74,8 +80,10 @@ class DocumentController extends Controller
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'division_id' => 'required|exists:divisions,id',
+            'document_type_id' => 'required|exists:document_types,id',
         ]);
+
+        $validated['division_id'] = auth()->user()->division_id;
 
         $doc = $this->documentService->create($validated, auth()->id());
 
@@ -91,7 +99,7 @@ class DocumentController extends Controller
     {
         $this->authorize('view', $document);
 
-        $document->load('owner', 'division', 'currentVersion', 'versions.author');
+        $document->load('owner', 'division', 'documentType', 'currentVersion', 'versions.author');
 
         return view('documents.show', compact('document'));
     }
@@ -109,7 +117,7 @@ class DocumentController extends Controller
     {
         $this->authorize('view', $document);
 
-        $document->load('owner', 'division', 'currentVersion');
+        $document->load('owner', 'division', 'documentType', 'currentVersion');
 
         return view('documents.preview', compact('document'));
     }

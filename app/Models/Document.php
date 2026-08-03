@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Document extends Model
 {
     protected $fillable = [
-        'document_number', 'title', 'division_id', 'owner_id',
+        'document_number', 'title', 'division_id', 'document_type_id', 'owner_id',
         'is_public', 'current_version_id',
     ];
 
@@ -23,6 +23,11 @@ class Document extends Model
     public function division(): BelongsTo
     {
         return $this->belongsTo(Division::class);
+    }
+
+    public function documentType(): BelongsTo
+    {
+        return $this->belongsTo(DocumentType::class);
     }
 
     public function owner(): BelongsTo
