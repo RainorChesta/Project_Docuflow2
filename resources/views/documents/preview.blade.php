@@ -18,13 +18,49 @@
                         <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm">Back to Edit</a>
                     </div>
 
-                    @if($document->currentVersion)
-                        <div class="prose max-w-none">
-                            {!! $document->currentVersion->content !!}
-                        </div>
-                    @else
-                        <p class="text-base-content/60 italic">No approved content yet.</p>
-                    @endif
+                    <div id="live-preview-content">
+                        @if($document->displayVersion())
+                            <div class="prose max-w-none">
+                                {!! $document->displayVersion()->content !!}
+                            </div>
+                        @else
+                            <p class="text-base-content/60 italic">No approved content yet.</p>
+                        @endif
+                    </div>
+
+                    {{-- Live sync: konten dari tab editor via localStorage --}}
+                    <script>
+                        (function () {
+                            const key = 'doc-preview-{{ $document->id }}';
+                            const target = document.getElementById('live-preview-content');
+                            if (!target) return;
+
+                            function render(html) {
+                                if (html && html.trim().length) {
+                                    target.innerHTML = '<div class="prose max-w-none">' + html + '</div>';
+                                }
+                            }
+
+                            // Hanya render draft kalau benar-benar ada konten (bukan cuma <p><br></p>)
+                            function hasRealContent(html) {
+                                if (!html) return false;
+                                const el = document.createElement('div');
+                                el.innerHTML = html;
+                                return el.textContent.trim().length > 0 || el.querySelector('img, table, iframe');
+                            }
+
+                            // Konten terakhir yang tersimpan di editor (kalau ada)
+                            const draft = localStorage.getItem(key);
+                            if (hasRealContent(draft)) render(draft);
+
+                            // Tab editor menulis → storage event → update realtime
+                            window.addEventListener('storage', (e) => {
+                                if (e.key === key && hasRealContent(e.newValue)) {
+                                    render(e.newValue);
+                                }
+                            });
+                        })();
+                    </script>
                 </div>
             </div>
         </div>

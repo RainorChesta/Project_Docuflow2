@@ -14,7 +14,7 @@ export function initJoditEditor(selector, overrides = {}) {
         width: '100%',
         language: 'id',
         toolbarButtonSize: 'middle',
-        toolbarAdaptive: true,
+        toolbarAdaptive: false,   // jangan sembunyikan tombol ke menu "…" — semua tombol selalu tampil
         toolbarSticky: false,
 
         // Konten tampil seperti halaman kertas terpisah
@@ -196,8 +196,40 @@ export function initJoditEditor(selector, overrides = {}) {
         ...overrides,
     });
 
+    const storageKey = ta.dataset.liveStorage;
+
     const form = ta.closest('form');
-    if (form) form.addEventListener('submit', () => { ta.value = editor.value; });
+    let draftSaved = false;
+    if (form) form.addEventListener('submit', () => {
+        ta.value = editor.value;
+        // Draft sudah di-save → bersihkan, biar preview/show konsisten dari DB
+        if (storageKey) {
+            localStorage.removeItem(storageKey);
+            draftSaved = true;
+        }
+    });
+
+    // Live preview sync: mirror content into localStorage for the preview page (other tab)
+    if (storageKey) {
+        // Restore unsaved draft from localStorage if it has real content
+        const draft = localStorage.getItem(storageKey);
+        if (draft && draft.trim().length) {
+            const probe = document.createElement('div');
+            probe.innerHTML = draft;
+            const hasContent = probe.textContent.trim().length > 0 || probe.querySelector('img, table, iframe');
+            if (hasContent) {
+                editor.value = draft;
+                ta.value = draft;
+            }
+        }
+
+        let timer = null;
+        editor.events.on('change', () => {
+            if (draftSaved) return; // sudah di-save, jangan nulis draft kosong lagi
+            clearTimeout(timer);
+            timer = setTimeout(() => localStorage.setItem(storageKey, editor.value), 250);
+        });
+    }
 
     return editor;
 }

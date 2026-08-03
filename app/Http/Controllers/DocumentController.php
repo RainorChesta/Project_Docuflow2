@@ -116,6 +116,15 @@ class DocumentController extends Controller
         return view('documents.preview', compact('document'));
     }
 
+    public function previewContent(Document $document): View
+    {
+        $this->authorize('view', $document);
+
+        $document->load('currentVersion');
+
+        return view('documents.preview-content', compact('document'));
+    }
+
     public function save(Request $request, Document $document): RedirectResponse
     {
         $this->authorize('update', $document);
