@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\DivisionController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\DocumentTypeController;
 use App\Http\Controllers\ApprovalController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\JoditController;
 use App\Http\Controllers\ProfileController;
@@ -15,7 +16,7 @@ Route::get('/', function () {
 });
 
 Route::middleware('auth')->group(function () {
-    Route::get('/dashboard', fn() => view('dashboard'))->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // Jodit image upload
     Route::post('/jodit-upload', [JoditController::class, 'upload'])->name('jodit.upload');
@@ -25,6 +26,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/documents/{document}/edit', [DocumentController::class, 'edit'])->name('documents.edit');
     Route::get('/documents/{document}/preview', [DocumentController::class, 'preview'])->name('documents.preview');
     Route::put('/documents/{document}/save', [DocumentController::class, 'save'])->name('documents.save');
+    Route::put('/documents/{document}/save-draft', [DocumentController::class, 'saveDraft'])->name('documents.save-draft');
+    Route::patch('/documents/{document}/visibility', [DocumentController::class, 'updateVisibility'])->name('documents.update-visibility');
+    Route::post('/documents/{document}/discard', [DocumentController::class, 'discard'])->name('documents.discard');
     Route::post('/documents/{document}/toggle-public', [DocumentController::class, 'togglePublic'])->name('documents.toggle-public');
 
     // Approvals
@@ -53,5 +57,6 @@ Route::middleware('auth')->group(function () {
 // Shared link access (no auth required)
 Route::get('/share/{token}', [ShareLinkController::class, 'access'])->name('shared.documents');
 Route::post('/share/{token}/save', [ShareLinkController::class, 'save'])->name('shared.documents.save');
+Route::post('/share/{token}/discard', [ShareLinkController::class, 'discard'])->name('shared.documents.discard');
 
 require __DIR__.'/auth.php';

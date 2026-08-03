@@ -10,21 +10,15 @@ use Illuminate\Support\Facades\DB;
 
 class DocumentService
 {
-    public function generateId(Division $division, DocumentType $documentType): string
+    public function generateId(?Division $division): string
     {
-        $now = Carbon::now();
-        $year = $now->year;
-        $romanMonth = $this->toRomanMonth($now->month);
-        $centralCode = config('dokuflow.central_code');
+        // Non-division scopes (general/personal) use a generic prefix since
+        // they are not tied to any division.
+        $prefix = $division ? $division->code : 'GEN';
+        $date = Carbon::now()->format('Ymd');
 
-        // "/" di kode tipe diganti "-" khusus untuk nomor dokumen,
-        // supaya jumlah segmen yang dipisah "/" tetap konsisten (6 segmen)
-        $typeCodeForNumber = str_replace('/', '-', $documentType->code);
-
-        return DB::transaction(function () use ($division, $documentType, $year, $romanMonth, $centralCode, $typeCodeForNumber) {
-            $lastDoc = Document::where('division_id', $division->id)
-                ->where('document_type_id', $documentType->id)
-                ->whereYear('created_at', $year)
+        return DB::transaction(function () use ($prefix, $date) {
+            $lastDoc = Document::where('document_number', 'like', $prefix . '-' . $date . '-%')
                 ->lockForUpdate()
                 ->orderByDesc('id')
                 ->first();
@@ -46,6 +40,7 @@ class DocumentService
                 $romanMonth,
                 $year
             );
+            return sprintf('%s-%s-%03d', $prefix, $date, $seq);
         });
     }
 
@@ -55,6 +50,10 @@ class DocumentService
         $documentType = DocumentType::findOrFail($data['document_type_id']);
 
         $data['document_number'] = $this->generateId($division, $documentType);
+        $data['visibility'] ??= Document::VISIBILITY_DIVISION;
+
+        $division = $data['division_id'] ? Division::findOrFail($data['division_id']) : null;
+        $data['document_number'] = $this->generateId($division);
         $data['owner_id'] = $ownerId;
 
         return DB::transaction(function () use ($data) {
@@ -65,7 +64,7 @@ class DocumentService
                 'content' => '',
                 'author_id' => $data['owner_id'],
                 'author_name' => \App\Models\User::find($data['owner_id'])->name,
-                'status' => 'pending',
+                'status' => 'draft',
             ]);
 
             return $doc;

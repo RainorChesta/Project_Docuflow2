@@ -11,17 +11,79 @@ class VersionService
 {
     public function savePending(Document $document, string $content, User $author): DocumentVersion
     {
+        return DB::transaction(function () use ($document, $content, $author) {
+            // Pending version already exists → update it in place, keep the same version number.
+            $pending = $document->versions()->pending()
+                ->whereNull('discarded_at')
+                ->orderBy('version_number', 'desc')
+                ->first();
+
+            if ($pending) {
+                $pending->update([
+                    'content' => \Purifier::clean($content),
+                    'author_id' => $author->id,
+                    'author_name' => $author->name,
+                ]);
+
+                return $pending;
+            }
+
+            $versionNumber = ($document->versions()->max('version_number') ?? 0) + 1;
+
+            $version = $document->versions()->create([
+                'version_number' => $versionNumber,
+                'content' => \Purifier::clean($content),
+                'author_id' => $author->id,
+                'author_name' => $author->name,
+                'status' => 'pending',
+            ]);
+
+            return $version;
+        });
+    }
+
+    /**
+     * Discard the newest pending version. The previous pending version
+     * (if any) becomes pending again.
+     */
+    public function discardPending(Document $document): ?DocumentVersion
+    {
+        $pending = $document->versions()->pending()
+            ->whereNull('discarded_at')
+            ->orderBy('version_number', 'desc')
+            ->first();
+
+        if ($pending) {
+            $pending->update(['status' => 'discarded', 'discarded_at' => now()]);
+        }
+
+        return $pending;
+    }
+
+    public function saveDraft(Document $document, string $content, User $author): DocumentVersion
+    {
+        // Draft terbaru = v1 yang dibuat saat create. Update kontennya, tetap draft.
+        $version = $document->versions()->latest('version_number')->first();
+
+        if ($version && $version->status === 'draft') {
+            $version->update([
+                'content' => \Purifier::clean($content),
+                'author_name' => $author->name,
+            ]);
+
+            return $version;
+        }
+
+        // Fallback: buat versi draft baru
         $versionNumber = ($document->versions()->max('version_number') ?? 0) + 1;
 
-        $version = $document->versions()->create([
+        return $document->versions()->create([
             'version_number' => $versionNumber,
             'content' => \Purifier::clean($content),
             'author_id' => $author->id,
             'author_name' => $author->name,
-            'status' => 'pending',
+            'status' => 'draft',
         ]);
-
-        return $version;
     }
 
     public function approve(DocumentVersion $version, User $reviewer, ?string $notes = null): void

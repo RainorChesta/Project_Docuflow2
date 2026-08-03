@@ -1,5 +1,3 @@
-
-
 import Alpine from 'alpinejs';
 import './jodit';
 import { initJoditEditor } from './jodit';
@@ -14,21 +12,24 @@ window.Alpine = Alpine;
 Alpine.start();
 
 // ─── Theme Toggle ───────────────────────────────────────────────
-// No stored key = follow OS live. Manual light/dark persists and overrides OS.
+// Ikut Windows secara default. Klik Light/Dark = override untuk SESI
+// browser ini saja (sessionStorage) — nempel walau reload/pindah
+// halaman, tapi hilang kalau tab/browser ditutup. OS berubah tema
+// selalu langsung menang & menghapus override sesi yang aktif.
 (function() {
     const KEY = 'theme:v2';
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
 
-    // stored choice, or 'auto' when nothing stored
-    function pref() {
-        return localStorage.getItem(KEY) || 'auto';
+    function override() {
+        return sessionStorage.getItem(KEY); // 'light' | 'dark' | null
     }
 
-    // effective theme for rendering: explicit choice, else OS preference
-    function eff() {
-        var p = pref();
-        if (p !== 'auto') return p;
+    function osTheme() {
         return mq.matches ? 'dark' : 'light';
+    }
+
+    function eff() {
+        return override() || osTheme();
     }
 
     function apply(t) {
@@ -39,14 +40,13 @@ Alpine.start();
         var e = eff();
         document.getElementById('themeIconSun')?.classList.toggle('hidden', e !== 'light');
         document.getElementById('themeIconMoon')?.classList.toggle('hidden', e !== 'dark');
-        document.getElementById('themeIconAuto')?.classList.toggle('hidden', pref() !== 'auto');
-        document.getElementById('themeToggleBtn')?.setAttribute('aria-label', 'Theme: ' + e + (pref() === 'auto' ? ' (auto)' : ''));
+        document.getElementById('themeToggleBtn')?.setAttribute('aria-label', 'Theme: ' + e);
     }
 
     function markActive() {
-        var p = pref();
+        var o = override();
         document.querySelectorAll('.theme-option').forEach(function(el) {
-            var isActive = el.dataset.themeValue === p;
+            var isActive = el.dataset.themeValue === o;
             el.classList.toggle('bg-primary/10', isActive);
             el.classList.toggle('text-primary', isActive);
             el.setAttribute('aria-pressed', isActive ? 'true' : 'false');
@@ -58,22 +58,17 @@ Alpine.start();
         syncIcon();
         markActive();
 
-        // OS theme change → follow live unless user picked a manual theme
+        // Windows berubah tema → selalu menang, hapus override sesi
         mq.addEventListener('change', function() {
-            if (pref() === 'auto') {
-                apply(eff());
-                syncIcon();
-            }
+            sessionStorage.removeItem(KEY);
+            apply(eff());
+            syncIcon();
+            markActive();
         });
 
         document.querySelectorAll('.theme-option').forEach(function(btn) {
             btn.addEventListener('click', function() {
-                var v = this.dataset.themeValue;
-                if (localStorage.getItem(KEY) === v) {
-                    localStorage.removeItem(KEY); // re-click active → back to following OS
-                } else {
-                    localStorage.setItem(KEY, v);
-                }
+                sessionStorage.setItem(KEY, this.dataset.themeValue);
                 apply(eff());
                 syncIcon();
                 markActive();

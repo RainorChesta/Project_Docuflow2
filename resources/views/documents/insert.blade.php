@@ -14,6 +14,9 @@
                     <span class="badge badge-ghost badge-sm hidden sm:inline-flex">
                         {{ $document->document_number ?? '' }}
                     </span>
+                    @if($document->versions()->where('status', 'draft')->exists())
+                        <span class="badge badge-warning badge-sm">Draft</span>
+                    @endif
                 </div>
 
                 <div class="flex items-center gap-3 shrink-0">
@@ -26,9 +29,9 @@
                         <span class="text-sm font-medium">{{ auth()->user()->name }}</span>
                     </div>
 
-                    <a href="{{ route('documents.show', $document) }}" class="btn btn-ghost btn-sm">
+                    <button type="button" onclick="document.getElementById('discard-modal').showModal()" class="btn btn-ghost btn-sm">
                         Cancel
-                    </a>
+                    </button>
 
                     @if(Route::has('documents.preview'))
                         <a href="{{ route('documents.preview', $document) }}" target="_blank" class="btn btn-ghost btn-sm gap-1">
@@ -55,30 +58,6 @@
                     </div>
                 </div>
             @endif
-
-            {{-- Pending version warning: saving updates the pending version in place --}}
-            @php
-                $pending = $document->versions->first(fn($v) => $v->status === 'pending' && !$v->discarded_at);
-            @endphp
-            @if($pending)
-                <div class="max-w-6xl mx-auto px-6 pb-3">
-                    <div class="alert alert-warning shadow-sm">
-                        <div class="flex items-center justify-between gap-4 w-full">
-                            <div class="flex items-center gap-2 text-sm">
-                                <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                                <span>
-                                    Ada versi pending (v{{ $pending->version_number }}) yang belum di-review.
-                                    <strong>Save akan memperbarui versi pending tersebut (tanpa versi baru).</strong>
-                                </span>
-                            </div>
-                            <form method="POST" action="{{ route('documents.discard', $document) }}" class="shrink-0">
-                                @csrf
-                                <button type="submit" class="btn btn-outline btn-warning btn-sm">Discard pending (v{{ $pending->version_number }})</button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            @endif
         </div>
 
         {{-- Canvas / Dokumen --}}
@@ -99,12 +78,46 @@
 
                     <p class="text-center text-xs text-base-content/50 mt-4">
                         Save akan membuat versi baru yang menunggu approval Head.
-                        @if($pending ?? null)
-                            Versi pending yang ada akan diperbarui (bukan versi baru).
-                        @endif
                     </p>
                 </div>
             </form>
         </div>
     </div>
+
+    {{-- Modal: Discard / Save as Draft --}}
+    <dialog id="discard-modal" class="modal">
+        <div class="modal-box">
+            <h3 class="font-semibold text-lg mb-1">Unsaved changes</h3>
+            <p class="text-sm text-base-content/60">Save as draft or discard this document?</p>
+            <div class="modal-action">
+                <button type="button" class="btn btn-ghost" onclick="document.getElementById('discard-modal').close()">Keep Editing</button>
+                <form method="POST" action="{{ route('documents.save-draft', $document) }}" class="inline">
+                    @csrf
+                    @method('PUT')
+                    <input type="hidden" name="content" id="draft-content">
+                    <button type="submit" class="btn btn-neutral">Save as Draft</button>
+                </form>
+                <form method="POST" action="{{ route('documents.destroy', $document) }}" class="inline">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="btn btn-error" onclick="return confirm('Discard this document permanently?')">Discard</button>
+                </form>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
 </x-app-layout>
+
+<script>
+    // Isi hidden input dengan konten editor saat Save as Draft diklik
+    document.getElementById('discard-modal').addEventListener('click', function (e) {
+        const saveDraftForm = e.target.closest('form[action*="save-draft"]');
+        if (saveDraftForm) {
+            const joditEl = document.getElementById('jodit-editor');
+            const editor = window.__joditInstances?.get(joditEl.id);
+            document.getElementById('draft-content').value = editor ? editor.value : joditEl.value;
+        }
+    });
+</script>

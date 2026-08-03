@@ -24,7 +24,21 @@ class DocumentController extends Controller
     {
         $user = auth()->user();
 
-        $query = Document::with('owner', 'division', 'documentType', 'currentVersion')
+        // Tab selection: general | mine | division
+        $type = $request->get('type', 'general');
+
+        $query = Document::with('owner', 'division', 'currentVersion', 'versions');
+
+        if ($type === 'general') {
+            $query->general();
+        } elseif ($type === 'mine') {
+            $query->ownedBy($user);
+        } else {
+            $query->division($user);
+        }
+        $query = Document::with('owner', 'division', 'currentVersion')
+            // Only show documents already approved by the head; pending ones are hidden.
+            ->whereHas('currentVersion')
             ->where(function ($q) use ($user) {
                 $q->where('division_id', $user->division_id)
                   ->orWhere('is_public', true);
@@ -58,18 +72,18 @@ class DocumentController extends Controller
 
         $documents = $query->latest()->paginate(15)->withQueryString();
 
-        $divisions = auth()->user()->isAdmin()
+        $divisions = $user->isAdmin()
             ? Division::all()
-            : Division::where('id', auth()->user()->division_id)->get();
+            : Division::whereIn('id', $user->allDivisionIds())->get();
 
-        $documentTypes = DocumentType::orderBy('name')->get();
-
-        return view('documents.index', compact('documents', 'divisions', 'documentTypes'));
+        return view('documents.index', compact('documents', 'divisions', 'type'));
     }
 
     public function create(): View
     {
-        $documentTypes = DocumentType::orderBy('name')->get();
+        $divisions = auth()->user()->isAdmin()
+            ? Division::all()
+            : Division::whereIn('id', auth()->user()->allDivisionIds())->get();
 
         return view('documents.create', compact('documentTypes'));
     }
@@ -83,16 +97,25 @@ class DocumentController extends Controller
             'document_type_id' => 'required|exists:document_types,id',
         ]);
 
-        $validated['division_id'] = auth()->user()->division_id;
+        // Documents created here are always division-scoped; scope is
+        // changed later from the document's own settings.
+        $validated['visibility'] = Document::VISIBILITY_DIVISION;
+
+        // Users may only assign documents to divisions they belong to.
+        if (!auth()->user()->isAdmin()
+            && !in_array((int) $validated['division_id'], auth()->user()->allDivisionIds(), true)) {
+            abort(403, 'You cannot create documents in this division.');
+        }
 
         $doc = $this->documentService->create($validated, auth()->id());
 
         $this->auditService->log(auth()->user(), 'document.created', 'document', $doc->id, [
             'title' => $doc->title,
             'document_number' => $doc->document_number,
+            'visibility' => $doc->visibility,
         ]);
 
-        return redirect()->route('documents.show', $doc)->with('success', 'Document created.');
+        return redirect()->route('documents.edit', $doc)->with('success', 'Document created. Fill in the content.');
     }
 
     public function show(Document $document): View
@@ -101,16 +124,20 @@ class DocumentController extends Controller
 
         $document->load('owner', 'division', 'documentType', 'currentVersion', 'versions.author');
 
-        return view('documents.show', compact('document'));
+        $divisions = auth()->user()->isAdmin()
+            ? Division::all()
+            : Division::whereIn('id', auth()->user()->allDivisionIds())->get();
+
+        return view('documents.show', compact('document', 'divisions'));
     }
 
     public function edit(Document $document): View
     {
         $this->authorize('update', $document);
 
-        $document->load('currentVersion');
+        $document->load('currentVersion', 'versions');
 
-        return view('documents.edit', compact('document'));
+        return view('documents.insert', compact('document'));
     }
 
     public function preview(Document $document): View
@@ -130,6 +157,7 @@ class DocumentController extends Controller
             'content' => 'required|string',
         ]);
 
+        // savePending updates the existing pending version in place — no new version.
         $version = $this->versionService->savePending($document, $validated['content'], auth()->user());
 
         $this->auditService->log(auth()->user(), 'version.created', 'document_version', $version->id, [
@@ -137,19 +165,86 @@ class DocumentController extends Controller
             'version_number' => $version->version_number,
         ]);
 
-        return redirect()->route('documents.show', $document)->with('success', 'Edit saved. Pending approval.');
+        $message = $version->wasRecentlyCreated
+            ? 'Edit saved. Pending approval.'
+            : 'Versi v' . $version->version_number . ' diperbarui (tetap menunggu approval).';
+
+        return redirect()->route('documents.show', $document)->with('success', $message);
     }
 
-    public function togglePublic(Document $document): RedirectResponse
+    public function discard(Request $request, Document $document): RedirectResponse
     {
         $this->authorize('update', $document);
 
-        $document->update(['is_public' => !$document->is_public]);
+        $discarded = $this->versionService->discardPending($document);
 
-        $this->auditService->log(auth()->user(), 'document.toggle_public', 'document', $document->id, [
-            'is_public' => $document->is_public,
+        if ($discarded) {
+            $this->auditService->log(auth()->user(), 'version.discarded', 'document_version', $discarded->id, [
+                'document_id' => $document->id,
+                'version_number' => $discarded->version_number,
+            ]);
+        }
+
+        return redirect()->route('documents.show', $document)->with('success', $discarded
+            ? 'Versi pending v' . $discarded->version_number . ' di-discard.'
+            : 'Tidak ada versi pending untuk di-discard.');
+    }
+
+    public function saveDraft(Request $request, Document $document): RedirectResponse
+    {
+        $this->authorize('update', $document);
+
+        $validated = $request->validate([
+            'content' => 'required|string',
         ]);
 
-        return back()->with('success', $document->is_public ? 'Document is now public.' : 'Document is now private.');
+        $this->versionService->saveDraft($document, $validated['content'], auth()->user());
+
+        return redirect()->route('documents.show', $document)->with('success', 'Draft saved.');
+    }
+
+    public function destroy(Document $document): RedirectResponse
+    {
+        $this->authorize('delete', $document);
+
+        $document->delete();
+
+        return redirect()->route('documents.index')->with('success', 'Document discarded.');
+    }
+
+    /**
+     * Change a document's visibility scope (general / division / personal).
+     */
+    public function updateVisibility(Request $request, Document $document): RedirectResponse
+    {
+        $this->authorize('update', $document);
+
+        $validated = $request->validate([
+            'visibility' => 'required|in:general,division,personal',
+            'division_id' => 'nullable|required_if:visibility,division|exists:divisions,id',
+        ]);
+
+        if ($validated['visibility'] === 'division'
+            && !auth()->user()->isAdmin()
+            && !in_array((int) $validated['division_id'], auth()->user()->allDivisionIds(), true)) {
+            abort(403, 'You cannot assign this document to this division.');
+        }
+
+        $document->update([
+            'visibility' => $validated['visibility'],
+            // Division-scoped docs require a division; other scopes drop it.
+            'division_id' => $validated['visibility'] === 'division'
+                ? $validated['division_id']
+                : null,
+            // Legacy derived flag stays in sync with the scope.
+            'is_public' => $validated['visibility'] === Document::VISIBILITY_GENERAL,
+        ]);
+
+        $this->auditService->log(auth()->user(), 'document.visibility_changed', 'document', $document->id, [
+            'visibility' => $validated['visibility'],
+            'division_id' => $document->division_id,
+        ]);
+
+        return back()->with('success', 'Document visibility updated.');
     }
 }
