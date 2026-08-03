@@ -1,0 +1,55 @@
+@php
+    $hasDraft = $doc->versions->contains('status', 'draft');
+    $hasPending = $doc->versions->contains('status', 'pending');
+@endphp
+<div class="px-6 py-4 flex items-center justify-between gap-4">
+    <div class="min-w-0">
+        <div class="flex items-center gap-2">
+            <a href="{{ route('documents.show', $doc) }}" class="link link-primary font-medium truncate">
+                {{ $doc->title }}
+            </a>
+            @if($doc->documentType)
+                <span class="badge badge-outline badge-sm shrink-0">{{ $doc->documentType->code }}</span>
+            @endif
+        </div>
+        <p class="text-sm text-base-content/60 truncate">
+            {{ $doc->document_number }}
+            @if($doc->isGeneral()) <span class="text-success">· General</span>
+            @elseif($doc->isPersonal()) <span class="text-info">· Personal</span>
+            @else <span>· {{ $doc->division?->code ?? '—' }}</span>
+            @endif
+            · {{ $doc->owner->name }}
+        </p>
+    </div>
+    <div class="flex items-center gap-3 shrink-0">
+        <div class="text-sm text-base-content/60">
+            @if($doc->currentVersion)
+                <span class="badge badge-success badge-sm">v{{ $doc->currentVersion->version_number }}</span>
+            @elseif($hasPending)
+                <span class="badge badge-warning badge-sm">Pending</span>
+            @elseif($hasDraft)
+                <span class="badge badge-warning badge-sm">Draft</span>
+            @else
+                <span class="badge badge-ghost badge-sm">No version</span>
+            @endif
+        </div>
+        @if($doc->owner_id === auth()->id() && $hasDraft && !$hasPending && !$doc->currentVersion)
+            <a href="{{ route('documents.edit', $doc) }}" class="btn btn-ghost btn-xs">Edit</a>
+        @endif
+        <button
+            type="button"
+            class="btn btn-ghost btn-sm btn-circle"
+            title="Preview"
+            x-on:click="previewDoc(
+                '{{ route('documents.preview-content', $doc) }}',
+                '{{ $doc->title }}',
+                '{{ $doc->document_number }} · {{ $doc->division?->code ?? '—' }}'
+            )"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+        </button>
+    </div>
+</div>

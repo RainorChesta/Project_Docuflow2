@@ -30,21 +30,14 @@
                         Cancel
                     </a>
 
-                    @if(Route::has('documents.preview'))
-                        <a href="{{ route('documents.preview', $document) }}" target="_blank" class="btn btn-ghost btn-sm gap-1">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                            Preview
-                        </a>
-                    @endif
-
                     <button type="submit" form="editor-form" class="btn btn-primary btn-sm px-6">
                         Save Changes
                     </button>
+                    @if($hasDraftOnly)
+                        <button type="submit" form="draft-form" class="btn btn-neutral btn-sm">
+                            Save as Draft
+                        </button>
+                    @endif
                 </div>
             </div>
 
@@ -59,6 +52,7 @@
             {{-- Pending version warning: saving updates the pending version in place --}}
             @php
                 $pending = $document->versions->first(fn($v) => $v->status === 'pending' && !$v->discarded_at);
+                $hasDraftOnly = !$pending && !$document->currentVersion;
             @endphp
             @if($pending)
                 <div class="max-w-6xl mx-auto px-6 pb-3">
@@ -83,6 +77,15 @@
 
         {{-- Canvas / Dokumen --}}
         <div class="py-10 px-4">
+            @if(session('success'))
+                <div class="max-w-6xl mx-auto mb-4">
+                    <div class="alert alert-success shadow-sm">
+                        <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <span>{{ session('success') }}</span>
+                    </div>
+                </div>
+            @endif
+
             <form method="POST" action="{{ route('documents.save', $document) }}" id="editor-form">
                 @csrf
                 @method('PUT')
@@ -99,13 +102,67 @@
                     </div>
 
                     <p class="text-center text-xs text-base-content/50 mt-4">
-                        Save akan membuat versi baru yang menunggu approval Head.
+                        @if($hasDraftOnly)
+                            <strong>Save Changes</strong> mengirim draft untuk approval (status jadi pending).
+                        @else
+                            Save akan membuat versi baru yang menunggu approval Head.
+                        @endif
                         @if($pending ?? null)
                             Versi pending yang ada akan diperbarui (bukan versi baru).
                         @endif
                     </p>
                 </div>
             </form>
+
+            @if($hasDraftOnly)
+                <form method="POST" action="{{ route('documents.save-draft', $document) }}" id="draft-form">
+                    @csrf
+                    @method('PUT')
+                    <input type="hidden" name="content" id="draft-content">
+                </form>
+            @endif
+
+            {{-- Live preview (tanpa tab kedua) --}}
+            <div class="mt-10">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="font-semibold text-base-content">Preview</h2>
+                    <a href="{{ route('documents.preview', $document) }}" target="_blank" class="btn btn-ghost btn-xs gap-1">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                        Buka di tab baru
+                    </a>
+                </div>
+                <div class="bg-base-100 rounded-xl shadow-md border border-base-300 p-8">
+                    <div id="live-preview-content" class="prose max-w-none">
+                        {!! $document->displayVersion()->content ?? '' !!}
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+
+    <script>
+        (function () {
+            const editor = window.__joditInstances?.get('jodit-editor');
+            const target = document.getElementById('live-preview-content');
+            if (editor && target) {
+                function render() {
+                    const html = editor.value;
+                    if (html && html.trim().length) {
+                        target.innerHTML = '<div class="prose max-w-none">' + html + '</div>';
+                    }
+                }
+                editor.events.on('change', render);
+            }
+
+            // Isi hidden input draft-form dengan konten editor saat submit
+            const draftForm = document.getElementById('draft-form');
+            if (draftForm) {
+                draftForm.addEventListener('submit', () => {
+                    const ta = document.getElementById('jodit-editor');
+                    const inst = window.__joditInstances?.get(ta.id);
+                    document.getElementById('draft-content').value = inst ? inst.value : ta.value;
+                });
+            }
+        })();
+    </script>
 </x-app-layout>

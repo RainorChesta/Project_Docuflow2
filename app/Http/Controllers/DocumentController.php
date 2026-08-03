@@ -30,19 +30,15 @@ class DocumentController extends Controller
         $query = Document::with('owner', 'division', 'currentVersion', 'versions');
 
         if ($type === 'general') {
+            // General (public) — visible to everyone.
             $query->general();
         } elseif ($type === 'mine') {
+            // My Documents — semua dokumen milik user, apapun scopenya.
             $query->ownedBy($user);
         } else {
+            // Division-scoped documents of divisions the user belongs to.
             $query->division($user);
         }
-        $query = Document::with('owner', 'division', 'currentVersion')
-            // Only show documents already approved by the head; pending ones are hidden.
-            ->whereHas('currentVersion')
-            ->where(function ($q) use ($user) {
-                $q->where('division_id', $user->division_id)
-                  ->orWhere('is_public', true);
-            });
 
         if ($search = $request->get('search')) {
             $query->where(function ($q) use ($search) {
@@ -78,7 +74,13 @@ class DocumentController extends Controller
 
         $documentTypes = DocumentType::orderBy('name')->get();
 
-        return view('documents.index', compact('documents', 'divisions', 'documentTypes', 'type'));
+        $view = match ($type) {
+            'general' => 'documents.general',
+            'mine' => 'documents.mine',
+            default => 'documents.division',
+        };
+
+        return view($view, compact('documents', 'documentTypes', 'type'));
     }
 
     public function create(): View
@@ -226,6 +228,8 @@ class DocumentController extends Controller
 
     /**
      * Change a document's visibility scope (general / division / personal).
+     * Division is not selectable here — the document keeps its original
+     * division (division_id is NOT NULL at DB level).
      */
     public function updateVisibility(Request $request, Document $document): RedirectResponse
     {
@@ -233,21 +237,10 @@ class DocumentController extends Controller
 
         $validated = $request->validate([
             'visibility' => 'required|in:general,division,personal',
-            'division_id' => 'nullable|required_if:visibility,division|exists:divisions,id',
         ]);
-
-        if ($validated['visibility'] === 'division'
-            && !auth()->user()->isAdmin()
-            && !in_array((int) $validated['division_id'], auth()->user()->allDivisionIds(), true)) {
-            abort(403, 'You cannot assign this document to this division.');
-        }
 
         $document->update([
             'visibility' => $validated['visibility'],
-            // Division-scoped docs require a division; other scopes drop it.
-            'division_id' => $validated['visibility'] === 'division'
-                ? $validated['division_id']
-                : null,
             // Legacy derived flag stays in sync with the scope.
             'is_public' => $validated['visibility'] === Document::VISIBILITY_GENERAL,
         ]);
