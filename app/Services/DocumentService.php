@@ -10,15 +10,25 @@ use Illuminate\Support\Facades\DB;
 
 class DocumentService
 {
-    public function generateId(?Division $division): string
+    public function generateId(?Division $division, DocumentType $documentType): string
     {
-        // Non-division scopes (general/personal) use a generic prefix since
-        // they are not tied to any division.
-        $prefix = $division ? $division->code : 'GEN';
-        $date = Carbon::now()->format('Ymd');
+        $now = Carbon::now();
+        $year = $now->year;
+        $romanMonth = $this->toRomanMonth($now->month);
+        $centralCode = config('dokuflow.central_code');
 
-        return DB::transaction(function () use ($prefix, $date) {
-            $lastDoc = Document::where('document_number', 'like', $prefix . '-' . $date . '-%')
+        // Non-division scopes (general/personal) use a generic code since
+        // they are not tied to any division.
+        $divisionCode = $division ? $division->code : 'GEN';
+
+        // "/" di kode tipe diganti "-" khusus untuk nomor dokumen, supaya
+        // jumlah segmen yang dipisah "/" tetap konsisten (6 segmen).
+        $typeCodeForNumber = str_replace('/', '-', $documentType->code);
+
+        return DB::transaction(function () use ($division, $documentType, $year, $romanMonth, $centralCode, $divisionCode, $typeCodeForNumber) {
+            $lastDoc = Document::where('division_id', $division?->id)
+                ->where('document_type_id', $documentType->id)
+                ->whereYear('created_at', $year)
                 ->lockForUpdate()
                 ->orderByDesc('id')
                 ->first();
@@ -26,6 +36,20 @@ class DocumentService
             $seq = 1;
             if ($lastDoc) {
                 // Sequence selalu di segmen pertama, jadi aman diparsing
+                // meskipun kode tipe mengandung "-" hasil substitusi di atas.
+                $firstSegment = explode('/', $lastDoc->document_number)[0];
+                $seq = (int) $firstSegment + 1;
+            }
+
+            return sprintf(
+                '%03d/%s/%s/%s/%s/%d',
+                $seq,
+                $typeCodeForNumber,
+                $divisionCode,
+                $centralCode,
+                $romanMonth,
+                $year
+            );
                 // meskipun kode tipe mengandung "-" hasil substitusi di atas
                 $firstSegment = explode('-', $lastDoc->document_number)[2] ?? null;
                 $seq = $firstSegment ? (int) $firstSegment + 1 : 1;
@@ -37,6 +61,10 @@ class DocumentService
 
     public function create(array $data, int $ownerId): Document
     {
+        $division = !empty($data['division_id']) ? Division::findOrFail($data['division_id']) : null;
+        $documentType = DocumentType::findOrFail($data['document_type_id']);
+
+        $data['document_number'] = $this->generateId($division, $documentType);
         $division = $data['division_id'] ? Division::findOrFail($data['division_id']) : null;
         $documentType = DocumentType::findOrFail($data['document_type_id']);
 
