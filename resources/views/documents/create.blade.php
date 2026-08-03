@@ -9,21 +9,41 @@
                         @csrf
 
                         <div class="form-control w-full mb-4">
+                            <label for="document_type_id" class="label">
+                                <span class="label-text font-medium">Tipe Dokumen</span>
+                            </label>
+                            <select name="document_type_id" id="document_type_id" class="select select-bordered w-full" required>
+                                <option value="">Pilih tipe dokumen...</option>
+                                @foreach($documentTypes as $type)
+                                    <option value="{{ $type->id }}" {{ old('document_type_id') == $type->id ? 'selected' : '' }}>
+                                        {{ $type->code }} - {{ $type->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('document_type_id') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div class="form-control w-full mb-4">
                             <label for="title" class="label">
                                 <span class="label-text font-medium">Title</span>
                             </label>
-                            <input type="text" name="title" id="title" class="input input-bordered w-full" required>
+                            <input type="text" name="title" id="title" value="{{ old('title') }}" class="input input-bordered w-full" required>
+                            <input type="text" name="title" id="title" class="input input-bordered w-full" required autofocus>
                             @error('title') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                         </div>
 
                         <div class="form-control w-full mb-4">
-                            <label for="division_id" class="label">
+                            <label class="label">
                                 <span class="label-text font-medium">Division</span>
                             </label>
+                            <input type="text" value="{{ auth()->user()->division->code }} - {{ auth()->user()->division->name }}" class="input input-bordered w-full bg-base-200" disabled>
+                            <p class="text-xs text-base-content/50 mt-1">Otomatis sesuai divisi akun kamu.</p>
                             <select name="division_id" id="division_id" class="select select-bordered w-full" required>
                                 <option value="">Select division...</option>
                                 @foreach($divisions as $div)
-                                    <option value="{{ $div->id }}">{{ $div->code }} - {{ $div->name }}</option>
+                                    <option value="{{ $div->id }}" {{ old('division_id') == $div->id ? 'selected' : '' }}>
+                                        {{ $div->code }} - {{ $div->name }}
+                                    </option>
                                 @endforeach
                             </select>
                             @error('division_id') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror

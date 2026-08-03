@@ -3,7 +3,9 @@
 use App\Http\Controllers\Admin\DivisionController;
 use App\Http\Controllers\Admin\RetentionController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\DocumentTypeController;
 use App\Http\Controllers\ApprovalController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\JoditController;
 use App\Http\Controllers\ProfileController;
@@ -15,7 +17,7 @@ Route::get('/', function () {
 });
 
 Route::middleware('auth')->group(function () {
-    Route::get('/dashboard', fn() => view('dashboard'))->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // Jodit image upload
     Route::post('/jodit-upload', [JoditController::class, 'upload'])->name('jodit.upload');
@@ -26,6 +28,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/documents/{document}/preview', [DocumentController::class, 'preview'])->name('documents.preview');
     Route::get('/documents/{document}/preview-content', [DocumentController::class, 'previewContent'])->name('documents.preview-content');
     Route::put('/documents/{document}/save', [DocumentController::class, 'save'])->name('documents.save');
+    Route::put('/documents/{document}/save-draft', [DocumentController::class, 'saveDraft'])->name('documents.save-draft');
+    Route::patch('/documents/{document}/visibility', [DocumentController::class, 'updateVisibility'])->name('documents.update-visibility');
     Route::post('/documents/{document}/discard', [DocumentController::class, 'discard'])->name('documents.discard');
     Route::post('/documents/{document}/toggle-public', [DocumentController::class, 'togglePublic'])->name('documents.toggle-public');
 
@@ -45,6 +49,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('users', UserController::class);
         Route::get('/retention', [RetentionController::class, 'edit'])->name('retention.edit');
         Route::put('/retention', [RetentionController::class, 'update'])->name('retention.update');
+        Route::resource('document-types', DocumentTypeController::class);
     });
 
     // Profile

@@ -231,5 +231,13 @@ export function initJoditEditor(selector, overrides = {}) {
         });
     }
 
+    // Daftarkan instance agar bisa diakses dari luar (modal, dll)
+    if (window.__joditInstances) {
+        window.__joditInstances.set(ta.id, editor);
+    }
+
     return editor;
 }
+
+// Registry instance untuk akses dari modal/script lain (jangan timpa window.Jodit!)
+window.__joditInstances = window.__joditInstances || new Map();

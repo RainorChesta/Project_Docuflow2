@@ -9,14 +9,21 @@ class DocumentPolicy
 {
     public function view(User $user, Document $document): bool
     {
-        if ($document->is_public) return true;
         if ($user->isAdmin()) return true;
-        return $user->division_id === $document->division_id;
+        if ($document->isGeneral()) return true;
+        if ($user->id === $document->owner_id) return true;
+
+        // Division-scoped docs: visible to members of that division.
+        return $document->isDivision()
+            && $document->division_id
+            && in_array($document->division_id, $user->allDivisionIds(), true);
     }
 
     public function create(User $user): bool
     {
-        return $user->division_id !== null && $user->is_active;
+        // Any active user may create documents; personal/general docs
+        // do not require a division.
+        return $user->is_active;
     }
 
     public function update(User $user, Document $document): bool
@@ -32,6 +39,11 @@ class DocumentPolicy
 
     public function delete(User $user, Document $document): bool
     {
-        return $user->isAdmin();
+        if ($user->isAdmin()) return true;
+
+        // Owner boleh discard dokumen yang masih draft
+        return $user->id === $document->owner_id
+            && $document->versions()->where('status', 'draft')->exists()
+            && !$document->versions()->whereIn('status', ['active', 'pending'])->exists();
     }
 }

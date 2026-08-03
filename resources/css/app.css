@@ -80,6 +80,18 @@
     color: #888 !important;
 }
 
+/* Kunci posisi placeholder di dalam textbox — jangan ikut bergeser saat klik/focus */
+.jodit-placeholder {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    padding: 48px 56px !important; /* samakan dengan padding konten editor */
+    margin: 0 !important;
+    pointer-events: none !important;
+    box-sizing: border-box !important;
+}
+
 /* Jodit UI (toolbar, popup, dialog) — paksa teks gelap biar terbaca */
 .jodit-container,
 .jodit-dialog,
