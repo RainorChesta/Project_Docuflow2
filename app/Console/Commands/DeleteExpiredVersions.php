@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\DocumentVersion;
+use App\Models\Setting;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -13,7 +14,9 @@ class DeleteExpiredVersions extends Command
 
     public function handle(): int
     {
-        $days = $this->option('days') ?? config('app.version_retention_days', 365);
+        $days = $this->option('days')
+            ?? Setting::get('version_retention_days')
+            ?? config('app.version_retention_days', 365);
 
         $retentionDate = now()->subDays((int) $days);
 

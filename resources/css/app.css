@@ -1,6 +1,7 @@
 @import "jodit/es2018/jodit.min.css";
 @import "tailwindcss";
 @plugin "daisyui";
+@plugin "@tailwindcss/typography";
 
 @theme {
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
@@ -39,6 +40,28 @@
     --color-base-300: oklch(0.35 0.04 250);
     --color-base-content: oklch(0.98 0.005 250);
   }
+}
+
+/* Alpine x-cloak: hide element until Alpine initializes */
+[x-cloak] {
+    display: none !important;
+}
+
+/* Document tables (prose) — visible grid borders for any structure (with/without thead) */
+.prose table {
+    border-collapse: collapse;
+    width: 100%;
+}
+.prose table th,
+.prose table td {
+    border: 1px solid var(--color-base-300);
+    padding: 0.5em 0.75em;
+}
+
+/* Gambar dokumen ikut ukuran Jodit (width atribut), tapi tak meluber melebihi konten */
+.prose img {
+    max-width: 100%;
+    height: auto;
 }
 
 /* Jodit editor — override DaisyUI base-content color leak */

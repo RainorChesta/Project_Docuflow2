@@ -25,7 +25,7 @@
             <!-- Right Area -->
             <div class="flex flex-col flex-1 min-w-0">
                 <!-- Topbar -->
-                <header class="h-16 bg-base-100 border-b border-base-300 flex items-center justify-between px-6 shrink-0">
+                <header class="h-16 bg-base-100 border-b border-base-300 flex items-center justify-between px-6 shrink-0 sticky top-0 z-30">
                     <div class="flex items-center gap-3">
                         @isset($header)
                             <h1 class="text-lg font-semibold text-base-content">{{ $header }}</h1>

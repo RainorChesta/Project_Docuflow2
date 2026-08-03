@@ -58,6 +58,15 @@
                                 <p class="text-xs text-base-content/50 mt-1">Otomatis sesuai divisi akun kamu.</p>
                             </div>
                         @endif
+                        <div class="form-control w-full mb-4">
+                            <label class="label">
+                                <span class="label-text font-medium">Division</span>
+                            </label>
+                            @php($myDivision = auth()->user()->division)
+                            <input type="text" value="{{ $myDivision ? $myDivision->code . ' - ' . $myDivision->name : '—' }}" class="input input-bordered w-full bg-base-200" disabled>
+                            <input type="hidden" name="division_id" value="{{ auth()->user()->division_id }}">
+                            <p class="text-xs text-base-content/50 mt-1">Otomatis sesuai divisi akun kamu.</p>
+                        </div>
 
                         <div class="flex justify-end">
                             <button type="submit" class="btn btn-primary">Create Document</button>

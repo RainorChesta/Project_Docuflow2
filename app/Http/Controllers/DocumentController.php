@@ -84,6 +84,11 @@ class DocumentController extends Controller
         $divisions = $user->isAdmin() ? Division::all() : collect();
 
         return view('documents.create', compact('documentTypes', 'divisions'));
+        $divisions = auth()->user()->isAdmin()
+            ? Division::all()
+            : Division::whereIn('id', auth()->user()->allDivisionIds())->get();
+             $documentTypes = DocumentType::all(); 
+        return view('documents.create', compact('divisions','documentTypes'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -96,6 +101,12 @@ class DocumentController extends Controller
             'title' => 'required|string|max:255',
             'document_type_id' => 'required|exists:document_types,id',
         ];
+            'division_id' => 'required|exists:divisions,id',
+        ]);
+
+        // Documents created here are always division-scoped; scope is
+        // changed later from the document's own settings.
+        $validated['visibility'] = Document::VISIBILITY_DIVISION;
 
         if ($user->isAdmin()) {
             // Admin wajib pilih divisi karena tidak terikat divisi manapun.
@@ -153,6 +164,15 @@ class DocumentController extends Controller
         $document->load('owner', 'division', 'documentType', 'currentVersion');
 
         return view('documents.preview', compact('document'));
+    }
+
+    public function previewContent(Document $document): View
+    {
+        $this->authorize('view', $document);
+
+        $document->load('currentVersion');
+
+        return view('documents.preview-content', compact('document'));
     }
 
     public function save(Request $request, Document $document): RedirectResponse

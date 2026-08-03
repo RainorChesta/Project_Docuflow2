@@ -60,6 +60,18 @@ class Document extends Model
         return $this->belongsTo(DocumentVersion::class, 'current_version_id');
     }
 
+    /**
+     * Version to display: approved current version, else latest pending (not discarded).
+     */
+    public function displayVersion(): ?DocumentVersion
+    {
+        return $this->currentVersion
+            ?? $this->versions
+                ->filter(fn($v) => $v->status === 'pending' && !$v->discarded_at)
+                ->sortByDesc('version_number')
+                ->first();
+    }
+
     public function versions(): HasMany
     {
         return $this->hasMany(DocumentVersion::class);

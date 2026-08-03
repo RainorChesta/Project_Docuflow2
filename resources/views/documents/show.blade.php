@@ -118,9 +118,10 @@
             <!-- Content -->
             <div class="card bg-base-100 border border-base-300 shadow-sm mb-6">
                 <div class="card-body">
-                    @if($document->currentVersion)
+                    @php $display = $document->displayVersion(); @endphp
+                    @if($display)
                         <div class="prose max-w-none">
-                            {!! $document->currentVersion->content !!}
+                            {!! $display->content !!}
                         </div>
                     @else
                         <p class="text-base-content/60 italic">No approved content yet.</p>
@@ -147,6 +148,14 @@
                         Share Link
                     </button>
                 @endcan
+
+                <button
+                    type="button"
+                    class="btn btn-ghost btn-sm"
+                    onclick="document.getElementById('version-modal').showModal()"
+                >
+                    Lihat Versi ({{ $document->versions->count() }})
+                </button>
             </div>
 
             <!-- Share Link Form -->
@@ -196,42 +205,53 @@
                 </div>
             </div>
 
-            <!-- Version History -->
-            <div class="card bg-base-100 border border-base-300 shadow-sm">
-                <div class="card-body">
-                    <h3 class="font-semibold mb-4">Version History</h3>
-                    @forelse($document->versions->sortByDesc('version_number') as $version)
-                        <div class="flex items-center justify-between py-2 border-b border-base-200 text-sm">
-                            <div>
-                                <span class="font-medium">v{{ $version->version_number }}</span>
-                                <span class="text-base-content/60">by {{ $version->author_name }}</span>
-                                <span class="text-base-content/40">{{ $version->created_at->format('M d, Y H:i') }}</span>
-                                @if($version->id === $document->current_version_id)
-                                    <span class="badge badge-success badge-sm ml-2">Active</span>
-                                @elseif($version->status === 'pending')
-                                    <span class="badge badge-warning badge-sm ml-2">Pending</span>
-                                @elseif($version->status === 'discarded' || $version->discarded_at)
-                                    <span class="badge badge-neutral badge-sm ml-2">Discarded</span>
-                                @elseif($version->status === 'rejected')
-                                    <span class="badge badge-error badge-sm ml-2">Rejected</span>
-                                @endif
-                            </div>
-                            <div class="flex gap-2">
-                                @can('update', $document)
-                                    @if($version->status === 'active' && $version->id !== $document->current_version_id)
-                                        <form method="POST" action="{{ route('approvals.rollback', [$document, $version]) }}" class="inline">
-                                            @csrf
-                                            <button class="link link-primary">Rollback</button>
-                                        </form>
-                                    @endif
-                                @endcan
-                            </div>
-                        </div>
-                    @empty
-                        <p class="text-base-content/60 text-sm">No versions yet.</p>
-                    @endforelse
-                </div>
-            </div>
         </div>
     </div>
+
+    {{-- Version History modal --}}
+    <dialog id="version-modal" class="modal">
+        <div class="modal-box max-w-2xl max-h-[85vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-semibold">Version History</h3>
+                <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('version-modal').close()">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            @forelse($document->versions->sortByDesc('version_number') as $version)
+                <div class="flex items-center justify-between py-2 border-b border-base-200 text-sm">
+                    <div>
+                        <span class="font-medium">v{{ $version->version_number }}</span>
+                        <span class="text-base-content/60">by {{ $version->author_name }}</span>
+                        <span class="text-base-content/40">{{ $version->created_at->format('M d, Y H:i') }}</span>
+                        @if($version->id === $document->current_version_id)
+                            <span class="badge badge-success badge-sm ml-2">Active</span>
+                        @elseif($version->status === 'pending')
+                            <span class="badge badge-warning badge-sm ml-2">Pending</span>
+                        @elseif($version->status === 'discarded' || $version->discarded_at)
+                            <span class="badge badge-neutral badge-sm ml-2">Discarded</span>
+                        @elseif($version->status === 'rejected')
+                            <span class="badge badge-error badge-sm ml-2">Rejected</span>
+                        @endif
+                    </div>
+                    <div class="flex gap-2">
+                        @can('update', $document)
+                            @if($version->status === 'active' && $version->id !== $document->current_version_id)
+                                <form method="POST" action="{{ route('approvals.rollback', [$document, $version]) }}" class="inline">
+                                    @csrf
+                                    <button class="link link-primary">Rollback</button>
+                                </form>
+                            @endif
+                        @endcan
+                    </div>
+                </div>
+            @empty
+                <p class="text-base-content/60 text-sm">No versions yet.</p>
+            @endforelse
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
 </x-app-layout>

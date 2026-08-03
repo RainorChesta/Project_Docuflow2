@@ -50,6 +50,12 @@ class DocumentService
                 $romanMonth,
                 $year
             );
+                // meskipun kode tipe mengandung "-" hasil substitusi di atas
+                $firstSegment = explode('-', $lastDoc->document_number)[2] ?? null;
+                $seq = $firstSegment ? (int) $firstSegment + 1 : 1;
+            }
+
+            return sprintf('%s-%s-%03d', $prefix, $date, $seq);
         });
     }
 
@@ -59,6 +65,10 @@ class DocumentService
         $documentType = DocumentType::findOrFail($data['document_type_id']);
 
         $data['document_number'] = $this->generateId($division, $documentType);
+        $division = $data['division_id'] ? Division::findOrFail($data['division_id']) : null;
+        $documentType = DocumentType::findOrFail($data['document_type_id']);
+
+        $data['document_number'] = $this->generateId($division);
         $data['visibility'] ??= Document::VISIBILITY_DIVISION;
         $data['owner_id'] = $ownerId;
 
