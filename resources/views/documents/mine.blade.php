@@ -31,6 +31,4 @@
             </div>
         </div>
     </div>
-
-    @include('documents._preview_modal')
 </x-app-layout>

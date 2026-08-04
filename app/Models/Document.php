@@ -118,7 +118,10 @@ class Document extends Model
         }
 
         return $query->where('visibility', self::VISIBILITY_DIVISION)
-            ->whereIn('division_id', $divisionIds);
+            ->whereIn('division_id', $divisionIds)
+            // Only approved/published documents appear in Dokumen Divisi.
+            // Pending (not yet approved) documents stay hidden until approved.
+            ->whereHas('versions', fn($q) => $q->where('status', 'active'));
     }
 
     /**
