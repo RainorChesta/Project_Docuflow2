@@ -32,10 +32,24 @@ class VersionService
                 return $pending;
             }
 
-            $versionNumber = ($document->versions()->max('version_number') ?? 0) + 1;
+            // Tidak ada pending, tapi ada draft (mis. v1 hasil create) → promosikan draft
+            // jadi pending dengan version_number yang sama, bukan bikin versi baru.
+            $draft = $document->versions()->where('status', 'draft')
+                ->orderBy('version_number', 'desc')
+                ->first();
 
-            // Draft lama jadi usang saat konten dikirim ke approval — buang.
-            $document->versions()->where('status', 'draft')->delete();
+            if ($draft) {
+                $draft->update([
+                    'content' => \Purifier::clean($content),
+                    'author_id' => $author->id,
+                    'author_name' => $author->name,
+                    'status' => 'pending',
+                ]);
+
+                return $draft;
+            }
+
+            $versionNumber = ($document->versions()->max('version_number') ?? 0) + 1;
 
             $version = $document->versions()->create([
                 'version_number' => $versionNumber,
