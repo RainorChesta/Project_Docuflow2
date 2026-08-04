@@ -66,6 +66,9 @@ class UserController extends Controller
 
         // password di-hash otomatis oleh cast 'hashed' di model
         unset($validated['password_confirmation']);
+        if (empty($validated['password'])) {
+            unset($validated['password']);
+        }
 
         $user->update($validated);
 
