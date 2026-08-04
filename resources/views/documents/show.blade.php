@@ -212,6 +212,8 @@
                         <span class="text-base-content/40">{{ $version->created_at->format('M d, Y H:i') }}</span>
                         @if($version->id === $document->current_version_id)
                             <span class="badge badge-success badge-sm ml-2">Active</span>
+                        @elseif($version->status === 'inactive')
+                            <span class="badge badge-neutral badge-sm ml-2">Inactive</span>
                         @elseif($version->status === 'pending')
                             <span class="badge badge-warning badge-sm ml-2">Pending</span>
                         @elseif($version->status === 'discarded' || $version->discarded_at)
@@ -221,8 +223,12 @@
                         @endif
                     </div>
                     <div class="flex gap-2">
+                        <a href="{{ route('documents.preview-version', [$document, $version]) }}"
+                           class="btn btn-ghost btn-xs">Preview</a>
                         @can('update', $document)
-                            @if($version->status === 'active' && $version->id !== $document->current_version_id)
+                            @if($version->id !== $document->current_version_id
+                                && $version->status !== 'pending'
+                                && !($version->status === 'discarded' || $version->discarded_at))
                                 <form method="POST" action="{{ route('approvals.rollback', [$document, $version]) }}" class="inline">
                                     @csrf
                                     <button class="link link-primary">Rollback</button>

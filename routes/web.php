@@ -27,6 +27,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/documents/{document}/edit', [DocumentController::class, 'edit'])->name('documents.edit');
     Route::get('/documents/{document}/preview', [DocumentController::class, 'preview'])->name('documents.preview');
     Route::get('/documents/{document}/preview-content', [DocumentController::class, 'previewContent'])->name('documents.preview-content');
+    Route::get('/documents/{document}/versions/{version}/preview', [DocumentController::class, 'previewVersion'])->name('documents.preview-version');
     Route::put('/documents/{document}/save', [DocumentController::class, 'save'])->name('documents.save');
     Route::put('/documents/{document}/save-draft', [DocumentController::class, 'saveDraft'])->name('documents.save-draft');
     Route::patch('/documents/{document}/visibility', [DocumentController::class, 'updateVisibility'])->name('documents.update-visibility');

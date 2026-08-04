@@ -3,8 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Document;
-use App\Models\Division;
 use App\Models\DocumentType;
+use App\Models\Division;
+use App\Models\DocumentVersion;
 use App\Services\AuditService;
 use App\Services\DocumentService;
 use App\Services\VersionService;
@@ -161,6 +162,15 @@ class DocumentController extends Controller
         $document->load('currentVersion');
 
         return view('documents.preview-content', compact('document'));
+    }
+
+    public function previewVersion(Document $document, DocumentVersion $version): View
+    {
+        $this->authorize('view', $document);
+
+        abort_unless($version->document_id === $document->id, 404);
+
+        return view('documents.preview-version', compact('document', 'version'));
     }
 
     public function save(Request $request, Document $document): RedirectResponse

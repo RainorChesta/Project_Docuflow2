@@ -22,7 +22,7 @@
         </p>
     </div>
     <div class="flex items-center gap-3 shrink-0">
-        @if($doc->owner_id === auth()->id() && $hasDraft && !$hasPending && !$doc->currentVersion)
+        @if($doc->owner_id === auth()->id())
             <a href="{{ route('documents.edit', $doc) }}" class="btn btn-ghost btn-xs">Edit</a>
         @endif
         <a

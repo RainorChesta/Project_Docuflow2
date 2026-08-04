@@ -110,6 +110,12 @@ class VersionService
     public function approve(DocumentVersion $version, User $reviewer, ?string $notes = null): void
     {
         DB::transaction(function () use ($version, $reviewer, $notes) {
+            // Versi aktif sebelumnya jadi inactive — cuma satu active per dokumen.
+            $version->document->versions()
+                ->where('status', 'active')
+                ->where('id', '!=', $version->id)
+                ->update(['status' => 'inactive']);
+
             $version->update([
                 'status' => 'active',
                 'reviewer_id' => $reviewer->id,
