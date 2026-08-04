@@ -2,6 +2,34 @@ import { Jodit } from 'jodit';
 import 'jodit/es2021/jodit.min.css';
 import 'jodit/esm/plugins/all.js'; // registrasi semua plugin bawaan (wajib biar icon & fungsi lengkap)
 
+// Daftar Google Fonts yang dipakai di dokumen — SATU sumber kebenaran,
+// dipakai baik untuk import ke iframe MAUPUN untuk isi dropdown toolbar.
+// key   = value CSS font-family (harus match persis dgn nama di Google Fonts)
+// label = teks yang tampil di dropdown toolbar
+const GOOGLE_FONTS_URL =
+    'https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900' +
+    '&family=Open+Sans:ital,wght@0,300..800;1,300..800' +
+    '&family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,400' +
+    '&family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400' +
+    '&family=Lora:ital,wght@0,400..700;1,400..700' +
+    '&family=Source+Code+Pro:ital,wght@0,400;0,700;1,400' +
+    '&display=swap';
+
+const FONT_LIST = {
+    'Default': 'Default',
+    'Arial,Helvetica,sans-serif': 'Arial',
+    'Georgia,serif': 'Georgia',
+    '"Times New Roman",Times,serif': 'Times New Roman',
+    '"Courier New",Courier,monospace': 'Courier New',
+    // --- Google Fonts ---
+    'Roboto,sans-serif': 'Roboto',
+    '"Open Sans",sans-serif': 'Open Sans',
+    'Merriweather,serif': 'Merriweather',
+    'Poppins,sans-serif': 'Poppins',
+    'Lora,serif': 'Lora',
+    '"Source Code Pro",monospace': 'Source Code Pro',
+};
+
 export function initJoditEditor(selector, overrides = {}) {
     const ta = document.querySelector(selector);
     if (!ta) return null;
@@ -22,7 +50,13 @@ export function initJoditEditor(selector, overrides = {}) {
         // ke dokumen iframe editor DAN dialog preview bawaan Jodit
         // (previewBox memanggil generateDocumentStructure.iframe, jadi
         // iframeStyle ter-inject di sana juga — preview dan editor selalu konsisten).
+        //
+        // PENTING: @import WAJIB jadi baris PALING ATAS di dalam iframeStyle,
+        // sama seperti aturan @import di file CSS biasa — kalau tidak,
+        // browser akan mengabaikannya diam-diam dan font tidak akan pernah
+        // muncul di dalam iframe editor maupun di dialog preview.
         iframeStyle: [
+            `@import url('${GOOGLE_FONTS_URL}');`,
             'html { margin:0; padding:0; background:#e5e7eb; }',
             'body {',
             '  box-sizing:border-box;',
@@ -63,9 +97,14 @@ export function initJoditEditor(selector, overrides = {}) {
             'cut', 'copy', 'paste', 'selectall', 'find', '|',
             'preview', 'print', 'fullsize', 'about',
         ],
-        
+
         // Tombol image: langsung buka file picker & upload, tanpa tab URL
         controls: {
+            // Daftar font custom (Google Fonts) yang muncul di dropdown toolbar "font"
+            font: {
+                list: Jodit.atom(FONT_LIST),
+            },
+
             image: {
                 name: 'image',
                 tooltip: 'Sisipkan Gambar',
@@ -123,7 +162,7 @@ export function initJoditEditor(selector, overrides = {}) {
                     input.click();
                 },
             },
-                        // === TAMBAHKAN KODE DI BAWAH INI ===
+            // === TAMBAHKAN KODE DI BAWAH INI ===
             file: {
                 name: 'file',
                 tooltip: 'Sisipkan File',
@@ -181,8 +220,8 @@ export function initJoditEditor(selector, overrides = {}) {
                 },
             },
         },
-        
-        
+
+
         uploader: uploadUrl ? {
             url: uploadUrl,
             format: 'json',

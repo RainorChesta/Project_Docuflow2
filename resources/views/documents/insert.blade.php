@@ -1,3 +1,8 @@
+@php
+    // Dokumen baru = belum pernah dikirim ke approval (cuma versi draft).
+    $isNewDoc = $document->versions->contains(fn($v) => $v->status !== 'draft') === false;
+@endphp
+
 <x-app-layout>
     <div class="min-h-screen bg-base-200/50">
 
@@ -33,7 +38,7 @@
                         Cancel
                     </button>
 
-                    @if(Route::has('documents.preview'))
+                    <!-- @if(Route::has('documents.preview'))
                         <a href="{{ route('documents.preview', $document) }}" target="_blank" class="btn btn-ghost btn-sm gap-1">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
@@ -43,7 +48,7 @@
                             </svg>
                             Preview
                         </a>
-                    @endif
+                    @endif -->
 
                     <button type="submit" form="editor-form" class="btn btn-primary btn-sm px-6">
                         Save Changes
@@ -88,21 +93,29 @@
     <dialog id="discard-modal" class="modal">
         <div class="modal-box">
             <h3 class="font-semibold text-lg mb-1">Unsaved changes</h3>
-            <p class="text-sm text-base-content/60">Save as draft or discard this document?</p>
-            <div class="modal-action">
-                <button type="button" class="btn btn-ghost" onclick="document.getElementById('discard-modal').close()">Keep Editing</button>
-                <form method="POST" action="{{ route('documents.save-draft', $document) }}" class="inline">
-                    @csrf
-                    @method('PUT')
-                    <input type="hidden" name="content" id="draft-content">
-                    <button type="submit" class="btn btn-neutral">Save as Draft</button>
-                </form>
-                <form method="POST" action="{{ route('documents.destroy', $document) }}" class="inline">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" class="btn btn-error" onclick="return confirm('Discard this document permanently?')">Discard</button>
-                </form>
-            </div>
+            @if($isNewDoc)
+                <p class="text-sm text-base-content/60">Save as draft or discard this document?</p>
+                <div class="modal-action">
+                    <button type="button" class="btn btn-ghost" onclick="document.getElementById('discard-modal').close()">Keep Editing</button>
+                    <form method="POST" action="{{ route('documents.save-draft', $document) }}" class="inline">
+                        @csrf
+                        @method('PUT')
+                        <input type="hidden" name="content" id="draft-content">
+                        <button type="submit" class="btn btn-neutral">Save as Draft</button>
+                    </form>
+                    <form method="POST" action="{{ route('documents.destroy', $document) }}" class="inline">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn btn-error" onclick="return confirm('Discard this document permanently?')">Discard</button>
+                    </form>
+                </div>
+            @else
+                <p class="text-sm text-base-content/60">Keluar tanpa menyimpan perubahan?</p>
+                <div class="modal-action">
+                    <button type="button" class="btn btn-ghost" onclick="document.getElementById('discard-modal').close()">Keep Editing</button>
+                    <a href="{{ url()->previous() }}" class="btn btn-neutral">Back</a>
+                </div>
+            @endif
         </div>
         <form method="dialog" class="modal-backdrop">
             <button>close</button>
