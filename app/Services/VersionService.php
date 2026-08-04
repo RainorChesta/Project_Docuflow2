@@ -24,7 +24,7 @@ class VersionService
                 $document->versions()->where('status', 'draft')->delete();
 
                 $pending->update([
-                    'content' => \Purifier::clean($content),
+                    'content' => \Purifier::clean($content, 'youtube'),
                     'author_id' => $author->id,
                     'author_name' => $author->name,
                 ]);
@@ -40,7 +40,7 @@ class VersionService
 
             if ($draft) {
                 $draft->update([
-                    'content' => \Purifier::clean($content),
+                    'content' => \Purifier::clean($content, 'youtube'),
                     'author_id' => $author->id,
                     'author_name' => $author->name,
                     'status' => 'pending',
@@ -53,7 +53,7 @@ class VersionService
 
             $version = $document->versions()->create([
                 'version_number' => $versionNumber,
-                'content' => \Purifier::clean($content),
+                'content' => \Purifier::clean($content, 'youtube'),
                 'author_id' => $author->id,
                 'author_name' => $author->name,
                 'status' => 'pending',
@@ -88,7 +88,7 @@ class VersionService
 
         if ($version && $version->status === 'draft') {
             $version->update([
-                'content' => \Purifier::clean($content),
+                'content' => \Purifier::clean($content, 'youtube'),
                 'author_name' => $author->name,
             ]);
 
@@ -100,7 +100,7 @@ class VersionService
 
         return $document->versions()->create([
             'version_number' => $versionNumber,
-            'content' => \Purifier::clean($content),
+            'content' => \Purifier::clean($content, 'youtube'),
             'author_id' => $author->id,
             'author_name' => $author->name,
             'status' => 'draft',

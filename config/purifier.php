@@ -36,6 +36,7 @@ return [
         "youtube" => [
             "HTML.SafeIframe"      => 'true',
             "URI.SafeIframeRegexp" => "%^(http://|https://|//)(www.youtube.com/embed/|player.vimeo.com/video/)%",
+            "HTML.Allowed"         => 'iframe[src|width|height|allowfullscreen],div,b,strong,i,em,u,a[href|title],ul,ol,li,p[style],br,span[style],img[width|height|alt|src],h1,h2,h3,h4,h5,h6,blockquote,pre,code,hr,table[style|border],caption,thead,tbody,tfoot,tr[style],th[style|colspan|rowspan],td[style|colspan|rowspan]',
         ],
         'custom_definition' => [
             'id'  => 'html5-definitions',
