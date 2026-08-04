@@ -86,6 +86,13 @@
             </div>
         </div>
 
+        <!-- Shared Edit History link -->
+        <div class="flex justify-end">
+            <a href="{{ route('shared.history') }}" class="text-sm font-medium text-primary hover:text-primary/80 transition-colors">
+                Riwayat Edit via Share Link →
+            </a>
+        </div>
+
         <!-- Recent Documents -->
         <div class="bg-base-100 border border-base-300 rounded-box">
             <div class="px-5 py-4 border-b border-base-300 flex items-center justify-between">

@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
 use App\Models\Document;
 use App\Models\DocumentAccessLink;
 use App\Services\AccessLinkService;
 use App\Services\AuditService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\View\View;
 
 class ShareLinkController extends Controller
 {
@@ -37,7 +39,7 @@ class ShareLinkController extends Controller
             'role' => $link->role,
         ]);
 
-        return back()->with('success', route('shared.documents', $link->token));
+        return back()->with('share_link', route('shared.documents', $link->token));
     }
 
     public function destroy(Document $document, DocumentAccessLink $link): RedirectResponse
@@ -61,6 +63,10 @@ class ShareLinkController extends Controller
             abort(404);
         }
 
+        if ($link->role === 'editor' && !auth()->check()) {
+            return redirect()->guest(route('login'));
+        }
+
         $document = $link->document()->with('owner', 'division', 'currentVersion', 'versions.author')->firstOrFail();
 
         return view('documents.shared', compact('document', 'link'));
@@ -74,6 +80,10 @@ class ShareLinkController extends Controller
             abort(403);
         }
 
+        if (!auth()->check()) {
+            return redirect()->guest(route('login'));
+        }
+
         $document = $link->document;
 
         $validated = $request->validate([
@@ -81,11 +91,10 @@ class ShareLinkController extends Controller
         ]);
 
         $versionService = app(\App\Services\VersionService::class);
-        $version = $versionService->savePending($document, $validated['content'], auth()->user() ?? $document->owner);
+        $version = $versionService->savePending($document, $validated['content'], auth()->user());
 
-        // Use a system audit since no authenticated user
         $auditService = app(\App\Services\AuditService::class);
-        $auditService->log(null, 'version.created_via_link', 'document_version', $version->id, [
+        $auditService->log(auth()->user(), 'version.created_via_link', 'document_version', $version->id, [
             'document_id' => $document->id,
             'version_number' => $version->version_number,
             'link_token' => $token,
@@ -94,12 +103,31 @@ class ShareLinkController extends Controller
         return redirect()->route('shared.documents', $token)->with('success', 'Edit saved. Pending approval.');
     }
 
+    public function upload(Request $request, string $token)
+    {
+        $link = DocumentAccessLink::where('token', $token)->firstOrFail();
+
+        if ($link->isExpired() || $link->role !== 'editor') {
+            abort(403);
+        }
+
+        if (!auth()->check()) {
+            return redirect()->guest(route('login'));
+        }
+
+        return app(JoditController::class)->upload($request);
+    }
+
     public function discard(string $token): RedirectResponse
     {
         $link = DocumentAccessLink::where('token', $token)->firstOrFail();
 
         if ($link->isExpired() || $link->role !== 'editor') {
             abort(403);
+        }
+
+        if (!auth()->check()) {
+            return redirect()->guest(route('login'));
         }
 
         $document = $link->document;
@@ -119,5 +147,39 @@ class ShareLinkController extends Controller
         return redirect()->route('shared.documents', $token)->with('success', $discarded
             ? 'Versi pending v' . $discarded->version_number . ' di-discard.'
             : 'Tidak ada versi pending untuk di-discard.');
+    }
+
+    public function history(): View
+    {
+        $logs = AuditLog::where('user_id', auth()->id())
+            ->where('action', 'version.created_via_link')
+            ->latest('created_at')
+            ->get()
+            ->unique(fn ($log) => $log->metadata['document_id'] ?? null)
+            ->values();
+
+        $documents = Document::whereIn('id', $logs->pluck('metadata.document_id'))
+            ->with('division', 'currentVersion')
+            ->get()
+            ->keyBy('id');
+
+        $links = DocumentAccessLink::whereIn('token', $logs->pluck('metadata.link_token'))
+            ->get()
+            ->keyBy('token');
+
+        $history = $logs->map(function ($log) use ($documents, $links) {
+            $docId = $log->metadata['document_id'] ?? null;
+            $token = $log->metadata['link_token'] ?? null;
+
+            return [
+                'document' => $documents->get($docId),
+                'link' => $links->get($token),
+                'token' => $token,
+                'version_number' => $log->metadata['version_number'] ?? null,
+                'edited_at' => $log->created_at,
+            ];
+        })->filter(fn ($h) => $h['document'] && $h['token']);
+
+        return view('documents.shared-history', compact('history'));
     }
 }

@@ -65,7 +65,7 @@
                                 class="textarea textarea-bordered w-full"
                                 data-upload-url="{{ route('shared.documents.upload', $link->token) }}"
                                 data-csrf-token="{{ csrf_token() }}"
-                            >{{ $document->currentVersion->content ?? '' }}</textarea>
+                            >{{ $pending->content ?? $document->currentVersion->content ?? '' }}</textarea>
                             <div class="mt-4 flex justify-end">
                                 <button type="submit" class="btn btn-primary">
                                     Save & Submit for Approval

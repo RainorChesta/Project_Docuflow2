@@ -43,6 +43,7 @@ Route::middleware('auth')->group(function () {
     // Share Links
     Route::post('/documents/{document}/links', [ShareLinkController::class, 'store'])->name('links.store');
     Route::delete('/documents/{document}/links/{link}', [ShareLinkController::class, 'destroy'])->name('links.destroy');
+    Route::get('/my-shared-edits', [ShareLinkController::class, 'history'])->name('shared.history');
 
     // Admin
     Route::prefix('admin')->name('admin.')->group(function () {
@@ -63,5 +64,6 @@ Route::middleware('auth')->group(function () {
 Route::get('/share/{token}', [ShareLinkController::class, 'access'])->name('shared.documents');
 Route::post('/share/{token}/save', [ShareLinkController::class, 'save'])->name('shared.documents.save');
 Route::post('/share/{token}/discard', [ShareLinkController::class, 'discard'])->name('shared.documents.discard');
+Route::post('/share/{token}/upload', [ShareLinkController::class, 'upload'])->name('shared.documents.upload');
 
 require __DIR__.'/auth.php';

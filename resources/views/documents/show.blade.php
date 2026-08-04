@@ -168,7 +168,12 @@
                             <h4 class="text-sm font-medium text-base-content/70 mb-2">Active Links</h4>
                             @foreach($document->accessLinks as $link)
                                 <div class="flex justify-between items-center py-2 border-b border-base-200 text-sm">
-                                    <span class="text-base-content/60 truncate max-w-md">{{ route('shared.documents', $link->token) }}</span>
+                                    <button type="button"
+                                            class="text-base-content/60 truncate max-w-md text-left hover:underline"
+                                            onclick="openShareLinkModal('{{ route('shared.documents', $link->token) }}')"
+                                            title="Klik untuk salin link">
+                                        {{ route('shared.documents', $link->token) }}
+                                    </button>
                                     <div class="flex gap-2 items-center">
                                         <span class="badge {{ $link->role === 'editor' ? 'badge-primary' : 'badge-ghost' }} badge-sm">
                                             {{ $link->role }}
@@ -192,6 +197,66 @@
 
         </div>
     </div>
+
+    {{-- Share link modal (reusable) --}}
+    <style>
+        #share-link-modal::backdrop { background: rgba(0, 0, 0, 0.5); }
+    </style>
+    <dialog id="share-link-modal" class="modal">
+        <div class="modal-box max-w-md">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-semibold">Link Berhasil Dibuat</h3>
+                <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('share-link-modal').close()">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <input id="share-link-input" type="text" readonly
+                   class="input input-bordered w-full mb-4" onclick="this.select()">
+
+            <div class="flex flex-wrap gap-2">
+                <button type="button" id="share-link-copy-btn" class="btn btn-primary btn-sm" onclick="shareLinkCopy()">
+                    Copy Link
+                </button>
+                <a id="share-link-email" href="mailto:?subject={{ rawurlencode('Link Dokumen: ' . $document->title) }}&body="
+                   class="btn btn-neutral btn-sm">
+                    Share Email
+                </a>
+                <a id="share-link-wa" href="https://wa.me/?text=" target="_blank" rel="noopener"
+                   class="btn btn-success btn-sm">
+                    Share WhatsApp
+                </a>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
+
+    <script>
+        function openShareLinkModal(url) {
+            document.getElementById('share-link-input').value = url;
+            document.getElementById('share-link-email').href = 'mailto:?subject=' + encodeURIComponent('Link Dokumen: {{ $document->title }}') + '&body=' + encodeURIComponent(url);
+            document.getElementById('share-link-wa').href = 'https://wa.me/?text=' + encodeURIComponent(url);
+            document.getElementById('share-link-modal').showModal();
+        }
+
+        @if(session('share_link'))
+            openShareLinkModal('{{ session('share_link') }}');
+        @endif
+
+        function shareLinkCopy() {
+            const input = document.getElementById('share-link-input');
+            const btn = document.getElementById('share-link-copy-btn');
+            navigator.clipboard.writeText(input.value).then(() => {
+                const original = btn.textContent;
+                btn.textContent = 'Copied!';
+                setTimeout(() => { btn.textContent = original; }, 2000);
+            });
+        }
+    </script>
 
     {{-- Version History modal --}}
     <dialog id="version-modal" class="modal">
