@@ -15,7 +15,11 @@
                             <div><span class="text-base-content/60">Division:</span> {{ $document->division?->code ?? '—' }}</div>
                             <div><span class="text-base-content/60">Owner:</span> {{ $document->owner->name }}</div>
                         </div>
-                        <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm">Back to Edit</a>
+                        @can('update', $document)
+                            <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm">Back to Edit</a>
+                        @else
+                            <a href="{{ route('documents.show', $document) }}" class="btn btn-ghost btn-sm">Back</a>
+                        @endcan
                     </div>
 
                     <div id="live-preview-content">
