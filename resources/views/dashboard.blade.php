@@ -5,7 +5,7 @@
         <div class="max-w-7xl mx-auto">
             @if(auth()->user()->isAdmin())
                 {{-- Admin dashboard: General Dokumen list (tab hidden from admin navbar) --}}
-                @include('documents._search')
+                @include('documents._search', ['type' => 'general'])
 
                 @if(session('success'))
                     <div class="alert alert-success mb-4">
