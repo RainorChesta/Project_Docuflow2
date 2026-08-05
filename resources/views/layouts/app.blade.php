@@ -45,12 +45,6 @@
                             </div>
                             <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box shadow-lg border border-base-300 w-48 mt-2 p-2">
                                 <li><a href="{{ route('profile.edit') }}" class="text-sm">Profile</a></li>
-                                <li>
-                                    <form method="POST" action="{{ route('logout') }}">
-                                        @csrf
-                                        <button type="submit" class="text-sm text-error">Log Out</button>
-                                    </form>
-                                </li>
                             </ul>
                         </div>
                     </div>
