@@ -104,10 +104,13 @@ class Document extends Model
 
     /**
      * General (public) documents — visible to every authenticated user.
+     * Hanya dokumen berstatus aktif (punya versi approved) yang muncul,
+     * konsisten dengan scopeDivision. Dokumen pending/draft tidak tampil.
      */
     public function scopeGeneral(Builder $query): Builder
     {
-        return $query->where('visibility', self::VISIBILITY_GENERAL);
+        return $query->where('visibility', self::VISIBILITY_GENERAL)
+            ->whereHas('versions', fn($q) => $q->where('status', 'active'));
     }
 
     /**
