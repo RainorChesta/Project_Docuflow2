@@ -17,7 +17,7 @@
                         @forelse($documents as $doc)
                             @include('documents._list', ['doc' => $doc])
                         @empty
-                            <div class="p-6 text-base-content/60">Tidak ada dokumen general.</div>
+                            <div class="p-6 text-base-content/60">Tidak ada dokumen.</div>
                         @endforelse
                     </div>
                     @if($documents->hasPages())
