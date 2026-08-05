@@ -1,10 +1,15 @@
 <style>
+    /* WAJIB baris PERTAMA — @import harus paling atas di file CSS, sama
+       seperti iframeStyle editor di resources/js/jodit.js. Tanpa ini font
+       Google tidak tampil di preview halaman → beda dgn pratinjau Jodit. */
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,400&family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Lora:ital,wght@0,400..700;1,400..700&family=Source+Code+Pro:ital,wght@0,400;0,700;1,400&display=swap');
+
     .doku-paper-scope .doku-paper {
         width: 794px;
         margin: 0 auto;
         padding: 48px 56px;
         background-color: #fff;
-        min-height: 1123px;
+        min-height: 1129px;
         border: 2px solid #6b7280;
         border-top: none; /* konsisten sama iframeStyle editor */
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -22,9 +27,9 @@
         background-image: repeating-linear-gradient(
             to bottom,
             transparent 0,
-            transparent 1117px,
-            #d1d5db 1117px,
-            #d1d5db 1123px
+            transparent 1129px,
+            #d1d5db 1129px,
+            #d1d5db 1135px
         ) !important;
         background-repeat: repeat-y !important;
     }
@@ -35,31 +40,14 @@
         clear: both;
     }
 
-    /* Reset margin/padding default elemen supaya tidak kena style
-       Tailwind/daisyUI dari luar — samakan juga dengan UA default iframe */
-    .doku-paper-scope .doku-paper p {
-        margin: 0 0 1em 0;
-    }
-
-    .doku-paper-scope .doku-paper ul,
-    .doku-paper-scope .doku-paper ol {
-        margin: 1em 0;
-        padding-left: 40px;
-    }
-
-    /* Tailwind preflight reset list-style jadi none → bullet/nomor hilang.
-       Di iframe editor tidak ada preflight (pakai default browser), jadi
-       set eksplisit biar preview konsisten dengan editor. */
-    .doku-paper-scope .doku-paper ul {
-        list-style: disc;
-    }
-
-    .doku-paper-scope .doku-paper ol {
-        list-style: decimal;
-    }
-
-    .doku-paper-scope .doku-paper li {
-        list-style: inherit;
+    /* Netralkan preflight Tailwind di dalam paper: semua elemen konten
+       dikembalikan ke default browser (UA stylesheet) — persis seperti
+       render di iframe editor Jodit yang TIDAK kena preflight. Tanpa ini
+       margin h1-h6, ukuran heading, list-style, dsb. di-reset preflight
+       → tinggi konten beda → elemen yang di editor jatuh ke halaman
+       berikutnya (di bawah garis) malah sejajar dengan garis di preview. */
+    .doku-paper-scope .doku-paper :is(p, h1, h2, h3, h4, h5, h6, ul, ol, li, blockquote, pre, figure, dl, dd, dt, hr) {
+        all: revert;
     }
 
     .doku-paper-scope .doku-paper table {

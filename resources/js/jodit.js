@@ -64,11 +64,11 @@ export function initJoditEditor(selector, overrides = {}) {
             '  margin:0 auto;',
             '  padding:48px 56px;',
             '  background:#fff;',
-            '  min-height:1123px;',
+            '  min-height:1129px;',
             '  border:2px solid #6b7280;',
             '  border-top:none;',
             '  box-shadow:0 1px 3px rgba(0,0,0,0.1);',
-            '  background-image:repeating-linear-gradient(to bottom, transparent 0, transparent 1100px, #d1d5db 1100px, #d1d5db 1106px);',
+            '  background-image:repeating-linear-gradient(to bottom, transparent 0, transparent 1129px, #d1d5db 1129px, #d1d5db 1135px);',
             '}',
             // Style tabel default Jodit — wajib dipertahankan karena iframeStyle
             // mengganti total bawaan (yang punya border th/td).
