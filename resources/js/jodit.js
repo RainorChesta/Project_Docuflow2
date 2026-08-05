@@ -219,6 +219,83 @@ export function initJoditEditor(selector, overrides = {}) {
                     input.click();
                 },
             },
+
+            // === TAMBAHKAN KODE DI BAWAH INI ===
+            // Override tombol "print" bawaan Jodit. Bawaan memanggil
+            // myWindow.print() langsung setelah body.innerHTML diisi, sebelum
+            // gambar selesai dimuat → dialog print muncul dengan gambar kosong.
+            // Di sini kita tunggu semua <img> selesai load dulu baru print.
+            print: {
+                name: 'print',
+                tooltip: 'Print',
+                exec: (jodit) => {
+                    const iframe = jodit.create.element('iframe');
+                    Object.assign(iframe.style, {
+                        position: 'fixed',
+                        right: 0,
+                        bottom: 0,
+                        width: 0,
+                        height: 0,
+                        border: 0,
+                    });
+                    jodit.container.appendChild(iframe);
+
+                    const afterFinishPrint = () => {
+                        jodit.e.off(jodit.ow, 'mousemove', afterFinishPrint);
+                        iframe.remove();
+                    };
+
+                    const myWindow = iframe.contentWindow;
+                    if (!myWindow) return;
+
+                    jodit.e
+                        .on(myWindow, 'onbeforeunload onafterprint', afterFinishPrint)
+                        .on(jodit.ow, 'mousemove', afterFinishPrint);
+
+                    // Bangun struktur iframe sama seperti bawaan (pakai iframeStyle
+                    // yang sudah diset, biar paper look & font konsisten).
+                    jodit.e.fire('generateDocumentStructure.iframe', myWindow.document, jodit);
+                    myWindow.document.body.innerHTML = jodit.value;
+
+                    const style = myWindow.document.createElement('style');
+                    style.innerHTML = `@media print { body { -webkit-print-color-adjust: exact; } }`;
+                    myWindow.document.head.appendChild(style);
+
+                    // Tunggu semua gambar di dalam konten selesai dimuat.
+                    const imgs = Array.from(myWindow.document.querySelectorAll('img'));
+                    if (imgs.length === 0) {
+                        myWindow.focus();
+                        myWindow.print();
+                        return;
+                    }
+                    let remaining = imgs.length;
+                    let done = false;
+                    const finish = () => {
+                        if (done) return;
+                        done = true;
+                        myWindow.focus();
+                        myWindow.print();
+                    };
+                    imgs.forEach((img) => {
+                        if (img.complete && img.naturalWidth > 0) {
+                            remaining--;
+                            if (remaining === 0) finish();
+                            return;
+                        }
+                        img.addEventListener('load', () => {
+                            remaining--;
+                            if (remaining === 0) finish();
+                        });
+                        img.addEventListener('error', () => {
+                            remaining--;
+                            if (remaining === 0) finish();
+                        });
+                    });
+                    // Jaring pengaman: kalau ada gambar yang tak kunjung load,
+                    // tetap print setelah 3 detik.
+                    setTimeout(finish, 3000);
+                },
+            },
         },
 
 
