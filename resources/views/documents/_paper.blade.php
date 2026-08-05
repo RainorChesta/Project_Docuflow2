@@ -47,6 +47,21 @@
         padding-left: 40px;
     }
 
+    /* Tailwind preflight reset list-style jadi none → bullet/nomor hilang.
+       Di iframe editor tidak ada preflight (pakai default browser), jadi
+       set eksplisit biar preview konsisten dengan editor. */
+    .doku-paper-scope .doku-paper ul {
+        list-style: disc;
+    }
+
+    .doku-paper-scope .doku-paper ol {
+        list-style: decimal;
+    }
+
+    .doku-paper-scope .doku-paper li {
+        list-style: inherit;
+    }
+
     .doku-paper-scope .doku-paper table {
         width: 100%;
         border: none;
