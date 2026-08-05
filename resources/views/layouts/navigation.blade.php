@@ -19,6 +19,7 @@
             Dashboard
         </a>
 
+        @if(!auth()->user()->isAdmin())
         <a href="{{ route('documents.index', ['type' => 'general']) }}"
            class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150
                   {{ request()->routeIs('documents.*') && request('type', '') === 'general' ? 'bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}">
@@ -39,6 +40,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
             Dokumen Divisi
         </a>
+        @endif
 
         @if(auth()->user()->isHead())
         <a href="{{ route('approvals.index') }}"
