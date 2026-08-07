@@ -47,7 +47,9 @@ class PdfExportService
 
         $dompdf = new Dompdf($options);
         $dompdf->loadHtml($html, 'UTF-8');
-        $dompdf->setPaper('A4', 'portrait');
+        // Ikuti ukuran kertas yang dipilih di editor (paper_size dokumen),
+        // bukan hardcoded A4 — konsisten dengan preview/editor.
+        $dompdf->setPaper($document->paper_size ?? 'A4', 'portrait');
         $dompdf->render();
 
         $filename = $this->filename($document);
@@ -149,6 +151,13 @@ class PdfExportService
 
     private function buildHtml(Document $document, string $content): string
     {
+        // Margin dari dokumen (px, disimpan editor) — fallback 72/48/60.
+        $m = $document->paper_margin ?? [];
+        $top = $m['top'] ?? 72;
+        $right = $m['right'] ?? 48;
+        $bottom = $m['bottom'] ?? 72;
+        $left = $m['left'] ?? 48;
+
         // Header/footer via dompdf inline script: title + export date + page numbers.
         $head = <<<'HTML'
         <script type="text/php">
@@ -166,7 +175,7 @@ class PdfExportService
             <meta charset="utf-8">
             {$head}
             <style>
-                @page { margin: 72px 48px 60px; }
+                @page { margin: {$top}px {$right}px {$bottom}px {$left}px; }
                 body { font-family: 'DejaVu Sans', sans-serif; font-size: 12px; color: #111; line-height: 1.5; }
                 table { border-collapse: collapse; width: 100%; }
                 table th, table td { border: 1px solid #ccc; padding: 4px 6px; }

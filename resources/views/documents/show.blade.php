@@ -81,6 +81,9 @@
             @endif
 
             <!-- Metadata -->
+            @php
+                $hasDraft = $document->versions->contains('status', 'draft');
+            @endphp
             <div class="card bg-base-100 border border-base-300 shadow-sm mb-6">
                 <div class="card-body">
                     <div class="flex items-center gap-3 mb-4">
@@ -133,9 +136,6 @@
                     </div>
 
                     {{-- Actions (di bawah keterangan, sejajar menyamping) --}}
-                    @php
-                        $hasDraft = $document->versions->contains('status', 'draft');
-                    @endphp
                     <div class="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-base-200">
                         @can('update', $document)
                             @if($hasDraft && !$pendingVersion && !$document->currentVersion)
