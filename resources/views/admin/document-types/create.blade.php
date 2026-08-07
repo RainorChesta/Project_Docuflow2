@@ -10,7 +10,11 @@
 
                         <div class="form-control w-full mb-4">
                             <label for="code" class="label"><span class="label-text font-medium">Kode Dokumen</span></label>
-                            <input type="text" name="code" id="code" value="{{ old('code') }}" class="input input-bordered w-full" required>
+                            <input type="text" name="code" id="code" value="{{ old('code') }}"
+                                   class="input input-bordered w-full uppercase"
+                                   style="text-transform: uppercase;"
+                                   oninput="this.value = this.value.toUpperCase();"
+                                   required>
                             @error('code') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                         </div>
 

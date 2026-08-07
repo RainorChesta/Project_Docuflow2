@@ -23,8 +23,11 @@
                     </div>
 
                     <div id="live-preview-content">
-                        @if($document->displayVersion())
-                            @include('documents._paper', ['content' => $document->displayVersion()->content])
+                        @php $display = $document->displayVersion(); @endphp
+                        @if($display && $display->file_path)
+                            @include('documents._file-preview', ['document' => $document, 'version' => $display])
+                        @elseif($display)
+                            @include('documents._paper', ['content' => $display->content])
                         @else
                             <p class="text-base-content/60 italic">No approved content yet.</p>
                         @endif

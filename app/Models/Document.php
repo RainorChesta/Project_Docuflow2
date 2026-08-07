@@ -12,12 +12,14 @@ class Document extends Model
     protected $fillable = [
         'document_number', 'title', 'visibility', 'division_id', 'owner_id',
         'document_type_id', 'is_public', 'current_version_id',
+        'pending_rollback_version_id', 'rollback_requested_by_id', 'rollback_requested_at',
     ];
 
     protected function casts(): array
     {
         return [
             'is_public' => 'boolean',
+            'rollback_requested_at' => 'datetime',
         ];
     }
 
@@ -58,6 +60,21 @@ class Document extends Model
     public function currentVersion(): BelongsTo
     {
         return $this->belongsTo(DocumentVersion::class, 'current_version_id');
+    }
+
+    public function pendingRollbackVersion(): BelongsTo
+    {
+        return $this->belongsTo(DocumentVersion::class, 'pending_rollback_version_id');
+    }
+
+    public function rollbackRequestedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'rollback_requested_by_id');
+    }
+
+    public function hasPendingRollback(): bool
+    {
+        return !is_null($this->pending_rollback_version_id);
     }
 
     /**

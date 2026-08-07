@@ -5,7 +5,7 @@
         <div class="max-w-3xl mx-auto">
             <div class="card bg-base-100 border border-base-300 shadow-sm">
                 <div class="card-body">
-                    <form method="POST" action="{{ route('documents.store') }}">
+                    <form method="POST" action="{{ route('documents.store') }}" enctype="multipart/form-data">
                         @csrf
 
                         <div class="form-control w-full mb-4">
@@ -21,6 +21,20 @@
                                 @endforeach
                             </select>
                             @error('document_type_id') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div class="form-control w-full mb-4">
+                            <label for="document_number_field" class="label">
+                                <span class="label-text font-medium">Nomor Dokumen</span>
+                                <span id="document-number-hint" class="label-text-alt text-base-content/50">Preview otomatis</span>
+                            </label>
+                            <input type="text" id="document_number_field"
+                                   value="{{ old('document_number', 'Pilih tipe dokumen dahulu...') }}"
+                                   class="input input-bordered w-full font-mono bg-base-200" disabled>
+                            @error('document_number') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
+                            <p class="text-xs text-base-content/50 mt-1">
+                                Nomor final dihitung ulang saat disimpan — preview ini hanya perkiraan.
+                            </p>
                         </div>
 
                         <div class="form-control w-full mb-4">
@@ -41,6 +55,30 @@
                             <p class="text-xs text-base-content/50 mt-1">Otomatis sesuai divisi akun kamu.</p>
                         </div>
 
+                        <div class="divider"></div>
+
+                        <div class="form-control mb-2">
+                            <label class="label cursor-pointer justify-start gap-3">
+                                <input type="checkbox" name="is_upload" id="is_upload" value="1"
+                                       class="checkbox checkbox-sm checkbox-primary"
+                                       {{ old('is_upload') ? 'checked' : '' }}>
+                                <span class="label-text font-medium">Unggah dokumen yang sudah ada (bukan ditulis di editor)</span>
+                            </label>
+                        </div>
+
+                        <div id="upload-field" class="form-control w-full mb-4 {{ old('is_upload') ? '' : 'hidden' }}">
+                            <label for="file" class="label">
+                                <span class="label-text font-medium">Berkas Dokumen</span>
+                            </label>
+                            <input type="file" name="file" id="file" accept=".pdf,.docx"
+                                   class="file-input file-input-bordered w-full">
+                            <p class="text-xs text-base-content/50 mt-1">Hanya PDF atau DOCX, maksimal 10MB.</p>
+                            @error('file') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
+                            <p class="text-xs text-info mt-1">
+                                Setelah berkas dipilih, isi nomor dokumen di atas sesuai nomor resmi pada berkas fisik.
+                            </p>
+                        </div>
+
                         <div class="flex justify-end">
                             <button type="submit" class="btn btn-primary">Create Document</button>
                         </div>
@@ -49,4 +87,80 @@
             </div>
         </div>
     </div>
+
+    <script>
+        (function () {
+            var typeSelect = document.getElementById('document_type_id');
+            var numberField = document.getElementById('document_number_field');
+            var numberHint = document.getElementById('document-number-hint');
+            var uploadCheckbox = document.getElementById('is_upload');
+            var uploadField = document.getElementById('upload-field');
+            var fileInput = document.getElementById('file');
+
+            var lastPreview = numberField.value;
+
+            function fetchPreview() {
+                var typeId = typeSelect.value;
+                if (!typeId) {
+                    numberField.value = 'Pilih tipe dokumen dahulu...';
+                    lastPreview = '';
+                    return;
+                }
+
+                fetch('{{ route('documents.next-number') }}?document_type_id=' + encodeURIComponent(typeId), {
+                    headers: { 'Accept': 'application/json' }
+                })
+                    .then(function (res) { return res.json(); })
+                    .then(function (data) {
+                        lastPreview = data.number;
+                        if (numberField.disabled) {
+                            numberField.value = data.number;
+                        }
+                    })
+                    .catch(function () {
+                        numberField.value = 'Gagal memuat preview';
+                    });
+            }
+
+            function setUploadMode(isFileChosen) {
+                if (isFileChosen) {
+                    numberField.disabled = false;
+                    numberField.name = 'document_number';
+                    numberField.classList.remove('bg-base-200');
+                    numberField.value = lastPreview || '';
+                    numberHint.textContent = 'Isi manual sesuai berkas';
+                } else {
+                    numberField.disabled = true;
+                    numberField.removeAttribute('name');
+                    numberField.classList.add('bg-base-200');
+                    numberField.value = lastPreview || 'Pilih tipe dokumen dahulu...';
+                    numberHint.textContent = 'Preview otomatis';
+                }
+            }
+
+            typeSelect.addEventListener('change', fetchPreview);
+
+            uploadCheckbox.addEventListener('change', function () {
+                if (uploadCheckbox.checked) {
+                    uploadField.classList.remove('hidden');
+                } else {
+                    uploadField.classList.add('hidden');
+                    fileInput.value = '';
+                    setUploadMode(false);
+                }
+            });
+
+            fileInput.addEventListener('change', function () {
+                setUploadMode(fileInput.files.length > 0);
+            });
+
+            // Restore state kalau form reload akibat error validasi.
+            if (typeSelect.value) {
+                fetchPreview();
+            }
+            if (uploadCheckbox.checked) {
+                uploadField.classList.remove('hidden');
+            }
+        })();
+    </script>
 </x-app-layout>

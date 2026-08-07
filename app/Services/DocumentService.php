@@ -5,33 +5,90 @@ namespace App\Services;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\Division;
+use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 
 class DocumentService
 {
+    /**
+     * Generate the final, authoritative document number. Locks the row
+     * range to avoid duplicate sequences under concurrent submissions.
+     */
     public function generateId(?Division $division, ?DocumentType $documentType): string
     {
-        $centralCode = config('dokuflow.central_code', 'JBM');
-        $typeCode = $documentType?->code ?? 'GEN';
-        $divisionCode = $division?->code ?? 'GEN';
-        $romanMonth = $this->toRomanMonth(Carbon::now()->month);
-        $year = Carbon::now()->year;
-
-        return DB::transaction(function () use ($centralCode, $typeCode, $divisionCode, $romanMonth, $year) {
-            $lastDoc = Document::where('document_number', 'like', '%/' . $typeCode . '/' . $divisionCode . '/' . $centralCode . '/' . $romanMonth . '/' . $year)
+        return DB::transaction(function () use ($division, $documentType) {
+            $lastDoc = Document::where('division_id', $division?->id)
+                ->where('document_type_id', $documentType?->id)
+                ->whereYear('created_at', now()->year)
                 ->lockForUpdate()
                 ->orderByDesc('id')
                 ->first();
 
-            $seq = 1;
-            if ($lastDoc) {
-                $firstSegment = explode('/', $lastDoc->document_number)[0];
-                $seq = (int) $firstSegment + 1;
-            }
+            $seq = $this->nextSequenceFrom($lastDoc);
 
-            return sprintf('%03d/%s/%s/%s/%s/%d', $seq, $typeCode, $divisionCode, $centralCode, $romanMonth, $year);
+            return $this->formatNumber($division, $documentType, $seq);
         });
+    }
+
+    /**
+     * Non-locking preview of the next number, purely indicative for the
+     * create form. The authoritative number is recalculated (with a lock)
+     * when the form is actually submitted, so this may occasionally be
+     * off by one under concurrent submissions — that's expected/accepted.
+     */
+    public function previewNumber(?Division $division, ?DocumentType $documentType): string
+    {
+        $lastDoc = Document::where('division_id', $division?->id)
+            ->where('document_type_id', $documentType?->id)
+            ->whereYear('created_at', now()->year)
+            ->orderByDesc('id')
+            ->first();
+
+        $seq = $this->nextSequenceFrom($lastDoc);
+
+        return $this->formatNumber($division, $documentType, $seq);
+    }
+
+    private function nextSequenceFrom(?Document $lastDoc): int
+    {
+        if (!$lastDoc) {
+            return 1;
+        }
+
+        // Sequence selalu di segmen pertama, jadi aman diparsing meskipun
+        // kode tipe mengandung "-" hasil substitusi di formatNumber().
+        $firstSegment = explode('/', $lastDoc->document_number)[0];
+
+        return (int) $firstSegment + 1;
+    }
+
+    private function formatNumber(?Division $division, ?DocumentType $documentType, int $seq): string
+    {
+        $now = Carbon::now();
+        $year = $now->year;
+        $romanMonth = $this->toRomanMonth($now->month);
+        $centralCode = config('dokuflow.central_code', 'JBM');
+
+        // Non-division scopes (general/personal) pakai kode generik karena
+        // tidak terikat divisi manapun.
+        $divisionCode = $division ? $division->code : 'GEN';
+
+        // "/" di kode tipe diganti "-" khusus untuk nomor dokumen, supaya
+        // jumlah segmen yang dipisah "/" tetap konsisten (6 segmen).
+        $typeCode = $documentType?->code ?? 'GEN';
+        $typeCodeForNumber = str_replace('/', '-', $typeCode);
+
+        return sprintf(
+            '%03d/%s/%s/%s/%s/%d',
+            $seq,
+            $typeCodeForNumber,
+            $divisionCode,
+            $centralCode,
+            $romanMonth,
+            $year
+        );
     }
 
     public function create(array $data, int $ownerId): Document
@@ -50,8 +107,44 @@ class DocumentService
                 'version_number' => 1,
                 'content' => '',
                 'author_id' => $data['owner_id'],
-                'author_name' => \App\Models\User::find($data['owner_id'])->name,
+                'author_name' => User::find($data['owner_id'])->name,
                 'status' => 'draft',
+            ]);
+
+            return $doc;
+        });
+    }
+
+    /**
+     * Dokumen dari berkas fisik yang sudah diunggah (bukan ditulis di Jodit).
+     * Nomor sudah divalidasi manual oleh controller (mengikuti format resmi),
+     * jadi tidak di-generate di sini. Versi pertama langsung berstatus
+     * "pending" — skip draft, langsung minta approval kepala divisi.
+     */
+    public function createFromUpload(array $data, int $ownerId, UploadedFile $file): Document
+    {
+        return DB::transaction(function () use ($data, $ownerId, $file) {
+            $data['visibility'] ??= Document::VISIBILITY_DIVISION;
+            $data['owner_id'] = $ownerId;
+
+            $doc = Document::create($data);
+
+            $extension = $file->getClientOriginalExtension();
+            $storedPath = $file->storeAs(
+                'documents/' . $doc->id,
+                'v1.' . $extension,
+                'local'
+            );
+
+            $doc->versions()->create([
+                'version_number' => 1,
+                'content' => '',
+                'author_id' => $ownerId,
+                'author_name' => User::find($ownerId)->name,
+                'status' => 'pending',
+                'file_path' => $storedPath,
+                'file_original_name' => $file->getClientOriginalName(),
+                'file_mime' => $file->getClientMimeType(),
             ]);
 
             return $doc;

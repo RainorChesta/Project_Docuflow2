@@ -8,7 +8,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class DocumentVersion extends Model
 {
     protected $fillable = [
-        'document_id', 'version_number', 'content', 'author_id',
+        'document_id', 'version_number', 'content', 'file_path',
+        'file_original_name', 'file_mime', 'author_id',
         'author_name', 'status', 'reviewer_id', 'review_notes', 'reviewed_at',
         'discarded_at',
     ];
@@ -19,6 +20,11 @@ class DocumentVersion extends Model
             'reviewed_at' => 'datetime',
             'discarded_at' => 'datetime',
         ];
+    }
+
+    public function isFileUpload(): bool
+    {
+        return !is_null($this->file_path);
     }
 
     public function scopePending($query)
