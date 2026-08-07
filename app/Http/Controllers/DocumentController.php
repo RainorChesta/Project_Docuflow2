@@ -9,8 +9,10 @@ use App\Models\DocumentVersion;
 use App\Services\AuditService;
 use App\Services\DocumentService;
 use App\Services\VersionService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class DocumentController extends Controller
@@ -93,35 +95,75 @@ class DocumentController extends Controller
         return view('documents.create', compact('divisions','documentTypes'));
     }
 
+    /**
+     * Preview nomor dokumen berikutnya untuk tipe dokumen tertentu, di
+     * divisi milik user yang sedang login. Murni indikatif — nomor final
+     * dihitung ulang (dengan lock) saat form benar-benar disubmit.
+     */
+    public function nextNumber(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'document_type_id' => 'required|exists:document_types,id',
+        ]);
+
+        $user = auth()->user();
+        $division = $user->division_id ? Division::find($user->division_id) : null;
+        $documentType = DocumentType::findOrFail($validated['document_type_id']);
+
+        return response()->json([
+            'number' => $this->documentService->previewNumber($division, $documentType),
+        ]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $this->authorize('create', Document::class);
 
-        $validated = $request->validate([
+        $user = auth()->user();
+        $isUpload = $request->boolean('is_upload');
+
+        $rules = [
             'title' => 'required|string|max:255',
             'document_type_id' => 'required|exists:document_types,id',
-            'division_id' => 'required|exists:divisions,id',
-        ]);
+        ];
 
-        // Documents created here are always division-scoped; scope is
-        // changed later from the document's own settings.
-        $validated['visibility'] = Document::VISIBILITY_DIVISION;
-
-        // Users may only assign documents to divisions they belong to.
-        if (!auth()->user()->isAdmin()
-            && !in_array((int) $validated['division_id'], auth()->user()->allDivisionIds(), true)) {
-            abort(403, 'You cannot create documents in this division.');
+        if ($isUpload) {
+            $rules['file'] = 'required|file|mimes:pdf,docx|max:10240';
+            $rules['document_number'] = [
+                'required',
+                'string',
+                'max:100',
+                'unique:documents,document_number',
+                // Format resmi: seq/tipe/divisi/pusat/bulan-romawi/tahun
+                'regex:/^\d{3}\/[A-Z0-9.\-]+\/[A-Z0-9]+\/[A-Z0-9]+\/(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII)\/\d{4}$/',
+            ];
         }
 
-        $doc = $this->documentService->create($validated, auth()->id());
+        $validated = $request->validate($rules, [
+            'document_number.regex' => 'Format nomor tidak sesuai. Contoh: 029/S.ED/HRD/JBM/VIII/2026',
+        ]);
 
-        $this->auditService->log(auth()->user(), 'document.created', 'document', $doc->id, [
+        $validated['division_id'] = $user->division_id;
+        $validated['visibility'] = Document::VISIBILITY_DIVISION;
+
+        if ($isUpload) {
+            $doc = $this->documentService->createFromUpload($validated, $user->id, $request->file('file'));
+            $message = 'Dokumen diunggah. Menunggu approval kepala divisi.';
+        } else {
+            $doc = $this->documentService->create($validated, $user->id);
+            $message = 'Document created. Fill in the content.';
+        }
+
+        $this->auditService->log($user, 'document.created', 'document', $doc->id, [
             'title' => $doc->title,
             'document_number' => $doc->document_number,
             'visibility' => $doc->visibility,
+            'via_upload' => $isUpload,
         ]);
 
-        return redirect()->route('documents.edit', $doc)->with('success', 'Document created. Fill in the content.');
+        return $isUpload
+            ? redirect()->route('documents.show', $doc)->with('success', $message)
+            : redirect()->route('documents.edit', $doc)->with('success', $message);
     }
 
     public function show(Document $document): View
@@ -142,6 +184,14 @@ class DocumentController extends Controller
         $this->authorize('update', $document);
 
         $document->load('currentVersion', 'versions');
+
+        $latest = $document->versions()->latest('version_number')->first();
+
+        abort_if(
+            $latest && $latest->file_path,
+            403,
+            'Dokumen ini berasal dari unggahan berkas dan tidak bisa diedit lewat editor. Gunakan rollback untuk mengubah isinya.'
+        );
 
         return view('documents.insert', compact('document'));
     }
@@ -258,6 +308,42 @@ class DocumentController extends Controller
         return redirect()->route('documents.index')->with('success', 'Document discarded.');
     }
 
+    public function uploadVersion(Request $request, Document $document): RedirectResponse
+    {
+        $this->authorize('update', $document);
+
+        $validated = $request->validate([
+            'file' => 'required|file|mimes:pdf,docx|max:10240',
+        ]);
+
+        $version = $this->versionService->savePendingFile($document, $request->file('file'), auth()->user());
+
+        $this->auditService->log(auth()->user(), 'version.uploaded', 'document_version', $version->id, [
+            'document_id' => $document->id,
+            'version_number' => $version->version_number,
+        ]);
+
+        return redirect()->route('documents.show', $document)->with('success', 'Versi baru diunggah. Menunggu approval.');
+    }
+
+    /**
+     * Stream berkas unggahan secara privat. Akses tetap tunduk pada
+     * policy 'view' dokumen — tidak pernah lewat disk publik.
+     */
+    public function file(Document $document, DocumentVersion $version)
+    {
+        $this->authorize('view', $document);
+
+        abort_unless($version->document_id === $document->id, 404);
+        abort_unless($version->file_path, 404);
+
+        return Storage::disk('local')->response(
+            $version->file_path,
+            $version->file_original_name,
+            ['Content-Disposition' => 'inline; filename="' . $version->file_original_name . '"']
+        );
+    }
+
     /**
      * Change a document's visibility scope (general / division / personal).
      * Division is not selectable here — the document keeps its original
@@ -269,6 +355,7 @@ class DocumentController extends Controller
 
         $validated = $request->validate([
             'visibility' => 'required|in:general,division,personal',
+            'division_id' => 'nullable|required_if:visibility,division|exists:divisions,id',
         ]);
 
         $document->update([

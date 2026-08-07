@@ -6,6 +6,43 @@
                     <span>{{ session('success') }}</span>
                 </div>
             @endif
+            @if(session('error'))
+                <div class="alert alert-error mb-4">
+                    <span>{{ session('error') }}</span>
+                </div>
+            @endif
+
+            <!-- Pending Rollback Banner -->
+            @if($document->hasPendingRollback())
+                <div class="alert alert-warning mb-6 shadow-sm">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="flex items-center gap-3">
+                            <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+                            </svg>
+                            <div>
+                                <p class="font-semibold text-sm">Permintaan rollback ke v{{ $document->pendingRollbackVersion->version_number }}</p>
+                                <p class="text-xs text-base-content/70">
+                                    Diajukan oleh {{ $document->rollbackRequestedBy?->name ?? '—' }}.
+                                    Versi setelah v{{ $document->pendingRollbackVersion->version_number }} akan dihapus permanen jika disetujui.
+                                </p>
+                            </div>
+                        </div>
+                        @can('approve', $document)
+                            <div class="flex flex-wrap gap-2 shrink-0">
+                                <form method="POST" action="{{ route('approvals.rollback-request.approve', $document) }}" class="inline">
+                                    @csrf
+                                    <button class="btn btn-success btn-sm" onclick="return confirm('Yakin? Versi setelah v{{ $document->pendingRollbackVersion->version_number }} akan dihapus permanen dan tidak bisa dikembalikan.')">Approve Rollback</button>
+                                </form>
+                                <form method="POST" action="{{ route('approvals.rollback-request.reject', $document) }}" class="inline">
+                                    @csrf
+                                    <button class="btn btn-error btn-sm">Reject</button>
+                                </form>
+                            </div>
+                        @endcan
+                    </di\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+                </div>
+            @endif
 
             <!-- Pending Banner (paling atas) -->
             @php $pendingVersion = $document->versions->firstWhere('status', 'pending'); @endphp
@@ -157,6 +194,10 @@
             <div class="card bg-base-100 border border-base-300 shadow-sm mb-6">
                 <div class="card-body p-0">
                     @php $display = $document->displayVersion(); @endphp
+                    @if($display && $display->file_path)
+                        @include('documents._file-preview', ['document' => $document, 'version' => $display])
+                    @elseif($display)
+                        @include('documents._paper', ['content' => $display->content])
                     @if($display)
                         @include('documents._paper', [
                             'content' => $display->content,
@@ -165,11 +206,29 @@
                             'paperMargin' => $document->paper_margin,
                         ])
                     @else
-                        <p class="text-base-content/60 italic">No approved content yet.</p>
+                        <p class="text-base-content/60 italic p-6">No approved content yet.</p>
                     @endif
                 </div>
             </div>
 
+            <!-- Actions -->
+            @php $isFileBased = $display && $display->file_path; @endphp
+            <div class="flex gap-2 mb-6">
+                @can('update', $document)
+                    @if($isFileBased)
+                        <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('edit-restricted-modal').showModal()">
+                            Edit Document
+                        </button>
+                    @elseif($hasDraft && !$pendingVersion && !$document->currentVersion)
+                        <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm">
+                            Edit Draft
+                        </a>
+                    @else
+                        <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm">
+                            Edit Document
+                        </a>
+                    @endif
+                @endcan
             @if($errors->has('export'))
                 <div class="alert alert-error mb-6">
                     <span>{{ $errors->first('export') }} Silakan coba lagi.</span>
@@ -317,6 +376,10 @@
                 setTimeout(() => { btn.textContent = original; }, 2000);
             });
         }
+
+        @if($errors->has('file'))
+            document.getElementById('upload-version-modal').showModal();
+        @endif
     </script>
 
     {{-- Version History modal --}}
@@ -330,10 +393,18 @@
                     </svg>
                 </button>
             </div>
+            @if($document->hasPendingRollback())
+                <div class="alert alert-warning alert-sm mb-3 text-xs">
+                    Rollback ke v{{ $document->pendingRollbackVersion->version_number }} sedang menunggu approval — opsi rollback lain dinonaktifkan sementara.
+                </div>
+            @endif
             @forelse($document->versions->sortByDesc('version_number') as $version)
                 <div class="flex items-center justify-between py-2 border-b border-base-200 text-sm">
                     <div>
                         <span class="font-medium">v{{ $version->version_number }}</span>
+                        @if($version->file_path)
+                            <span class="badge badge-ghost badge-sm ml-1">Berkas</span>
+                        @endif
                         <span class="text-base-content/60">by {{ $version->author_name }}</span>
                         <span class="text-base-content/40">{{ $version->created_at->format('M d, Y H:i') }}</span>
                         @if($version->id === $document->current_version_id)
@@ -347,6 +418,9 @@
                         @elseif($version->status === 'rejected')
                             <span class="badge badge-error badge-sm ml-2">Rejected</span>
                         @endif
+                        @if($document->hasPendingRollback() && $document->pending_rollback_version_id === $version->id)
+                            <span class="badge badge-warning badge-sm ml-2">Target Rollback</span>
+                        @endif
                     </div>
                     <div class="flex gap-2">
                         <a href="{{ route('documents.preview-version', [$document, $version]) }}"
@@ -354,7 +428,8 @@
                         @can('update', $document)
                             @if($version->id !== $document->current_version_id
                                 && $version->status !== 'pending'
-                                && !($version->status === 'discarded' || $version->discarded_at))
+                                && !($version->status === 'discarded' || $version->discarded_at)
+                                && !$document->hasPendingRollback())
                                 <form method="POST" action="{{ route('approvals.rollback', [$document, $version]) }}" class="inline">
                                     @csrf
                                     <button class="link link-primary">Rollback</button>
@@ -413,6 +488,71 @@
                 <div class="flex justify-end gap-2 pt-2">
                     <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('scope-modal').close()">Cancel</button>
                     <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                </div>
+            </form>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
+
+    {{-- Edit restricted modal (dokumen berbasis unggahan) --}}
+    <dialog id="edit-restricted-modal" class="modal">
+        <div class="modal-box max-w-md">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-semibold">Tidak Bisa Diedit Langsung</h3>
+                <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('edit-restricted-modal').close()">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <p class="text-sm text-base-content/70 mb-5">
+                Dokumen ini berasal dari berkas yang diunggah, bukan ditulis di editor — jadi isinya tidak bisa diedit langsung.
+                Ada dua cara untuk mengubahnya:
+            </p>
+            <ul class="text-sm space-y-2 mb-5 list-disc list-inside text-base-content/80">
+                <li><span class="font-medium">Rollback</span> ke versi sebelumnya yang masih tersimpan.</li>
+                <li><span class="font-medium">Unggah versi terbaru</span> untuk menggantikan isi dokumen saat ini.</li>
+            </ul>
+            <div class="flex justify-end gap-2">
+                <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('edit-restricted-modal').close(); document.getElementById('version-modal').showModal();">
+                    Lihat Versi
+                </button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('edit-restricted-modal').close(); document.getElementById('upload-version-modal').showModal();">
+                    Unggah Versi Terbaru
+                </button>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
+
+    {{-- Upload new version modal --}}
+    <dialog id="upload-version-modal" class="modal">
+        <div class="modal-box max-w-md">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-semibold">Unggah Versi Terbaru</h3>
+                <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('upload-version-modal').close()">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <form method="POST" action="{{ route('documents.upload-version', $document) }}" enctype="multipart/form-data">
+                @csrf
+                <div class="form-control w-full mb-4">
+                    <label for="upload-version-file" class="label">
+                        <span class="label-text font-medium">Berkas Pengganti</span>
+                    </label>
+                    <input type="file" name="file" id="upload-version-file" accept=".pdf,.docx" class="file-input file-input-bordered w-full" required>
+                    <p class="text-xs text-base-content/50 mt-1">Hanya PDF atau DOCX, maksimal 10MB. Versi baru akan menunggu approval kepala divisi.</p>
+                    @error('file') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('upload-version-modal').close()">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Upload</button>
                 </div>
             </form>
         </div>

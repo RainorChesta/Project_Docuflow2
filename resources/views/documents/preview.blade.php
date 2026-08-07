@@ -23,6 +23,11 @@
                     </div>
 
                     <div id="live-preview-content">
+                        @php $display = $document->displayVersion(); @endphp
+                        @if($display && $display->file_path)
+                            @include('documents._file-preview', ['document' => $document, 'version' => $display])
+                        @elseif($display)
+                            @include('documents._paper', ['content' => $display->content])
                         @if($document->displayVersion())
                             @include('documents._paper', [
                                 'content' => $document->displayVersion()->content,
