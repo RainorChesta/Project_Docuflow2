@@ -78,8 +78,14 @@
                             id="jodit-editor"
                             data-upload-url="{{ route('jodit.upload') }}"
                             data-csrf-token="{{ csrf_token() }}"
+                            data-live-storage="doc-preview-{{ $document->id }}"
                         >{{ $document->displayVersion()->content ?? '' }}</textarea>
                     </div>
+
+                    {{-- Pengaturan kertas: diisi JS dari editor sebelum submit,
+                         biar pilihan ukuran kertas & margin ikut tersimpan. --}}
+                    <input type="hidden" name="paper_size" id="paper-size-input" value="{{ $document->paper_size ?? 'A4' }}">
+                    <input type="hidden" name="paper_margin" id="paper-margin-input" value="{{ $document->paper_margin ? json_encode($document->paper_margin) : '' }}">
 
                     <p class="text-center text-xs text-base-content/50 mt-4">
                         Save akan membuat versi baru yang menunggu approval Head.
@@ -133,4 +139,27 @@
             document.getElementById('draft-content').value = editor ? editor.value : joditEl.value;
         }
     });
+
+    // Sinkronkan pengaturan kertas (ukuran + margin) dari editor ke hidden
+    // input sebelum form disubmit, supaya ikut tersimpan ke database.
+    // Editor dicari LAZILY (saat submit), karena instance Jodit baru terdaftar
+    // di window.__joditInstances setelah halaman selesai dimuat — kalau dicari
+    // di awal script (parse time), belum ada.
+    (function () {
+        const form = document.getElementById('editor-form');
+        if (!form) return;
+
+        form.addEventListener('submit', function () {
+            const editor = window.__joditInstances?.get('jodit-editor');
+            const size = editor?.currentPaperSize;
+            const margin = editor?.currentMargin;
+            if (!size || !margin) return;
+            const key = Object.keys(window.__paperSizes || {})
+                .find(k => window.__paperSizes[k] === size);
+            const sizeInput = document.getElementById('paper-size-input');
+            const marginInput = document.getElementById('paper-margin-input');
+            if (sizeInput && key) sizeInput.value = key;
+            if (marginInput) marginInput.value = JSON.stringify(margin);
+        });
+    })();
 </script>

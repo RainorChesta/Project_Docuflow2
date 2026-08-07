@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\DocumentTypeController;
 use App\Http\Controllers\ApprovalController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\DocumentExportController;
 use App\Http\Controllers\JoditController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ShareLinkController;
@@ -49,6 +50,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/documents/{document}/links', [ShareLinkController::class, 'store'])->name('links.store');
     Route::delete('/documents/{document}/links/{link}', [ShareLinkController::class, 'destroy'])->name('links.destroy');
     Route::get('/my-shared-edits', [ShareLinkController::class, 'history'])->name('shared.history');
+
+    // PDF Export
+    Route::post('/documents/{document}/export-pdf', [DocumentExportController::class, 'export'])
+        ->name('documents.export-pdf');
 
     // Admin
     Route::prefix('admin')->name('admin.')->group(function () {

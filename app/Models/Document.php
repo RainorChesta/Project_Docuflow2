@@ -13,6 +13,7 @@ class Document extends Model
         'document_number', 'title', 'visibility', 'division_id', 'owner_id',
         'document_type_id', 'is_public', 'current_version_id',
         'pending_rollback_version_id', 'rollback_requested_by_id', 'rollback_requested_at',
+        'paper_size', 'paper_margin',
     ];
 
     protected function casts(): array
@@ -20,6 +21,7 @@ class Document extends Model
         return [
             'is_public' => 'boolean',
             'rollback_requested_at' => 'datetime',
+            'paper_margin' => 'array',
         ];
     }
 

@@ -229,6 +229,18 @@ class DocumentController extends Controller
 
         $validated = $request->validate([
             'content' => 'required|string',
+            'paper_size' => 'nullable|string|in:A4,A5,A3,Letter,Legal',
+            // paper_margin dikirim sebagai JSON string dari hidden input
+            // (lihat insert.blade.php) — decode manual ke array.
+            'paper_margin' => 'nullable|string',
+        ]);
+
+        $margin = $this->decodePaperMargin($validated['paper_margin'] ?? null);
+
+        // Simpan pengaturan kertas ke dokumen (dipakai preview/show).
+        $document->update([
+            'paper_size' => $validated['paper_size'] ?? 'A4',
+            'paper_margin' => $margin,
         ]);
 
         // savePending updates the existing pending version in place — no new version.
@@ -270,6 +282,16 @@ class DocumentController extends Controller
 
         $validated = $request->validate([
             'content' => 'required|string',
+            'paper_size' => 'nullable|string|in:A4,A5,A3,Letter,Legal',
+            'paper_margin' => 'nullable|string',
+        ]);
+
+        $margin = $this->decodePaperMargin($validated['paper_margin'] ?? null);
+
+        // Simpan pengaturan kertas ke dokumen (dipakai preview/show).
+        $document->update([
+            'paper_size' => $validated['paper_size'] ?? 'A4',
+            'paper_margin' => $margin,
         ]);
 
         $this->versionService->saveDraft($document, $validated['content'], auth()->user());
@@ -348,5 +370,34 @@ class DocumentController extends Controller
         ]);
 
         return back()->with('success', 'Document visibility updated.');
+    }
+
+    /**
+     * Decode paper_margin yang dikirim sebagai JSON string dari hidden input
+     * (lihat insert.blade.php). Kembalikan array {top,right,bottom,left} atau
+     * null kalau kosong/tidak valid.
+     */
+    private function decodePaperMargin(?string $raw): ?array
+    {
+        if (!$raw || trim($raw) === '' || trim($raw) === 'null') {
+            return null;
+        }
+
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return null;
+        }
+
+        // Hanya ambil 4 sisi margin, pastikan angka ≥ 0.
+        $margin = [];
+        foreach (['top', 'right', 'bottom', 'left'] as $side) {
+            $v = $decoded[$side] ?? null;
+            if (!is_numeric($v) || (int) $v < 0) {
+                return null;
+            }
+            $margin[$side] = (int) $v;
+        }
+
+        return $margin;
     }
 }

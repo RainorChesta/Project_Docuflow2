@@ -125,7 +125,7 @@
             {{-- Live preview (tanpa tab kedua) --}}
             <div class="mt-10">
                 <div class="bg-base-100 rounded-xl shadow-md border border-base-300 p-8">
-                    <div id="live-preview-content" class="prose max-w-none">
+                    <div id="live-preview-content" class="prose max-w-none" style="overflow-wrap:break-word; word-break:break-word;">
                         {!! $document->displayVersion()->content ?? '' !!}
                     </div>
                 </div>

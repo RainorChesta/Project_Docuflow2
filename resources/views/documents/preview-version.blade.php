@@ -38,6 +38,12 @@
                     @else
                         @include('documents._paper', ['content' => $version->content ?? ''])
                     @endif
+                    @include('documents._paper', [
+    'content' => $version->content ?? '',
+    'liveStorage' => 'doc-preview-' . $document->id,
+    'paperSize' => $document->paper_size ?? 'A4',
+    'paperMargin' => $document->paper_margin,
+])
                 </div>
             </div>
         </div>
