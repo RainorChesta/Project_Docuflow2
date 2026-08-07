@@ -47,6 +47,7 @@ const PAPER_SIZES = {
 // Margin default (px), match dengan padding lama "48px 56px" (atas/bawah 48,
 // kanan/kiri 56). Ini SATU-SATUNYA sumber kebenaran untuk margin halaman —
 // dipakai di iframeStyle (editor & preview) dan dibaca lagi saat print/export.
+// UI margin menampilkan cm (dikonversi), nilai internal tetap px.
 const DEFAULT_MARGIN = { top: 48, right: 56, bottom: 48, left: 56 };
 
 // Cari nama key ukuran kertas (A4/A5/...) dari objek size — dipakai untuk
@@ -596,6 +597,10 @@ function initPreviewPagination(scopeSelector = '.doku-paper-scope') {
 }
 
 
+// Margin internal disimpan dalam px (DEFAULT_MARGIN). Popup menampilkan
+// dan menerima nilai dalam cm: 1cm = 96/2.54 px.
+const PX_PER_CM = 96 / 2.54;
+
 // Dipanggil dari tombol toolbar "margin" — lihat controls.margin di bawah.
 function buildMarginPopup(editor, close) {
     const current = editor.currentMargin || DEFAULT_MARGIN;
@@ -610,7 +615,7 @@ function buildMarginPopup(editor, close) {
     wrapper.style.cssText = 'padding:12px; display:flex; flex-direction:column; gap:8px; min-width:220px; background:#fff;';
 
     const title = document.createElement('div');
-    title.textContent = 'Margin Halaman (px)';
+    title.textContent = 'Margin Halaman (cm)';
     title.style.cssText = 'font-weight:600; margin-bottom:4px; color:#1a1a1a;';
     wrapper.appendChild(title);
 
@@ -626,8 +631,8 @@ function buildMarginPopup(editor, close) {
         const input = document.createElement('input');
         input.type = 'number';
         input.min = '0';
-        input.step = '1';
-        input.value = current[key];
+        input.step = '0.1';
+        input.value = (current[key] / PX_PER_CM).toFixed(2);
         input.style.cssText = 'width:70px; padding:4px 6px; border:1px solid #ccc; border-radius:4px;';
 
         inputs[key] = input;
@@ -648,12 +653,12 @@ function buildMarginPopup(editor, close) {
     btn.addEventListener('click', () => {
         const next = {};
         for (const { key } of fields) {
-            const v = parseInt(inputs[key].value, 10);
+            const v = parseFloat(inputs[key].value);
             if (!Number.isFinite(v) || v < 0) {
                 errorMsg.style.display = 'block';
                 return;
             }
-            next[key] = v;
+            next[key] = Math.round(v * PX_PER_CM);
         }
         errorMsg.style.display = 'none';
         applyPaperSize(editor, editor.currentPaperSize, next);
@@ -662,6 +667,169 @@ function buildMarginPopup(editor, close) {
     wrapper.appendChild(btn);
 
     return wrapper;
+}
+
+// Popup tombol "print": pilih ukuran kertas fisik (A3/A4/A5/dst) lalu cetak.
+// Konten editor dicetak ulang dengan @page { size } sesuai pilihan, terlepas
+// dari ukuran kertas yang aktif di editor.
+function buildPrintPopup(editor, close) {
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'padding:12px; display:flex; flex-direction:column; gap:8px; min-width:200px; background:#fff;';
+
+    const title = document.createElement('div');
+    title.textContent = 'Cetak dengan Ukuran';
+    title.style.cssText = 'font-weight:600; margin-bottom:4px; color:#1a1a1a;';
+    wrapper.appendChild(title);
+
+    const select = document.createElement('select');
+    select.style.cssText = 'width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px;';
+    const currentKey = findPaperKey(editor.currentPaperSize || PAPER_SIZES['A4']);
+    for (const key of Object.keys(PAPER_SIZES)) {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = key;
+        if (key === currentKey) opt.selected = true;
+        select.appendChild(opt);
+    }
+    wrapper.appendChild(select);
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = 'Cetak';
+    btn.style.cssText = 'margin-top:6px; padding:6px 10px; cursor:pointer; border:1px solid #ccc; border-radius:4px; background:#f3f4f6;';
+    btn.addEventListener('click', () => {
+        const size = PAPER_SIZES[select.value] || PAPER_SIZES['A4'];
+        if (typeof close === 'function') close();
+        doPrint(editor, size);
+    });
+    wrapper.appendChild(btn);
+
+    return wrapper;
+}
+
+// Inti logika cetak: bangun iframe, isi konten bersih (forced page-break
+// sesuai repaginateEditor), set @page { size } + margin sesuai argumen,
+// tunggu gambar load, lalu panggil print.
+function doPrint(jodit, size) {
+    const iframe = jodit.create.element('iframe');
+    Object.assign(iframe.style, {
+        position: 'fixed',
+        right: 0,
+        bottom: 0,
+        width: 0,
+        height: 0,
+        border: 0,
+    });
+    jodit.container.appendChild(iframe);
+
+    const afterFinishPrint = () => {
+        jodit.e.off(jodit.ow, 'mousemove', afterFinishPrint);
+        iframe.remove();
+    };
+
+    const myWindow = iframe.contentWindow;
+    if (!myWindow) return;
+
+    jodit.e
+        .on(myWindow, 'onbeforeunload onafterprint', afterFinishPrint)
+        .on(jodit.ow, 'mousemove', afterFinishPrint);
+
+    // Bangun struktur iframe sama seperti bawaan (pakai iframeStyle
+    // yang sudah diset, biar paper look & font konsisten).
+    jodit.e.fire('generateDocumentStructure.iframe', myWindow.document, jodit);
+    // getCleanValue({ forPrint: true }): WAJIB — ini yang memaksa
+    // titik potong halaman saat export identik dengan yang sudah
+    // dihitung repaginateEditor (forced page-break persis di
+    // posisi spacer), bukan dihitung ulang oleh reflow browser.
+    myWindow.document.body.innerHTML = getCleanValue(jodit, { forPrint: true });
+
+    const margin = jodit.currentMargin || DEFAULT_MARGIN;
+    // @page { size } & { margin } sama-sama tidak reliable pakai
+    // unit "px" di semua browser — spec-nya buat unit fisik
+    // (in/cm/mm). Convert ke inch (96px = 1in) biar pasti dikenali.
+    const widthIn = (size.width / 96).toFixed(4);
+    const heightIn = (size.height / 96).toFixed(4);
+    const mTopIn = (margin.top / 96).toFixed(4);
+    const mRightIn = (margin.right / 96).toFixed(4);
+    const mBottomIn = (margin.bottom / 96).toFixed(4);
+    const mLeftIn = (margin.left / 96).toFixed(4);
+    const style = myWindow.document.createElement('style');
+    style.innerHTML = `
+        @page {
+            size: ${widthIn}in ${heightIn}in;
+            /* Margin WAJIB lewat @page, bukan padding body —
+               @page margin otomatis diulang di SETIAP halaman
+               fisik saat browser memotong konten yang lebih
+               panjang dari satu halaman. Kalau margin cuma
+               ditaruh sebagai padding body (cara lama), padding
+               itu cuma muncul sekali di awal & akhir keseluruhan
+               konten — halaman 2, 3, dst di tengah dokumen jadi
+               tidak dapat margin atas/bawah sama sekali. */
+            margin: ${mTopIn}in ${mRightIn}in ${mBottomIn}in ${mLeftIn}in;
+        }
+        @media print {
+            html {
+                background: #fff !important;
+            }
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                box-shadow: none !important;
+                /* Body TIDAK boleh lagi punya padding/width sendiri
+                   saat print — area konten sudah otomatis dikurangi
+                   margin oleh @page di atas. Kalau body masih pakai
+                   padding manual, margin jadi dobel (padding body +
+                   @page margin) dan ukurannya meleset lagi. */
+                width: 100% !important;
+                min-height: 0 !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            /* Titik potong halaman dipaksa persis di posisi yang
+               sudah dihitung repaginateEditor (lihat
+               getCleanValue forPrint), bukan diserahkan ke
+               reflow otomatis browser. */
+            [data-page-break] {
+                break-after: page;
+                page-break-after: always;
+            }
+        }
+    `;
+    myWindow.document.head.appendChild(style);
+
+    // Tunggu semua gambar di dalam konten selesai dimuat.
+    const imgs = Array.from(myWindow.document.querySelectorAll('img'));
+    if (imgs.length === 0) {
+        myWindow.focus();
+        myWindow.print();
+        return;
+    }
+    let remaining = imgs.length;
+    let done = false;
+    const finish = () => {
+        if (done) return;
+        done = true;
+        myWindow.focus();
+        myWindow.print();
+    };
+    imgs.forEach((img) => {
+        if (img.complete && img.naturalWidth > 0) {
+            remaining--;
+            if (remaining === 0) finish();
+            return;
+        }
+        img.addEventListener('load', () => {
+            remaining--;
+            if (remaining === 0) finish();
+        });
+        img.addEventListener('error', () => {
+            remaining--;
+            if (remaining === 0) finish();
+        });
+    });
+    // Jaring pengaman: kalau ada gambar yang tak kunjung load,
+    // tetap print setelah 3 detik.
+    setTimeout(finish, 3000);
 }
 
 export function initJoditEditor(selector, overrides = {}) {

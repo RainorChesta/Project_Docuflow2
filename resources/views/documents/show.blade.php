@@ -197,8 +197,6 @@
                     @if($display && $display->file_path)
                         @include('documents._file-preview', ['document' => $document, 'version' => $display])
                     @elseif($display)
-                        @include('documents._paper', ['content' => $display->content])
-                    @if($display)
                         @include('documents._paper', [
                             'content' => $display->content,
                             'liveStorage' => 'doc-preview-' . $document->id,

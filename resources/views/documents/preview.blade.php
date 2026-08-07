@@ -27,10 +27,8 @@
                         @if($display && $display->file_path)
                             @include('documents._file-preview', ['document' => $document, 'version' => $display])
                         @elseif($display)
-                            @include('documents._paper', ['content' => $display->content])
-                        @if($document->displayVersion())
                             @include('documents._paper', [
-                                'content' => $document->displayVersion()->content,
+                                'content' => $display->content,
                                 'liveStorage' => 'doc-preview-' . $document->id,
                                 'paperSize' => $document->paper_size ?? 'A4',
                                 'paperMargin' => $document->paper_margin,
