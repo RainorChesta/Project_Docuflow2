@@ -1,11 +1,4 @@
 <x-app-layout>
-    <x-slot name="header">
-        <div class="flex items-center justify-between">
-            <span>{{ $document->title }}</span>
-            <span class="text-sm font-normal text-base-content/60">{{ $document->document_number }}</span>
-        </div>
-    </x-slot>
-
     <div class="py-6">
         <div class="max-w-7xl mx-auto">
             @if(session('success'))
@@ -53,6 +46,11 @@
             <!-- Metadata -->
             <div class="card bg-base-100 border border-base-300 shadow-sm mb-6">
                 <div class="card-body">
+                    <div class="flex items-center gap-3 mb-4">
+                        <h1 class="text-xl font-bold text-base-content truncate">{{ $document->title }}</h1>
+                        <span class="badge badge-outline badge-sm shrink-0">{{ $document->document_number }}</span>
+                    </div>
+
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                         <div>
                             <span class="text-base-content/60">Division</span>
@@ -65,9 +63,6 @@
                         <div>
                             <span class="text-base-content/60">Status</span>
                             <p class="font-medium">
-                                @php
-                                    $hasDraft = $document->versions->contains('status', 'draft');
-                                @endphp
                                 @if($document->currentVersion)
                                     Active (v{{ $document->currentVersion->version_number }})
                                 @elseif($pendingVersion)
@@ -99,6 +94,62 @@
                             @endcan
                         </div>
                     </div>
+
+                    {{-- Actions (di bawah keterangan, sejajar menyamping) --}}
+                    @php
+                        $hasDraft = $document->versions->contains('status', 'draft');
+                    @endphp
+                    <div class="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-base-200">
+                        @can('update', $document)
+                            @if($hasDraft && !$pendingVersion && !$document->currentVersion)
+                                <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm">
+                                    Edit Draft
+                                </a>
+                            @else
+                                <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm">
+                                    Edit Document
+                                </a>
+                            @endif
+                        @endcan
+
+                        @can('update', $document)
+                            <button type="button" onclick="document.getElementById('link-form').showModal()" class="btn btn-neutral btn-sm">
+                                Share Link
+                            </button>
+                        @endcan
+
+                        <button
+                            type="button"
+                            class="btn btn-ghost btn-sm border border-base-300"
+                            onclick="document.getElementById('version-modal').showModal()"
+                        >
+                            Lihat Versi ({{ $document->versions->count() }})
+                        </button>
+
+                        {{-- Export to PDF --}}
+                        <form method="POST" action="{{ route('documents.export-pdf', $document) }}" class="inline"
+                              onsubmit="this.querySelector('button').disabled = true;
+                                        this.querySelector('button').classList.add('loading');
+                                        this.querySelector('button').innerHTML = 'Membuat PDF&hellip;';
+                                        return true;">
+                            @csrf
+                            <button type="submit" class="btn btn-ghost btn-sm border border-base-300">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                Export PDF
+                            </button>
+                        </form>
+                    </div>
+
+                    @if(session('pdf_export'))
+                        <div class="alert alert-success mt-3">
+                            <div class="flex items-center justify-between gap-3 w-full">
+                                <span>PDF berhasil dibuat. <span class="font-medium">{{ session('pdf_export.filename') }}</span></span>
+                                <a href="{{ session('pdf_export.url') }}" target="_blank" rel="noopener" class="btn btn-primary btn-sm shrink-0">
+                                    Download PDF
+                                </a>
+                            </div>
+                        </div>
+                    @endif
                 </div>
             </div>
 
@@ -114,46 +165,42 @@
                 </div>
             </div>
 
-            <!-- Actions -->
-            <div class="flex gap-2 mb-6">
-                @can('update', $document)
-                    @if($hasDraft && !$pendingVersion && !$document->currentVersion)
-                        <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm">
-                            Edit Draft
-                        </a>
-                    @else
-                        <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm">
-                            Edit Document
-                        </a>
+            @if($errors->has('export'))
+                <div class="alert alert-error mb-6">
+                    <span>{{ $errors->first('export') }} Silakan coba lagi.</span>
+                </div>
+            @endif
+
+            <!-- Share Link Modal -->
+            <dialog id="link-form" class="modal">
+                <div class="modal-box max-w-md">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-semibold">Generate Share Link</h3>
+                        <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('link-form').close()">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    @if(session('notice'))
+                        <div class="alert alert-warning mb-4">
+                            <span>{{ session('notice') }}</span>
+                        </div>
                     @endif
-                @endcan
 
-                @can('update', $document)
-                    <button onclick="document.getElementById('link-form').classList.toggle('hidden')" class="btn btn-neutral btn-sm">
-                        Share Link
-                    </button>
-                @endcan
+                    @php
+                        $activeLinks = $document->accessLinks->filter(fn($l) => !$l->isExpired());
+                        $activeRole = fn($r) => $activeLinks->firstWhere('role', $r);
+                    @endphp
 
-                <button
-                    type="button"
-                    class="btn btn-ghost btn-sm"
-                    onclick="document.getElementById('version-modal').showModal()"
-                >
-                    Lihat Versi ({{ $document->versions->count() }})
-                </button>
-            </div>
-
-            <!-- Share Link Form -->
-            <div id="link-form" class="hidden card bg-base-100 border border-base-300 shadow-sm mb-6">
-                <div class="card-body">
-                    <h3 class="font-semibold mb-4">Generate Share Link</h3>
                     <form method="POST" action="{{ route('links.store', $document) }}" class="flex gap-2 items-end">
                         @csrf
                         <div class="form-control">
                             <label class="label"><span class="label-text">Role</span></label>
                             <select name="role" class="select select-bordered" required>
-                                <option value="viewer">Viewer</option>
-                                <option value="editor">Editor</option>
+                                <option value="viewer" @disabled($activeRole('viewer'))>Viewer {{ $activeRole('viewer') ? '(active)' : '' }}</option>
+                                <option value="editor" @disabled($activeRole('editor'))>Editor {{ $activeRole('editor') ? '(active)' : '' }}</option>
                             </select>
                         </div>
                         <div class="form-control">
@@ -162,6 +209,12 @@
                         </div>
                         <button type="submit" class="btn btn-primary">Generate</button>
                     </form>
+
+                    @if($activeRole('viewer') || $activeRole('editor'))
+                        <p class="mt-3 text-xs text-base-content/50">
+                            Hanya satu link aktif per role. Role dengan link aktif tidak bisa digenerate lagi sampai link-nya dicabut (Revoke) atau kedaluwarsa.
+                        </p>
+                    @endif
 
                     @if($document->accessLinks->count())
                         <div class="mt-4">
@@ -193,7 +246,10 @@
                         </div>
                     @endif
                 </div>
-            </div>
+                <form method="dialog" class="modal-backdrop">
+                    <button>close</button>
+                </form>
+            </dialog>
 
         </div>
     </div>
