@@ -32,13 +32,26 @@
                         </div>
 
                         <div class="form-control w-full mb-4">
-                            <label class="label">
+                            <label for="division_id" class="label">
                                 <span class="label-text font-medium">Division</span>
                             </label>
-                            @php($myDivision = auth()->user()->division)
-                            <input type="text" value="{{ $myDivision ? $myDivision->code . ' - ' . $myDivision->name : '—' }}" class="input input-bordered w-full bg-base-200" disabled>
-                            <input type="hidden" name="division_id" value="{{ auth()->user()->division_id }}">
-                            <p class="text-xs text-base-content/50 mt-1">Otomatis sesuai divisi akun kamu.</p>
+                            @if(auth()->user()->isAdmin())
+                                <select name="division_id" id="division_id" class="select select-bordered w-full" required>
+                                    <option value="">Pilih divisi...</option>
+                                    @foreach($divisions as $div)
+                                        <option value="{{ $div->id }}" {{ old('division_id') == $div->id ? 'selected' : '' }}>
+                                            {{ $div->code }} - {{ $div->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <p class="text-xs text-base-content/50 mt-1">Admin bisa pilih divisi mana pun.</p>
+                            @else
+                                @php($myDivision = auth()->user()->division)
+                                <input type="text" value="{{ $myDivision ? $myDivision->code . ' - ' . $myDivision->name : '—' }}" class="input input-bordered w-full bg-base-200" disabled>
+                                <input type="hidden" name="division_id" value="{{ auth()->user()->division_id }}">
+                                <p class="text-xs text-base-content/50 mt-1">Otomatis sesuai divisi akun kamu.</p>
+                            @endif
+                            @error('division_id') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                         </div>
 
                         <div class="flex justify-end">

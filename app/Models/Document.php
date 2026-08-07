@@ -12,12 +12,14 @@ class Document extends Model
     protected $fillable = [
         'document_number', 'title', 'visibility', 'division_id', 'owner_id',
         'document_type_id', 'is_public', 'current_version_id',
+        'paper_size', 'paper_margin',
     ];
 
     protected function casts(): array
     {
         return [
             'is_public' => 'boolean',
+            'paper_margin' => 'array',
         ];
     }
 

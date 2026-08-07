@@ -33,7 +33,12 @@
                         <a href="{{ route('documents.show', $document) }}" class="btn btn-ghost btn-sm">Back</a>
                     </div>
 
-                    @include('documents._paper', ['content' => $version->content ?? ''])
+                    @include('documents._paper', [
+    'content' => $version->content ?? '',
+    'liveStorage' => 'doc-preview-' . $document->id,
+    'paperSize' => $document->paper_size ?? 'A4',
+    'paperMargin' => $document->paper_margin,
+])
                 </div>
             </div>
         </div>

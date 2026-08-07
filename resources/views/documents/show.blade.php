@@ -107,7 +107,12 @@
                 <div class="card-body p-0">
                     @php $display = $document->displayVersion(); @endphp
                     @if($display)
-                        @include('documents._paper', ['content' => $display->content])
+                        @include('documents._paper', [
+                            'content' => $display->content,
+                            'liveStorage' => 'doc-preview-' . $document->id,
+                            'paperSize' => $document->paper_size ?? 'A4',
+                            'paperMargin' => $document->paper_margin,
+                        ])
                     @else
                         <p class="text-base-content/60 italic">No approved content yet.</p>
                     @endif

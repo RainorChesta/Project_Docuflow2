@@ -1,10 +1,13 @@
 import Alpine from 'alpinejs';
 import './jodit';
-import { initJoditEditor } from './jodit';
+import { initJoditEditor, initPreviewPagination } from './jodit';
 
 document.addEventListener('DOMContentLoaded', () => {
     initJoditEditor('#jodit-editor');
     initJoditEditor('#editor-shared');
+    // Halaman preview (show / preview-version / preview): sisipkan batas
+    // antar halaman ke .doku-paper, baca ukuran kertas dari localStorage.
+    initPreviewPagination('.doku-paper-scope');
 });
 
 window.Alpine = Alpine;
