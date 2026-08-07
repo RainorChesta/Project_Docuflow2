@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\BusinessLogicException;
 use App\Models\AuditLog;
 use App\Models\Document;
 use App\Models\DocumentAccessLink;
@@ -27,12 +28,26 @@ class ShareLinkController extends Controller
             'expires_at' => 'nullable|date|after:today',
         ]);
 
-        $link = $this->accessLinkService->create(
-            $document,
-            $validated['role'],
-            $validated['expires_at'] ?? null,
-            auth()->user()
-        );
+        try {
+            $link = $this->accessLinkService->create(
+                $document,
+                $validated['role'],
+                $validated['expires_at'] ?? null,
+                auth()->user()
+            );
+        } catch (BusinessLogicException $e) {
+            // Same-role active link already exists → hand the existing one back.
+            $existing = DocumentAccessLink::query()
+                ->activeForRole($document->id, $validated['role'])
+                ->first();
+
+            if ($existing) {
+                return back()->with('share_link', route('shared.documents', $existing->token))
+                    ->with('notice', $e->getMessage());
+            }
+
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
 
         $this->auditService->log(auth()->user(), 'link.created', 'document_access_link', $link->id, [
             'document_id' => $document->id,
