@@ -68,6 +68,15 @@
         </a>
         @endif
 
+        @if(auth()->user()->isAdmin())
+        <a href="{{ route('documents.create') }}"
+           class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150
+                  {{ request()->routeIs('documents.create') ? 'bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4" /></svg>
+            Create Document
+        </a>
+        @endif
+
         @can('admin')
         <span class="px-3 pt-5 pb-1.5 text-xs font-semibold text-base-content/40 uppercase tracking-wider whitespace-nowrap"
               :class="open ? '' : 'lg:hidden'">Administration</span>

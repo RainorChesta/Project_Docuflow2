@@ -36,7 +36,11 @@
                         </a>
                     </div>
 
-                    @include('documents._paper', ['content' => $version->content ?? ''])
+                    @if($version->file_path)
+                        @include('documents._file-preview', ['document' => $document, 'version' => $version])
+                    @else
+                        @include('documents._paper', ['content' => $version->content ?? ''])
+                    @endif
                 </div>
             </div>
         </div>

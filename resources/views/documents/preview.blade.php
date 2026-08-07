@@ -29,8 +29,16 @@
                     </div>
 
                     <div id="live-preview-content">
-                        @if($document->displayVersion())
-                            @include('documents._paper', ['content' => $document->displayVersion()->content])
+                        @php $display = $document->displayVersion(); @endphp
+                        @if($display && $display->file_path)
+                            @include('documents._file-preview', ['document' => $document, 'version' => $display])
+                        @elseif($display)
+                            @include('documents._paper', [
+                                'content' => $display->content,
+                                'liveStorage' => 'doc-preview-' . $document->id,
+                                'paperSize' => $document->paper_size ?? 'A4',
+                                'paperMargin' => $document->paper_margin,
+                            ])
                         @else
                             <p class="text-base-content/60 italic">No approved content yet.</p>
                         @endif
@@ -52,6 +60,9 @@
                                     // scope ini hilang, style-nya nggak ke-apply sama sekali.
                                     const scope = document.createElement('div');
                                     scope.className = 'doku-paper-scope';
+                                    scope.dataset.liveStorage = 'doc-preview-{{ $document->id }}';
+                                    scope.dataset.paperSize = '{{ $document->paper_size ?? "A4" }}';
+                                    scope.dataset.paperMargin = '{{ json_encode($document->paper_margin) }}';
 
                                     const paper = document.createElement('div');
                                     paper.className = 'doku-paper';
@@ -60,6 +71,12 @@
                                     scope.appendChild(paper);
                                     target.innerHTML = '';
                                     target.appendChild(scope);
+
+                                    // Terapkan batas antar halaman sesuai ukuran kertas yang
+                                    // aktif di editor (dibaca dari localStorage).
+                                    if (window.__initPreviewPagination) {
+                                        window.__initPreviewPagination(scope);
+                                    }
                                 }
                             }
 
