@@ -12,7 +12,7 @@ class DocumentTypeController extends Controller
 {
     public function index(): View
     {
-        $documentTypes = DocumentType::orderBy('name')->paginate(20);
+        $documentTypes = DocumentType::orderBy('name')->paginate(10);
 
         return view('admin.document-types.index', compact('documentTypes'));
     }

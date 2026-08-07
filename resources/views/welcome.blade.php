@@ -27,11 +27,20 @@
                 {{-- Theme Toggle: follows OS until user picks Light/Dark --}}
                 <x-theme-toggle />
                 @auth
-                    <a href="{{ url('/dashboard') }}" class="btn btn-primary btn-sm">Dashboard</a>
+                    <a href="{{ url('/dashboard') }}" class="btn btn-primary btn-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                        Dashboard
+                    </a>
                 @else
-                    <a href="{{ route('login') }}" class="btn btn-ghost btn-sm">Log in</a>
+                    <a href="{{ route('login') }}" class="btn btn-ghost btn-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" /></svg>
+                        Log in
+                    </a>
                     @if (Route::has('register'))
-                        <a href="{{ route('register') }}" class="btn btn-primary btn-sm">Register</a>
+                        <a href="{{ route('register') }}" class="btn btn-primary btn-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                            Register
+                        </a>
                     @endif
                 @endauth
             </div>
@@ -55,9 +64,15 @@
                     </p>
                     <div class="flex flex-wrap gap-4 mt-10 justify-center lg:justify-start">
                         @auth
-                            <a href="{{ url('/dashboard') }}" class="btn btn-primary btn-lg px-8">Buka Dashboard</a>
+                            <a href="{{ url('/dashboard') }}" class="btn btn-primary btn-lg px-8">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                                Buka Dashboard
+                            </a>
                         @else
-                            <a href="{{ route('login') }}" class="btn btn-primary btn-lg px-8">Mulai Sekarang</a>
+                            <a href="{{ route('login') }}" class="btn btn-primary btn-lg px-8">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" /></svg>
+                                Mulai Sekarang
+                            </a>
                         @endauth
                     </div>
                 </div>

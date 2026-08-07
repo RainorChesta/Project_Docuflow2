@@ -1,4 +1,15 @@
 <x-app-layout>
+    @if(!auth()->user()->isAdmin() && !auth()->user()->isHead())
+        <x-confirm-modal
+            name="confirm-discard-{{ $document->id }}"
+            title="Discard Document?"
+            message="Are you sure you want to discard this document?"
+            :action="route('documents.discard', $document)"
+            method="POST"
+            confirmLabel="Discard"
+        />
+    @endif
+
     <div class="min-h-screen bg-base-200/50">
 
         {{-- Top Bar ala Word/Docs --}}
@@ -27,14 +38,17 @@
                     </div>
 
                     <a href="{{ route('documents.show', $document) }}" class="btn btn-ghost btn-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                         Cancel
                     </a>
 
                     <button type="submit" form="editor-form" class="btn btn-primary btn-sm px-6">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
                         Save Changes
                     </button>
                     @if($hasDraftOnly)
                         <button type="submit" form="draft-form" class="btn btn-neutral btn-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
                             Save as Draft
                         </button>
                     @endif
@@ -65,10 +79,20 @@
                                     <strong>Save akan memperbarui versi pending tersebut (tanpa versi baru).</strong>
                                 </span>
                             </div>
-                            <form method="POST" action="{{ route('documents.discard', $document) }}" class="shrink-0">
-                                @csrf
-                                <button type="submit" class="btn btn-outline btn-warning btn-sm">Discard pending (v{{ $pending->version_number }})</button>
-                            </form>
+                            @if(!auth()->user()->isAdmin() && !auth()->user()->isHead())
+                                <button type="button" class="btn btn-outline btn-warning btn-sm" x-on:click="$dispatch('open-modal', 'confirm-discard-{{ $document->id }}')">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                    Discard pending (v{{ $pending->version_number }})
+                                </button>
+                            @else
+                                <form method="POST" action="{{ route('documents.discard', $document) }}" class="shrink-0">
+                                    @csrf
+                                    <button type="submit" class="btn btn-outline btn-warning btn-sm">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                        Discard pending (v{{ $pending->version_number }})
+                                    </button>
+                                </form>
+                            @endif
                         </div>
                     </div>
                 </div>
