@@ -35,6 +35,7 @@
                     </div>
 
                     <button type="button" onclick="document.getElementById('discard-modal').showModal()" class="btn btn-ghost btn-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                         Cancel
                     </button>
 
@@ -51,6 +52,7 @@
                     @endif -->
 
                     <button type="submit" form="editor-form" class="btn btn-primary btn-sm px-6">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
                         Save Changes
                     </button>
                 </div>
@@ -90,30 +92,58 @@
     </div>
 
     {{-- Modal: Discard / Save as Draft --}}
+    <x-confirm-modal
+        name="confirm-discard-insert"
+        title="Discard this document permanently?"
+        message="Dokumen ini akan dihapus secara permanen dan tidak bisa dikembalikan."
+        :action="route('documents.destroy', $document)"
+        method="DELETE"
+        confirmLabel="Discard"
+        cancelLabel="Cancel"
+    />
+
     <dialog id="discard-modal" class="modal">
         <div class="modal-box">
             <h3 class="font-semibold text-lg mb-1">Unsaved changes</h3>
             @if($isNewDoc)
                 <p class="text-sm text-base-content/60">Save as draft or discard this document?</p>
                 <div class="modal-action">
-                    <button type="button" class="btn btn-ghost" onclick="document.getElementById('discard-modal').close()">Keep Editing</button>
+                    <button type="button" class="btn btn-ghost" onclick="document.getElementById('discard-modal').close()">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                        Keep Editing
+                    </button>
                     <form method="POST" action="{{ route('documents.save-draft', $document) }}" class="inline">
                         @csrf
                         @method('PUT')
                         <input type="hidden" name="content" id="draft-content">
-                        <button type="submit" class="btn btn-neutral">Save as Draft</button>
+                        <button type="submit" class="btn btn-neutral">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                            Save as Draft
+                        </button>
                     </form>
                     <form method="POST" action="{{ route('documents.destroy', $document) }}" class="inline">
                         @csrf
                         @method('DELETE')
-                        <button type="submit" class="btn btn-error" onclick="return confirm('Discard this document permanently?')">Discard</button>
+                        <button type="button"
+                                class="btn btn-error"
+                                onclick="document.getElementById('discard-modal').close()"
+                                x-on:click="$dispatch('open-modal', 'confirm-discard-insert')">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            Discard
+                        </button>
                     </form>
                 </div>
             @else
                 <p class="text-sm text-base-content/60">Keluar tanpa menyimpan perubahan?</p>
                 <div class="modal-action">
-                    <button type="button" class="btn btn-ghost" onclick="document.getElementById('discard-modal').close()">Keep Editing</button>
-                    <a href="{{ url()->previous() }}" class="btn btn-neutral">Back</a>
+                    <button type="button" class="btn btn-ghost" onclick="document.getElementById('discard-modal').close()">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                        Keep Editing
+                    </button>
+                    <a href="{{ url()->previous() }}" class="btn btn-neutral">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+                        Back
+                    </a>
                 </div>
             @endif
         </div>

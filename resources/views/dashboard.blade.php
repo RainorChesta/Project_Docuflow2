@@ -37,9 +37,15 @@
                         <div class="flex gap-2">
                             <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari dokumen berdasarkan judul atau nomor..."
                                    class="input input-bordered w-full">
-                            <button type="submit" class="btn btn-primary">Search</button>
+                            <button type="submit" class="btn btn-primary">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                                Search
+                            </button>
                             @if(request('search'))
-                                <a href="{{ route('dashboard') }}" class="btn btn-ghost">Clear</a>
+                                <a href="{{ route('dashboard') }}" class="btn btn-ghost">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                    Clear
+                                </a>
                             @endif
                         </div>
                     </form>
@@ -166,7 +172,10 @@
                                     <svg class="w-10 h-10 mx-auto text-base-content/20 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                                     <p class="text-sm text-base-content/50 mb-1">No documents yet</p>
                                     <p class="text-xs text-base-content/30">Create your first document to get started.</p>
-                                    <a href="{{ route('documents.create') }}" class="btn btn-primary btn-sm mt-4">Create Document</a>
+                                    <a href="{{ route('documents.create') }}" class="btn btn-primary btn-sm mt-4">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                                        Create Document
+                                    </a>
                                 </div>
                             @endforelse
                         </div>
