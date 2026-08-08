@@ -2,7 +2,7 @@
      Compact mode (desktop, sidebar tertutup): lebar 72px, hanya icon + tooltip. -->
 <aside class="bg-base-100 border-r border-base-300 flex flex-col shrink-0 h-screen sticky top-0
               {{-- Mobile: off-canvas drawer --}}
-              fixed inset-y-0 left-0 z-50 -translate-x-full lg:static lg:translate-x-0
+              fixed inset-y-0 left-0 z-50 -translate-x-full lg:translate-x-0
               overflow-hidden transition-[width,transform] duration-300 ease-in-out"
        :class="open ? 'translate-x-0 w-60' : '-translate-x-full lg:translate-x-0 lg:w-[72px]'">
     <!-- Logo -->

@@ -171,9 +171,14 @@
                     </div>
 
                     {{-- Actions (di bawah keterangan, sejajar menyamping) --}}
+                    @php $isFileBased = $document->displayVersion()?->file_path; @endphp
                     <div class="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-base-200">
                         @can('update', $document)
-                            @if($hasDraft && !$pendingVersion && !$document->currentVersion)
+                            @if($isFileBased)
+                                <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('edit-restricted-modal').showModal()">
+                                    Edit Document
+                                </button>
+                            @elseif($hasDraft && !$pendingVersion && !$document->currentVersion)
                                 <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm">
                                     Edit Draft
                                 </a>
@@ -198,18 +203,20 @@
                             Lihat Versi ({{ $document->versions->count() }})
                         </button>
 
-                        {{-- Export to PDF --}}
-                        <form method="POST" action="{{ route('documents.export-pdf', $document) }}" class="inline"
-                              onsubmit="this.querySelector('button').disabled = true;
-                                        this.querySelector('button').classList.add('loading');
-                                        this.querySelector('button').innerHTML = 'Membuat PDF&hellip;';
-                                        return true;">
-                            @csrf
-                            <button type="submit" class="btn btn-ghost btn-sm border border-base-300">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                                Export PDF
-                            </button>
-                        </form>
+                        {{-- Export to PDF (hanya untuk dokumen hasil editor) --}}
+                        @if(!$isFileBased)
+                            <form method="POST" action="{{ route('documents.export-pdf', $document) }}" class="inline"
+                                  onsubmit="this.querySelector('button').disabled = true;
+                                            this.querySelector('button').classList.add('loading');
+                                            this.querySelector('button').innerHTML = 'Membuat PDF&hellip;';
+                                            return true;">
+                                @csrf
+                                <button type="submit" class="btn btn-ghost btn-sm border border-base-300">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                    Export PDF
+                                </button>
+                            </form>
+                        @endif
                     </div>
 
                     @if(session('pdf_export'))
@@ -244,48 +251,12 @@
                 </div>
             </div>
 
-            <!-- Actions -->
-            @php $isFileBased = $display && $display->file_path; @endphp
-            <div class="flex gap-2 mb-6">
-                @can('update', $document)
-                    @if($isFileBased)
-                        <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('edit-restricted-modal').showModal()">
-                            Edit Document
-                        </button>
-                    @elseif($hasDraft && !$pendingVersion && !$document->currentVersion)
-                        <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                            Edit Draft
-                        </a>
-                    @else
-                        <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                            Edit Document
-                        </a>
-                    @endif
-                @endcan
             @if($errors->has('export'))
                 <div class="alert alert-error mb-6">
                     <span>{{ $errors->first('export') }} Silakan coba lagi.</span>
                 </div>
             @endif
 
-                @can('update', $document)
-                    <button onclick="document.getElementById('link-form').classList.toggle('hidden')" class="btn btn-neutral btn-sm">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 015.656 0l2 2a4 4 0 01-5.656 5.656l-1.414-1.414M10.172 13.828a4 4 0 01-5.656 0l-2-2a4 4 0 015.656-5.656l1.414 1.414" /></svg>
-                        Share Link
-                    </button>
-                @endcan
-
-                    <button
-                        type="button"
-                        class="btn btn-ghost btn-sm"
-                        onclick="document.getElementById('version-modal').showModal()"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        Lihat Versi ({{ $document->versions->count() }})
-                    </button>
-            </div>
             <!-- Share Link Modal -->
             <dialog id="link-form" class="modal">
                 <div class="modal-box max-w-md">

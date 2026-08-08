@@ -128,11 +128,6 @@
         gap: 8px;
         margin-bottom: 12px;
         font-size: 13px;
-        /* Sticky di dalam container scroll — dropdown ukuran kertas tetap
-           terlihat walau dokumen di-scroll. */
-        position: sticky;
-        top: 0;
-        z-index: 5;
         background: #e5e7eb;
         padding: 4px 0;
     }
