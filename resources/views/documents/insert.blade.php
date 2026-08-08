@@ -122,6 +122,11 @@
                         @csrf
                         @method('PUT')
                         <input type="hidden" name="content" id="draft-content">
+                        {{-- Pengaturan kertas wajib ikut terkirim — kalau tidak,
+                             saveDraft() menulis paper_margin/paper_size null dan
+                             margin yang baru di-set editor hilang. --}}
+                        <input type="hidden" name="paper_size" id="draft-paper-size-input" value="{{ $document->paper_size ?? 'A4' }}">
+                        <input type="hidden" name="paper_margin" id="draft-paper-margin-input" value="{{ $document->paper_margin ? json_encode($document->paper_margin) : '' }}">
                         <button type="submit" class="btn btn-neutral">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
                             Save as Draft
@@ -166,7 +171,13 @@
         if (saveDraftForm) {
             const joditEl = document.getElementById('jodit-editor');
             const editor = window.__joditInstances?.get(joditEl.id);
-            document.getElementById('draft-content').value = editor ? editor.value : joditEl.value;
+            // Buang elemen jeda pagination (data-page-spacer) — setara
+            // getCleanValue() di jodit.js — supaya spacer tidak ikut
+            // tersimpan ke database sebagai bagian dari konten dokumen.
+            const div = document.createElement('div');
+            div.innerHTML = editor ? editor.value : joditEl.value;
+            div.querySelectorAll('[data-page-spacer]').forEach(el => el.remove());
+            document.getElementById('draft-content').value = div.innerHTML;
         }
     });
 
@@ -176,20 +187,40 @@
     // di window.__joditInstances setelah halaman selesai dimuat — kalau dicari
     // di awal script (parse time), belum ada.
     (function () {
-        const form = document.getElementById('editor-form');
-        if (!form) return;
-
-        form.addEventListener('submit', function () {
-            const editor = window.__joditInstances?.get('jodit-editor');
+        function syncPaper(editor, sizeInput, marginInput) {
             const size = editor?.currentPaperSize;
             const margin = editor?.currentMargin;
             if (!size || !margin) return;
             const key = Object.keys(window.__paperSizes || {})
                 .find(k => window.__paperSizes[k] === size);
-            const sizeInput = document.getElementById('paper-size-input');
-            const marginInput = document.getElementById('paper-margin-input');
             if (sizeInput && key) sizeInput.value = key;
             if (marginInput) marginInput.value = JSON.stringify(margin);
-        });
+        }
+
+        // Form utama "Save Changes"
+        const form = document.getElementById('editor-form');
+        if (form) {
+            form.addEventListener('submit', function () {
+                syncPaper(
+                    window.__joditInstances?.get('jodit-editor'),
+                    document.getElementById('paper-size-input'),
+                    document.getElementById('paper-margin-input')
+                );
+            });
+        }
+
+        // Form "Save as Draft" (modal discard) — pengaturan kertas wajib ikut
+        // tersimpan; tanpa ini margin/ukuran kertas yang baru di-set editor
+        // hilang (fallback ke nilai lama) saat save draft.
+        const draftForm = document.querySelector('form[action*="save-draft"]');
+        if (draftForm) {
+            draftForm.addEventListener('submit', function () {
+                syncPaper(
+                    window.__joditInstances?.get('jodit-editor'),
+                    document.getElementById('draft-paper-size-input'),
+                    document.getElementById('draft-paper-margin-input')
+                );
+            });
+        }
     })();
 </script>

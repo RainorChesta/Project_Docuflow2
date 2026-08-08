@@ -289,10 +289,13 @@ class DocumentController extends Controller
         $margin = $this->decodePaperMargin($validated['paper_margin'] ?? null);
 
         // Simpan pengaturan kertas ke dokumen (dipakai preview/show).
-        $document->update([
-            'paper_size' => $validated['paper_size'] ?? 'A4',
+        // Hanya update yang benar-benar dikirim form — jangan menimpa
+        // pengaturan yang sudah ada dengan null kalau form lama tidak
+        // mengirim hidden input paper (dulu margin hilang setelah save draft).
+        $document->update(array_filter([
+            'paper_size' => $validated['paper_size'] ?? null,
             'paper_margin' => $margin,
-        ]);
+        ], fn($v) => $v !== null));
 
         $this->versionService->saveDraft($document, $validated['content'], auth()->user());
 

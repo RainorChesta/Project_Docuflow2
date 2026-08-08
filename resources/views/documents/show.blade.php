@@ -58,7 +58,7 @@
                                 </form>
                             </div>
                         @endcan
-                    </di\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+                    </div>
                 </div>
             @endif
 
@@ -203,19 +203,16 @@
                             Lihat Versi ({{ $document->versions->count() }})
                         </button>
 
-                        {{-- Export to PDF (hanya untuk dokumen hasil editor) --}}
+                        {{-- Export to PDF (hanya untuk dokumen hasil editor) —
+                             buka modal supaya ukuran kertas bisa dipilih dulu
+                             sebelum export, terpisah dari paper_size tersimpan
+                             di dokumen (lihat #export-pdf-modal). --}}
                         @if(!$isFileBased)
-                            <form method="POST" action="{{ route('documents.export-pdf', $document) }}" class="inline"
-                                  onsubmit="this.querySelector('button').disabled = true;
-                                            this.querySelector('button').classList.add('loading');
-                                            this.querySelector('button').innerHTML = 'Membuat PDF&hellip;';
-                                            return true;">
-                                @csrf
-                                <button type="submit" class="btn btn-ghost btn-sm border border-base-300">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                                    Export PDF
-                                </button>
-                            </form>
+                            <button type="button" class="btn btn-ghost btn-sm border border-base-300"
+                                    onclick="document.getElementById('export-pdf-modal').showModal()">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                Export PDF
+                            </button>
                         @endif
                     </div>
 
@@ -342,6 +339,52 @@
                     <button>close</button>
                 </form>
             </dialog>
+
+            {{-- Export PDF Modal — pilih ukuran kertas HANYA untuk export ini
+                 (tidak mengubah paper_size tersimpan di dokumen). Margin ikut
+                 margin dokumen; kalau tidak muat di kertas yang dipilih,
+                 PdfExportService akan meng-clamp-nya otomatis (lihat
+                 clampMarginToPage() di resources/js/jodit.js — logikanya
+                 sengaja dibuat identik dengan PdfExportService::buildHtml()). --}}
+            @if(!$isFileBased)
+                <dialog id="export-pdf-modal" class="modal">
+                    <div class="modal-box max-w-sm">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-semibold">Export ke PDF</h3>
+                            <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('export-pdf-modal').close()">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <form method="POST" action="{{ route('documents.export-pdf', $document) }}"
+                              onsubmit="this.querySelector('button[type=submit]').disabled = true;
+                                        this.querySelector('button[type=submit]').classList.add('loading');
+                                        this.querySelector('button[type=submit]').innerHTML = 'Membuat PDF&hellip;';
+                                        return true;">
+                            @csrf
+                            <div class="form-control w-full mb-2">
+                                <label class="label"><span class="label-text font-medium">Ukuran Kertas</span></label>
+                                <select name="paper_size" class="select select-bordered w-full">
+                                    @foreach(['A4','A5','A3','Letter','Legal'] as $size)
+                                        <option value="{{ $size }}" {{ ($document->paper_size ?? 'A4') === $size ? 'selected' : '' }}>{{ $size }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <p class="text-xs text-base-content/50 mb-4">
+                                Margin tetap mengikuti margin dokumen saat ini; kalau tidak muat di kertas yang dipilih, margin akan disesuaikan otomatis.
+                            </p>
+                            <div class="flex justify-end gap-2">
+                                <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('export-pdf-modal').close()">Batal</button>
+                                <button type="submit" class="btn btn-primary btn-sm">Export</button>
+                            </div>
+                        </form>
+                    </div>
+                    <form method="dialog" class="modal-backdrop">
+                        <button>close</button>
+                    </form>
+                </dialog>
+            @endif
 
         </div>
     </div>

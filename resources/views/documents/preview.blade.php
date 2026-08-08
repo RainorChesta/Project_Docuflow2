@@ -15,18 +15,51 @@
                             <div><span class="text-base-content/60">Division:</span> {{ $document->division?->code ?? '—' }}</div>
                             <div><span class="text-base-content/60">Owner:</span> {{ $document->owner->name }}</div>
                         </div>
-                        @can('update', $document)
-                            <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                Back to Edit
-                            </a>
-                        @else
-                            <a href="{{ route('documents.show', $document) }}" class="btn btn-ghost btn-sm">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-                                Back
-                            </a>
-                        @endcan
+                        @php $isFileBased = $document->displayVersion()?->file_path; @endphp
+                        <div class="flex flex-wrap items-center gap-2">
+                            @if(!$isFileBased)
+                                <form method="POST" action="{{ route('documents.export-pdf', $document) }}" class="inline"
+                                      onsubmit="this.querySelector('button').disabled = true;
+                                                this.querySelector('button').classList.add('loading');
+                                                this.querySelector('button').innerHTML = 'Membuat PDF&hellip;';
+                                                return true;">
+                                    @csrf
+                                    <button type="submit" class="btn btn-ghost btn-sm border border-base-300">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                        Export PDF
+                                    </button>
+                                </form>
+                            @endif
+                            @can('update', $document)
+                                <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                    Back to Edit
+                                </a>
+                            @else
+                                <a href="{{ route('documents.show', $document) }}" class="btn btn-ghost btn-sm">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+                                    Back
+                                </a>
+                            @endcan
+                        </div>
                     </div>
+
+                    @if(session('pdf_export'))
+                        <div class="alert alert-success mt-3">
+                            <div class="flex items-center justify-between gap-3 w-full">
+                                <span>PDF berhasil dibuat. <span class="font-medium">{{ session('pdf_export.filename') }}</span></span>
+                                <a href="{{ session('pdf_export.url') }}" target="_blank" rel="noopener" class="btn btn-primary btn-sm shrink-0">
+                                    Download PDF
+                                </a>
+                            </div>
+                        </div>
+                    @endif
+
+                    @if($errors->has('export'))
+                        <div class="alert alert-error mb-6">
+                            <span>{{ $errors->first('export') }} Silakan coba lagi.</span>
+                        </div>
+                    @endif
 
                     <div id="live-preview-content">
                         @php $display = $document->displayVersion(); @endphp

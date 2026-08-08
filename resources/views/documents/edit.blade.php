@@ -125,6 +125,26 @@
                         >{{ $document->displayVersion()->content ?? '' }}</textarea>
                     </div>
 
+                    {{-- FIX AKAR MASALAH margin: sebelumnya form ini cuma
+                         mengirim `content` — pilihan ukuran kertas & margin
+                         yang diatur lewat toolbar editor (paperSize/margin)
+                         HANYA pernah tersimpan di localStorage browser
+                         (lihat applyPaperSize() di resources/js/jodit.js),
+                         TIDAK PERNAH ikut ke server. Akibatnya kolom
+                         paper_size/paper_margin dokumen di DB tidak pernah
+                         ter-update walau sudah "Terapkan" di popup margin,
+                         sementara halaman preview (_paper.blade.php) memang
+                         sengaja memprioritaskan localStorage di atas data DB
+                         — jadi preview kelihatan sudah bermargin besar
+                         (sisa localStorage), padahal hasil save yang benar2
+                         tersimpan di server masih margin default/kosong.
+                         Hidden input ini diisi oleh handler submit di
+                         initJoditEditor() (resources/js/jodit.js) tepat
+                         sebelum form dikirim, dari editor.currentPaperSize /
+                         editor.currentMargin yang sedang aktif. --}}
+                    <input type="hidden" name="paper_size" id="paper-size-input">
+                    <input type="hidden" name="paper_margin" id="paper-margin-input">
+
                     <p class="text-center text-xs text-base-content/50 mt-4">
                         @if($hasDraftOnly)
                             <strong>Save Changes</strong> mengirim draft untuk approval (status jadi pending).
@@ -143,6 +163,12 @@
                     @csrf
                     @method('PUT')
                     <input type="hidden" name="content" id="draft-content">
+                    {{-- FIX: sama seperti editor-form di atas — draft-form
+                         punya path submit terpisah (tidak lewat submit
+                         handler initJoditEditor di jodit.js), jadi hidden
+                         input ini diisi manual oleh script di bawah. --}}
+                    <input type="hidden" name="paper_size" id="draft-paper-size">
+                    <input type="hidden" name="paper_margin" id="draft-paper-margin">
                 </form>
             @endif
 
@@ -178,6 +204,21 @@
                     const ta = document.getElementById('jodit-editor');
                     const inst = window.__joditInstances?.get(ta.id);
                     document.getElementById('draft-content').value = inst ? inst.value : ta.value;
+
+                    // FIX: draft-form tidak lewat submit handler bawaan
+                    // initJoditEditor (yang cuma dipasang di form terdekat
+                    // dari textarea, yaitu #editor-form) — jadi paper_size &
+                    // paper_margin harus diisi manual di sini juga, dari
+                    // instance editor yang sama (window.__joditInstances),
+                    // supaya draft yang disimpan juga membawa margin yang
+                    // sedang aktif, bukan cuma konten.
+                    const sizeKey = inst && window.__findPaperKey
+                        ? (window.__findPaperKey(inst.currentPaperSize) || 'A4')
+                        : 'A4';
+                    document.getElementById('draft-paper-size').value = sizeKey;
+                    document.getElementById('draft-paper-margin').value = inst
+                        ? JSON.stringify(inst.currentMargin || {})
+                        : '';
                 });
             }
         })();

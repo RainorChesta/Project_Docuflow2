@@ -68,9 +68,14 @@ class PdfExportService
      * konsisten dengan print di editor Jodit (font asli, CSS @page,
      * pagination browser).
      *
+     * @param string|null $paperSizeOverride Ukuran kertas opsional (A4/A5/
+     *        A3/Letter/Legal) dari form export di halaman show — override
+     *        HANYA untuk export ini, tidak mengubah $document->paper_size.
+     *        Kalau null, pakai $document->paper_size (fallback 'A4').
+     *
      * @throws BusinessLogicException if the document has no exportable content
      */
-    public function export(Document $document, User $user): array
+    public function export(Document $document, User $user, ?string $paperSizeOverride = null): array
     {
         $display = $document->displayVersion();
 
@@ -84,7 +89,7 @@ class PdfExportService
         }
 
         $content = $this->normalizeContentFonts($display->content);
-        $html = $this->buildHtml($document, $this->resolveImagePaths($content));
+        $html = $this->buildHtml($document, $this->resolveImagePaths($content), $paperSizeOverride);
 
         $filename = $this->filename($document);
         $path = 'exports/' . $filename;
@@ -286,6 +291,26 @@ class PdfExportService
      */
     private const MAX_IMG_WIDTH_PX = 690;
 
+    /**
+     * Ruang tulis minimum per halaman (px) — SAMA PERSIS dengan
+     * MIN_PAGE_CONTENT_PX di resources/js/jodit.js. Dipakai untuk mengecek
+     * apakah margin dokumen muat di dalam kertas.
+     */
+    private const MIN_PAGE_CONTENT_PX = 60;
+
+    /**
+     * Ukuran kertas (px @96dpi) — SAMA PERSIS dengan PAPER_SIZES di
+     * resources/js/jodit.js (sumber kebenaran ukuran kertas editor).
+     * Dipakai untuk mengecek apakah margin dokumen muat di dalam kertas.
+     */
+    private const PAPER_SIZES_PX = [
+        'A4' => ['width' => 794, 'height' => 1123],
+        'A5' => ['width' => 559, 'height' => 794],
+        'A3' => ['width' => 1123, 'height' => 1587],
+        'Letter' => ['width' => 816, 'height' => 1056],
+        'Legal' => ['width' => 816, 'height' => 1344],
+    ];
+
     private function filename(Document $document): string
     {
         $title = preg_replace('/[^A-Za-z0-9_\-]+/', '_', $document->title) ?: 'document';
@@ -321,10 +346,31 @@ class PdfExportService
         ];
     }
 
-    private function buildHtml(Document $document, string $content): string
+    private function buildHtml(Document $document, string $content, ?string $paperSizeOverride = null): string
     {
         $margin = $this->resolveMargin($document);
-        $paperSize = $document->paper_size ?? 'A4';
+        // FIX: paperSizeOverride (dari form export halaman show) menang
+        // atas paper_size tersimpan di dokumen — tapi HANYA untuk
+        // rendering export ini, $document->paper_size sendiri tidak diubah.
+        $paperSize = $paperSizeOverride ?? $document->paper_size ?? 'A4';
+
+        // Clamp margin ke ukuran kertas: margin total (atas+bawah / kiri+kanan)
+        // tidak boleh melebihi ukuran kertas. Tanpa ini, @page margin yang lebih
+        // besar dari halaman membuat Chrome/Edge headless JATUH ke ukuran kertas
+        // default (mis. Letter) dan margin diabaikan total — konten yang di
+        // editor kelihatan di bawah halaman (margin besar) malah muncul di paling
+        // atas halaman saat export. Nilai ini SAMA PERSIS dengan
+        // clampMarginToPage() di resources/js/jodit.js — termasuk saat paperSize
+        // di-override dari request export (bukan cuma dari $document->paper_size),
+        // dua-duanya sekarang memakai $paperSize yang sudah final di atas.
+        $page = self::PAPER_SIZES_PX[$paperSize] ?? self::PAPER_SIZES_PX['A4'];
+        if ($margin['top'] + $margin['bottom'] > $page['height'] - self::MIN_PAGE_CONTENT_PX) {
+            $margin['top'] = max(0, $page['height'] - self::MIN_PAGE_CONTENT_PX - $margin['bottom']);
+        }
+        if ($margin['left'] + $margin['right'] > $page['width'] - self::MIN_PAGE_CONTENT_PX) {
+            $margin['left'] = max(0, $page['width'] - self::MIN_PAGE_CONTENT_PX - $margin['right']);
+        }
+
         $topIn = $this->pxToIn($margin['top']);
         $rightIn = $this->pxToIn($margin['right']);
         $bottomIn = $this->pxToIn($margin['bottom']);

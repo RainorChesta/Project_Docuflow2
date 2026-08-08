@@ -36,6 +36,10 @@ const FONT_LIST = {
 // (repaginateEditor) MAUPUN untuk memaksa ukuran halaman fisik saat print/
 // export (lihat controls.print.exec di bawah, yang set @page { size }).
 // Karena dua-duanya baca dari objek yang sama, keduanya dijamin selalu sinkron.
+//
+// PENTING JUGA: nilai px di sini WAJIB SAMA PERSIS dengan PAPER_SIZES_PX di
+// app/Services/PdfExportService.php — kalau salah satu berubah, yang lain
+// harus ikut disesuaikan manual (PHP tidak bisa import dari file JS ini).
 const PAPER_SIZES = {
     'A4': { width: 794, height: 1123 },
     'A5': { width: 559, height: 794 },
@@ -48,7 +52,48 @@ const PAPER_SIZES = {
 // kanan/kiri 56). Ini SATU-SATUNYA sumber kebenaran untuk margin halaman —
 // dipakai di iframeStyle (editor & preview) dan dibaca lagi saat print/export.
 // UI margin menampilkan cm (dikonversi), nilai internal tetap px.
+//
+// PENTING: nilai ini WAJIB SAMA PERSIS dengan DEFAULT_MARGIN di
+// app/Services/PdfExportService.php.
 const DEFAULT_MARGIN = { top: 48, right: 56, bottom: 48, left: 56 };
+
+// Ruang tulis minimum per halaman (px) — SAMA PERSIS dengan
+// MIN_PAGE_CONTENT_PX di app/Services/PdfExportService.php. Dipakai oleh
+// clampMarginToPage() di bawah untuk membatasi margin supaya tidak
+// "memakan" seluruh halaman.
+const MIN_PAGE_CONTENT_PX = 60;
+
+// Clamp margin ke ukuran kertas: margin gabungan (top+bottom / left+right)
+// tidak boleh melebihi ukuran kertas dikurangi ruang tulis minimum.
+//
+// FIX AKAR MASALAH margin ekstrem (mis. 15cm/30cm) tidak sesuai antara
+// editor & hasil export PDF: PdfExportService.php SUDAH lebih dulu punya
+// clamp seperti ini (lihat komentar di buildHtml() di sana, yang secara
+// eksplisit merujuk "clampMarginToPage() di jodit.js" — padahal fungsi itu
+// sebelumnya TIDAK PERNAH ada di file ini). Akibatnya:
+//   - Editor: contentPerPage = size.height - margin.top - margin.bottom
+//     bisa jadi 0/negatif untuk margin ekstrem → pagination visual di
+//     editor kacau/tidak presisi, dan @page margin yang dikirim ke print
+//     browser juga mentah (melebihi tinggi kertas, perilakunya tidak
+//     konsisten antar browser).
+//   - Server: PdfExportService diam-diam MENGECILKAN margin.top/left
+//     supaya konten tetap muat & tercetak.
+// Dua sisi menghasilkan margin efektif yang berbeda pada kasus yang sama
+// persis itulah yang bikin hasil export "tidak sesuai" editor.
+//
+// Fungsi ini WAJIB tetap sinkron (nilai & logika) dengan clamp yang ada di
+// PdfExportService::buildHtml() — kalau salah satu berubah, yang lain harus
+// ikut disesuaikan manual.
+function clampMarginToPage(size, margin) {
+    const clamped = { ...margin };
+    if (clamped.top + clamped.bottom > size.height - MIN_PAGE_CONTENT_PX) {
+        clamped.top = Math.max(0, size.height - MIN_PAGE_CONTENT_PX - clamped.bottom);
+    }
+    if (clamped.left + clamped.right > size.width - MIN_PAGE_CONTENT_PX) {
+        clamped.left = Math.max(0, size.width - MIN_PAGE_CONTENT_PX - clamped.right);
+    }
+    return clamped;
+}
 
 // Cari nama key ukuran kertas (A4/A5/...) dari objek size — dipakai untuk
 // menyimpan pilihan kertas ke localStorage supaya halaman preview tahu
@@ -103,7 +148,13 @@ function buildIframeStyle(size, margin = DEFAULT_MARGIN) {
 // aktif di editor (atau default kalau belum pernah diset sama sekali).
 function applyPaperSize(editor, size, margin) {
     size = size || editor.currentPaperSize || PAPER_SIZES['A4'];
-    margin = margin || editor.currentMargin || DEFAULT_MARGIN;
+    // FIX: margin di-clamp ke ukuran kertas SEBELUM dipakai di mana pun —
+    // ini SATU-SATUNYA titik di mana margin masuk ke state editor
+    // (iframeStyle, body style, localStorage), jadi cukup diclamp di sini
+    // supaya semua jalur pemanggil (init, ganti ukuran kertas, popup
+    // margin) otomatis konsisten dengan clamp yang sama di
+    // PdfExportService.php.
+    margin = clampMarginToPage(size, margin || editor.currentMargin || DEFAULT_MARGIN);
 
     editor.o.iframeStyle = buildIframeStyle(size, margin);
     // Simpan ukuran & margin aktif di instance editor supaya
@@ -305,8 +356,13 @@ function repaginateEditor(editor) {
         // PENTING: batas halaman BUKAN di kelipatan size.height (tinggi kertas
         // penuh) — margin.top sudah "terpakai" duluan sebagai padding-top body
         // sebelum konten mulai. Jadi ruang tulis yang beneran tersedia per
-        // halaman cuma segini:
-        const contentPerPage = size.height - margin.top - margin.bottom;
+        // halaman cuma segini. FIX: dijaga minimal 1px lewat Math.max sebagai
+        // jaring pengaman terakhir — margin sendiri sudah diclamp lebih dulu
+        // di applyPaperSize()/repaginatePreview() lewat clampMarginToPage(),
+        // jadi nilai ini seharusnya tidak akan pernah ≤ 0 lagi, tapi guard ini
+        // tetap dipertahankan untuk data lama (localStorage/DB) dari sebelum
+        // clamp ini ada.
+        const contentPerPage = Math.max(size.height - margin.top - margin.bottom, 1);
         let nextBoundary = contentPerPage;
 
         for (const child of children) {
@@ -450,7 +506,13 @@ function scheduleRepaginate(editor) {
 function repaginatePreview(paperEl, size, margin) {
     if (!paperEl) return;
     size = size || PAPER_SIZES['A4'];
-    margin = margin || DEFAULT_MARGIN;
+    // FIX: clamp margin ke ukuran kertas — sama seperti applyPaperSize().
+    // Preview membaca margin dari localStorage/DB, yang bisa jadi data
+    // lama (dari sebelum clampMarginToPage() ada) atau nilai kertas hasil
+    // dropdown ukuran kertas di preview itu sendiri (lihat
+    // initPreviewPagination) yang belum tentu sudah diclamp terhadap
+    // ukuran kertas BARU yang dipilih di situ.
+    margin = clampMarginToPage(size, margin || DEFAULT_MARGIN);
     const gap = margin.top + margin.bottom;
 
     // Terapkan ukuran kertas & margin ke elemen kertas.
@@ -466,7 +528,7 @@ function repaginatePreview(paperEl, size, margin) {
 
     const paddingTop = parseFloat(getComputedStyle(paperEl).paddingTop) || 0;
     const paperTop = paperEl.getBoundingClientRect().top;
-    const contentPerPage = size.height - margin.top - margin.bottom;
+    const contentPerPage = Math.max(size.height - margin.top - margin.bottom, 1);
     let nextBoundary = contentPerPage;
 
     for (const child of children) {
@@ -646,6 +708,13 @@ function buildMarginPopup(editor, close) {
     errorMsg.textContent = 'Margin harus angka ≥ 0.';
     wrapper.appendChild(errorMsg);
 
+    // BARU: pesan info kalau margin di-clamp otomatis supaya muat di
+    // kertas (bukan error — sama seperti yang akan dilakukan
+    // PdfExportService saat export, lihat clampMarginToPage()).
+    const infoMsg = document.createElement('div');
+    infoMsg.style.cssText = 'color:#92400e; font-size:12px; display:none;';
+    wrapper.appendChild(infoMsg);
+
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.textContent = 'Terapkan';
@@ -656,12 +725,34 @@ function buildMarginPopup(editor, close) {
             const v = parseFloat(inputs[key].value);
             if (!Number.isFinite(v) || v < 0) {
                 errorMsg.style.display = 'block';
+                infoMsg.style.display = 'none';
                 return;
             }
             next[key] = Math.round(v * PX_PER_CM);
         }
         errorMsg.style.display = 'none';
-        applyPaperSize(editor, editor.currentPaperSize, next);
+
+        // FIX: clamp margin SEBELUM diterapkan — sama seperti yang
+        // dilakukan PdfExportService::buildHtml() saat export, supaya
+        // margin efektif di editor & hasil PDF selalu identik untuk
+        // margin ekstrem (mis. 15cm/30cm).
+        const size = editor.currentPaperSize || PAPER_SIZES['A4'];
+        const clamped = clampMarginToPage(size, next);
+        const wasClamped = clamped.top !== next.top || clamped.left !== next.left;
+
+        applyPaperSize(editor, editor.currentPaperSize, clamped);
+
+        if (wasClamped) {
+            infoMsg.textContent = `Margin disesuaikan otomatis (maks ~${((size.height - MIN_PAGE_CONTENT_PX) / PX_PER_CM).toFixed(1)}cm atas+bawah, ~${((size.width - MIN_PAGE_CONTENT_PX) / PX_PER_CM).toFixed(1)}cm kiri+kanan) supaya tetap muat di kertas.`;
+            infoMsg.style.display = 'block';
+            // Update input agar mencerminkan nilai yang benar-benar terpakai.
+            fields.forEach(({ key }) => {
+                inputs[key].value = (clamped[key] / PX_PER_CM).toFixed(2);
+            });
+            return; // biarkan popup tetap terbuka biar user lihat pesannya
+        }
+
+        infoMsg.style.display = 'none';
         if (typeof close === 'function') close();
     });
     wrapper.appendChild(btn);
@@ -707,9 +798,86 @@ function buildPrintPopup(editor, close) {
     return wrapper;
 }
 
+// FIX AKAR MASALAH "1 halaman kosong di export saat margin besar (mis. 20cm)":
+// iframe print dibuat BARU setiap kali cetak, jadi Google Fonts (@import di
+// iframeStyle) harus di-fetch ulang dari jaringan — BEDA dari iframe editor
+// yang fontnya sudah lama termuat & metriknya sudah "settle". Kode print
+// sebelumnya HANYA menunggu <img> selesai load sebelum memanggil print(),
+// TIDAK PERNAH menunggu font. Kalau print() sempat terpanggil sebelum font
+// selesai load, browser sempat render teks pakai font fallback (metrik
+// lebar/tinggi beda dari font asli) — sementara batas halaman (page-break)
+// yang disisipkan getCleanValue({forPrint:true}) dihitung repaginateEditor
+// pakai tinggi konten versi font ASLI (karena di editor fontnya sudah lama
+// termuat). Mismatch tinggi ini bikin sisa konten di akhir halaman meleber
+// ke halaman berikutnya, nongol sebagai halaman nyaris kosong.
+//
+// Kenapa baru kelihatan jelas di margin besar: makin besar margin, makin
+// sempit ruang tulis per halaman (contentPerPage) — jadi pergeseran tinggi
+// sekecil apa pun akibat font fallback jauh lebih gampang mendorong konten
+// lewat batas halaman. Di margin kecil, ruang lebih (dari sisa halaman)
+// biasanya cukup menyerap pergeseran itu tanpa kelihatan.
+//
+// Fix: tunggu document.fonts.ready DI IFRAME PRINT (bukan iframe editor)
+// SEJAJAR dengan penantian gambar, sebelum memanggil print() — supaya font
+// asli benar-benar sudah settle & tinggi konten yang di-print identik
+// dengan yang dipakai repaginateEditor saat menghitung titik potong halaman.
+function waitForFontsAndImages(win, callback) {
+    let done = false;
+    const finish = () => {
+        if (done) return;
+        done = true;
+        callback();
+    };
+
+    const imgs = Array.from(win.document.querySelectorAll('img'));
+    let imagesReady = imgs.length === 0;
+    let remainingImgs = imgs.length;
+
+    // Font Loading API — document.fonts.ready resolve begitu semua font
+    // yang dideklarasikan via @import/@font-face SELESAI dimuat & di-parse.
+    // Fallback ke Promise.resolve() kalau browser tidak dukung (aman, jadi
+    // tidak pernah nge-block print selamanya di browser lama).
+    const fontsReady = win.document.fonts && win.document.fonts.ready
+        ? win.document.fonts.ready
+        : Promise.resolve();
+    let fontsSettled = false;
+
+    const checkAndFinish = () => {
+        if (imagesReady && fontsSettled) finish();
+    };
+
+    fontsReady.then(() => { fontsSettled = true; checkAndFinish(); })
+        .catch(() => { fontsSettled = true; checkAndFinish(); }); // jangan sampai error font nge-block print selamanya
+
+    if (imagesReady) {
+        checkAndFinish();
+    } else {
+        imgs.forEach((img) => {
+            if (img.complete && img.naturalWidth > 0) {
+                remainingImgs--;
+                if (remainingImgs === 0) { imagesReady = true; checkAndFinish(); }
+                return;
+            }
+            img.addEventListener('load', () => {
+                remainingImgs--;
+                if (remainingImgs === 0) { imagesReady = true; checkAndFinish(); }
+            });
+            img.addEventListener('error', () => {
+                remainingImgs--;
+                if (remainingImgs === 0) { imagesReady = true; checkAndFinish(); }
+            });
+        });
+    }
+
+    // Jaring pengaman: font di jaringan lambat/gagal → tetap print setelah
+    // 4 detik (dinaikkan dari 3 detik semula, kasih sedikit ruang lebih
+    // untuk font-fetch yang sebelumnya sama sekali tidak ditunggu).
+    setTimeout(finish, 4000);
+}
+
 // Inti logika cetak: bangun iframe, isi konten bersih (forced page-break
 // sesuai repaginateEditor), set @page { size } + margin sesuai argumen,
-// tunggu gambar load, lalu panggil print.
+// tunggu FONT & gambar load, lalu panggil print.
 function doPrint(jodit, size) {
     const iframe = jodit.create.element('iframe');
     Object.assign(iframe.style, {
@@ -743,6 +911,8 @@ function doPrint(jodit, size) {
     // posisi spacer), bukan dihitung ulang oleh reflow browser.
     myWindow.document.body.innerHTML = getCleanValue(jodit, { forPrint: true });
 
+    // FIX: margin di sini SUDAH pasti hasil clampMarginToPage() karena
+    // jodit.currentMargin hanya pernah diset lewat applyPaperSize().
     const margin = jodit.currentMargin || DEFAULT_MARGIN;
     // @page { size } & { margin } sama-sama tidak reliable pakai
     // unit "px" di semua browser — spec-nya buat unit fisik
@@ -797,39 +967,14 @@ function doPrint(jodit, size) {
     `;
     myWindow.document.head.appendChild(style);
 
-    // Tunggu semua gambar di dalam konten selesai dimuat.
-    const imgs = Array.from(myWindow.document.querySelectorAll('img'));
-    if (imgs.length === 0) {
+    // FIX: tunggu FONT (document.fonts.ready) & gambar sama-sama selesai —
+    // lihat catatan panjang di waitForFontsAndImages soal kenapa font juga
+    // wajib ditunggu (bukan cuma gambar), supaya tinggi konten saat print
+    // identik dengan yang dihitung repaginateEditor.
+    waitForFontsAndImages(myWindow, () => {
         myWindow.focus();
         myWindow.print();
-        return;
-    }
-    let remaining = imgs.length;
-    let done = false;
-    const finish = () => {
-        if (done) return;
-        done = true;
-        myWindow.focus();
-        myWindow.print();
-    };
-    imgs.forEach((img) => {
-        if (img.complete && img.naturalWidth > 0) {
-            remaining--;
-            if (remaining === 0) finish();
-            return;
-        }
-        img.addEventListener('load', () => {
-            remaining--;
-            if (remaining === 0) finish();
-        });
-        img.addEventListener('error', () => {
-            remaining--;
-            if (remaining === 0) finish();
-        });
     });
-    // Jaring pengaman: kalau ada gambar yang tak kunjung load,
-    // tetap print setelah 3 detik.
-    setTimeout(finish, 3000);
 }
 
 export function initJoditEditor(selector, overrides = {}) {
@@ -1114,6 +1259,9 @@ export function initJoditEditor(selector, overrides = {}) {
                     myWindow.document.body.innerHTML = getCleanValue(jodit, { forPrint: true });
 
                     const size = jodit.currentPaperSize || PAPER_SIZES['A4'];
+                    // FIX: margin di sini SUDAH pasti hasil clampMarginToPage()
+                    // karena jodit.currentMargin hanya pernah diset lewat
+                    // applyPaperSize().
                     const margin = jodit.currentMargin || DEFAULT_MARGIN;
                     // @page { size } & { margin } sama-sama tidak reliable pakai
                     // unit "px" di semua browser — spec-nya buat unit fisik
@@ -1168,39 +1316,26 @@ export function initJoditEditor(selector, overrides = {}) {
                     `;
                     myWindow.document.head.appendChild(style);
 
-                    // Tunggu semua gambar di dalam konten selesai dimuat.
-                    const imgs = Array.from(myWindow.document.querySelectorAll('img'));
-                    if (imgs.length === 0) {
+                    // FIX AKAR MASALAH "1 halaman kosong saat export dengan
+                    // margin besar": sebelumnya di sini HANYA menunggu <img>
+                    // selesai load sebelum print() dipanggil — TIDAK PERNAH
+                    // menunggu Google Fonts (@import di iframeStyle) selesai
+                    // dimuat di iframe print yang baru dibuat ini. Kalau
+                    // print() sempat jalan sebelum font settle, teks sempat
+                    // ke-render pakai font fallback (metrik beda dari font
+                    // asli yang dipakai repaginateEditor saat menghitung
+                    // titik potong halaman) → tinggi konten meleset dari
+                    // perhitungan → sisa konten di akhir dorong ke halaman
+                    // baru yang nyaris kosong. Efeknya paling kelihatan pas
+                    // margin besar karena ruang tulis per halaman
+                    // (contentPerPage) jadi sempit, jadi pergeseran tinggi
+                    // sekecil apa pun sudah cukup mendorong konten meleber.
+                    // waitForFontsAndImages menunggu document.fonts.ready
+                    // SEJAJAR dengan gambar sebelum benar-benar print().
+                    waitForFontsAndImages(myWindow, () => {
                         myWindow.focus();
                         myWindow.print();
-                        return;
-                    }
-                    let remaining = imgs.length;
-                    let done = false;
-                    const finish = () => {
-                        if (done) return;
-                        done = true;
-                        myWindow.focus();
-                        myWindow.print();
-                    };
-                    imgs.forEach((img) => {
-                        if (img.complete && img.naturalWidth > 0) {
-                            remaining--;
-                            if (remaining === 0) finish();
-                            return;
-                        }
-                        img.addEventListener('load', () => {
-                            remaining--;
-                            if (remaining === 0) finish();
-                        });
-                        img.addEventListener('error', () => {
-                            remaining--;
-                            if (remaining === 0) finish();
-                        });
                     });
-                    // Jaring pengaman: kalau ada gambar yang tak kunjung load,
-                    // tetap print setelah 3 detik.
-                    setTimeout(finish, 3000);
                 },
             },
         },
@@ -1242,9 +1377,36 @@ export function initJoditEditor(selector, overrides = {}) {
         // untuk disimpan ke DB, jadi TIDAK pakai forPrint — spacer dibuang
         // polos, bukan diganti page-break (DB harus menyimpan HTML "flat").
         ta.value = getCleanValue(editor);
+
+        // FIX AKAR MASALAH "preview bermargin besar tapi hasil save seolah
+        // belum dikasih margin": sebelumnya applyPaperSize() HANYA menulis
+        // ukuran kertas & margin aktif ke localStorage (buat sinkron preview
+        // di tab lain) — form submit ini TIDAK PERNAH mengirim paper_size/
+        // paper_margin ke server, jadi kolomnya di DB tidak pernah ter-update.
+        // Preview lalu memprioritaskan localStorage di atas data DB (lihat
+        // initPreviewPagination), sehingga margin besar yang sempat dicoba di
+        // editor "nyangkut" tampil di preview padahal tidak pernah tersimpan.
+        // Sekarang nilai currentMargin/currentPaperSize yang aktif di editor
+        // ikut disisipkan ke hidden input sebelum submit, supaya benar-benar
+        // sampai ke server & tersimpan di kolom dokumen.
+        const sizeInput = form.querySelector('[name="paper_size"]');
+        const marginInput = form.querySelector('[name="paper_margin"]');
+        if (sizeInput) {
+            sizeInput.value = findPaperKey(editor.currentPaperSize || PAPER_SIZES['A4']) || 'A4';
+        }
+        if (marginInput) {
+            marginInput.value = JSON.stringify(editor.currentMargin || DEFAULT_MARGIN);
+        }
+
         // Draft sudah di-save → bersihkan, biar preview/show konsisten dari DB
         if (storageKey) {
             localStorage.removeItem(storageKey);
+            // FIX: hapus juga key ':paper' — kalau dibiarkan, preview akan
+            // TERUS membaca margin lama dari localStorage (yang tadi belum
+            // tentu tersimpan ke DB) alih-alih nilai baru yang baru saja
+            // disimpan server, karena initPreviewPagination memprioritaskan
+            // localStorage di atas data DB.
+            localStorage.removeItem(storageKey + ':paper');
             draftSaved = true;
         }
     });
@@ -1365,6 +1527,10 @@ window.__initPreviewPagination = initPreviewPagination;
 // Ekspos daftar ukuran kertas supaya halaman edit bisa mencocokkan nama
 // ukuran (A4/A5/...) dari objek size yang aktif di editor.
 window.__paperSizes = PAPER_SIZES;
+// Ekspos findPaperKey supaya halaman edit (edit.blade.php) bisa mencocokkan
+// nama ukuran (A4/A5/...) dari objek size aktif tanpa duplikasi logic saat
+// mengisi hidden input paper_size sebelum submit.
+window.__findPaperKey = findPaperKey;
 
 // Ekspor untuk dipakai halaman preview (show / preview-version / preview).
 export { initPreviewPagination, repaginatePreview, readStoredPaper };
