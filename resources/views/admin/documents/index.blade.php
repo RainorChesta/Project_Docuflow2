@@ -2,7 +2,7 @@
     <x-slot name="header">Semua Dokumen</x-slot>
 
     <div class="py-6">
-        <div class="max-w-7xl mx-auto">
+        <div class="max-w-7xl mx-auto w-full">
             @if(session('success'))
                 <div class="alert alert-success mb-4">{{ session('success') }}</div>
             @endif
@@ -43,7 +43,7 @@
 
             <div class="card bg-base-100 border border-base-300 shadow-sm">
                 <div class="overflow-x-auto">
-                    <table class="table">
+                    <table class="table min-w-[720px]">
                         <thead>
                             <tr>
                                 <th>Dokumen</th>

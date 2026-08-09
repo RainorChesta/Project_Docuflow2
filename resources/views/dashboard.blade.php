@@ -2,7 +2,7 @@
     <x-slot name="header">Dashboard</x-slot>
 
     <div class="py-6">
-        <div class="max-w-7xl mx-auto">
+        <div class="max-w-7xl mx-auto w-full">
             @if(auth()->user()->isAdmin())
                 {{-- Admin dashboard: General Dokumen list (tab hidden from admin navbar) --}}
                 @include('documents._search', ['type' => 'general'])
@@ -19,24 +19,23 @@
                             @forelse($documents as $doc)
                                 @include('documents._list', ['doc' => $doc])
                             @empty
-                                <div class="p-6 text-base-content/60">Tidak ada dokumen.</div>
+                                <div class="p-4 sm:p-6 text-base-content/60">Tidak ada dokumen.</div>
                             @endforelse
                         </div>
                         @if($documents->hasPages())
                             <div class="p-4 border-t border-base-200">
                                 {{ $documents->links() }}
                             </div>
-                        @endif
-                    </div>
+                        @endif                    </div>
                 </div>
             @else
                 {{-- Non-admin dashboard: stats + recent documents --}}
-                <div class="max-w-7xl mx-auto space-y-6">
+                <div class="max-w-7xl mx-auto w-full space-y-6">
                     <!-- Search -->
                     <form method="GET" action="{{ route('dashboard') }}" class="card bg-base-100 border border-base-300 rounded-box p-4">
-                        <div class="flex gap-2">
+                        <div class="flex flex-col sm:flex-row gap-2">
                             <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari dokumen berdasarkan judul atau nomor..."
-                                   class="input input-bordered w-full">
+                                   class="input input-bordered w-full sm:flex-1">
                             <button type="submit" class="btn btn-primary">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                                 Search
@@ -53,13 +52,13 @@
                     @if(request('search') && $results)
                         <!-- Search Results -->
                         <div class="bg-base-100 border border-base-300 rounded-box">
-                            <div class="px-5 py-4 border-b border-base-300 flex items-center justify-between">
+                            <div class="px-4 sm:px-5 py-4 border-b border-base-300 flex flex-wrap items-center justify-between gap-2">
                                 <h2 class="font-semibold text-base-content">Search Results</h2>
                                 <span class="text-sm text-base-content/50">{{ $results->total() }} found</span>
                             </div>
                             <div class="divide-y divide-base-200">
                                 @forelse($results as $doc)
-                                    <div class="px-5 py-3.5 flex items-center justify-between hover:bg-base-50 transition-colors">
+                                    <div class="px-4 sm:px-5 py-3.5 flex flex-wrap items-center justify-between gap-2 hover:bg-base-50 transition-colors">
                                         <div class="flex items-center gap-3 min-w-0">
                                             <svg class="w-8 h-8 shrink-0 text-base-content/20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                                             <div class="min-w-0">
@@ -69,7 +68,7 @@
                                                 </p>
                                             </div>
                                         </div>
-                                        <div class="flex items-center gap-3 shrink-0">
+                                        <div class="flex flex-wrap items-center gap-3 shrink-0">
                                             <a href="{{ route('documents.preview', $doc) }}" title="Preview Dokumen" class="inline-flex items-center justify-center w-6 h-6 rounded-full text-base-content/60 hover:text-base-content hover:bg-base-200">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -85,7 +84,7 @@
                                         </div>
                                     </div>
                                 @empty
-                                    <div class="px-5 py-10 text-center text-sm text-base-content/50">No documents match "{{ request('search') }}".</div>
+                                    <div class="px-4 sm:px-5 py-10 text-center text-sm text-base-content/50">No documents match "{{ request('search') }}".</div>
                                 @endforelse
                             </div>
                             @if($results->hasPages())
@@ -125,7 +124,7 @@
                     </div>
 
                     <!-- Shared Edit History link -->
-                    <div class="flex justify-end">
+                    <div class="flex flex-wrap justify-end">
                         <a href="{{ route('shared.history') }}" class="text-sm font-medium text-primary hover:text-primary/80 transition-colors">
                             Riwayat Edit via Share Link →
                         </a>
@@ -133,13 +132,13 @@
 
                     <!-- Recent Documents -->
                     <div class="bg-base-100 border border-base-300 rounded-box">
-                        <div class="px-5 py-4 border-b border-base-300 flex items-center justify-between">
+                        <div class="px-4 sm:px-5 py-4 border-b border-base-300 flex flex-wrap items-center justify-between gap-2">
                             <h2 class="font-semibold text-base-content">Recent Documents</h2>
                             <a href="{{ route('documents.index', ['type' => 'mine']) }}" class="text-sm font-medium text-primary hover:text-primary/80 transition-colors">View all</a>
                         </div>
                         <div class="divide-y divide-base-200">
                             @forelse($recent as $doc)
-                                <div class="px-5 py-3.5 flex items-center justify-between hover:bg-base-50 transition-colors">
+                                <div class="px-4 sm:px-5 py-3.5 flex flex-wrap items-center justify-between gap-2 hover:bg-base-50 transition-colors">
                                     <div class="flex items-center gap-3 min-w-0">
                                         <svg class="w-8 h-8 shrink-0 text-base-content/20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                                         <div class="min-w-0">
@@ -149,7 +148,7 @@
                                             </p>
                                         </div>
                                     </div>
-                                    <div class="flex items-center gap-3 shrink-0">
+                                    <div class="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">
                                         <a href="{{ route('documents.preview', $doc) }}" title="Preview Dokumen" class="inline-flex items-center justify-center w-6 h-6 rounded-full text-base-content/60 hover:text-base-content hover:bg-base-200">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -168,7 +167,7 @@
                                     </div>
                                 </div>
                             @empty
-                                <div class="px-5 py-10 text-center">
+                                <div class="px-4 sm:px-5 py-10 text-center">
                                     <svg class="w-10 h-10 mx-auto text-base-content/20 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                                     <p class="text-sm text-base-content/50 mb-1">No documents yet</p>
                                     <p class="text-xs text-base-content/30">Create your first document to get started.</p>

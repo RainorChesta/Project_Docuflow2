@@ -2,8 +2,8 @@
     <x-slot name="header">Edit User</x-slot>
 
     <div class="py-6">
-        <div class="max-w-xl mx-auto">
-            <div class="card bg-base-100 border border-base-300 shadow-sm p-6">
+        <div class="max-w-xl mx-auto w-full px-0">
+            <div class="card bg-base-100 border border-base-300 shadow-sm p-4 sm:p-6">
                 <form method="POST" action="{{ route('admin.users.update', $user) }}">
                     @csrf @method('PUT')
                     @if($errors->any())
@@ -54,7 +54,7 @@
                             <span class="label-text">Active</span>
                         </label>
                     </div>
-                    <div class="flex justify-end">
+                    <div class="flex flex-wrap justify-end">
                         <button type="submit" class="btn btn-primary">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
                             Update

@@ -1,10 +1,19 @@
-<style>
+@once
+    @push('styles')
+        <style>
     /* WAJIB baris PERTAMA — @import harus paling atas di file CSS, sama
        seperti iframeStyle editor di resources/js/jodit.js. Tanpa ini font
        Google tidak tampil di preview halaman → beda dgn pratinjau Jodit. */
     @import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,400&family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Lora:ital,wght@0,400..700;1,400..700&family=Source+Code+Pro:ital,wght@0,400;0,700;1,400&display=swap');
 
-    @media print {
+    /* Fix scroll hilang saat live-sync render: preview.blade.php merender
+       ulang konten draft dari localStorage dengan menimpa innerHTML
+       #live-preview-content — style <style> di dalam partial ini ikut
+       terhapus, padahal CSS-nya (max-height 75vh + overflow auto) yang
+       bikin area kertas bisa di-scroll. Dengan memindahkan <style> ke
+       HEAD dokumen (dipush sekali per render), style tetap hidup walau
+       konten di-render ulang. */
+            @media print {
     .doku-paper-scope {
         max-height: none;
         overflow: visible;
@@ -76,11 +85,33 @@
 }
 
     /* Responsif: di layar sempit, kertas mengikuti lebar device dan
-       margin halaman dikecilkan biar konten tidak kepotong. */
+       margin halaman dikecilkan biar konten tidak kepotong. !important
+       dipakai karena repaginatePreview (resources/js/jodit.js) menulis
+       width/min-height sebagai inline style — media query ini harus
+       menang biar preview pas dengan lebar layar kecil. Garis pembatas
+       antar halaman TETAP ditampilkan (hanya dirampingkan) supaya
+       user tetap melihat di mana halaman berikutnya dimulai — sama
+       seperti di layar lebar. */
     @media (max-width: 640px) {
+        .doku-paper-scope {
+            padding: 8px;
+            max-height: 90vh;
+        }
         .doku-paper-scope .doku-paper {
-            padding: 24px 16px;
-            min-height: auto;
+            width: 100% !important;
+            min-height: auto !important;
+        }
+        .doku-paper-scope .doku-paper [data-page-spacer] {
+            display: block !important;
+        }
+        .doku-paper-scope .doku-paper [data-page-spacer] > div {
+            background: #fff !important;
+        }
+        .doku-paper-scope .doku-paper [data-page-spacer] > div:nth-child(2) {
+            height: 6px !important;
+            background: #cbd5e1 !important;
+            border-top: 1px solid #94a3b8 !important;
+            border-bottom: 1px solid #94a3b8 !important;
         }
     }
     .doku-paper-scope .doku-paper::after {
@@ -124,6 +155,7 @@
        kertas tanpa kontrol. */
     .doku-paper-scope .doku-paper-toolbar {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
         gap: 8px;
         margin-bottom: 12px;
@@ -138,7 +170,9 @@
         background: #fff;
         color: #1a1a1a;
     }
-</style>
+        </style>
+    @endpush
+@endonce
 
 <div class="doku-paper-scope" @isset($liveStorage) data-live-storage="{{ $liveStorage }}" @endisset
      data-paper-size="{{ $paperSize ?? 'A4' }}"

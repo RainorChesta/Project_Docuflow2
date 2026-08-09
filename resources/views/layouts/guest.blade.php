@@ -21,7 +21,7 @@
     </head>
     <body class="min-h-screen bg-gradient-to-br from-primary/10 via-base-200 to-secondary/10 font-sans antialiased flex items-center justify-center p-4">
         <div class="card bg-base-100 w-full max-w-md shadow-2xl border border-base-200">
-            <div class="card-body p-8">
+            <div class="card-body p-4 sm:p-8">
                 <div class="text-center mb-6 flex flex-col items-center gap-3">
                     <div class="self-end -mb-2">
                         <x-theme-toggle />
@@ -29,7 +29,7 @@
                     <a href="/" class="inline-block">
                         <x-application-logo class="mx-auto h-14 w-14 text-primary" />
                     </a>
-                    <h1 class="text-xl font-bold text-base-content mt-3">{{ $heading ?? config('app.name', 'DokuFlow') }}</h1>
+                    <h1 class="text-xl font-bold text-base-content mt-3 break-words text-center">{{ $heading ?? config('app.name', 'DokuFlow') }}</h1>
                     <p class="text-base-content/50 text-sm mt-1">{{ $description ?? __('Silakan masuk ke akun Anda') }}</p>
                 </div>
 

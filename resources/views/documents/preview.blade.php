@@ -1,16 +1,16 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center justify-between">
-            <span>{{ $document->title }}</span>
-            <span class="text-sm font-normal text-base-content/60">{{ $document->document_number }}</span>
+        <div class="flex flex-wrap items-center gap-2 justify-between">
+            <span class="min-w-0 truncate">{{ $document->title }}</span>
+            <span class="text-sm font-normal text-base-content/60 shrink-0">{{ $document->document_number }}</span>
         </div>
     </x-slot>
 
     <div class="py-6">
-        <div class="max-w-4xl mx-auto">
+        <div class="max-w-4xl mx-auto w-full px-0">
             <div class="card bg-base-100 border border-base-300 shadow-sm">
                 <div class="card-body">
-                    <div class="flex justify-between items-center mb-4 pb-4 border-b border-base-300">
+                    <div class="flex flex-wrap justify-between items-center gap-3 mb-4 pb-4 border-b border-base-300">
                         <div class="text-sm">
                             <div><span class="text-base-content/60">Division:</span> {{ $document->division?->code ?? '—' }}</div>
                             <div><span class="text-base-content/60">Owner:</span> {{ $document->owner->name }}</div>
@@ -46,7 +46,7 @@
 
                     @if(session('pdf_export'))
                         <div class="alert alert-success mt-3">
-                            <div class="flex items-center justify-between gap-3 w-full">
+                            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 w-full">
                                 <span>PDF berhasil dibuat. <span class="font-medium">{{ session('pdf_export.filename') }}</span></span>
                                 <a href="{{ session('pdf_export.url') }}" target="_blank" rel="noopener" class="btn btn-primary btn-sm shrink-0">
                                     Download PDF

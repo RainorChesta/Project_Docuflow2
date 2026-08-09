@@ -14,20 +14,20 @@
 
         {{-- Top Bar ala Word/Docs --}}
         <div class="sticky top-0 z-20 bg-base-100 border-b border-base-300 shadow-sm">
-            <div class="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
+            <div class="max-w-6xl mx-auto px-3 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
 
                 <div class="flex items-center gap-3 min-w-0">
                     <svg class="w-6 h-6 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    <h1 class="text-lg font-semibold truncate">{{ $document->title }}</h1>
+                    <h1 class="text-base sm:text-lg font-semibold truncate min-w-0">{{ $document->title }}</h1>
                     <span class="badge badge-ghost badge-sm hidden sm:inline-flex">
                         {{ $document->document_number ?? '' }}
                     </span>
                 </div>
 
-                <div class="flex items-center gap-3 shrink-0">
+                <div class="flex flex-wrap items-center gap-2 shrink-0">
                     <div class="hidden md:flex items-center gap-2 pr-3 mr-1 border-r border-base-300">
                         <div class="avatar placeholder">
                             <div class="bg-neutral text-neutral-content rounded-full w-8">
@@ -56,7 +56,7 @@
             </div>
 
             @if($errors->any())
-                <div class="max-w-6xl mx-auto px-6 pb-3">
+                <div class="max-w-6xl mx-auto px-3 sm:px-6 pb-3">
                     <div class="alert alert-error py-2 text-sm">
                         <span>{{ $errors->first() }}</span>
                     </div>
@@ -69,10 +69,10 @@
                 $hasDraftOnly = !$pending && !$document->currentVersion;
             @endphp
             @if($pending)
-                <div class="max-w-6xl mx-auto px-6 pb-3">
+                <div class="max-w-6xl mx-auto px-3 sm:px-6 pb-3">
                     <div class="alert alert-warning shadow-sm">
-                        <div class="flex items-center justify-between gap-4 w-full">
-                            <div class="flex items-center gap-2 text-sm">
+                        <div class="flex flex-col sm:flex-row items-center justify-between gap-3 w-full">
+                            <div class="flex items-start sm:items-center gap-2 text-sm min-w-0">
                                 <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                                 <span>
                                     Ada versi pending (v{{ $pending->version_number }}) yang belum di-review.
@@ -100,7 +100,7 @@
         </div>
 
         {{-- Canvas / Dokumen --}}
-        <div class="py-10 px-4">
+        <div class="py-10 px-2 sm:px-4">
             @if(session('success'))
                 <div class="max-w-6xl mx-auto mb-4">
                     <div class="alert alert-success shadow-sm">
@@ -109,7 +109,6 @@
                     </div>
                 </div>
             @endif
-
             <form method="POST" action="{{ route('documents.save', $document) }}" id="editor-form">
                 @csrf
                 @method('PUT')
@@ -145,7 +144,7 @@
                     <input type="hidden" name="paper_size" id="paper-size-input">
                     <input type="hidden" name="paper_margin" id="paper-margin-input">
 
-                    <p class="text-center text-xs text-base-content/50 mt-4">
+                    <p class="text-center text-xs text-base-content/50 mt-4 px-2">
                         @if($hasDraftOnly)
                             <strong>Save Changes</strong> mengirim draft untuk approval (status jadi pending).
                         @else
@@ -174,7 +173,7 @@
 
             {{-- Live preview (tanpa tab kedua) --}}
             <div class="mt-10">
-                <div class="bg-base-100 rounded-xl shadow-md border border-base-300 p-8">
+                <div class="bg-base-100 rounded-xl shadow-md border border-base-300 p-4 sm:p-8">
                     <div id="live-preview-content" class="prose max-w-none" style="overflow-wrap:break-word; word-break:break-word;">
                         {!! $document->displayVersion()->content ?? '' !!}
                     </div>

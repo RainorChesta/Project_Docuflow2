@@ -2,15 +2,15 @@
     <x-slot name="header">Riwayat Edit via Share Link</x-slot>
 
     <div class="py-6">
-        <div class="max-w-5xl mx-auto">
+        <div class="max-w-5xl mx-auto w-full px-0">
             <div class="bg-base-100 border border-base-300 rounded-box">
-                <div class="px-5 py-4 border-b border-base-300">
+                <div class="px-4 sm:px-5 py-4 border-b border-base-300">
                     <h2 class="font-semibold text-base-content">Dokumen yang Pernah Kamu Edit</h2>
                 </div>
                 <div class="divide-y divide-base-200">
                     @forelse($history as $item)
                         @php $linkActive = $item['link'] && !$item['link']->isExpired(); @endphp
-                        <div class="px-5 py-3.5 flex items-center justify-between">
+                        <div class="px-4 sm:px-5 py-3.5 flex flex-wrap items-center justify-between gap-2">
                             <div class="min-w-0">
                                 <p class="text-sm font-medium text-base-content truncate">{{ $item['document']->title }}</p>
                                 <p class="text-xs text-base-content/40 mt-0.5">
@@ -30,7 +30,7 @@
                             </div>
                         </div>
                     @empty
-                        <div class="px-5 py-10 text-center text-sm text-base-content/50">
+                        <div class="px-4 sm:px-5 py-10 text-center text-sm text-base-content/50">
                             Belum ada dokumen yang pernah kamu edit lewat share link.
                         </div>
                     @endforelse

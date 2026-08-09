@@ -13,14 +13,25 @@ class JoditController extends Controller
     public function upload(Request $request)
     {
         // 1. CEK MANUAL: Apakah ada file yang dikirim?
-        // Jika tidak ada, langsung return JSON error (mencegah redirect 302)
+        // Jika tidak ada, langsung return JSON error (mencegah redirect 302).
+        // Catatan: kalau request POST kosong padahal JS sudah append file,
+        // kemungkinan besar file TIDAK sampai ke PHP karena melebihi
+        // upload_max_filesize / post_max_size di php.ini — PHP diam-diam
+        // membuang file-nya. Pesan ini menjelaskan dua-duanya.
         if (!$request->hasFile('files')) {
+            $fileCount = count($request->allFiles());
+            $msg = 'Tidak ada file yang ditemukan dalam request.';
+            if ($fileCount === 0 && $request->isMethod('post') && count($request->all()) === 0) {
+                $msg .= ' Kemungkinan file melebihi batas upload server (upload_max_filesize/post_max_size di php.ini), atau field bukan "files[]".';
+            } else {
+                $msg .= ' Pastikan nama field adalah "files[]".';
+            }
             return response()->json([
                 'success' => false,
                 'data' => [
                     'files' => [],
                     'error' => 1,
-                    'msg' => 'Tidak ada file yang ditemukan dalam request. Pastikan nama field adalah "files[]".'
+                    'msg' => $msg,
                 ]
             ], 422);
         }

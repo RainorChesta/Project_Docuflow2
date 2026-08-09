@@ -1,6 +1,6 @@
 @props(['items' => []])
 
-<nav class="breadcrumbs text-sm text-base-content/60 mb-4" aria-label="Breadcrumb">
+<nav class="breadcrumbs text-sm text-base-content/60 mb-4 overflow-x-auto whitespace-nowrap" aria-label="Breadcrumb">
     <ul>
         @foreach($items as $item)
             @if(!empty($item['url']) && !$loop->last)

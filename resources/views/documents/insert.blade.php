@@ -8,14 +8,14 @@
 
         {{-- Top Bar ala Word/Docs --}}
         <div class="sticky top-0 z-20 bg-base-100 border-b border-base-300 shadow-sm">
-            <div class="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
+            <div class="max-w-6xl mx-auto px-3 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
 
                 <div class="flex items-center gap-3 min-w-0">
                     <svg class="w-6 h-6 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    <h1 class="text-lg font-semibold truncate">{{ $document->title }}</h1>
+                    <h1 class="text-base sm:text-lg font-semibold truncate min-w-0">{{ $document->title }}</h1>
                     <span class="badge badge-ghost badge-sm hidden sm:inline-flex">
                         {{ $document->document_number ?? '' }}
                     </span>
@@ -24,7 +24,7 @@
                     @endif
                 </div>
 
-                <div class="flex items-center gap-3 shrink-0">
+                <div class="flex flex-wrap items-center gap-2 shrink-0">
                     <div class="hidden md:flex items-center gap-2 pr-3 mr-1 border-r border-base-300">
                         <div class="avatar placeholder">
                             <div class="bg-neutral text-neutral-content rounded-full w-8">
@@ -59,7 +59,7 @@
             </div>
 
             @if($errors->any())
-                <div class="max-w-6xl mx-auto px-6 pb-3">
+                <div class="max-w-6xl mx-auto px-3 sm:px-6 pb-3">
                     <div class="alert alert-error py-2 text-sm">
                         <span>{{ $errors->first() }}</span>
                     </div>
@@ -68,7 +68,7 @@
         </div>
 
         {{-- Canvas / Dokumen --}}
-        <div class="py-10 px-4">
+        <div class="py-10 px-2 sm:px-4">
             <form method="POST" action="{{ route('documents.save', $document) }}" id="editor-form">
                 @csrf
                 @method('PUT')
@@ -89,7 +89,7 @@
                     <input type="hidden" name="paper_size" id="paper-size-input" value="{{ $document->paper_size ?? 'A4' }}">
                     <input type="hidden" name="paper_margin" id="paper-margin-input" value="{{ $document->paper_margin ? json_encode($document->paper_margin) : '' }}">
 
-                    <p class="text-center text-xs text-base-content/50 mt-4">
+                    <p class="text-center text-xs text-base-content/50 mt-4 px-2">
                         Save akan membuat versi baru yang menunggu approval Head.
                     </p>
                 </div>

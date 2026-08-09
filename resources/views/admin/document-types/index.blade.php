@@ -2,7 +2,7 @@
     <x-slot name="header">Document Types</x-slot>
 
     <div class="py-6">
-        <div class="max-w-4xl mx-auto">
+        <div class="max-w-4xl mx-auto w-full">
             <div class="mb-4">
                 <a href="{{ route('admin.document-types.create') }}" class="btn btn-primary">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
@@ -19,7 +19,8 @@
 
             <div class="card bg-base-100 border border-base-300 shadow-sm">
                 <div class="card-body p-0">
-                    <table class="table">
+                    <div class="overflow-x-auto">
+                        <table class="table min-w-[520px]">
                         <thead>
                             <tr>
                                 <th>Kode</th>
@@ -51,6 +52,7 @@
                             @endforelse
                         </tbody>
                     </table>
+                    </div>
                     @if($documentTypes->hasPages())
                         <div class="p-4 border-t border-base-200 flex flex-col sm:flex-row items-center justify-between gap-3">
                             <p class="text-sm text-base-content/60 shrink-0">

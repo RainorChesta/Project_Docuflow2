@@ -2,7 +2,7 @@
     <x-slot name="header">Pending Approvals</x-slot>
 
     <div class="py-6">
-        <div class="max-w-7xl mx-auto">
+        <div class="max-w-7xl mx-auto w-full">
             @if(session('success'))
                 <div class="alert alert-success mb-4">{{ session('success') }}</div>
             @endif
@@ -10,20 +10,20 @@
             @if($pendingRollbacks->count())
                 <div class="card bg-base-100 border border-base-300 shadow-sm mb-6">
                     <div class="card-body p-0">
-                        <div class="px-5 py-3 border-b border-base-300">
+                        <div class="px-4 sm:px-5 py-3 border-b border-base-300">
                             <h3 class="font-semibold">Permintaan Rollback</h3>
                         </div>
                         <div class="divide-y divide-base-200">
                             @foreach($pendingRollbacks as $doc)
-                                <div class="p-6">
-                                    <div class="flex justify-between items-start">
-                                        <div>
-                                            <p class="font-medium">{{ $doc->title }}</p>
+                                <div class="p-4 sm:p-6">
+                                    <div class="flex flex-wrap justify-between items-start gap-3">
+                                        <div class="min-w-0">
+                                            <p class="font-medium break-words">{{ $doc->title }}</p>
                                             <p class="text-sm text-base-content/60">
                                                 Rollback ke v{{ $doc->pendingRollbackVersion->version_number }} · oleh {{ $doc->rollbackRequestedBy?->name ?? '—' }} · {{ $doc->rollback_requested_at?->diffForHumans() }}
                                             </p>
                                         </div>
-                                        <div class="flex gap-2 items-center">
+                                        <div class="flex flex-wrap gap-2 items-center shrink-0">
                                             <a href="{{ route('documents.preview', $doc) }}" title="Preview Dokumen" class="inline-flex items-center justify-center w-6 h-6 rounded-full text-base-content/60 hover:text-base-content hover:bg-base-200">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -51,15 +51,15 @@
                 <div class="card-body p-0">
                     <div class="divide-y divide-base-200">
                         @forelse($pendingVersions as $version)
-                            <div class="p-6">
-                                <div class="flex justify-between items-start">
-                                    <div>
-                                        <p class="font-medium">{{ $version->document->title }}</p>
+                            <div class="p-4 sm:p-6">
+                                <div class="flex flex-wrap justify-between items-start gap-3">
+                                    <div class="min-w-0">
+                                        <p class="font-medium break-words">{{ $version->document->title }}</p>
                                         <p class="text-sm text-base-content/60">
                                             v{{ $version->version_number }} · by {{ $version->author_name }} · {{ $version->created_at->diffForHumans() }}
                                         </p>
                                     </div>
-                                    <div class="flex gap-2 items-center">
+                                    <div class="flex flex-wrap gap-2 items-center shrink-0">
                                         <a href="{{ route('documents.preview', $version->document) }}" title="Preview Dokumen" class="inline-flex items-center justify-center w-6 h-6 rounded-full text-base-content/60 hover:text-base-content hover:bg-base-200">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -82,12 +82,12 @@
                                         </form>
                                     </div>
                                 </div>
-                                <div class="mt-3 p-3 bg-base-200/50 rounded-lg text-sm max-h-32 overflow-y-auto">
+                                <div class="mt-3 p-3 bg-base-200/50 rounded-lg text-sm max-h-32 overflow-y-auto prose max-w-none" style="overflow-wrap:break-word; word-break:break-word;">
                                     {!! $version->content !!}
                                 </div>
                             </div>
                         @empty
-                            <div class="p-6 text-base-content/60">No pending approvals.</div>
+                            <div class="p-4 sm:p-6 text-base-content/60">No pending approvals.</div>
                         @endforelse
                     </div>
                 </div>

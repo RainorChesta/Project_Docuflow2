@@ -1,8 +1,8 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center justify-between">
-            <span>{{ $document->title }}</span>
-            <span class="text-sm font-normal text-base-content/60">{{ $document->document_number }}</span>
+        <div class="flex flex-wrap items-center gap-2 justify-between">
+            <span class="min-w-0 truncate">{{ $document->title }}</span>
+            <span class="text-sm font-normal text-base-content/60 shrink-0">{{ $document->document_number }}</span>
         </div>
     </x-slot>
 
@@ -18,7 +18,7 @@
     @endif
 
     <div class="py-6">
-        <div class="max-w-7xl mx-auto">
+        <div class="max-w-7xl mx-auto w-full">
             @if(session('success'))
                 <div class="alert alert-success mb-4">
                     <span>{{ session('success') }}</span>
@@ -34,7 +34,7 @@
             @if($document->hasPendingRollback())
                 <div class="alert alert-warning mb-6 shadow-sm">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div class="flex items-center gap-3">
+                        <div class="flex items-start sm:items-center gap-3 min-w-0">
                             <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
                             </svg>
@@ -67,7 +67,7 @@
             @if($pendingVersion)
                 <div class="alert alert-warning mb-6 shadow-sm">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div class="flex items-center gap-3">
+                        <div class="flex items-start sm:items-center gap-3 min-w-0">
                             <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                             </svg>
@@ -120,12 +120,12 @@
             @endphp
             <div class="card bg-base-100 border border-base-300 shadow-sm mb-6">
                 <div class="card-body">
-                    <div class="flex items-center gap-3 mb-4">
-                        <h1 class="text-xl font-bold text-base-content truncate">{{ $document->title }}</h1>
+                    <div class="flex flex-wrap items-center gap-3 mb-4">
+                        <h1 class="text-xl font-bold text-base-content truncate min-w-0">{{ $document->title }}</h1>
                         <span class="badge badge-outline badge-sm shrink-0">{{ $document->document_number }}</span>
                     </div>
 
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                         <div>
                             <span class="text-base-content/60">Division</span>
                             <p class="font-medium">{{ $document->division?->code ?? '—' }}</p>
@@ -188,7 +188,6 @@
                                 </a>
                             @endif
                         @endcan
-
                         @can('update', $document)
                             <button type="button" onclick="document.getElementById('link-form').showModal()" class="btn btn-neutral btn-sm">
                                 Share Link
@@ -218,7 +217,7 @@
 
                     @if(session('pdf_export'))
                         <div class="alert alert-success mt-3">
-                            <div class="flex items-center justify-between gap-3 w-full">
+                            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 w-full">
                                 <span>PDF berhasil dibuat. <span class="font-medium">{{ session('pdf_export.filename') }}</span></span>
                                 <a href="{{ session('pdf_export.url') }}" target="_blank" rel="noopener" class="btn btn-primary btn-sm shrink-0">
                                     Download PDF
@@ -243,7 +242,7 @@
                             'paperMargin' => $document->paper_margin,
                         ])
                     @else
-                        <p class="text-base-content/60 italic p-6">No approved content yet.</p>
+                        <p class="text-base-content/60 italic p-4 sm:p-6">No approved content yet.</p>
                     @endif
                 </div>
             </div>
@@ -253,11 +252,10 @@
                     <span>{{ $errors->first('export') }} Silakan coba lagi.</span>
                 </div>
             @endif
-
             <!-- Share Link Modal -->
             <dialog id="link-form" class="modal">
-                <div class="modal-box max-w-md">
-                    <div class="flex items-center justify-between mb-4">
+                <div class="modal-box max-w-md max-h-[85vh] overflow-y-auto">
+                    <div class="flex flex-wrap items-center justify-between mb-4">
                         <h3 class="font-semibold">Generate Share Link</h3>
                         <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('link-form').close()">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -277,18 +275,18 @@
                         $activeRole = fn($r) => $activeLinks->firstWhere('role', $r);
                     @endphp
 
-                    <form method="POST" action="{{ route('links.store', $document) }}" class="flex gap-2 items-end">
+                    <form method="POST" action="{{ route('links.store', $document) }}" class="flex flex-col sm:flex-row gap-3 sm:gap-2 sm:items-end">
                         @csrf
                         <div class="form-control">
                             <label class="label"><span class="label-text">Role</span></label>
-                            <select name="role" class="select select-bordered" required>
+                            <select name="role" class="select select-bordered w-full" required>
                                 <option value="viewer" @disabled($activeRole('viewer'))>Viewer {{ $activeRole('viewer') ? '(active)' : '' }}</option>
                                 <option value="editor" @disabled($activeRole('editor'))>Editor {{ $activeRole('editor') ? '(active)' : '' }}</option>
                             </select>
                         </div>
                         <div class="form-control">
                             <label class="label"><span class="label-text">Expires (optional)</span></label>
-                            <input type="date" name="expires_at" class="input input-bordered" min="{{ date('Y-m-d', strtotime('+1 day')) }}">
+                            <input type="date" name="expires_at" class="input input-bordered w-full" min="{{ date('Y-m-d', strtotime('+1 day')) }}">
                         </div>
                         <button type="submit" class="btn btn-primary">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
@@ -306,14 +304,14 @@
                         <div class="mt-4">
                             <h4 class="text-sm font-medium text-base-content/70 mb-2">Active Links</h4>
                             @foreach($document->accessLinks as $link)
-                                <div class="flex justify-between items-center py-2 border-b border-base-200 text-sm">
+                                <div class="flex flex-wrap justify-between items-center gap-2 py-2 border-b border-base-200 text-sm">
                                     <button type="button"
-                                            class="text-base-content/60 truncate max-w-md text-left hover:underline"
+                                            class="text-base-content/60 break-all max-w-full min-w-0 text-left hover:underline"
                                             onclick="openShareLinkModal('{{ route('shared.documents', $link->token) }}')"
                                             title="Klik untuk salin link">
                                         {{ route('shared.documents', $link->token) }}
                                     </button>
-                                    <div class="flex gap-2 items-center">
+                                    <div class="flex flex-wrap gap-2 items-center shrink-0">
                                         <span class="badge {{ $link->role === 'editor' ? 'badge-primary' : 'badge-ghost' }} badge-sm">
                                             {{ $link->role }}
                                         </span>
@@ -348,8 +346,8 @@
                  sengaja dibuat identik dengan PdfExportService::buildHtml()). --}}
             @if(!$isFileBased)
                 <dialog id="export-pdf-modal" class="modal">
-                    <div class="modal-box max-w-sm">
-                        <div class="flex items-center justify-between mb-4">
+                <div class="modal-box max-w-sm max-h-[85vh] overflow-y-auto">
+                        <div class="flex flex-wrap items-center justify-between mb-4">
                             <h3 class="font-semibold">Export ke PDF</h3>
                             <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('export-pdf-modal').close()">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -374,7 +372,7 @@
                             <p class="text-xs text-base-content/50 mb-4">
                                 Margin tetap mengikuti margin dokumen saat ini; kalau tidak muat di kertas yang dipilih, margin akan disesuaikan otomatis.
                             </p>
-                            <div class="flex justify-end gap-2">
+                            <div class="flex flex-wrap justify-end gap-2">
                                 <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('export-pdf-modal').close()">Batal</button>
                                 <button type="submit" class="btn btn-primary btn-sm">Export</button>
                             </div>
@@ -394,8 +392,8 @@
         #share-link-modal::backdrop { background: rgba(0, 0, 0, 0.5); }
     </style>
     <dialog id="share-link-modal" class="modal">
-        <div class="modal-box max-w-md">
-            <div class="flex items-center justify-between mb-4">
+        <div class="modal-box max-w-md max-h-[85vh] overflow-y-auto">
+            <div class="flex flex-wrap items-center justify-between mb-4">
                 <h3 class="font-semibold">Link Berhasil Dibuat</h3>
                 <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('share-link-modal').close()">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -459,7 +457,7 @@
     {{-- Version History modal --}}
     <dialog id="version-modal" class="modal">
         <div class="modal-box max-w-2xl max-h-[85vh] overflow-y-auto">
-            <div class="flex items-center justify-between mb-4">
+            <div class="flex flex-wrap items-center justify-between mb-4">
                 <h3 class="font-semibold">Version History</h3>
                 <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('version-modal').close()">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -473,8 +471,8 @@
                 </div>
             @endif
             @forelse($document->versions->sortByDesc('version_number') as $version)
-                <div class="flex items-center justify-between py-2 border-b border-base-200 text-sm">
-                    <div>
+                <div class="flex flex-wrap items-center justify-between gap-2 py-2 border-b border-base-200 text-sm">
+                    <div class="min-w-0">
                         <span class="font-medium">v{{ $version->version_number }}</span>
                         @if($version->file_path)
                             <span class="badge badge-ghost badge-sm ml-1">Berkas</span>
@@ -496,7 +494,7 @@
                             <span class="badge badge-warning badge-sm ml-2">Target Rollback</span>
                         @endif
                     </div>
-                    <div class="flex gap-2">
+                    <div class="flex flex-wrap gap-2 shrink-0">
                         <a href="{{ route('documents.preview-version', [$document, $version]) }}"
                            class="btn btn-ghost btn-xs">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
@@ -529,8 +527,8 @@
 
     {{-- Change scope modal --}}
     <dialog id="scope-modal" class="modal">
-        <div class="modal-box max-w-sm">
-            <div class="flex items-center justify-between mb-4">
+        <div class="modal-box max-w-sm max-h-[85vh] overflow-y-auto">
+            <div class="flex flex-wrap items-center justify-between mb-4">
                 <h3 class="font-semibold">Change Scope</h3>
                 <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('scope-modal').close()">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -544,7 +542,7 @@
                 <label class="label cursor-pointer justify-start gap-3 rounded-lg border border-base-300 p-3 hover:bg-base-200/50">
                     <input type="radio" name="visibility" value="general" class="radio radio-sm radio-primary"
                            {{ $document->isGeneral() ? 'checked' : '' }}>
-                    <span class="block">
+                    <span class="block min-w-0">
                         <span class="block font-medium text-sm">General (public)</span>
                         <span class="block text-xs text-base-content/60">Terlihat oleh semua pengguna.</span>
                     </span>
@@ -552,7 +550,7 @@
                 <label class="label cursor-pointer justify-start gap-3 rounded-lg border border-base-300 p-3 hover:bg-base-200/50">
                     <input type="radio" name="visibility" value="division" class="radio radio-sm radio-primary"
                            {{ $document->isDivision() ? 'checked' : '' }}>
-                    <span class="block">
+                    <span class="block min-w-0">
                         <span class="block font-medium text-sm">Division only</span>
                         <span class="block text-xs text-base-content/60">Hanya divisi {{ $document->division?->code ?? '' }} yang bisa melihat.</span>
                     </span>
@@ -560,12 +558,12 @@
                 <label class="label cursor-pointer justify-start gap-3 rounded-lg border border-base-300 p-3 hover:bg-base-200/50">
                     <input type="radio" name="visibility" value="personal" class="radio radio-sm radio-primary"
                            {{ $document->isPersonal() ? 'checked' : '' }}>
-                    <span class="block">
+                    <span class="block min-w-0">
                         <span class="block font-medium text-sm">Personal</span>
                         <span class="block text-xs text-base-content/60">Hanya kamu yang bisa melihat.</span>
                     </span>
                 </label>
-                <div class="flex justify-end gap-2 pt-2">
+                <div class="flex flex-wrap justify-end gap-2 pt-2">
                     <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('scope-modal').close()">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                         Cancel
@@ -584,8 +582,8 @@
 
     {{-- Edit restricted modal (dokumen berbasis unggahan) --}}
     <dialog id="edit-restricted-modal" class="modal">
-        <div class="modal-box max-w-md">
-            <div class="flex items-center justify-between mb-4">
+        <div class="modal-box max-w-md max-h-[85vh] overflow-y-auto">
+            <div class="flex flex-wrap items-center justify-between mb-4">
                 <h3 class="font-semibold">Tidak Bisa Diedit Langsung</h3>
                 <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('edit-restricted-modal').close()">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -601,7 +599,7 @@
                 <li><span class="font-medium">Rollback</span> ke versi sebelumnya yang masih tersimpan.</li>
                 <li><span class="font-medium">Unggah versi terbaru</span> untuk menggantikan isi dokumen saat ini.</li>
             </ul>
-            <div class="flex justify-end gap-2">
+            <div class="flex flex-wrap justify-end gap-2">
                 <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('edit-restricted-modal').close(); document.getElementById('version-modal').showModal();">
                     Lihat Versi
                 </button>
@@ -617,8 +615,8 @@
 
     {{-- Upload new version modal --}}
     <dialog id="upload-version-modal" class="modal">
-        <div class="modal-box max-w-md">
-            <div class="flex items-center justify-between mb-4">
+        <div class="modal-box max-w-md max-h-[85vh] overflow-y-auto">
+            <div class="flex flex-wrap items-center justify-between mb-4">
                 <h3 class="font-semibold">Unggah Versi Terbaru</h3>
                 <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('upload-version-modal').close()">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -636,7 +634,7 @@
                     <p class="text-xs text-base-content/50 mt-1">Hanya PDF atau DOCX, maksimal 10MB. Versi baru akan menunggu approval kepala divisi.</p>
                     @error('file') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                 </div>
-                <div class="flex justify-end gap-2">
+                <div class="flex flex-wrap justify-end gap-2">
                     <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('upload-version-modal').close()">Cancel</button>
                     <button type="submit" class="btn btn-primary btn-sm">Upload</button>
                 </div>

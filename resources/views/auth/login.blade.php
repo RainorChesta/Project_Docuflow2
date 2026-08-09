@@ -33,7 +33,7 @@
             </label>
         </div>
 
-        <div class="flex items-center justify-between mt-6">
+        <div class="flex flex-wrap items-center justify-between gap-3 mt-6">
             @if (Route::has('password.request'))
                 <a class="link link-hover text-sm text-base-content/50 hover:text-primary" href="{{ route('password.request') }}">
                     {{ __('Lupa password?') }}

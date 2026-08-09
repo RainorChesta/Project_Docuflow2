@@ -1515,6 +1515,88 @@ export function initJoditEditor(selector, overrides = {}) {
     // secara berulang tanpa henti.
     editor.events.on('change', () => scheduleRepaginate(editor));
 
+    // FIX FULLSIZE SCROLL: mode "buka editor ukuran penuh" (tombol fullsize)
+    // bawaan Jodit mem-patok container ke tinggi viewport TAPI tidak membuat
+    // area mana pun bisa di-scroll:
+    //   - body/html dikasih class jodit_fullsize-box_true → overflow:hidden
+    //     + height:0 (plugin fullsize), jadi halaman utama tidak bisa scroll.
+    //   - iframe editor di-auto-grow (inline height = tinggi konten, mis.
+    //     1905px) sehingga dokumen di DALAM iframe tidak perlu scroll, tapi
+    //     iframe-nya sendiri melebihi viewport dan tidak bisa digeser.
+    //   - container overflow:visible.
+    // Hasilnya: konten dokumen yang lebih panjang dari layar terpotong dan
+    // tidak bisa di-scroll sama sekali. Solusi: saat fullsize aktif, kunci
+    // tinggi iframe = viewport − toolbar, lalu aktifkan scroll di dalam
+    // dokumen iframe (overflow-y:auto di html/body iframe). Scrollbar
+    // muncul di iframe dan konten bisa digulir. Saat keluar fullsize,
+    // tinggi iframe dikembalikan ke auto (auto-grow seperti biasa).
+    //
+    // CATATAN TIMING: plugin size Jodit TERUS menulis ulang inline
+    // min-height/height iframe (dari --jd-jodit-workplace-height) setiap
+    // resize/reflow — sekali set saja tidak cukup, nilai kita bakal
+    // ketimpa. Karena itu pasang MutationObserver pada atribut style
+    // iframe SELAMA fullsize aktif: setiap Jodit menulis ulang tinggi,
+    // kita re-clamp ke calc(100vh − toolbar). Observasi dihentikan saat
+    // keluar fullsize (style iframe dikembalikan ke auto-grow).
+    const TOOLBAR_OFFSET = 45; // perkiraan tinggi toolbar Jodit
+    let fullsizeClamping = false;
+    const clampFullsizeIframe = () => {
+        const iframe = editor.container?.querySelector('iframe');
+        if (!iframe || !editor.isFullSize) return;
+        fullsizeClamping = true;
+        iframe.style.height = 'calc(100vh - ' + TOOLBAR_OFFSET + 'px)';
+        iframe.style.minHeight = '0';
+        const doc = iframe.contentDocument;
+        if (doc) {
+            doc.documentElement.style.overflowY = 'auto';
+            doc.body.style.overflowY = 'auto';
+        }
+        queueMicrotask(() => { fullsizeClamping = false; });
+    };
+    const detachFullsizeScroll = () => {
+        const iframe = editor.container?.querySelector('iframe');
+        if (iframe) {
+            iframe.style.height = '';
+            iframe.style.minHeight = '';
+            const doc = iframe.contentDocument;
+            if (doc) {
+                doc.documentElement.style.overflowY = '';
+                doc.body.style.overflowY = '';
+            }
+            // Plugin size Jodit menimpa tinggi iframe dari konten; paksa
+            // re-hitung biar auto-grow balik normal.
+            editor.e.fire('resize');
+            editor.e.fire('afterResize');
+        }
+    };
+    const applyFullsizeScroll = (isFull) => {
+        if (isFull) {
+            clampFullsizeIframe();
+            // Plugin size Jodit menulis ulang tinggi iframe SECARA ASYNC —
+            // timing-nya di luar kendali (beberapa tick, kadang lebih lama).
+            // Observer style tidak cukup; loop rAF murah yang terus jalan
+            // selama fullsize aktif memastikan nilai kita selalu menang.
+            // Berhenti otomatis saat keluar fullsize (isFullSize false).
+            const reapply = () => {
+                if (!editor.isFullSize) return;
+                clampFullsizeIframe();
+                requestAnimationFrame(reapply);
+            };
+            requestAnimationFrame(reapply);
+            editor.e.on('resize.fullsizeFix', clampFullsizeIframe);
+            editor.e.on('afterResize.fullsizeFix', clampFullsizeIframe);
+        } else {
+            editor.e.off('resize.fullsizeFix');
+            editor.e.off('afterResize.fullsizeFix');
+            detachFullsizeScroll();
+        }
+    };
+    editor.e.on('toggleFullSize', applyFullsizeScroll);
+    // Kalau editor dibuat dengan opsi fullsize:true langsung, terapkan juga.
+    if (editor.o.fullsize) {
+        setTimeout(() => applyFullsizeScroll(true), 100);
+    }
+
     return editor;
 }
 

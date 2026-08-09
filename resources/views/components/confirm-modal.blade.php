@@ -9,11 +9,11 @@
 ])
 
 <x-modal :name="$name" :show="false" maxWidth="sm">
-    <div class="p-6">
+    <div class="p-4 sm:p-6">
         <h3 class="text-lg font-semibold text-base-content">{{ $title }}</h3>
         <p class="mt-2 text-sm text-base-content/70">{{ $message }}</p>
 
-        <div class="mt-6 flex justify-end gap-3">
+        <div class="mt-6 flex flex-wrap justify-end gap-3">
             <button type="button"
                     class="btn btn-ghost"
                     x-on:click="$dispatch('close-modal', '{{ $name }}')">

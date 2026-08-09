@@ -1,10 +1,15 @@
 <!-- Left Sidebar — SHARED untuk semua role (di-include dari layouts/app.blade.php).
-     Compact mode (desktop, sidebar tertutup): lebar 72px, hanya icon + tooltip. -->
-<aside class="bg-base-100 border-r border-base-300 flex flex-col shrink-0 h-screen sticky top-0
+     Compact mode (desktop, sidebar tertutup): lebar 72px, hanya icon + tooltip.
+     Penting: fixed (off-canvas) HANYA di layar < lg. Di lg+ sidebar harus
+     position:static (in-flow) supaya ikut "memakan" ruang flex — kalau tetap
+     fixed, konten kanan TIDAK ikut melebar saat sidebar ditutup (fixed tidak
+     pernah memakan space layout), cuma nav-nya hilang. -->
+<aside class="bg-base-100 border-r border-base-300 flex flex-col shrink-0
               {{-- Mobile: off-canvas drawer --}}
-              fixed inset-y-0 left-0 z-50 -translate-x-full lg:translate-x-0
+              fixed inset-y-0 left-0 z-50 -translate-x-full lg:static lg:translate-x-0
+              lg:sticky lg:top-0 lg:h-screen
               overflow-hidden transition-[width,transform] duration-300 ease-in-out"
-       :class="open ? 'translate-x-0 w-60' : '-translate-x-full lg:translate-x-0 lg:w-[72px]'">
+       :class="open ? 'translate-x-0 w-60 max-w-[85vw]' : '-translate-x-full lg:translate-x-0 lg:w-[72px]'">
     <!-- Logo -->
     <div class="h-16 flex items-center border-b border-base-300 shrink-0 overflow-hidden"
          :class="open ? 'px-4' : 'justify-center px-0'">
