@@ -91,7 +91,12 @@
        menang biar preview pas dengan lebar layar kecil. Garis pembatas
        antar halaman TETAP ditampilkan (hanya dirampingkan) supaya
        user tetap melihat di mana halaman berikutnya dimulai — sama
-       seperti di layar lebar. */
+       seperti di layar lebar.
+       Ukuran teks ikut dikecilkan (px fix, bukan em) supaya konten
+       tetap terbaca di device kecil. Pakai px agar tidak kompaun pada
+       elemen bersarang (em berlipat tiap level) dan mengalahkan
+       font-size inline dari Jodit. Pagination tetap akurat karena
+       dihitung dari layout yang sudah berskala ini. */
     @media (max-width: 640px) {
         .doku-paper-scope {
             padding: 8px;
@@ -100,7 +105,17 @@
         .doku-paper-scope .doku-paper {
             width: 100% !important;
             min-height: auto !important;
+            font-size: 14px !important;
         }
+        .doku-paper-scope .doku-paper :is(p, li, td, th, div, span, blockquote, pre, figcaption, dd, dt) {
+            font-size: 14px !important;
+        }
+        .doku-paper-scope .doku-paper h1 { font-size: 28px !important; }
+        .doku-paper-scope .doku-paper h2 { font-size: 21px !important; }
+        .doku-paper-scope .doku-paper h3 { font-size: 17px !important; }
+        .doku-paper-scope .doku-paper h4 { font-size: 14px !important; }
+        .doku-paper-scope .doku-paper h5 { font-size: 12px !important; }
+        .doku-paper-scope .doku-paper h6 { font-size: 11px !important; }
         .doku-paper-scope .doku-paper [data-page-spacer] {
             display: block !important;
         }
@@ -113,6 +128,20 @@
             border-top: 1px solid #94a3b8 !important;
             border-bottom: 1px solid #94a3b8 !important;
         }
+    }
+    @media (max-width: 400px) {
+        .doku-paper-scope .doku-paper {
+            font-size: 13px !important;
+        }
+        .doku-paper-scope .doku-paper :is(p, li, td, th, div, span, blockquote, pre, figcaption, dd, dt) {
+            font-size: 13px !important;
+        }
+        .doku-paper-scope .doku-paper h1 { font-size: 24px !important; }
+        .doku-paper-scope .doku-paper h2 { font-size: 18px !important; }
+        .doku-paper-scope .doku-paper h3 { font-size: 15px !important; }
+        .doku-paper-scope .doku-paper h4 { font-size: 13px !important; }
+        .doku-paper-scope .doku-paper h5 { font-size: 11px !important; }
+        .doku-paper-scope .doku-paper h6 { font-size: 10px !important; }
     }
     .doku-paper-scope .doku-paper::after {
         content: "";
