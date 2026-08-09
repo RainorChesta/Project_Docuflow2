@@ -40,13 +40,13 @@
         </a>
         <div class="text-sm text-base-content/60">
             @if($doc->currentVersion)
-                <span class="badge badge-success badge-sm">v{{ $doc->currentVersion->version_number }}</span>
+                <span class="badge badge-success badge-sm w-16 justify-center">v{{ $doc->currentVersion->version_number }}</span>
             @elseif($hasPending)
                 <span class="badge badge-warning badge-sm w-16 justify-center">Pending</span>
             @elseif($hasDraft)
                 <span class="badge badge-warning badge-sm w-16 justify-center">Draft</span>
             @else
-                <span class="badge badge-ghost badge-sm">No version</span>
+                <span class="badge badge-ghost badge-sm w-16 justify-center">No version</span>
             @endif
         </div>
     </div>

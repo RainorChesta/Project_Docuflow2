@@ -46,36 +46,23 @@ Alpine.start();
         document.getElementById('themeToggleBtn')?.setAttribute('aria-label', 'Theme: ' + e);
     }
 
-    function markActive() {
-        var o = override();
-        document.querySelectorAll('.theme-option').forEach(function(el) {
-            var isActive = el.dataset.themeValue === o;
-            el.classList.toggle('bg-primary/10', isActive);
-            el.classList.toggle('text-primary', isActive);
-            el.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-        });
-    }
-
     document.addEventListener('DOMContentLoaded', function() {
         apply(eff());
         syncIcon();
-        markActive();
 
         // Windows berubah tema → selalu menang, hapus override sesi
         mq.addEventListener('change', function() {
             sessionStorage.removeItem(KEY);
             apply(eff());
             syncIcon();
-            markActive();
         });
 
-        document.querySelectorAll('.theme-option').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                sessionStorage.setItem(KEY, this.dataset.themeValue);
-                apply(eff());
-                syncIcon();
-                markActive();
-            });
+        // Klik toggle = langsung balik tema (light ↔ dark)
+        document.getElementById('themeToggleBtn')?.addEventListener('click', function() {
+            var next = eff() === 'dark' ? 'light' : 'dark';
+            sessionStorage.setItem(KEY, next);
+            apply(next);
+            syncIcon();
         });
     });
 })();

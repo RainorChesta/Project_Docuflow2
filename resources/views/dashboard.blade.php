@@ -34,14 +34,22 @@
                     <!-- Search -->
                     <form method="GET" action="{{ route('dashboard') }}" class="card bg-base-100 border border-base-300 rounded-box p-4">
                         <div class="flex flex-col sm:flex-row gap-2">
-                            <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari dokumen berdasarkan judul atau nomor..."
-                                   class="input input-bordered w-full sm:flex-1">
-                            <button type="submit" class="btn btn-primary">
+                            <input type="text" name="search" value="{{ request('search') }}" placeholder="Search title or number..."
+                                   class="input input-bordered input-sm w-full sm:flex-1">
+                            <select name="document_type_id" class="select select-bordered select-sm w-full sm:w-auto" onchange="this.form.submit()">
+                                <option value="">Semua tipe</option>
+                                @foreach($documentTypes as $dt)
+                                    <option value="{{ $dt->id }}" {{ request('document_type_id') == $dt->id ? 'selected' : '' }}>
+                                        {{ $dt->code }} - {{ $dt->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <button type="submit" class="btn btn-outline btn-primary btn-sm">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                                 Search
                             </button>
-                            @if(request('search'))
-                                <a href="{{ route('dashboard') }}" class="btn btn-ghost">
+                            @if(request('search') || request('document_type_id'))
+                                <a href="{{ route('dashboard') }}" class="btn btn-ghost btn-sm">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                                     Clear
                                 </a>
@@ -49,7 +57,7 @@
                         </div>
                     </form>
 
-                    @if(request('search') && $results)
+                    @if($results)
                         <!-- Search Results -->
                         <div class="bg-base-100 border border-base-300 rounded-box">
                             <div class="px-4 sm:px-5 py-4 border-b border-base-300 flex flex-wrap items-center justify-between gap-2">
@@ -97,19 +105,19 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div class="stat bg-base-100 border border-base-300 rounded-box p-4">
                             <div class="stat-title text-base-content/50 text-xs font-medium">Total Documents</div>
-                            <div class="stat-value text-2xl font-bold text-base-content mt-1">{{ auth()->user()->documents()->count() }}</div>
+                            <div class="stat-value text-2xl font-bold text-primary mt-1">{{ auth()->user()->documents()->count() }}</div>
                             <div class="stat-desc text-xs text-base-content/40 mt-1">All time</div>
                         </div>
                         <div class="stat bg-base-100 border border-base-300 rounded-box p-4">
                             <div class="stat-title text-base-content/50 text-xs font-medium">Active Documents</div>
-                            <div class="stat-value text-2xl font-bold text-success mt-1">
+                            <div class="stat-value text-2xl font-bold text-primary mt-1">
                                 {{ auth()->user()->documents()->whereHas('currentVersion', fn($q) => $q->where('status', 'active'))->count() }}
                             </div>
                             <div class="stat-desc text-xs text-base-content/40 mt-1">Approved & published</div>
                         </div>
                         <div class="stat bg-base-100 border border-base-300 rounded-box p-4">
                             <div class="stat-title text-base-content/50 text-xs font-medium">Pending Approval</div>
-                            <div class="stat-value text-2xl font-bold text-warning mt-1">
+                            <div class="stat-value text-2xl font-bold text-primary mt-1">
                                 {{ auth()->user()->documents()->whereHas('versions', fn($q) => $q->where('status', 'pending'))->count() }}
                             </div>
                             <div class="stat-desc text-xs text-base-content/40 mt-1">Awaiting head review</div>

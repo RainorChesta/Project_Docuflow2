@@ -120,23 +120,23 @@
             @endphp
             <div class="card bg-base-100 border border-base-300 shadow-sm mb-6">
                 <div class="card-body">
-                    <div class="flex flex-wrap items-center gap-3 mb-4">
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-base-200 pb-4">
                         <h1 class="text-xl font-bold text-base-content truncate min-w-0">{{ $document->title }}</h1>
                         <span class="badge badge-outline badge-sm shrink-0">{{ $document->document_number }}</span>
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-5 pt-4 text-sm">
                         <div>
-                            <span class="text-base-content/60">Division</span>
-                            <p class="font-medium">{{ $document->division?->code ?? '—' }}</p>
+                            <span class="text-xs uppercase tracking-wide text-base-content/50">Division</span>
+                            <p class="font-medium mt-1">{{ $document->division?->code ?? '—' }}</p>
                         </div>
                         <div>
-                            <span class="text-base-content/60">Owner</span>
-                            <p class="font-medium">{{ $document->owner->name }}</p>
+                            <span class="text-xs uppercase tracking-wide text-base-content/50">Owner</span>
+                            <p class="font-medium mt-1">{{ $document->owner->name }}</p>
                         </div>
                         <div>
-                            <span class="text-base-content/60">Status</span>
-                            <p class="font-medium">
+                            <span class="text-xs uppercase tracking-wide text-base-content/50">Status</span>
+                            <p class="font-medium mt-1">
                                 @if($document->currentVersion)
                                     Active (v{{ $document->currentVersion->version_number }})
                                 @elseif($pendingVersion)
@@ -149,8 +149,8 @@
                             </p>
                         </div>
                         <div>
-                            <span class="text-base-content/60">Visibility</span>
-                            <p class="font-medium">
+                            <span class="text-xs uppercase tracking-wide text-base-content/50">Visibility</span>
+                            <p class="font-medium mt-1">
                                 @if($document->isGeneral())
                                     <span class="badge badge-success badge-sm">General</span>
                                 @elseif($document->isPersonal())
@@ -159,20 +159,12 @@
                                     <span class="badge badge-neutral badge-sm">{{ $document->division?->code ?? 'Division' }} only</span>
                                 @endif
                             </p>
-                            @can('update', $document)
-                                <div class="mt-2">
-                                    <button type="button" class="btn btn-ghost btn-xs" onclick="document.getElementById('scope-modal').showModal()">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                        Change scope
-                                    </button>
-                                </div>
-                            @endcan
                         </div>
                     </div>
 
                     {{-- Actions (di bawah keterangan, sejajar menyamping) --}}
                     @php $isFileBased = $document->displayVersion()?->file_path; @endphp
-                    <div class="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-base-200">
+                    <div class="flex flex-wrap items-center gap-2 mt-5 pt-4 border-t border-base-200">
                         @can('update', $document)
                             @if($isFileBased)
                                 <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('edit-restricted-modal').showModal()">
@@ -189,7 +181,7 @@
                             @endif
                         @endcan
                         @can('update', $document)
-                            <button type="button" onclick="document.getElementById('link-form').showModal()" class="btn btn-neutral btn-sm">
+                            <button type="button" onclick="document.getElementById('link-form').showModal()" class="btn btn-outline btn-primary btn-sm">
                                 Share Link
                             </button>
                         @endcan
@@ -201,6 +193,13 @@
                         >
                             Lihat Versi ({{ $document->versions->count() }})
                         </button>
+
+                        @can('update', $document)
+                            <button type="button" class="btn btn-ghost btn-sm border border-base-300" onclick="document.getElementById('scope-modal').showModal()">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                Change scope
+                            </button>
+                        @endcan
 
                         {{-- Export to PDF (hanya untuk dokumen hasil editor) —
                              buka modal supaya ukuran kertas bisa dipilih dulu
@@ -584,7 +583,7 @@
     <dialog id="edit-restricted-modal" class="modal">
         <div class="modal-box max-w-md max-h-[85vh] overflow-y-auto">
             <div class="flex flex-wrap items-center justify-between mb-4">
-                <h3 class="font-semibold">Tidak Bisa Diedit Langsung</h3>
+                <h3 class="font-semibold">Dokumen Tidak Dapat Diedit Langsung</h3>
                 <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('edit-restricted-modal').close()">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -592,8 +591,8 @@
                 </button>
             </div>
             <p class="text-sm text-base-content/70 mb-5">
-                Dokumen ini berasal dari berkas yang diunggah, bukan ditulis di editor — jadi isinya tidak bisa diedit langsung.
-                Ada dua cara untuk mengubahnya:
+                Dokumen ini berasal dari berkas yang diunggah, bukan ditulis melalui editor, sehingga isinya tidak dapat diedit secara langsung.
+                Terdapat dua cara untuk memperbarui dokumen:
             </p>
             <ul class="text-sm space-y-2 mb-5 list-disc list-inside text-base-content/80">
                 <li><span class="font-medium">Rollback</span> ke versi sebelumnya yang masih tersimpan.</li>

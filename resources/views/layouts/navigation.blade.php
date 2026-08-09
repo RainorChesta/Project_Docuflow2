@@ -90,7 +90,7 @@
 
         <a href="{{ route('admin.divisions.index') }}"
            class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
-                  {{ request()->routeIs('admin.*') ? 'bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"
+                  {{ request()->routeIs('admin.divisions.*') ? 'bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0'"
            :title="open ? '' : 'Divisions'">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
@@ -101,9 +101,9 @@
            class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
                   {{ request()->routeIs('admin.documents.*') ? 'bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0'"
-           :title="open ? '' : 'Semua Dokumen'">
+           :title="open ? '' : 'All Documents'">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">Semua Dokumen</span>
+            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">All Documents</span>
         </a>
 
         <a href="{{ route('admin.document-types.index') }}"
@@ -111,7 +111,7 @@
                   {{ request()->routeIs('admin.document-types.*') ? 'bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0'"
            :title="open ? '' : 'Document Types'">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
             <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">Document Types</span>
         </a>
 
@@ -137,12 +137,9 @@
 
     <!-- User footer -->
     <div class="border-t border-base-300 p-3">
+    <div class="border-t border-base-300 p-3">
         <div class="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-base-content/60"
              :class="open ? '' : 'lg:justify-center lg:px-0'">
-            <div class="w-7 h-7 rounded-full bg-primary text-primary-content flex items-center justify-center text-xs font-bold shrink-0"
-                 :title="open ? '' : '{{ Auth::user()->name }}'">
-                {{ substr(Auth::user()->name, 0, 1) }}
-            </div>
             <div class="flex-1 min-w-0" :class="open ? '' : 'lg:hidden'">
                 <div class="font-medium text-base-content truncate">{{ Auth::user()->name }}</div>
                 <div class="text-xs text-base-content/40 truncate">{{ Auth::user()->email }}</div>

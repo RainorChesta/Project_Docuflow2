@@ -64,9 +64,6 @@
 
                         <div class="dropdown dropdown-end">
                             <div tabindex="0" role="button" class="flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-lg hover:bg-base-200 transition-colors max-w-full">
-                                <div class="w-7 h-7 rounded-full bg-primary text-primary-content flex items-center justify-center text-xs font-bold shrink-0">
-                                    {{ substr(Auth::user()->name, 0, 1) }}
-                                </div>
                                 <span class="text-sm font-medium text-base-content hidden sm:block truncate max-w-[120px]">{{ Auth::user()->name }}</span>
                                 <svg class="w-4 h-4 text-base-content/40 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                             </div>
@@ -88,14 +85,19 @@
                         $isHead = $user->isHead();
 
                         $docType = request('type', 'general');
+                        if ($route && in_array($name, ['documents.edit', 'documents.show', 'documents.preview', 'documents.preview-version'])) {
+                            $docType = match (request()->route('document')?->visibility) {
+                                'personal' => 'mine',
+                                'division' => 'division',
+                                default => 'general',
+                            };
+                        }
                         $docTypeLabel = match ($docType) {
                             'mine' => 'My Documents',
                             'division' => 'Division Documents',
                             default => 'General Documents',
                         };
                         $docTypeRoute = route('documents.index', ['type' => $docType]);
-
-                        $crumbs[] = ['label' => 'Dashboard', 'url' => route('dashboard')];
 
                         if ($route) {
                             if (str_starts_with($name, 'documents.')) {
@@ -110,31 +112,34 @@
                                     'documents.preview-version' => 'Preview',
                                     default => $docTypeLabel,
                                 }, 'url' => null];
-                            } elseif (str_starts_with($name, 'admin.')) {
-                                $section = match (true) {
-                                    str_contains($name, 'divisions') => 'Divisions',
-                                    str_contains($name, 'document-types') => 'Document Types',
-                                    str_contains($name, 'users') => 'Users',
-                                    str_contains($name, 'retention') => 'Retention',
-                                    default => 'Administration',
-                                };
-                                $crumbs[] = ['label' => $section, 'url' => null];
-                                if (str_contains($name, '.create')) {
-                                    $crumbs[] = ['label' => 'Create', 'url' => null];
-                                } elseif (str_contains($name, '.edit')) {
-                                    $crumbs[] = ['label' => 'Edit', 'url' => null];
+                            } elseif ($name !== 'dashboard') {
+                                $crumbs[] = ['label' => 'Dashboard', 'url' => route('dashboard')];
+                                if (str_starts_with($name, 'admin.')) {
+                                    $section = match (true) {
+                                        str_contains($name, 'divisions') => 'Divisions',
+                                        str_contains($name, 'document-types') => 'Document Types',
+                                        str_contains($name, 'users') => 'Users',
+                                        str_contains($name, 'retention') => 'Retention',
+                                        default => 'Administration',
+                                    };
+                                    $crumbs[] = ['label' => $section, 'url' => null];
+                                    if (str_contains($name, '.create')) {
+                                        $crumbs[] = ['label' => 'Create', 'url' => null];
+                                    } elseif (str_contains($name, '.edit')) {
+                                        $crumbs[] = ['label' => 'Edit', 'url' => null];
+                                    }
+                                } elseif ($name === 'approvals.index') {
+                                    $crumbs[] = ['label' => 'Approvals', 'url' => null];
+                                } elseif ($name === 'shared.history') {
+                                    $crumbs[] = ['label' => 'Shared Edit History', 'url' => null];
+                                } elseif ($name === 'profile.edit') {
+                                    $crumbs[] = ['label' => 'Profile', 'url' => null];
                                 }
-                            } elseif ($name === 'approvals.index') {
-                                $crumbs[] = ['label' => 'Approvals', 'url' => null];
-                            } elseif ($name === 'shared.history') {
-                                $crumbs[] = ['label' => 'Shared Edit History', 'url' => null];
-                            } elseif ($name === 'profile.edit') {
-                                $crumbs[] = ['label' => 'Profile', 'url' => null];
                             }
                         }
                     @endphp
 
-                    @if(count($crumbs) > 1)
+                    @if(count($crumbs) > 0)
                         <x-breadcrumbs :items="$crumbs" />
                     @endif
 

@@ -16,13 +16,16 @@ class DashboardController extends Controller
 
         // Search across every document the user may see.
         $results = null;
-        if ($search = $request->get('search')) {
+        if ($request->filled('search') || $request->filled('document_type_id')) {
             $results = Document::with('owner', 'division', 'currentVersion')
                 ->visibleTo($user)
-                ->where(function ($q) use ($search) {
-                    $q->where('title', 'like', "%{$search}%")
-                      ->orWhere('document_number', 'like', "%{$search}%");
+                ->when($request->filled('search'), function ($q) use ($request) {
+                    $q->where(function ($q) use ($request) {
+                        $q->where('title', 'like', "%{$request->get('search')}%")
+                          ->orWhere('document_number', 'like', "%{$request->get('search')}%");
+                    });
                 })
+                ->when($request->filled('document_type_id'), fn($q) => $q->where('document_type_id', $request->get('document_type_id')))
                 ->latest()
                 ->paginate(10)
                 ->withQueryString();
@@ -72,6 +75,8 @@ class DashboardController extends Controller
             ->take(5)
             ->get();
 
-        return view('dashboard', compact('results', 'recent'));
+        $documentTypes = DocumentType::orderBy('name')->get();
+
+        return view('dashboard', compact('results', 'recent', 'documentTypes'));
     }
 }
