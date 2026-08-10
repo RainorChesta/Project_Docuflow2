@@ -4,7 +4,7 @@
 @endphp
 
 <div class="p-4">
-    <div class="flex items-center justify-between mb-3 px-2">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-3 px-2">
         <div class="text-sm text-base-content/60">
             <span class="font-medium text-base-content">{{ $version->file_original_name }}</span>
             — dokumen diunggah, bukan hasil editor.

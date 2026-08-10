@@ -9,7 +9,7 @@
 
 @layer base {
   :root {
-    --color-primary: oklch(0.49 0.19 275);
+    --color-primary: oklch(0.303 0.067 -94.8);
     --color-primary-content: oklch(1 0 0);
     --color-secondary: oklch(0.55 0.04 260);
     --color-secondary-content: oklch(1 0 0);
@@ -39,7 +39,44 @@
     --color-base-200: oklch(0.2 0.04 260);
     --color-base-300: oklch(0.35 0.04 250);
     --color-base-content: oklch(0.98 0.005 250);
+    /* Primary lebih terang di dark mode — navy gelap tak kebaca
+       di atas bg gelap (outline button, teks primary, active menu). */
+    --color-primary: oklch(0.62 0.12 265);
+    --color-primary-content: oklch(0.15 0.03 265);
   }
+}
+
+/* Override DaisyUI theme :root — unlayered beats layered, so custom
+   brand colors win over daisyui's default theme. Base colors left to
+   the layered :root/.dark so dark mode still works. */
+:root {
+  --color-primary: oklch(0.303 0.067 -94.8);
+  --color-primary-content: oklch(1 0 0);
+  --color-secondary: oklch(0.55 0.04 260);
+  --color-secondary-content: oklch(1 0 0);
+  --color-accent: oklch(0.58 0.16 245);
+  --color-accent-content: oklch(1 0 0);
+  --color-neutral: oklch(0.28 0.04 250);
+  --color-neutral-content: oklch(0.98 0.005 250);
+  --color-info: oklch(0.58 0.16 245);
+  --color-success: oklch(0.62 0.2 145);
+  --color-success-content: oklch(1 0 0);
+  --color-warning: oklch(0.7 0.16 70);
+  --color-warning-content: oklch(1 0 0);
+  --color-error: oklch(0.55 0.22 30);
+  --color-error-content: oklch(1 0 0);
+  --radius-box: 0.5rem;
+  --radius-field: 0.375rem;
+  --radius-selector: 0.25rem;
+  --border: 1px;
+}
+
+/* Dark mode: primary lebih terang biar outline button, teks primary,
+   dan active menu kebaca di atas bg gelap. Unlayered supaya menang
+   atas :root unlayered di atas (specificity sama, urutan menang). */
+.dark {
+  --color-primary: oklch(0.62 0.12 265);
+  --color-primary-content: oklch(0.15 0.03 265);
 }
 
 /* Alpine x-cloak: hide element until Alpine initializes */

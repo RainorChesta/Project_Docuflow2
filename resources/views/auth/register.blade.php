@@ -39,12 +39,13 @@
             <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
         </div>
 
-        <div class="flex items-center justify-between mt-6">
+        <div class="flex flex-wrap items-center justify-between gap-3 mt-6">
             <a class="link link-hover text-sm text-base-content/50 hover:text-primary" href="{{ route('login') }}">
                 {{ __('Sudah punya akun?') }}
             </a>
 
             <button type="submit" class="btn btn-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                 {{ __('Register') }}
             </button>
         </div>

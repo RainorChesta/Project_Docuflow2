@@ -2,7 +2,7 @@
     <x-slot name="header">New Document Type</x-slot>
 
     <div class="py-6">
-        <div class="max-w-lg mx-auto">
+        <div class="max-w-lg mx-auto w-full px-0">
             <div class="card bg-base-100 border border-base-300 shadow-sm">
                 <div class="card-body">
                     <form method="POST" action="{{ route('admin.document-types.store') }}">
@@ -24,8 +24,11 @@
                             @error('name') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                         </div>
 
-                        <div class="flex justify-end">
-                            <button type="submit" class="btn btn-primary">Save</button>
+                        <div class="flex flex-wrap justify-end">
+                            <button type="submit" class="btn btn-primary">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                                Save
+                            </button>
                         </div>
                     </form>
                 </div>

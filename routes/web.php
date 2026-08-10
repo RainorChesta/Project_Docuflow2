@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\DivisionController;
+use App\Http\Controllers\Admin\DocumentController as AdminDocumentController;
 use App\Http\Controllers\Admin\RetentionController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\DocumentTypeController;
@@ -62,6 +63,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/retention', [RetentionController::class, 'edit'])->name('retention.edit');
         Route::put('/retention', [RetentionController::class, 'update'])->name('retention.update');
         Route::resource('document-types', DocumentTypeController::class);
+        Route::get('/documents', [AdminDocumentController::class, 'index'])->name('documents.index');
+        Route::delete('/documents/{document}', [AdminDocumentController::class, 'destroy'])->name('documents.destroy');
     });
 
     // Profile

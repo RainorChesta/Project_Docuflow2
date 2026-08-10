@@ -1,10 +1,19 @@
-<style>
+@once
+    @push('styles')
+        <style>
     /* WAJIB baris PERTAMA — @import harus paling atas di file CSS, sama
        seperti iframeStyle editor di resources/js/jodit.js. Tanpa ini font
        Google tidak tampil di preview halaman → beda dgn pratinjau Jodit. */
     @import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,400&family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Lora:ital,wght@0,400..700;1,400..700&family=Source+Code+Pro:ital,wght@0,400;0,700;1,400&display=swap');
 
-    @media print {
+    /* Fix scroll hilang saat live-sync render: preview.blade.php merender
+       ulang konten draft dari localStorage dengan menimpa innerHTML
+       #live-preview-content — style <style> di dalam partial ini ikut
+       terhapus, padahal CSS-nya (max-height 75vh + overflow auto) yang
+       bikin area kertas bisa di-scroll. Dengan memindahkan <style> ke
+       HEAD dokumen (dipush sekali per render), style tetap hidup walau
+       konten di-render ulang. */
+            @media print {
     .doku-paper-scope {
         max-height: none;
         overflow: visible;
@@ -76,12 +85,63 @@
 }
 
     /* Responsif: di layar sempit, kertas mengikuti lebar device dan
-       margin halaman dikecilkan biar konten tidak kepotong. */
+       margin halaman dikecilkan biar konten tidak kepotong. !important
+       dipakai karena repaginatePreview (resources/js/jodit.js) menulis
+       width/min-height sebagai inline style — media query ini harus
+       menang biar preview pas dengan lebar layar kecil. Garis pembatas
+       antar halaman TETAP ditampilkan (hanya dirampingkan) supaya
+       user tetap melihat di mana halaman berikutnya dimulai — sama
+       seperti di layar lebar.
+       Ukuran teks ikut dikecilkan (px fix, bukan em) supaya konten
+       tetap terbaca di device kecil. Pakai px agar tidak kompaun pada
+       elemen bersarang (em berlipat tiap level) dan mengalahkan
+       font-size inline dari Jodit. Pagination tetap akurat karena
+       dihitung dari layout yang sudah berskala ini. */
     @media (max-width: 640px) {
-        .doku-paper-scope .doku-paper {
-            padding: 24px 16px;
-            min-height: auto;
+        .doku-paper-scope {
+            padding: 8px;
+            max-height: 90vh;
         }
+        .doku-paper-scope .doku-paper {
+            width: 100% !important;
+            min-height: auto !important;
+            font-size: 14px !important;
+        }
+        .doku-paper-scope .doku-paper :is(p, li, td, th, div, span, blockquote, pre, figcaption, dd, dt) {
+            font-size: 14px !important;
+        }
+        .doku-paper-scope .doku-paper h1 { font-size: 28px !important; }
+        .doku-paper-scope .doku-paper h2 { font-size: 21px !important; }
+        .doku-paper-scope .doku-paper h3 { font-size: 17px !important; }
+        .doku-paper-scope .doku-paper h4 { font-size: 14px !important; }
+        .doku-paper-scope .doku-paper h5 { font-size: 12px !important; }
+        .doku-paper-scope .doku-paper h6 { font-size: 11px !important; }
+        .doku-paper-scope .doku-paper [data-page-spacer] {
+            display: block !important;
+        }
+        .doku-paper-scope .doku-paper [data-page-spacer] > div {
+            background: #fff !important;
+        }
+        .doku-paper-scope .doku-paper [data-page-spacer] > div:nth-child(2) {
+            height: 6px !important;
+            background: #cbd5e1 !important;
+            border-top: 1px solid #94a3b8 !important;
+            border-bottom: 1px solid #94a3b8 !important;
+        }
+    }
+    @media (max-width: 400px) {
+        .doku-paper-scope .doku-paper {
+            font-size: 13px !important;
+        }
+        .doku-paper-scope .doku-paper :is(p, li, td, th, div, span, blockquote, pre, figcaption, dd, dt) {
+            font-size: 13px !important;
+        }
+        .doku-paper-scope .doku-paper h1 { font-size: 24px !important; }
+        .doku-paper-scope .doku-paper h2 { font-size: 18px !important; }
+        .doku-paper-scope .doku-paper h3 { font-size: 15px !important; }
+        .doku-paper-scope .doku-paper h4 { font-size: 13px !important; }
+        .doku-paper-scope .doku-paper h5 { font-size: 11px !important; }
+        .doku-paper-scope .doku-paper h6 { font-size: 10px !important; }
     }
     .doku-paper-scope .doku-paper::after {
         content: "";
@@ -124,15 +184,11 @@
        kertas tanpa kontrol. */
     .doku-paper-scope .doku-paper-toolbar {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
         gap: 8px;
         margin-bottom: 12px;
         font-size: 13px;
-        /* Sticky di dalam container scroll — dropdown ukuran kertas tetap
-           terlihat walau dokumen di-scroll. */
-        position: sticky;
-        top: 0;
-        z-index: 5;
         background: #e5e7eb;
         padding: 4px 0;
     }
@@ -143,7 +199,9 @@
         background: #fff;
         color: #1a1a1a;
     }
-</style>
+        </style>
+    @endpush
+@endonce
 
 <div class="doku-paper-scope" @isset($liveStorage) data-live-storage="{{ $liveStorage }}" @endisset
      data-paper-size="{{ $paperSize ?? 'A4' }}"

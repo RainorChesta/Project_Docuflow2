@@ -2,9 +2,12 @@
     <x-slot name="header">Users</x-slot>
 
     <div class="py-6">
-        <div class="max-w-7xl mx-auto">
+        <div class="max-w-7xl mx-auto w-full">
             <div class="mb-4">
-                <a href="{{ route('admin.users.create') }}" class="btn btn-primary btn-sm">+ New User</a>
+                <a href="{{ route('admin.users.create') }}" class="btn btn-primary btn-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                    New User
+                </a>
             </div>
 
             @if(session('success'))
@@ -16,7 +19,7 @@
 
             <div class="card bg-base-100 border border-base-300 shadow-sm">
                 <div class="overflow-x-auto">
-                    <table class="table">
+                    <table class="table min-w-[640px]">
                         <thead>
                             <tr>
                                 <th>Name</th>
@@ -40,7 +43,10 @@
                                     </td>
                                     <td>{{ $user->is_active ? 'Yes' : 'No' }}</td>
                                     <td class="text-right">
-                                        <a href="{{ route('admin.users.edit', $user) }}" class="link link-primary">Edit</a>
+                                        <a href="{{ route('admin.users.edit', $user) }}" class="link link-primary inline-flex items-center gap-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                            Edit
+                                        </a>
                                     </td>
                                 </tr>
                             @endforeach
