@@ -265,6 +265,36 @@ function getCleanValue(editor, { forPrint = false } = {}) {
     const raw = editor.value;
     const doc = new DOMParser().parseFromString(raw, 'text/html');
 
+    // FIX QR (print): saat forPrint, ganti placeholder QR (lihat control
+    // "qrCode" di atas) jadi <img> QR asli yang di-fetch dari server
+    // (route documents.qrcode, lihat data-qr-image-url di textarea) —
+    // supaya QR beneran ke-print & bisa di-scan. Saat forPrint=false
+    // (disimpan ke DB / draft localStorage), placeholder TETAP teks biasa
+    // — QR baru "hidup" saat konten ditampilkan lewat halaman show/preview
+    // (lihat QrCodeService::injectPlaceholder di server) atau saat print
+    // ini sendiri, bukan disimpan sebagai gambar beku.
+    if (forPrint) {
+        const qrImageUrl = editor.element?.dataset?.qrImageUrl;
+        if (qrImageUrl) {
+            // Ukuran QR di-baca dari TEKS placeholder ("[QR CODE DOKUMEN
+            // 150px]"), BUKAN dari atribut data-qr-size — Jodit membuang
+            // semua atribut data-* saat clean-html/save, jadi atribut tidak
+            // bisa diandalkan untuk menyimpan ukuran. Teks tidak pernah kena
+            // strip, jadi ukuran dijamin selalu ikut walau atribut
+            // data-qr-placeholder sendiri ikut hilang.
+            doc.querySelectorAll('[data-qr-placeholder], span[style*="dashed"]').forEach((el) => {
+                const match = el.textContent.match(/\[QR CODE DOKUMEN\s*(\d+)px\]/i);
+                if (!match) return;
+                const size = Math.max(40, Math.min(400, parseInt(match[1], 10) || 120));
+                const img = doc.createElement('img');
+                img.src = qrImageUrl;
+                img.alt = 'QR Code Dokumen';
+                img.style.cssText = `width:${size}px;height:${size}px;vertical-align:middle;`;
+                el.replaceWith(img);
+            });
+        }
+    }
+
     doc.querySelectorAll('[data-page-spacer]').forEach((el) => {
         if (forPrint) {
             const pageBreak = doc.createElement('div');
@@ -664,6 +694,63 @@ function initPreviewPagination(scopeSelector = '.doku-paper-scope') {
 const PX_PER_CM = 96 / 2.54;
 
 // Dipanggil dari tombol toolbar "margin" — lihat controls.margin di bawah.
+// Popup tombol "Sisip QR Code": pilih ukuran QR (px) lalu insert placeholder
+// ke posisi kursor. Ukuran dipakai sebagai width/height <img> saat render
+// final (server: QrCodeService::injectPlaceholder; print: getCleanValue).
+function buildQrPopup(editor, close) {
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'padding:12px; display:flex; flex-direction:column; gap:8px; min-width:220px; background:#fff;';
+
+    const title = document.createElement('div');
+    title.textContent = 'Ukuran QR Code';
+    title.style.cssText = 'font-weight:600; margin-bottom:4px; color:#1a1a1a;';
+    wrapper.appendChild(title);
+
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = '40';
+    input.max = '400';
+    input.step = '10';
+    input.value = '120';
+    input.style.cssText = 'width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;';
+    wrapper.appendChild(input);
+
+    const hint = document.createElement('div');
+    hint.textContent = 'px (40–400)';
+    hint.style.cssText = 'color:#6b7280; font-size:12px;';
+    wrapper.appendChild(hint);
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = 'Sisipkan';
+    btn.style.cssText = 'margin-top:6px; padding:6px 10px; cursor:pointer; border:1px solid #ccc; border-radius:4px; background:#f3f4f6;';
+    btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        let size = parseInt(input.value, 10);
+        if (!Number.isFinite(size)) size = 120;
+        size = Math.max(40, Math.min(400, size));
+
+        // FIX: ukuran di-encode LANGSUNG di teks placeholder (bukan atribut
+        // data-qr-size) — Jodit membuang semua atribut data-* saat clean-html
+        // saat save (lihat catatan di getCleanValue di bawah), jadi kalau
+        // ukuran disimpan sebagai atribut, nilainya selalu hilang & fallback
+        // ke default. Teks konten tidak pernah kena strip, jadi aman.
+        editor.s.insertHTML(
+            '<span data-qr-placeholder="true" contenteditable="false" ' +
+            'style="display:inline-block;padding:4px 10px;margin:0 2px;' +
+            'border:1px dashed #94a3b8;border-radius:4px;background:#f1f5f9;' +
+            'font-family:monospace;font-size:12px;color:#475569;' +
+            'vertical-align:middle;user-select:none;">[QR CODE DOKUMEN ' + size + 'px]</span>'
+        );
+        if (typeof close === 'function') close();
+        editor.e.fire('closeAllPopups');
+    });
+    wrapper.appendChild(btn);
+
+    return wrapper;
+}
+
 function buildMarginPopup(editor, close) {
     const current = editor.currentMargin || DEFAULT_MARGIN;
     const fields = [
@@ -1031,7 +1118,7 @@ export function initJoditEditor(selector, overrides = {}) {
             'superscript', 'subscript', '|',
             'ul', 'ol', 'indent', 'outdent', '|',
             'font', 'fontsize', 'brush', 'paragraph', 'lineHeight', '|',
-            'image', 'video', 'file', 'table', 'link', 'hr', '|',
+            'image', 'video', 'file', 'table', 'link', 'hr', 'qrCode', '|',
             'align', '|',
             'paperSize', 'margin', '|',
             'undo', 'redo', 'eraser', 'copyformat', '|',
@@ -1074,6 +1161,22 @@ export function initJoditEditor(selector, overrides = {}) {
                 tooltip: 'Margin Halaman',
                 icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="1"/><rect x="7" y="7" width="10" height="10" stroke-dasharray="2 2"/></svg>',
                 popup: (editor, _current, _self, close) => buildMarginPopup(editor, close),
+            },
+
+            // Tombol "Sisip QR Code Dokumen": buka popup pilih ukuran QR,
+            // lalu insert placeholder (bukan gambar asli) ke posisi kursor —
+            // teks-format ini yang tersimpan ke DB, supaya QR selalu "hidup"
+            // mengikuti URL dokumen terkini, bukan snapshot beku.
+            // Placeholder diganti jadi <img> QR asli HANYA saat render final:
+            // - server-side: QrCodeService::injectPlaceholder() (show/preview/
+            //   preview-version/PDF export)
+            // - client-side: getCleanValue({forPrint:true}) di bawah, dipakai tombol
+            //   "print" di toolbar ini sendiri.
+            qrCode: {
+                name: 'qrCode',
+                tooltip: 'Sisip QR Code Dokumen',
+                icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM14 20h3M20 14v3M20 20h.01"/></svg>',
+                popup: (editor, _current, _self, close) => buildQrPopup(editor, close),
             },
 
             image: {

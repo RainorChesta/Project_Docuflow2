@@ -10,137 +10,125 @@
         />
     @endif
 
+    @php
+        $pending = $document->versions->first(fn($v) => $v->status === 'pending' && !$v->discarded_at);
+        $hasDraftOnly = !$pending && !$document->currentVersion;
+    @endphp
+
     <div class="min-h-screen bg-base-200/50">
-
-        {{-- Top Bar ala Word/Docs --}}
-        <div class="sticky top-0 z-20 bg-base-100 border-b border-base-300 shadow-sm">
-            <div class="max-w-6xl mx-auto px-3 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
-
-                <div class="flex items-center gap-3 min-w-0">
-                    <svg class="w-6 h-6 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <h1 class="text-base sm:text-lg font-semibold truncate min-w-0">{{ $document->title }}</h1>
-                    <span class="badge badge-ghost badge-sm hidden sm:inline-flex">
-                        {{ $document->document_number ?? '' }}
-                    </span>
-                </div>
-
-                <div class="flex flex-wrap items-center gap-2 shrink-0">
-                    <div class="hidden md:flex items-center gap-2 pr-3 mr-1 border-r border-base-300">
-                        <div class="avatar placeholder">
-                            <div class="bg-neutral text-neutral-content rounded-full w-8">
-                                <span class="text-xs">{{ substr(auth()->user()->name, 0, 1) }}</span>
-                            </div>
-                        </div>
-                        <span class="text-sm font-medium">{{ auth()->user()->name }}</span>
-                    </div>
-
-                    <a href="{{ route('documents.show', $document) }}" class="btn btn-ghost btn-sm">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                        Cancel
-                    </a>
-
-                    <button type="submit" form="editor-form" class="btn btn-primary btn-sm px-6">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                        Save Changes
-                    </button>
-                    @if($hasDraftOnly)
-                        <button type="submit" form="draft-form" class="btn btn-neutral btn-sm">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
-                            Save as Draft
-                        </button>
-                    @endif
-                </div>
-            </div>
-
-            @if($errors->any())
-                <div class="max-w-6xl mx-auto px-3 sm:px-6 pb-3">
-                    <div class="alert alert-error py-2 text-sm">
-                        <span>{{ $errors->first() }}</span>
-                    </div>
-                </div>
-            @endif
-
-            {{-- Pending version warning: saving updates the pending version in place --}}
-            @php
-                $pending = $document->versions->first(fn($v) => $v->status === 'pending' && !$v->discarded_at);
-                $hasDraftOnly = !$pending && !$document->currentVersion;
-            @endphp
-            @if($pending)
-                <div class="max-w-6xl mx-auto px-3 sm:px-6 pb-3">
-                    <div class="alert alert-warning shadow-sm">
-                        <div class="flex flex-col sm:flex-row items-center justify-between gap-3 w-full">
-                            <div class="flex items-start sm:items-center gap-2 text-sm min-w-0">
-                                <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                                <span>
-                                    Ada versi pending (v{{ $pending->version_number }}) yang belum di-review.
-                                    <strong>Save akan memperbarui versi pending tersebut (tanpa versi baru).</strong>
-                                </span>
-                            </div>
-                            @if(!auth()->user()->isAdmin() && !auth()->user()->isHead())
-                                <button type="button" class="btn btn-outline btn-warning btn-sm" x-on:click="$dispatch('open-modal', 'confirm-discard-{{ $document->id }}')">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                    Discard pending (v{{ $pending->version_number }})
-                                </button>
-                            @else
-                                <form method="POST" action="{{ route('documents.discard', $document) }}" class="shrink-0">
-                                    @csrf
-                                    <button type="submit" class="btn btn-outline btn-warning btn-sm">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                        Discard pending (v{{ $pending->version_number }})
-                                    </button>
-                                </form>
-                            @endif
-                        </div>
-                    </div>
-                </div>
-            @endif
-        </div>
 
         {{-- Canvas / Dokumen --}}
         <div class="py-10 px-2 sm:px-4">
-            @if(session('success'))
-                <div class="max-w-6xl mx-auto mb-4">
-                    <div class="alert alert-success shadow-sm">
-                        <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        <span>{{ session('success') }}</span>
-                    </div>
-                </div>
-            @endif
-            <form method="POST" action="{{ route('documents.save', $document) }}" id="editor-form">
-                @csrf
-                @method('PUT')
+            <div class="max-w-6xl mx-auto">
 
-                <div>
-                    <div class="bg-base-100 rounded-xl shadow-md border border-base-300 overflow-hidden">
+                @if(session('success'))
+                    <div class="mb-4">
+                        <div class="alert alert-success shadow-sm">
+                            <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <span>{{ session('success') }}</span>
+                        </div>
+                    </div>
+                @endif
+
+                @if($errors->any())
+                    <div class="mb-4">
+                        <div class="alert alert-error py-2 text-sm">
+                            <span>{{ $errors->first() }}</span>
+                        </div>
+                    </div>
+                @endif
+
+                {{-- Pending version warning: saving updates the pending version in place --}}
+                @if($pending)
+                    <div class="mb-4">
+                        <div class="alert alert-warning shadow-sm">
+                            <div class="flex flex-col sm:flex-row items-center justify-between gap-3 w-full">
+                                <div class="flex items-start sm:items-center gap-2 text-sm min-w-0">
+                                    <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                    <span>
+                                        Ada versi pending (v{{ $pending->version_number }}) yang belum di-review.
+                                        <strong>Save akan memperbarui versi pending tersebut (tanpa versi baru).</strong>
+                                    </span>
+                                </div>
+                                @if(!auth()->user()->isAdmin() && !auth()->user()->isHead())
+                                    <button type="button" class="btn btn-outline btn-warning btn-sm" x-on:click="$dispatch('open-modal', 'confirm-discard-{{ $document->id }}')">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                        Discard pending (v{{ $pending->version_number }})
+                                    </button>
+                                @else
+                                    <form method="POST" action="{{ route('documents.discard', $document) }}" class="shrink-0">
+                                        @csrf
+                                        <button type="submit" class="btn btn-outline btn-warning btn-sm">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                            Discard pending (v{{ $pending->version_number }})
+                                        </button>
+                                    </form>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
+                <form method="POST" action="{{ route('documents.save', $document) }}" id="editor-form">
+                    @csrf
+                    @method('PUT')
+
+                    {{-- Kotak gabungan: title bar + toolbar + editor Jodit jadi satu kotak --}}
+                    <div id="jodit-merge-box" class="bg-base-100 rounded-xl shadow-md border border-base-300 overflow-hidden">
+
+                        {{-- Title/Action row (tanpa border/radius sendiri — menyatu lewat overflow-hidden induk) --}}
+                        <div class="bg-base-100 px-3 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+
+                            <div class="flex items-center gap-3 min-w-0">
+                                <svg class="w-6 h-6 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <h1 class="text-base sm:text-lg font-semibold truncate min-w-0">{{ $document->title }}</h1>
+                                <span class="badge badge-ghost badge-sm hidden sm:inline-flex">
+                                    {{ $document->document_number ?? '' }}
+                                </span>
+                            </div>
+
+                            <div class="flex flex-wrap items-center gap-2 shrink-0">
+                                <div class="hidden md:flex items-center gap-2 pr-3 mr-1 border-r border-base-300">
+                                    <div class="avatar placeholder">
+                                        <div class="bg-neutral text-neutral-content rounded-full w-8">
+                                            <span class="text-xs">{{ substr(auth()->user()->name, 0, 1) }}</span>
+                                        </div>
+                                    </div>
+                                    <span class="text-sm font-medium">{{ auth()->user()->name }}</span>
+                                </div>
+
+                                <a href="{{ route('documents.show', $document) }}" class="btn btn-ghost btn-sm">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                    Cancel
+                                </a>
+
+                                <button type="submit" form="editor-form" class="btn btn-primary btn-sm px-6">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                                    Save Changes
+                                </button>
+                                @if($hasDraftOnly)
+                                    <button type="submit" form="draft-form" class="btn btn-neutral btn-sm">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                                        Save as Draft
+                                    </button>
+                                @endif
+                            </div>
+                        </div>
+
+                        {{-- Jodit Editor (toolbar akan muncul langsung menyambung di bawah title row di atas) --}}
                         <textarea
                             name="content"
                             id="jodit-editor"
                             data-upload-url="{{ route('jodit.upload') }}"
                             data-csrf-token="{{ csrf_token() }}"
                             data-live-storage="doc-preview-{{ $document->id }}"
+                            data-qr-image-url="{{ route('documents.qrcode', $document) }}"
                         >{{ $document->displayVersion()->content ?? '' }}</textarea>
                     </div>
 
-                    {{-- FIX AKAR MASALAH margin: sebelumnya form ini cuma
-                         mengirim `content` — pilihan ukuran kertas & margin
-                         yang diatur lewat toolbar editor (paperSize/margin)
-                         HANYA pernah tersimpan di localStorage browser
-                         (lihat applyPaperSize() di resources/js/jodit.js),
-                         TIDAK PERNAH ikut ke server. Akibatnya kolom
-                         paper_size/paper_margin dokumen di DB tidak pernah
-                         ter-update walau sudah "Terapkan" di popup margin,
-                         sementara halaman preview (_paper.blade.php) memang
-                         sengaja memprioritaskan localStorage di atas data DB
-                         — jadi preview kelihatan sudah bermargin besar
-                         (sisa localStorage), padahal hasil save yang benar2
-                         tersimpan di server masih margin default/kosong.
-                         Hidden input ini diisi oleh handler submit di
-                         initJoditEditor() (resources/js/jodit.js) tepat
-                         sebelum form dikirim, dari editor.currentPaperSize /
-                         editor.currentMargin yang sedang aktif. --}}
                     <input type="hidden" name="paper_size" id="paper-size-input">
                     <input type="hidden" name="paper_margin" id="paper-margin-input">
 
@@ -154,33 +142,64 @@
                             Versi pending yang ada akan diperbarui (bukan versi baru).
                         @endif
                     </p>
-                </div>
-            </form>
-
-            @if($hasDraftOnly)
-                <form method="POST" action="{{ route('documents.save-draft', $document) }}" id="draft-form">
-                    @csrf
-                    @method('PUT')
-                    <input type="hidden" name="content" id="draft-content">
-                    {{-- FIX: sama seperti editor-form di atas — draft-form
-                         punya path submit terpisah (tidak lewat submit
-                         handler initJoditEditor di jodit.js), jadi hidden
-                         input ini diisi manual oleh script di bawah. --}}
-                    <input type="hidden" name="paper_size" id="draft-paper-size">
-                    <input type="hidden" name="paper_margin" id="draft-paper-margin">
                 </form>
-            @endif
 
-            {{-- Live preview (tanpa tab kedua) --}}
-            <div class="mt-10">
-                <div class="bg-base-100 rounded-xl shadow-md border border-base-300 p-4 sm:p-8">
-                    <div id="live-preview-content" class="prose max-w-none" style="overflow-wrap:break-word; word-break:break-word;">
-                        {!! $document->displayVersion()->content ?? '' !!}
+                @if($hasDraftOnly)
+                    <form method="POST" action="{{ route('documents.save-draft', $document) }}" id="draft-form">
+                        @csrf
+                        @method('PUT')
+                        <input type="hidden" name="content" id="draft-content">
+                        <input type="hidden" name="paper_size" id="draft-paper-size">
+                        <input type="hidden" name="paper_margin" id="draft-paper-margin">
+                    </form>
+                @endif
+
+                {{-- Live preview (tanpa tab kedua) --}}
+                <div class="mt-10">
+                    <div class="bg-base-100 rounded-xl shadow-md border border-base-300 p-4 sm:p-8">
+                        <div id="live-preview-content" class="prose max-w-none" style="overflow-wrap:break-word; word-break:break-word;">
+                            {!! $document->displayVersion()->content ?? '' !!}
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
+    <style>
+        /* Jodit membungkus dirinya sendiri dalam .jodit-container yang punya
+           border/border-radius/box-shadow bawaan (dari jodit.min.css),
+           independen dari div pembungkus kita (#jodit-merge-box). Itu sebabnya
+           walau textarea sudah satu div dengan title row, Jodit tetap
+           menggambar kotaknya sendiri di dalamnya → kelihatan dua kotak
+           terpisah (border/shadow ganda). Override ini di-scope KHUSUS ke
+           #jodit-merge-box (tidak global) supaya instance Jodit lain di
+           halaman lain tidak ikut terdampak. */
+        /* Jodit membungkus toolbar+editor dalam .jodit-container yang punya
+           border/border-radius/box-shadow/margin bawaan sendiri (dari
+           jodit.min.css) — itulah kotak terpisah dengan sudut membulat &
+           shadow yang masih kelihatan. Override ini menghapus SEMUA styling
+           luar itu supaya .jodit-container rata/flat dan menyatu sempurna
+           dengan #jodit-merge-box (parent). Sudut membulat yang tersisa di
+           kotak gabungan sepenuhnya berasal dari overflow-hidden + rounded-xl
+           milik #jodit-merge-box, bukan dari Jodit. Di-scope ke
+           #jodit-merge-box saja (bukan global) supaya instance Jodit lain di
+           halaman lain tidak terdampak. */
+        #jodit-merge-box .jodit-container {
+            border: none !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            margin: 0 !important;
+        }
+
+        /* jodit-toolbar_box (pembungkus toolbar) juga bisa punya radius/margin
+           sendiri di sudut atasnya — dimatikan juga supaya benar-benar rata
+           menyambung ke title row di atasnya tanpa celah/sudut membulat. */
+        #jodit-merge-box .jodit-toolbar_box {
+            border-radius: 0 !important;
+            margin: 0 !important;
+        }
+    </style>
 
     <script>
         (function () {

@@ -11,6 +11,10 @@ use Illuminate\Support\Facades\Storage;
 
 class PdfExportService
 {
+    public function __construct(
+        protected QrCodeService $qrCodeService,
+    ) {}
+
     /**
      * Margin default (px), HARUS SAMA PERSIS dengan DEFAULT_MARGIN di
      * resources/js/jodit.js — itu sumber kebenaran untuk margin editor &
@@ -89,6 +93,7 @@ class PdfExportService
         }
 
         $content = $this->normalizeContentFonts($display->content);
+        $content = $this->qrCodeService->injectPlaceholder($content, $document);
         $html = $this->buildHtml($document, $this->resolveImagePaths($content), $paperSizeOverride);
 
         $filename = $this->filename($document);

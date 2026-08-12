@@ -68,6 +68,7 @@
                         @elseif($display)
                             @include('documents._paper', [
                                 'content' => $display->content,
+                                'document' => $document,
                                 'liveStorage' => 'doc-preview-' . $document->id,
                                 'paperSize' => $document->paper_size ?? 'A4',
                                 'paperMargin' => $document->paper_margin,

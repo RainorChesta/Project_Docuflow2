@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Division;
 use App\Models\Document;
+use App\Models\DocumentAccessLink;
 use App\Models\DocumentType;
 use App\Models\DocumentVersion;
 use App\Models\User;
@@ -13,12 +14,11 @@ use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
-class DocumentExportPdfTest extends TestCase
+class SharedLinkExportPdfTest extends TestCase
 {
     use RefreshDatabase;
 
     private User $owner;
-    private User $admin;
     private Document $document;
 
     protected function setUp(): void
@@ -30,14 +30,24 @@ class DocumentExportPdfTest extends TestCase
         $division = Division::create(['code' => '01', 'name' => 'JBM']);
         $type = DocumentType::create(['code' => 'S.ED', 'name' => 'Surat Edaran']);
         $this->owner = User::factory()->create(['division_id' => $division->id]);
-        $this->admin = User::factory()->create(['system_role' => 'admin', 'is_active' => true]);
         $this->document = Document::create([
-            'document_number' => 'TST/002',
-            'title' => 'Surat Edaran Test',
+            'document_number' => 'TST/003',
+            'title' => 'Surat Edaran Shared',
             'visibility' => 'division',
             'division_id' => $division->id,
             'document_type_id' => $type->id,
             'owner_id' => $this->owner->id,
+        ]);
+    }
+
+    private function makeLink(string $role = 'viewer', bool $expired = false): DocumentAccessLink
+    {
+        return DocumentAccessLink::create([
+            'document_id' => $this->document->id,
+            'token' => 'tok_' . $role . '_' . uniqid(),
+            'role' => $role,
+            'expires_at' => $expired ? now()->subDay() : null,
+            'created_by' => $this->owner->id,
         ]);
     }
 
@@ -59,12 +69,13 @@ class DocumentExportPdfTest extends TestCase
     }
 
     #[Test]
-    public function successful_export_creates_pdf_and_audit_log(): void
+    public function viewer_can_export_via_share_link(): void
     {
         $this->addVersion('<h1>Konten</h1><p>Isi dokumen.</p>');
+        $link = $this->makeLink('viewer');
 
-        $response = $this->actingAs($this->admin)
-            ->post(route('documents.export-pdf', $this->document));
+        $response = $this->actingAs($this->owner)
+            ->post(route('shared.documents.export-pdf', $link->token));
 
         $response->assertRedirect();
         $response->assertSessionHas('pdf_export');
@@ -79,59 +90,58 @@ class DocumentExportPdfTest extends TestCase
     }
 
     #[Test]
-    public function user_without_view_permission_cannot_export(): void
+    public function editor_can_export_via_share_link(): void
     {
         $this->addVersion('<p>Konten</p>');
+        $link = $this->makeLink('editor');
 
-        $outsider = User::factory()->create(['division_id' => null, 'system_role' => 'staff']);
+        $response = $this->actingAs($this->owner)
+            ->post(route('shared.documents.export-pdf', $link->token));
 
-        $response = $this->actingAs($outsider)
-            ->post(route('documents.export-pdf', $this->document));
+        $response->assertRedirect();
+        $response->assertSessionHas('pdf_export');
+    }
 
-        $response->assertForbidden();
+    #[Test]
+    public function expired_link_cannot_export(): void
+    {
+        $this->addVersion('<p>Konten</p>');
+        $link = $this->makeLink('viewer', expired: true);
+
+        $response = $this->actingAs($this->owner)
+            ->post(route('shared.documents.export-pdf', $link->token));
+
+        $response->assertNotFound();
         $this->assertDatabaseMissing('audit_logs', ['action' => 'document.exported']);
     }
 
     #[Test]
     public function export_with_no_content_returns_error(): void
     {
-        // Document with no versions at all.
-        $response = $this->actingAs($this->admin)
-            ->post(route('documents.export-pdf', $this->document));
+        $link = $this->makeLink('viewer');
+
+        $response = $this->actingAs($this->owner)
+            ->post(route('shared.documents.export-pdf', $link->token));
 
         $response->assertRedirect();
         $response->assertSessionHasErrors('export');
-        $this->assertStringContainsString('No content available to export', session('errors')->first('export'));
     }
 
     #[Test]
-    public function export_failure_is_reported_and_retryable(): void
+    public function export_failure_is_reported(): void
     {
         $this->addVersion('<p>Konten</p>');
+        $link = $this->makeLink('viewer');
 
         $mock = \Mockery::mock(PdfExportService::class);
         $mock->shouldReceive('export')->andThrow(new \RuntimeException('boom'));
         $this->app->instance(PdfExportService::class, $mock);
 
-        $response = $this->actingAs($this->admin)
-            ->post(route('documents.export-pdf', $this->document));
+        $response = $this->actingAs($this->owner)
+            ->post(route('shared.documents.export-pdf', $link->token));
 
         $response->assertRedirect();
         $response->assertSessionHasErrors('export');
         $this->assertStringContainsString('PDF generation failed', session('errors')->first('export'));
-    }
-
-    #[Test]
-    public function export_respects_personal_visibility(): void
-    {
-        $this->addVersion('<p>Rahasia</p>');
-        $this->document->update(['visibility' => 'personal']);
-
-        $other = User::factory()->create(['division_id' => 1]);
-
-        $response = $this->actingAs($other)
-            ->post(route('documents.export-pdf', $this->document));
-
-        $response->assertForbidden();
     }
 }

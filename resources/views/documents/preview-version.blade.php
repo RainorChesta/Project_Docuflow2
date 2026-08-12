@@ -39,7 +39,7 @@
                     @if($version->file_path)
                         @include('documents._file-preview', ['document' => $document, 'version' => $version])
                     @else
-                        @include('documents._paper', ['content' => $version->content ?? ''])
+                        @include('documents._paper', ['content' => $version->content ?? '', 'document' => $document])
                     @endif
                 </div>
             </div>

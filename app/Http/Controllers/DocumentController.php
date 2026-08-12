@@ -8,10 +8,12 @@ use App\Models\Division;
 use App\Models\DocumentVersion;
 use App\Services\AuditService;
 use App\Services\DocumentService;
+use App\Services\QrCodeService;
 use App\Services\VersionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
@@ -21,6 +23,7 @@ class DocumentController extends Controller
         protected DocumentService $documentService,
         protected VersionService $versionService,
         protected AuditService $auditService,
+        protected QrCodeService $qrCodeService,
     ) {}
 
     public function index(Request $request): View
@@ -348,6 +351,39 @@ class DocumentController extends Controller
     }
 
     /**
+     * Stream gambar QR code (PNG) yang mengarah ke halaman show dokumen ini.
+     * Dipakai oleh tombol "print" di toolbar Jodit (client-side) untuk
+     * mengganti placeholder QR jadi gambar asli sebelum window.print()
+     * dipanggil — lihat getCleanValue({forPrint:true}) di resources/js/jodit.js.
+     */
+    public function qrCode(Document $document)
+    {
+        $this->authorize('view', $document);
+
+        $png = $this->qrCodeService->pngBytes($this->qrCodeService->qrcodeUrl($document));
+
+        return response($png, 200, ['Content-Type' => 'image/png']);
+    }
+
+    /**
+     * Resolver QR: token terenkripsi (lihat QrCodeService::qrcodeUrl) →
+     * dokumen → redirect ke halaman show. QR di dokumen fisik menunjuk
+     * ke sini, bukan ke URL dengan ID mentah.
+     */
+    public function viewByHash(string $token)
+    {
+        try {
+            $id = Crypt::decryptString(base64_decode(strtr($token, '-_', '+/')));
+        } catch (\Throwable) {
+            abort(404);
+        }
+
+        $document = Document::findOrFail($id);
+
+        return view('documents.verified', compact('document'));
+    }
+
+    /**
      * Change a document's visibility scope (general / division / personal).
      * Division is not selectable here — the document keeps its original
      * division (division_id is NOT NULL at DB level).
@@ -358,11 +394,15 @@ class DocumentController extends Controller
 
         $validated = $request->validate([
             'visibility' => 'required|in:general,division,personal',
-            'division_id' => 'nullable|required_if:visibility,division|exists:divisions,id',
         ]);
+
+        // Division scope keeps the document's original division; fall back to
+        // the current user's division if the document has none.
+        $divisionId = $document->division_id ?? auth()->user()->division_id;
 
         $document->update([
             'visibility' => $validated['visibility'],
+            'division_id' => $validated['visibility'] === Document::VISIBILITY_DIVISION ? $divisionId : null,
             // Legacy derived flag stays in sync with the scope.
             'is_public' => $validated['visibility'] === Document::VISIBILITY_GENERAL,
         ]);

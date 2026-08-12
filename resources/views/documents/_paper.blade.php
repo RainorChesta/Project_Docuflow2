@@ -178,10 +178,9 @@
         height: auto;
     }
 
-    /* Toolbar kecil di atas kertas: dropdown ukuran kertas + tombol reset.
-       Hanya tampil kalau halaman mengirim data-live-storage (punya editor
-       terkait); halaman tanpa itu (mis. show) tetap murni menampilkan
-       kertas tanpa kontrol. */
+    /* Toolbar kecil di atas kertas: dropdown ukuran kertas (hanya jika ada
+       editor terkait) + kontrol zoom in/out/reset — selalu tampil di semua
+       preview dokumen. */
     .doku-paper-scope .doku-paper-toolbar {
         display: flex;
         flex-wrap: wrap;
@@ -199,6 +198,25 @@
         background: #fff;
         color: #1a1a1a;
     }
+    .doku-paper-scope .doku-paper-toolbar .doku-paper-zoom-btn {
+        padding: 4px 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        background: #fff;
+        color: #1a1a1a;
+        cursor: pointer;
+        font-size: 13px;
+        line-height: 1;
+    }
+    .doku-paper-scope .doku-paper-toolbar .doku-paper-zoom-btn:hover {
+        background: #f3f4f6;
+    }
+    .doku-paper-scope .doku-paper-toolbar .doku-paper-zoom-label {
+        min-width: 44px;
+        text-align: center;
+        color: #1a1a1a;
+        font-weight: 600;
+    }
         </style>
     @endpush
 @endonce
@@ -206,17 +224,48 @@
 <div class="doku-paper-scope" @isset($liveStorage) data-live-storage="{{ $liveStorage }}" @endisset
      data-paper-size="{{ $paperSize ?? 'A4' }}"
      data-paper-margin="{{ json_encode($paperMargin ?? null) }}">
-    @isset($liveStorage)
-        <div class="doku-paper-toolbar">
+    <div class="doku-paper-toolbar">
+        @isset($liveStorage)
             <label class="text-base-content/70">Ukuran Kertas:</label>
             <select data-paper-size-select>
                 @foreach(['A4', 'A5', 'A3', 'Letter', 'Legal'] as $paperKey)
                     <option value="{{ $paperKey }}">{{ $paperKey }}</option>
                 @endforeach
             </select>
-        </div>
-    @endisset
+        @endisset
+        <button type="button" class="doku-paper-zoom-btn" data-paper-zoom-out title="Perkecil" aria-label="Zoom out">−</button>
+        <span class="doku-paper-zoom-label" data-paper-zoom-label>100%</span>
+        <button type="button" class="doku-paper-zoom-btn" data-paper-zoom-in title="Perbesar" aria-label="Zoom in">+</button>
+        <button type="button" class="doku-paper-zoom-btn" data-paper-zoom-reset>Reset</button>
+    </div>
     <div class="doku-paper">
-        {!! $content !!}
+        {!! isset($document) ? app(\App\Services\QrCodeService::class)->injectPlaceholder($content, $document) : $content !!}
     </div>
 </div>
+
+@once
+<script>
+    // Zoom in/out kertas preview — pakai event delegation supaya tetap hidup
+    // walau preview.blade.php me-render ulang .doku-paper-scope (innerHTML
+    // #live-preview-content ditimpa). State zoom disimpan di data-zoom scope.
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-paper-zoom-in], [data-paper-zoom-out], [data-paper-zoom-reset]');
+        if (!btn) return;
+        var scope = btn.closest('.doku-paper-scope');
+        if (!scope) return;
+        var zoom = parseInt(scope.dataset.zoom || '100', 10);
+        if (btn.hasAttribute('data-paper-zoom-in')) {
+            zoom = Math.min(200, zoom + 10);
+        } else if (btn.hasAttribute('data-paper-zoom-out')) {
+            zoom = Math.max(50, zoom - 10);
+        } else {
+            zoom = 100;
+        }
+        scope.dataset.zoom = zoom;
+        var paper = scope.querySelector('.doku-paper');
+        if (paper) paper.style.zoom = zoom / 100;
+        var label = scope.querySelector('[data-paper-zoom-label]');
+        if (label) label.textContent = zoom + '%';
+    });
+</script>
+@endonce
