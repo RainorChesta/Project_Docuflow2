@@ -1,9 +1,9 @@
 <x-app-layout>
-    <x-slot name="header">My Documents</x-slot>
+    <x-slot name="header">{{ __('Dokumen Saya') }}</x-slot>
 
     <div class="py-6">
         <div class="max-w-7xl mx-auto w-full">
-            @include('documents._header', ['title' => 'My Documents'])
+            @include('documents._header', ['title' => __('Dokumen Saya')])
 
             @include('documents._search')
 
@@ -19,7 +19,7 @@
                         @forelse($documents as $doc)
                             @include('documents._list', ['doc' => $doc])
                         @empty
-                            <div class="p-4 sm:p-6 text-base-content/60">Kamu belum punya dokumen pribadi.</div>
+                            <div class="p-4 sm:p-6 text-base-content/60">{{ __('Kamu belum punya dokumen pribadi.') }}</div>
                         @endforelse
                     </div>
                     @if($documents->hasPages())
