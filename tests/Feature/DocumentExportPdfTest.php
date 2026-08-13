@@ -27,6 +27,7 @@ class DocumentExportPdfTest extends TestCase
         Storage::fake('local');
 
         $division = Division::create(['code' => '01', 'name' => 'JBM']);
+        $docType = \App\Models\DocumentType::create(['name' => 'Surat Edaran', 'code' => 'S.ED']);
         $this->owner = User::factory()->create(['division_id' => $division->id]);
         $this->admin = User::factory()->create(['system_role' => 'admin', 'is_active' => true]);
         $this->document = Document::create([
@@ -35,6 +36,7 @@ class DocumentExportPdfTest extends TestCase
             'visibility' => 'division',
             'division_id' => $division->id,
             'owner_id' => $this->owner->id,
+            'document_type_id' => $docType->id,
         ]);
     }
 
@@ -66,7 +68,7 @@ class DocumentExportPdfTest extends TestCase
         $response->assertRedirect();
         $response->assertSessionHas('pdf_export');
 
-        Storage::disk('local')->assertExists('exports/' . session('pdf_export')['filename']);
+        $this->assertFileExists(storage_path('app/private/exports/' . session('pdf_export')['filename']));
 
         $this->assertDatabaseHas('audit_logs', [
             'action' => 'document.exported',

@@ -35,4 +35,28 @@ return [
         ],
     ],
 
+    'groq' => [
+        'key' => env('GROQ_API_KEY'),
+        'model' => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
+        'temperature' => env('GROQ_TEMPERATURE', 0.2),
+        'max_tokens' => env('GROQ_MAX_TOKENS', 800),
+        'timeout' => env('GROQ_TIMEOUT', 90),
+    ],
+
+    'deepseek' => [
+        'key' => env('DEEPSEEK_API_KEY'),
+        'model' => env('DEEPSEEK_MODEL', 'deepseek-v4-flash'),
+        'temperature' => env('DEEPSEEK_TEMPERATURE', 0.2),
+        'max_tokens' => env('DEEPSEEK_MAX_TOKENS', 800),
+        'timeout' => env('DEEPSEEK_TIMEOUT', 90),
+    ],
+
+    'ollama' => [
+        'url' => env('OLLAMA_URL', 'http://127.0.0.1:11434'), // native ollama API /api/generate
+        'model' => env('OLLAMA_MODEL', 'qwen2.5:1.5b'),
+        'temperature' => env('OLLAMA_TEMPERATURE', 0.2),
+        'max_tokens' => env('OLLAMA_MAX_TOKENS', 1500),
+        'timeout' => env('OLLAMA_TIMEOUT', 120),
+    ],
+
 ];

@@ -2,12 +2,14 @@
 
 namespace App\Services;
 
+use App\Jobs\SummarizeDocumentJob;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\Division;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class DocumentService
@@ -149,6 +151,24 @@ class DocumentService
 
             return $doc;
         });
+    }
+
+    /**
+     * Kirim job ringkasan AI ke antrian. Job hanya membawa document id —
+     * payload kecil, dan request web tidak menunggu Groq selesai.
+     */
+    public function dispatchSummary(Document $document, int $percentage = 30): void
+    {
+        // Lepas kunci lama (kalau ada) supaya job baru tidak di-skip.
+        Cache::lock('summarize:' . $document->id)->forceRelease();
+
+        $document->update([
+            'summary_status' => Document::SUMMARY_PROCESSING,
+            'summary_started_at' => now(),
+            'summary_error' => null,
+        ]);
+
+        SummarizeDocumentJob::dispatch($document->id, $percentage);
     }
 
     private function toRomanMonth(int $month): string
