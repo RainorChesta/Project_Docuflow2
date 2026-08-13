@@ -104,6 +104,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    });
 });
 
 // Shared link access (no auth required)
@@ -114,6 +115,6 @@ Route::post('/share/{token}/upload', [ShareLinkController::class, 'upload'])->na
 Route::post('/share/{token}/export-pdf', [ShareLinkController::class, 'exportPdf'])->name('shared.documents.export-pdf');
 
 // Share-token link access (Google Docs model)
-Route::get('/d/{token}', [DocumentShareController::class, 'accessByToken'])->name('documents.shared');
+Route::get('/shared/{token}', [DocumentShareController::class, 'accessByToken'])->name('documents.shared');
 
 require __DIR__.'/auth.php';

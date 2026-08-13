@@ -241,6 +241,7 @@ function buildSpacerElement(margin, gap, extraAttrs) {
             el.replaceWith(pageBreak);
         } else {
             el.remove();
+    }});
     const gapBandHeight = Math.max(2, Math.min(24, Math.round(gap * 0.3)));
     const remaining = gap - gapBandHeight;
     const beforeHeight = gap > 0 ? Math.round(remaining * (margin.bottom / gap)) : 0;
@@ -1080,8 +1081,8 @@ export function initJoditEditor(selector, overrides = {}) {
             'superscript', 'subscript', '|',
             'ul', 'ol', 'indent', 'outdent', '|',
             'font', 'fontsize', 'brush', 'paragraph', 'lineHeight', '|',
-            'image', 'video', 'file', 'table', 'link', 'hr', 'signature', '|',
-            'image', 'video', 'file', 'table', 'link', 'hr', 'qrCode', '|',
+            'image', 'video', 'file', 'table', 'link', 'hr','qrCode', 'signature', '|',
+            // 'image', 'video', 'file', 'table', 'link', 'hr', 'qrCode', '|',
             'align', '|',
             'paperSize', 'margin', '|',
             'undo', 'redo', 'eraser', 'copyformat', '|',

@@ -98,7 +98,8 @@ class SignatureResolverService
      */
     private function renderSignatureImage($signature, User $user, bool $forPdfExport = false): string
     {
-        $imgSrc = $forPdfExport ? $signature->base64 : $signature->url;
+        // Ensure the image URL is absolute and bust cache on updates for web preview pages
+        $imgSrc = $forPdfExport ? $signature->base64 : asset('storage/' . $signature->file_path) . '?cb=' . $signature->updated_at->timestamp;
 
         return sprintf(
             '<img src="%s" alt="TTD %s" class="doku-signature-img inline-block" style="max-height: 80px; width: auto; vertical-align: middle; object-fit: contain; margin: 4px;" data-ttd-user="%s" />',

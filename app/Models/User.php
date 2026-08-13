@@ -110,4 +110,6 @@ class User extends Authenticatable
     {
         return $this->system_role === 'head';
     }
+
+    protected $with = ['signature'];
 }

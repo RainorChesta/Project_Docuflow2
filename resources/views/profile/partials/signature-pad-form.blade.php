@@ -80,7 +80,7 @@
                 @if(auth()->user()->hasSignature())
                     {{-- Server-rendered on initial page load --}}
                     <div class="bg-white p-4 rounded-lg shadow-sm border border-base-300 w-full">
-                        <img src="{{ auth()->user()->signature->url }}"
+                        <img src="{{ asset('storage/' . auth()->user()->signature->file_path) }}"
                              alt="Tanda tangan {{ auth()->user()->name }}"
                              class="max-h-36 max-w-full object-contain mx-auto">
                     </div>
@@ -143,7 +143,8 @@
     function formatDate(isoStr) {
         const d = new Date(isoStr);
         const dd  = String(d.getDate()).padStart(2, '0');
-        const mon = d.toLocaleString('id-ID', { month: 'short' });
+        // Use English short month names for consistency with requirement
+        const mon = d.toLocaleString('en-US', { month: 'short' });
         const yr  = d.getFullYear();
         const hh  = String(d.getHours()).padStart(2, '0');
         const mm  = String(d.getMinutes()).padStart(2, '0');
@@ -306,6 +307,7 @@
                     if (hint) hint.style.opacity = '1';
                     saveBtn.disabled = true;
                     showFlash('Tanda tangan berhasil disimpan!');
+                    // No page reload needed; UI updates dynamically via renderSavedSignature
                 } else {
                     showFlash(data.message || 'Gagal menyimpan tanda tangan.', 'error');
                     saveBtn.disabled = false;

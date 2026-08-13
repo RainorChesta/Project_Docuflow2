@@ -54,11 +54,12 @@ class QrCodeService
 
     private function build(string $url)
     {
-        return (new Builder(
-            data: $url,
-            size: self::SIZE,
-            margin: 4,
-        ))->build();
+return (new Builder(
+        writer: new PngWriter(),
+        data: $url,
+        size: self::SIZE,
+        margin: 4,
+    ))->build();
     }
 
     /**
