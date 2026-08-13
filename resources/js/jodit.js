@@ -102,10 +102,6 @@ function buildIframeStyle(size, margin = DEFAULT_MARGIN) {
         '  background:#fff;',
         `  min-height:${size.height}px;`,
         '  box-shadow:0 1px 3px rgba(0,0,0,0.1);',
-        "  font-family: 'Times New Roman', Times, serif;",
-        '  font-size: 16px;',
-        '  line-height: normal;',
-        '  color: #111;',
         '}',
         'table { width:100%; border:none; border-collapse:collapse; empty-cells:show; max-width:100%; }',
         'th, td { padding:2px 5px; border:1px solid #ccc; }',
@@ -152,6 +148,47 @@ function applyPaperSize(editor, size, margin) {
     });
 }
 
+// Ambil HTML editor tanpa elemen spacer pagination (lihat repaginateEditor
+// di bawah) — WAJIB dipakai tiap kali konten mau disimpan/di-preview,
+// supaya jeda visual antar halaman di editor TIDAK ikut kesimpen sebagai
+// bagian dari dokumen asli.
+//
+// FIX ARSITEKTUR PRINT/EXPORT: dulu ada parameter forPrint yang mengubah
+// tiap spacer menjadi forced page-break (break-after:page) TEPAT di posisi
+// yang dihitung repaginateEditor di iframe EDITOR. Itu justru sumber utama
+// "teks amburadul saat margin ditambah" — repaginateEditor mengukur tinggi
+// elemen di iframe editor (yang punya kondisi render/font-loading sendiri),
+// sementara iframe print dibuat baru & fontnya di-fetch ulang secara
+// terpisah. Begitu margin besar (ruang tulis per halaman makin sempit),
+// selisih pengukuran sekecil apa pun antara dua iframe itu sudah cukup
+// membuat titik potong yang "dipaksakan" dari editor meleset dari tinggi
+// konten yang SEBENARNYA di iframe print — hasilnya 1 kalimat nyangkut di
+// atas/bawah dan sisa halaman kosong.
+//
+// Sekarang getCleanValue HANYA membuang spacer (untuk disimpan/preview).
+// Untuk cetak, TIDAK ADA LAGI titik potong yang dipaksakan dari editor —
+// browser sendiri yang menghitung page-break native saat print, karena
+// dialah satu-satunya pihak yang benar-benar tahu tinggi final tiap elemen
+// setelah font & layout di iframe print settle. Lihat doPrint() +
+// aturan `break-inside: avoid` di CSS print untuk cara barunya.
+// FIX AKAR MASALAH "ada spasi kosong gede sebelum list, list kepental utuh
+// ke halaman berikutnya": versi sebelumnya menganggap <ol>/<ul> sebagai SATU
+// elemen utuh yang "tidak boleh dipecah" — persis sama seperti paragraf atau
+// gambar. Begitu daftar bernomor (mis. 5 item) tidak muat lagi di sisa
+// halaman, SELURUH list didorong ke halaman berikutnya sebagai satu blok,
+// walau baru item ke-3 dst yang sebenarnya kepotong. Sisa ruang di halaman
+// sebelumnya (yang sebenarnya masih cukup buat item 1-2) jadi terbuang jadi
+// spasi kosong besar — itu yang muncul di screenshot: paragraf penutup di
+// atas, lalu blank sampai ke penanda halaman, baru listnya nongol utuh di
+// halaman berikutnya.
+//
+// FIX: list sekarang diperlakukan seperti di Word/Google Docs — boleh
+// terpotong ANTAR item (satu <li> boleh pindah halaman), tapi SATU <li>
+// sendiri tetap tidak boleh terpotong di tengah kalimat. Saat titik potong
+// jatuh di tengah sebuah <li>, list dipecah jadi DUA elemen <ol>/<ul>: satu
+// berisi item-item yang muat di halaman sekarang, satu lagi (mulai dari item
+// yang kepotong) diteruskan ke halaman berikutnya — dengan atribut `start`
+// di-set supaya nomor urutnya TETAP NYAMBUNG (bukan reset ke 1).
 function buildSpacerElement(margin, gap, extraAttrs) {
     const spacer = document.createElement('div');
     spacer.setAttribute('data-page-spacer', 'true');
@@ -198,6 +235,11 @@ function buildSpacerElement(margin, gap, extraAttrs) {
     return spacer;
 }
 
+// Sebelum menghitung ulang pagination (atau sebelum ekstrak nilai bersih
+// buat disimpan), gabungkan lagi list yang sebelumnya sempat dipecah jadi
+// dua elemen oleh paginateList() — supaya perhitungan/penyimpanan selalu
+// mulai dari struktur dokumen yang FLAT (satu list utuh), bukan dari hasil
+// pecahan iterasi sebelumnya yang sudah basi.
 function mergeSplitLists(container) {
     container.querySelectorAll(':scope > [data-page-spacer][data-list-continuation]').forEach((spacer) => {
         const prevList = spacer.previousElementSibling;
@@ -214,90 +256,118 @@ function mergeSplitLists(container) {
     });
 }
 
-function paginateList(list, nextBoundary, containerTop, paddingTop, margin, gap, contentPerPage) {
-    const items = Array.from(list.children).filter((el) => el.tagName === 'LI');
-    if (items.length === 0) return false;
+// Proses satu <ol>/<ul>: cari <li> pertama yang kepotong batas halaman,
+// pecah list di situ (item sebelumnya tetap di list asli, item itu dst
+// pindah ke list baru yang nomornya nyambung), sisipkan spacer di antara
+// keduanya, lalu lanjut evaluasi list baru itu terhadap batas halaman
+// berikutnya (jaga-jaga kalau dia sendiri masih kepanjangan untuk 1 halaman).
+function paginateList(list, containerTop, paddingTop, contentPerPage, gap, margin, startBoundary) {
+    let nextBoundary = startBoundary;
+    let current = list;
 
-    let splitAt = null;
-    for (const li of items) {
-        const rect = li.getBoundingClientRect();
-        const relTop = rect.top - containerTop - paddingTop;
-        const relBottom = relTop + rect.height;
+    while (current) {
+        const items = Array.from(current.children).filter((el) => el.tagName === 'LI');
+        if (items.length === 0) break;
 
-        if (relBottom > nextBoundary) {
-            // Jangan split jika ini item pertama dan itemnya lebih tinggi dari halaman
-            if (li === items[0] && rect.height > contentPerPage) return false;
-            splitAt = li;
+        let splitAt = null;
+        for (const li of items) {
+            const rect = li.getBoundingClientRect();
+            const relTop = rect.top - containerTop - paddingTop;
+            const relBottom = relTop + rect.height;
+
+            if (
+                (relBottom > nextBoundary && relTop < nextBoundary) ||
+                (relTop >= nextBoundary && relTop < nextBoundary + contentPerPage)
+            ) {
+                splitAt = li;
+                const tallerThanPage = rect.height > contentPerPage;
+                nextBoundary += contentPerPage + gap;
+                // Jaga-jaga: kalau satu <li> ini sendiri masih melewati
+                // batas halaman BARU juga (item pendek tapi ada banyak
+                // halaman kosong dilompati sebelumnya), majukan terus
+                // batasnya sampai benar-benar mengapit item ini.
+                if (!tallerThanPage) {
+                    let stillCrossing = true;
+                    while (stillCrossing) {
+                        const r2 = li.getBoundingClientRect();
+                        const rt2 = r2.top - containerTop - paddingTop;
+                        const rb2 = rt2 + r2.height;
+                        stillCrossing = rb2 > nextBoundary && rt2 < nextBoundary;
+                        if (stillCrossing) nextBoundary += contentPerPage + gap;
+                    }
+                }
+                break;
+            }
+        }
+
+        if (!splitAt) break; // sisa item di list ini semua muat di halaman sekarang
+
+        if (splitAt === items[0]) {
+            // Item pertama SEGMEN INI saja sudah harus pindah halaman →
+            // seluruh sisa list (current) didorong utuh, cukup 1 spacer.
+            const spacer = buildSpacerElement(margin, gap);
+            current.parentNode.insertBefore(spacer, current);
             break;
         }
+
+        // Pecah: item sebelum splitAt tetap di `current`, splitAt dst
+        // dipindah ke list baru yang meneruskan nomor urut (atribut
+        // `start` untuk <ol>) supaya penomoran tidak reset ke 1.
+        const newList = document.createElement(current.tagName);
+        Array.from(current.attributes).forEach((attr) => newList.setAttribute(attr.name, attr.value));
+        if (current.tagName === 'OL') {
+            const priorStart = parseInt(current.getAttribute('start') || '1', 10);
+            const movedCount = items.indexOf(splitAt);
+            newList.setAttribute('start', String(priorStart + movedCount));
+        }
+
+        let node = splitAt;
+        while (node) {
+            const nextNode = node.nextSibling;
+            newList.appendChild(node);
+            node = nextNode;
+        }
+
+        const spacer = buildSpacerElement(margin, gap, { 'data-list-continuation': 'true' });
+        current.parentNode.insertBefore(spacer, current.nextSibling);
+        current.parentNode.insertBefore(newList, spacer.nextSibling);
+
+        current = newList; // lanjut evaluasi sisa item di segmen baru ini
     }
 
-    if (!splitAt) return false;
-
-    if (splitAt === items[0]) {
-        return false;
-    }
-
-    const newList = document.createElement(list.tagName);
-    Array.from(list.attributes).forEach((attr) => newList.setAttribute(attr.name, attr.value));
-    if (list.tagName === 'OL') {
-        const priorStart = parseInt(list.getAttribute('start') || '1', 10);
-        const movedCount = items.indexOf(splitAt);
-        newList.setAttribute('start', String(priorStart + movedCount));
-    }
-
-    let node = splitAt;
-    while (node) {
-        const nextNode = node.nextSibling;
-        newList.appendChild(node);
-        node = nextNode;
-    }
-
-    const spacer = buildSpacerElement(margin, gap, { 'data-list-continuation': 'true' });
-    list.parentNode.insertBefore(spacer, list.nextSibling);
-    list.parentNode.insertBefore(newList, spacer.nextSibling);
-    return true;
+    return { nextBoundary, nextChild: current ? current.nextElementSibling : null };
 }
 
+// Jalankan pagination di satu container (body editor ATAU .doku-paper
+// preview) — dipakai bareng oleh repaginateEditor & repaginatePreview supaya
+// logikanya SATU tempat, tidak dobel kode dan tidak bisa saling melenceng.
 function paginateContainer(container, contentPerPage, gap, margin) {
     const paddingTop = parseFloat(getComputedStyle(container).paddingTop) || 0;
     const containerTop = container.getBoundingClientRect().top;
     let nextBoundary = contentPerPage;
-
     let child = container.firstElementChild;
+
     while (child) {
-        if (child.hasAttribute('data-page-spacer')) {
-            child = child.nextElementSibling;
+        if (child.tagName === 'OL' || child.tagName === 'UL') {
+            const result = paginateList(child, containerTop, paddingTop, contentPerPage, gap, margin, nextBoundary);
+            nextBoundary = result.nextBoundary;
+            child = result.nextChild;
             continue;
         }
 
         const rect = child.getBoundingClientRect();
-        let relTop = rect.top - containerTop - paddingTop;
-        let relBottom = relTop + rect.height;
-
-        const isList = child.tagName === 'OL' || child.tagName === 'UL';
+        const relTop = rect.top - containerTop - paddingTop;
+        const relBottom = relTop + rect.height;
         const elementTallerThanPage = rect.height > contentPerPage;
 
-        if (isList) {
-            const splitDone = paginateList(child, nextBoundary, containerTop, paddingTop, margin, gap, contentPerPage);
-            if (splitDone) {
-                nextBoundary += contentPerPage + gap;
-                child = child.nextElementSibling;
-                continue;
-            }
-        }
-
-        while (relBottom > nextBoundary) {
-            if (relTop >= nextBoundary || !elementTallerThanPage) {
-                const spacer = buildSpacerElement(margin, gap);
-                child.parentNode.insertBefore(spacer, child);
-                nextBoundary += contentPerPage + gap;
-                
-                relTop += gap;
-                relBottom += gap;
-            } else {
-                nextBoundary += contentPerPage + gap;
-            }
+        while (
+            (relBottom > nextBoundary && relTop < nextBoundary) ||
+            (relTop >= nextBoundary && relTop < nextBoundary + contentPerPage)
+        ) {
+            const spacer = buildSpacerElement(margin, gap);
+            child.parentNode.insertBefore(spacer, child);
+            nextBoundary += contentPerPage + gap;
+            if (elementTallerThanPage) break;
         }
 
         child = child.nextElementSibling;
@@ -481,63 +551,6 @@ function initPreviewPagination(scopeSelector = '.doku-paper-scope') {
 const PX_PER_CM = 96 / 2.54;
 
 // Dipanggil dari tombol toolbar "margin" — lihat controls.margin di bawah.
-// Popup tombol "Sisip QR Code": pilih ukuran QR (px) lalu insert placeholder
-// ke posisi kursor. Ukuran dipakai sebagai width/height <img> saat render
-// final (server: QrCodeService::injectPlaceholder; print: getCleanValue).
-function buildQrPopup(editor, close) {
-    const wrapper = document.createElement('div');
-    wrapper.style.cssText = 'padding:12px; display:flex; flex-direction:column; gap:8px; min-width:220px; background:#fff;';
-
-    const title = document.createElement('div');
-    title.textContent = 'Ukuran QR Code';
-    title.style.cssText = 'font-weight:600; margin-bottom:4px; color:#1a1a1a;';
-    wrapper.appendChild(title);
-
-    const input = document.createElement('input');
-    input.type = 'number';
-    input.min = '40';
-    input.max = '400';
-    input.step = '10';
-    input.value = '120';
-    input.style.cssText = 'width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;';
-    wrapper.appendChild(input);
-
-    const hint = document.createElement('div');
-    hint.textContent = 'px (40–400)';
-    hint.style.cssText = 'color:#6b7280; font-size:12px;';
-    wrapper.appendChild(hint);
-
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.textContent = 'Sisipkan';
-    btn.style.cssText = 'margin-top:6px; padding:6px 10px; cursor:pointer; border:1px solid #ccc; border-radius:4px; background:#f3f4f6;';
-    btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        let size = parseInt(input.value, 10);
-        if (!Number.isFinite(size)) size = 120;
-        size = Math.max(40, Math.min(400, size));
-
-        // FIX: ukuran di-encode LANGSUNG di teks placeholder (bukan atribut
-        // data-qr-size) — Jodit membuang semua atribut data-* saat clean-html
-        // saat save (lihat catatan di getCleanValue di bawah), jadi kalau
-        // ukuran disimpan sebagai atribut, nilainya selalu hilang & fallback
-        // ke default. Teks konten tidak pernah kena strip, jadi aman.
-        editor.s.insertHTML(
-            '<span data-qr-placeholder="true" contenteditable="false" ' +
-            'style="display:inline-block;padding:4px 10px;margin:0 2px;' +
-            'border:1px dashed #94a3b8;border-radius:4px;background:#f1f5f9;' +
-            'font-family:monospace;font-size:12px;color:#475569;' +
-            'vertical-align:middle;user-select:none;">[QR CODE DOKUMEN ' + size + 'px]</span>'
-        );
-        if (typeof close === 'function') close();
-        editor.e.fire('closeAllPopups');
-    });
-    wrapper.appendChild(btn);
-
-    return wrapper;
-}
-
 function buildMarginPopup(editor, close) {
     const current = editor.currentMargin || DEFAULT_MARGIN;
     const fields = [
@@ -622,121 +635,6 @@ function buildMarginPopup(editor, close) {
         if (typeof close === 'function') close();
     });
     wrapper.appendChild(btn);
-
-    return wrapper;
-}
-
-function buildSignaturePopup(editor, close) {
-    const wrapper = document.createElement('div');
-    wrapper.style.cssText = 'padding:12px; display:flex; flex-direction:column; gap:8px; min-width:240px; max-width:320px; background:#fff;';
-
-    const title = document.createElement('div');
-    title.textContent = 'Sisipkan Tanda Tangan (TTD)';
-    title.style.cssText = 'font-weight:600; margin-bottom:4px; color:#1a1a1a; font-size:14px;';
-    wrapper.appendChild(title);
-
-    // --- Search input ---
-    const searchInput = document.createElement('input');
-    searchInput.type = 'text';
-    searchInput.placeholder = 'Cari nama atau divisi...';
-    searchInput.style.cssText = 'width:100%; padding:6px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; color:#1f2937; outline:none; box-sizing:border-box; transition:border-color 0.15s;';
-    searchInput.addEventListener('focus', () => { searchInput.style.borderColor = '#6366f1'; });
-    searchInput.addEventListener('blur', () => { searchInput.style.borderColor = '#d1d5db'; });
-    // Hide search until data is loaded
-    searchInput.style.display = 'none';
-    wrapper.appendChild(searchInput);
-
-    const loading = document.createElement('div');
-    loading.textContent = 'Memuat daftar pengguna...';
-    loading.style.cssText = 'font-size:12px; color:#6b7280; padding:8px 0;';
-    wrapper.appendChild(loading);
-
-    const listContainer = document.createElement('div');
-    listContainer.style.cssText = 'display:none; flex-direction:column; gap:4px; max-height:220px; overflow-y:auto; margin-top:4px; border:1px solid #e5e7eb; border-radius:6px; padding:4px;';
-    wrapper.appendChild(listContainer);
-
-    // --- Empty state message (hidden by default) ---
-    const emptyState = document.createElement('div');
-    emptyState.textContent = 'Tidak ada tanda tangan ditemukan';
-    emptyState.style.cssText = 'display:none; font-size:12px; color:#9ca3af; text-align:center; padding:12px 0;';
-    wrapper.appendChild(emptyState);
-
-    fetch('/signatures/users', {
-        headers: { 'Accept': 'application/json' }
-    })
-    .then(res => res.json())
-    .then(data => {
-        loading.style.display = 'none';
-        listContainer.style.display = 'flex';
-        searchInput.style.display = '';
-        const users = data.users || [];
-
-        // Keep references to each button and its searchable text
-        const entries = [];
-
-        users.forEach(u => {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.style.cssText = 'display:flex; align-items:center; justify-content:space-between; width:100%; padding:6px 10px; border:none; background:transparent; border-radius:4px; text-align:left; cursor:pointer; font-size:13px; color:#1f2937; transition:background 0.15s;';
-            btn.onmouseover = () => btn.style.background = '#f3f4f6';
-            btn.onmouseout = () => btn.style.background = 'transparent';
-
-            const left = document.createElement('div');
-            left.style.cssText = 'display:flex; flex-direction:column;';
-            const name = document.createElement('span');
-            name.style.cssText = 'font-weight:500;';
-            const displayName = u.is_me ? `✨ TTD Saya (${u.name})` : u.name;
-            name.textContent = displayName;
-
-            const role = document.createElement('span');
-            role.style.cssText = 'font-size:11px; color:#6b7280;';
-            const roleText = `${u.role} - ${u.division}`;
-            role.textContent = roleText;
-
-            left.appendChild(name);
-            left.appendChild(role);
-
-            const badge = document.createElement('span');
-            badge.style.cssText = 'font-size:11px; font-family:monospace; background:#e0e7ff; color:#3730a3; padding:2px 6px; border-radius:4px; font-weight:600;';
-            badge.textContent = u.placeholder;
-
-            btn.appendChild(left);
-            btn.appendChild(badge);
-
-            btn.addEventListener('click', () => {
-                editor.selection.insertHTML(` ${u.placeholder} `);
-                if (typeof close === 'function') close();
-            });
-
-            listContainer.appendChild(btn);
-
-            // Store searchable text (lowercase) alongside the button element
-            entries.push({
-                el: btn,
-                searchText: `${displayName} ${roleText} ${u.placeholder}`.toLowerCase()
-            });
-        });
-
-        // --- Wire up search/filter ---
-        searchInput.addEventListener('input', () => {
-            const query = searchInput.value.trim().toLowerCase();
-            let visibleCount = 0;
-
-            entries.forEach(entry => {
-                const matches = !query || entry.searchText.includes(query);
-                entry.el.style.display = matches ? '' : 'none';
-                if (matches) visibleCount++;
-            });
-
-            // Show/hide empty state
-            emptyState.style.display = visibleCount === 0 ? 'block' : 'none';
-            listContainer.style.display = visibleCount === 0 ? 'none' : 'flex';
-        });
-    })
-    .catch(err => {
-        loading.textContent = 'Gagal memuat daftar pengguna.';
-        loading.style.color = '#ef4444';
-    });
 
     return wrapper;
 }
@@ -864,8 +762,6 @@ function buildPrintStyle(win, size, margin) {
                 min-height: 0 !important;
                 padding: 0 !important;
                 margin: 0 !important;
-                orphans: 1;
-                widows: 1;
             }
             /* FIX UTAMA: jangan paksa titik potong dari spacer editor.
                Biarkan browser menghitung native page-break sendiri
@@ -1018,8 +914,7 @@ export function initJoditEditor(selector, overrides = {}) {
             'superscript', 'subscript', '|',
             'ul', 'ol', 'indent', 'outdent', '|',
             'font', 'fontsize', 'brush', 'paragraph', 'lineHeight', '|',
-            'image', 'video', 'file', 'table', 'link', 'hr','qrCode', 'signature', '|',
-            // 'image', 'video', 'file', 'table', 'link', 'hr', 'qrCode', '|',
+            'image', 'video', 'file', 'table', 'link', 'hr', '|',
             'align', '|',
             'paperSize', 'margin', '|',
             'undo', 'redo', 'eraser', 'copyformat', '|',
@@ -1029,14 +924,6 @@ export function initJoditEditor(selector, overrides = {}) {
         ],
 
         controls: {
-            signature: {
-                name: 'signature',
-                tooltip: 'Sisipkan Tanda Tangan (TTD)',
-                icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 19h6"/><path d="M19 16v6"/><path d="M12 4a4 4 0 0 1 4 4c0 4-5 6-5 6s-5-2-5-6a4 4 0 0 1 4-4z"/><path d="M17.8 13.9 14 21.5 10 18l-2 3.5"/></svg>',
-                popup: (editor, _current, _self, close) => buildSignaturePopup(editor, close),
-            },
-
-            // Daftar font custom (Google Fonts) yang muncul di dropdown toolbar "font"
             font: {
                 list: Jodit.atom(FONT_LIST),
             },
@@ -1062,22 +949,6 @@ export function initJoditEditor(selector, overrides = {}) {
                 tooltip: 'Margin Halaman',
                 icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="1"/><rect x="7" y="7" width="10" height="10" stroke-dasharray="2 2"/></svg>',
                 popup: (editor, _current, _self, close) => buildMarginPopup(editor, close),
-            },
-
-            // Tombol "Sisip QR Code Dokumen": buka popup pilih ukuran QR,
-            // lalu insert placeholder (bukan gambar asli) ke posisi kursor —
-            // teks-format ini yang tersimpan ke DB, supaya QR selalu "hidup"
-            // mengikuti URL dokumen terkini, bukan snapshot beku.
-            // Placeholder diganti jadi <img> QR asli HANYA saat render final:
-            // - server-side: QrCodeService::injectPlaceholder() (show/preview/
-            //   preview-version/PDF export)
-            // - client-side: getCleanValue({forPrint:true}) di bawah, dipakai tombol
-            //   "print" di toolbar ini sendiri.
-            qrCode: {
-                name: 'qrCode',
-                tooltip: 'Sisip QR Code Dokumen',
-                icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM14 20h3M20 14v3M20 20h.01"/></svg>',
-                popup: (editor, _current, _self, close) => buildQrPopup(editor, close),
             },
 
             image: {
@@ -1347,23 +1218,6 @@ export function initJoditEditor(selector, overrides = {}) {
     });
 
     editor.events.on('change', () => scheduleRepaginate(editor));
-
-    editor.events.on('keydown', (e) => {
-        if (e.ctrlKey || e.metaKey) {
-            const key = e.key.toLowerCase();
-            if (key === 'z') {
-                e.preventDefault();
-                if (e.shiftKey) {
-                    editor.execCommand('redo');
-                } else {
-                    editor.execCommand('undo');
-                }
-            } else if (key === 'y') {
-                e.preventDefault();
-                editor.execCommand('redo');
-            }
-        }
-    });
 
     // Fullsize scroll fix (mode "buka editor ukuran penuh").
     const TOOLBAR_OFFSET = 45; // perkiraan tinggi toolbar Jodit

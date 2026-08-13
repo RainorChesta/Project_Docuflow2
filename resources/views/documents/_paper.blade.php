@@ -75,18 +75,14 @@
     outline: 1px solid #d1d5db;
     box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.08);
     box-sizing: border-box;
-    font-family: 'Times New Roman', Times, serif;
+    font-family: Times, "Times New Roman", serif;
     font-size: 16px;
     line-height: normal;
-    color: #111;
+    color: #000;
     /* Kata/teks panjang (URL, kode, font lebar) dipecah biar tidak
        meluber keluar kotak kertas preview. */
     overflow-wrap: break-word;
     word-break: break-word;
-    /* Gunakan overflow-x hidden agar elemen (seperti tabel) yang secara fisik
-       tidak muat di ukuran kertas kecil (misal A5) akan terpotong rapi di batas kertas,
-       persis seperti dokumen asli saat dicetak (daripada meluber merusak outline). */
-    overflow-x: hidden;
 }
 
     /* Responsif: di layar sempit, kertas mengikuti lebar device dan
@@ -229,12 +225,9 @@
 <div class="doku-paper-scope" @isset($liveStorage) data-live-storage="{{ $liveStorage }}" @endisset
      data-paper-size="{{ $paperSize ?? 'A4' }}"
      data-paper-margin="{{ json_encode($paperMargin ?? null) }}">
-    @isset($liveStorage)
-        <div class="doku-paper-toolbar">
-            <label class="text-base-content/70">{{ __('Ukuran Kertas') }}:</label>
     <div class="doku-paper-toolbar">
         @isset($liveStorage)
-            <label class="text-base-content/70">Ukuran Kertas:</label>
+            <label class="text-base-content/70">{{ __('Ukuran Kertas') }}:</label>
             <select data-paper-size-select>
                 @foreach(['A4', 'A5', 'A3', 'Letter', 'Legal'] as $paperKey)
                     <option value="{{ $paperKey }}">{{ $paperKey }}</option>
@@ -256,7 +249,6 @@
         {!! $finalContent !!}
     </div>
 </div>
-@endisset
 
 @once
 <script>
