@@ -59,6 +59,9 @@
                         @endisset
                     </div>
                     <div class="flex items-center gap-1">
+                        {{-- Language Switcher (ID <-> EN) --}}
+                        <x-language-toggle />
+
                         {{-- Theme Toggle: follows OS until user picks Light/Dark --}}
                         <x-theme-toggle />
 
@@ -93,9 +96,9 @@
                             };
                         }
                         $docTypeLabel = match ($docType) {
-                            'mine' => 'My Documents',
-                            'division' => 'Division Documents',
-                            default => 'General Documents',
+                            'mine' => __('Dokumen Saya'),
+                            'division' => __('Dokumen Divisi'),
+                            default => __('Dokumen Umum'),
                         };
                         $docTypeRoute = route('documents.index', ['type' => $docType]);
 
@@ -105,35 +108,35 @@
                                     $crumbs[] = ['label' => $docTypeLabel, 'url' => $docTypeRoute];
                                 }
                                 $crumbs[] = ['label' => match ($name) {
-                                    'documents.create' => 'Create',
-                                    'documents.edit' => 'Edit',
-                                    'documents.show' => 'Document Detail',
-                                    'documents.preview' => 'Preview',
-                                    'documents.preview-version' => 'Preview',
+                                    'documents.create' => __('Buat'),
+                                    'documents.edit' => __('Edit'),
+                                    'documents.show' => __('Detail Dokumen'),
+                                    'documents.preview' => __('Pratinjau'),
+                                    'documents.preview-version' => __('Pratinjau'),
                                     default => $docTypeLabel,
                                 }, 'url' => null];
                             } elseif ($name !== 'dashboard') {
-                                $crumbs[] = ['label' => 'Dashboard', 'url' => route('dashboard')];
+                                $crumbs[] = ['label' => __('Dashboard'), 'url' => route('dashboard')];
                                 if (str_starts_with($name, 'admin.')) {
                                     $section = match (true) {
-                                        str_contains($name, 'divisions') => 'Divisions',
-                                        str_contains($name, 'document-types') => 'Document Types',
-                                        str_contains($name, 'users') => 'Users',
-                                        str_contains($name, 'retention') => 'Retention',
-                                        default => 'Administration',
+                                        str_contains($name, 'divisions') => __('Divisi'),
+                                        str_contains($name, 'document-types') => __('Tipe Dokumen'),
+                                        str_contains($name, 'users') => __('Pengguna'),
+                                        str_contains($name, 'retention') => __('Retensi'),
+                                        default => __('Administrasi'),
                                     };
                                     $crumbs[] = ['label' => $section, 'url' => null];
                                     if (str_contains($name, '.create')) {
-                                        $crumbs[] = ['label' => 'Create', 'url' => null];
+                                        $crumbs[] = ['label' => __('Buat'), 'url' => null];
                                     } elseif (str_contains($name, '.edit')) {
-                                        $crumbs[] = ['label' => 'Edit', 'url' => null];
+                                        $crumbs[] = ['label' => __('Edit'), 'url' => null];
                                     }
                                 } elseif ($name === 'approvals.index') {
-                                    $crumbs[] = ['label' => 'Approvals', 'url' => null];
+                                    $crumbs[] = ['label' => __('Persetujuan'), 'url' => null];
                                 } elseif ($name === 'shared.history') {
-                                    $crumbs[] = ['label' => 'Shared Edit History', 'url' => null];
+                                    $crumbs[] = ['label' => __('Riwayat Edit via Share Link'), 'url' => null];
                                 } elseif ($name === 'profile.edit') {
-                                    $crumbs[] = ['label' => 'Profile', 'url' => null];
+                                    $crumbs[] = ['label' => __('Profil'), 'url' => null];
                                 }
                             }
                         }

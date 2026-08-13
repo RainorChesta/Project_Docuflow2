@@ -12,6 +12,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->web(append: [
+            \App\Http\Middleware\SetLocale::class,
+        ]);
         $middleware->alias([
             'share.link' => \App\Http\Middleware\ShareLinkAuth::class,
             'signature.required' => \App\Http\Middleware\EnsureUserHasSignature::class,

@@ -8,10 +8,12 @@ use App\Models\Division;
 use App\Models\DocumentVersion;
 use App\Services\AuditService;
 use App\Services\DocumentService;
+use App\Services\QrCodeService;
 use App\Services\VersionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
@@ -21,6 +23,7 @@ class DocumentController extends Controller
         protected DocumentService $documentService,
         protected VersionService $versionService,
         protected AuditService $auditService,
+        protected QrCodeService $qrCodeService,
     ) {}
 
     public function index(Request $request): View
@@ -183,6 +186,60 @@ class DocumentController extends Controller
             : Division::whereIn('id', auth()->user()->allDivisionIds())->get();
 
         return view('documents.show', compact('document', 'divisions'));
+    }
+
+    /**
+     * Mulai ringkasan AI secara asinkron. Request langsung balas dengan
+     * status processing — Groq dipanggil di queue job, bukan di sini.
+     */
+    public function summarize(Request $request, Document $document): JsonResponse
+    {
+        $this->authorize('view', $document);
+
+        $force = $request->boolean('force');
+        $percentage = (int) $request->input('percentage', 30);
+
+        // Sudah selesai & tidak dipaksa ringkas ulang → kirim hasil yang tersimpan.
+        if ($document->isSummaryCompleted() && !$force) {
+            return response()->json([
+                'status' => Document::SUMMARY_COMPLETED,
+                'summary' => $document->summary,
+            ]);
+        }
+
+        // Jika force ringkas ulang atau status sebelumnya failed → reset status
+        if ($force || $document->summary_status === Document::SUMMARY_FAILED) {
+            $document->update([
+                'summary_status' => Document::SUMMARY_PENDING,
+                'summary' => null,
+                'summary_error' => null,
+            ]);
+        }
+
+        $this->documentService->dispatchSummary($document, $percentage);
+
+        $document->refresh();
+
+        return response()->json([
+            'status' => $document->summary_status,
+            'summary' => $document->summary,
+            'error' => $document->summary_error,
+            'document_id' => $document->id,
+        ]);
+    }
+
+    /**
+     * Status ringkasan untuk polling frontend.
+     */
+    public function summaryStatus(Document $document): JsonResponse
+    {
+        $this->authorize('view', $document);
+
+        return response()->json([
+            'status' => $document->summary_status,
+            'summary' => $document->summary,
+            'error' => $document->summary_error,
+        ]);
     }
 
     public function edit(Document $document): View
@@ -354,6 +411,39 @@ class DocumentController extends Controller
     }
 
     /**
+     * Stream gambar QR code (PNG) yang mengarah ke halaman show dokumen ini.
+     * Dipakai oleh tombol "print" di toolbar Jodit (client-side) untuk
+     * mengganti placeholder QR jadi gambar asli sebelum window.print()
+     * dipanggil — lihat getCleanValue({forPrint:true}) di resources/js/jodit.js.
+     */
+    public function qrCode(Document $document)
+    {
+        $this->authorize('view', $document);
+
+        $png = $this->qrCodeService->pngBytes($this->qrCodeService->qrcodeUrl($document));
+
+        return response($png, 200, ['Content-Type' => 'image/png']);
+    }
+
+    /**
+     * Resolver QR: token terenkripsi (lihat QrCodeService::qrcodeUrl) →
+     * dokumen → redirect ke halaman show. QR di dokumen fisik menunjuk
+     * ke sini, bukan ke URL dengan ID mentah.
+     */
+    public function viewByHash(string $token)
+    {
+        try {
+            $id = Crypt::decryptString(base64_decode(strtr($token, '-_', '+/')));
+        } catch (\Throwable) {
+            abort(404);
+        }
+
+        $document = Document::findOrFail($id);
+
+        return view('documents.verified', compact('document'));
+    }
+
+    /**
      * Change a document's visibility scope (general / division / personal).
      * Division is not selectable here — the document keeps its original
      * division (division_id is NOT NULL at DB level).
@@ -364,11 +454,15 @@ class DocumentController extends Controller
 
         $validated = $request->validate([
             'visibility' => 'required|in:general,division,personal',
-            'division_id' => 'nullable|required_if:visibility,division|exists:divisions,id',
         ]);
+
+        // Division scope keeps the document's original division; fall back to
+        // the current user's division if the document has none.
+        $divisionId = $document->division_id ?? auth()->user()->division_id;
 
         $document->update([
             'visibility' => $validated['visibility'],
+            'division_id' => $validated['visibility'] === Document::VISIBILITY_DIVISION ? $divisionId : null,
             // Legacy derived flag stays in sync with the scope.
             'is_public' => $validated['visibility'] === Document::VISIBILITY_GENERAL,
         ]);

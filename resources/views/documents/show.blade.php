@@ -1,21 +1,48 @@
 <x-app-layout>
-    <x-slot name="header">
-        <div class="flex flex-wrap items-center gap-2 justify-between">
-            <span class="min-w-0 truncate">{{ $document->title }}</span>
-            <span class="text-sm font-normal text-base-content/60 shrink-0">{{ $document->document_number }}</span>
-        </div>
-    </x-slot>
+    <x-slot name="header">Document Detail</x-slot>
 
     @if(!auth()->user()->isAdmin() && !auth()->user()->isHead())
         <x-confirm-modal
             name="confirm-discard-{{ $document->id }}"
-            title="Discard Document?"
-            message="Are you sure you want to discard this document?"
+            :title="__('Discard Document?')"
+            :message="__('Are you sure you want to discard this document?')"
             :action="route('documents.discard', $document)"
             method="POST"
-            confirmLabel="Discard"
+            :confirmLabel="__('Discard')"
         />
     @endif
+
+    {{-- Konfirmasi approve rollback (banner pending rollback) --}}
+    @if($document->hasPendingRollback() && auth()->user()->can('approve', $document))
+        <x-confirm-modal
+            name="confirm-approve-rollback"
+            title="Approve Rollback?"
+            message="Versi setelah v{{ $document->pendingRollbackVersion->version_number }} akan dihapus permanen dan tidak bisa dikembalikan. Lanjutkan?"
+            :action="route('approvals.rollback-request.approve', $document)"
+            method="POST"
+            confirmLabel="Approve Rollback"
+            confirmClass="btn-success"
+        />
+    @endif
+
+    {{-- Konfirmasi ajukan rollback (modal Version History) --}}
+    @foreach($document->versions as $version)
+        @if($version->id !== $document->current_version_id
+            && $version->status !== 'pending'
+            && !($version->status === 'discarded' || $version->discarded_at)
+            && !$document->hasPendingRollback()
+            && auth()->user()->can('update', $document))
+            <x-confirm-modal
+                name="confirm-rollback-{{ $version->id }}"
+                title="Rollback ke v{{ $version->version_number }}?"
+                message="Permintaan rollback akan diajukan ke kepala divisi. Jika disetujui, semua versi setelah v{{ $version->version_number }} akan dihapus permanen."
+                :action="route('approvals.rollback', [$document, $version])"
+                method="POST"
+                confirmLabel="Ajukan Rollback"
+                reopenOnCancel="version-modal"
+            />
+        @endif
+    @endforeach
 
     <div class="py-6">
         <div class="max-w-7xl mx-auto w-full">
@@ -39,22 +66,58 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
                             </svg>
                             <div>
-                                <p class="font-semibold text-sm">Permintaan rollback ke v{{ $document->pendingRollbackVersion->version_number }}</p>
+                                <p class="font-semibold text-sm">{{ __('Permintaan rollback ke') }} v{{ $document->pendingRollbackVersion->version_number }}</p>
                                 <p class="text-xs text-base-content/70">
-                                    Diajukan oleh {{ $document->rollbackRequestedBy?->name ?? '—' }}.
-                                    Versi setelah v{{ $document->pendingRollbackVersion->version_number }} akan dihapus permanen jika disetujui.
+                                    {{ __('Diajukan oleh') }} {{ $document->rollbackRequestedBy?->name ?? '—' }}.
+                                    {{ __('Versi setelah') }} v{{ $document->pendingRollbackVersion->version_number }} {{ __('akan dihapus permanen jika disetujui.') }}
                                 </p>
                             </div>
                         </div>
                         @can('approve', $document)
                             <div class="flex flex-wrap gap-2 shrink-0">
-                                <form method="POST" action="{{ route('approvals.rollback-request.approve', $document) }}" class="inline">
-                                    @csrf
-                                    <button class="btn btn-success btn-sm" onclick="return confirm('Yakin? Versi setelah v{{ $document->pendingRollbackVersion->version_number }} akan dihapus permanen dan tidak bisa dikembalikan.')">Approve Rollback</button>
-                                </form>
-                                <form method="POST" action="{{ route('approvals.rollback-request.reject', $document) }}" class="inline">
-                                    @csrf
-                                    <button class="btn btn-error btn-sm">Reject</button>
+<<<<<<< HEAD
+                             <div class="flex flex-wrap gap-2 shrink-0">
+    <button
+        type="button"
+        class="btn btn-success btn-sm"
+        x-on:click="$dispatch('open-modal', 'confirm-approve-rollback')"
+    >
+        <svg xmlns="http://www.w3.org/2000/svg"
+             class="w-4 h-4"
+             fill="none"
+             viewBox="0 0 24 24"
+             stroke="currentColor">
+            <path stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M5 13l4 4L19 7" />
+        </svg>
+        {{ __('Approve') }} Rollback
+    </button>
+
+    <form
+        method="POST"
+        action="{{ route('approvals.rollback-request.reject', $document) }}"
+        class="inline"
+    >
+        @csrf
+
+        <button type="submit" class="btn btn-outline btn-error btn-sm">
+            <svg xmlns="http://www.w3.org/2000/svg"
+                 class="w-4 h-4"
+                 fill="none"
+                 viewBox="0 0 24 24"
+                 stroke="currentColor">
+                <path stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            {{ __('Reject') }}
+        </button>
+    </form>
+</div>
+>>>>>>> 2-bahasa
                                 </form>
                             </div>
                         @endcan
@@ -72,8 +135,8 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                             </svg>
                             <div>
-                                <p class="font-semibold text-sm">Pending approval (v{{ $pendingVersion->version_number }})</p>
-                                <p class="text-xs text-base-content/70">Versi menunggu review oleh kepala divisi.</p>
+                                <p class="font-semibold text-sm">{{ __('Menunggu Persetujuan') }} (v{{ $pendingVersion->version_number }})</p>
+                                <p class="text-xs text-base-content/70">{{ __('Versi menunggu review oleh kepala divisi.') }}</p>
                             </div>
                         </div>
                         <div class="flex flex-wrap gap-2 shrink-0">
@@ -83,13 +146,13 @@
                                         @csrf
                                         <button class="btn btn-outline btn-warning btn-xs">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                            Discard
+                                            {{ __('Discard') }}
                                         </button>
                                     </form>
                                 @else
                                     <button type="button" class="btn btn-outline btn-warning btn-xs" x-on:click="$dispatch('open-modal', 'confirm-discard-{{ $document->id }}')">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                        Discard
+                                            {{ __('Discard') }}
                                     </button>
                                 @endif
                             @endcan
@@ -98,14 +161,14 @@
                                     @csrf
                                     <button class="btn btn-success btn-sm">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                                        Approve
+                                        {{ __('Approve') }}
                                     </button>
                                 </form>
                                 <form method="POST" action="{{ route('approvals.reject', [$document, $pendingVersion]) }}" class="inline">
                                     @csrf
                                     <button class="btn btn-error btn-sm">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                        Reject
+                                        {{ __('Reject') }}
                                     </button>
                                 </form>
                             @endcan
@@ -127,36 +190,36 @@
 
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-5 pt-4 text-sm">
                         <div>
-                            <span class="text-xs uppercase tracking-wide text-base-content/50">Division</span>
+                            <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Divisi') }}</span>
                             <p class="font-medium mt-1">{{ $document->division?->code ?? '—' }}</p>
                         </div>
                         <div>
-                            <span class="text-xs uppercase tracking-wide text-base-content/50">Owner</span>
+                            <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Pengguna') }}</span>
                             <p class="font-medium mt-1">{{ $document->owner->name }}</p>
                         </div>
                         <div>
-                            <span class="text-xs uppercase tracking-wide text-base-content/50">Status</span>
+                            <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Status') }}</span>
                             <p class="font-medium mt-1">
                                 @if($document->currentVersion)
-                                    Active (v{{ $document->currentVersion->version_number }})
+                                    {{ __('Aktif') }} (v{{ $document->currentVersion->version_number }})
                                 @elseif($pendingVersion)
-                                    <span class="text-warning">Pending approval (v{{ $pendingVersion->version_number }})</span>
+                                    <span class="text-warning">{{ __('Menunggu Persetujuan') }} (v{{ $pendingVersion->version_number }})</span>
                                 @elseif($hasDraft)
-                                    <span class="text-warning">Draft</span>
+                                    <span class="text-warning">{{ __('Draf') }}</span>
                                 @else
-                                    <span class="text-warning">Pending first approval</span>
+                                    <span class="text-warning">{{ __('Menunggu Persetujuan Pertama') }}</span>
                                 @endif
                             </p>
                         </div>
                         <div>
-                            <span class="text-xs uppercase tracking-wide text-base-content/50">Visibility</span>
+                            <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Visibilitas') }}</span>
                             <p class="font-medium mt-1">
                                 @if($document->isGeneral())
-                                    <span class="badge badge-success badge-sm">General</span>
+                                    <span class="badge badge-success badge-sm">{{ __('Umum') }}</span>
                                 @elseif($document->isPersonal())
-                                    <span class="badge badge-info badge-sm">Personal</span>
+                                    <span class="badge badge-info badge-sm">{{ __('Personal') }}</span>
                                 @else
-                                    <span class="badge badge-neutral badge-sm">{{ $document->division?->code ?? 'Division' }} only</span>
+                                    <span class="badge badge-neutral badge-sm">{{ $document->division?->code ?? __('Divisi') }} {{ __('saja') }}</span>
                                 @endif
                             </p>
                         </div>
@@ -168,21 +231,21 @@
                         @can('update', $document)
                             @if($isFileBased)
                                 <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('edit-restricted-modal').showModal()">
-                                    Edit Document
+                                    {{ __('Edit Dokumen') }}
                                 </button>
                             @elseif($hasDraft && !$pendingVersion && !$document->currentVersion)
                                 <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm">
-                                    Edit Draft
+                                    {{ __('Edit Draft') }}
                                 </a>
                             @else
                                 <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm">
-                                    Edit Document
+                                    {{ __('Edit Dokumen') }}
                                 </a>
                             @endif
                         @endcan
                         @can('update', $document)
                             <button type="button" onclick="document.getElementById('link-form').showModal()" class="btn btn-outline btn-primary btn-sm">
-                                Share Link
+                                {{ __('Link Berbagi') }}
                             </button>
                         @endcan
                         @can('manageAccess', $document)
@@ -197,13 +260,13 @@
                             class="btn btn-ghost btn-sm border border-base-300"
                             onclick="document.getElementById('version-modal').showModal()"
                         >
-                            Lihat Versi ({{ $document->versions->count() }})
+                            {{ __('Lihat Versi') }} ({{ $document->versions->count() }})
                         </button>
 
                         @can('update', $document)
                             <button type="button" class="btn btn-ghost btn-sm border border-base-300" onclick="document.getElementById('scope-modal').showModal()">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                Change scope
+                                {{ __('Ubah Cakupan') }}
                             </button>
                         @endcan
 
@@ -215,9 +278,15 @@
                             <button type="button" class="btn btn-ghost btn-sm border border-base-300"
                                     onclick="document.getElementById('export-pdf-modal').showModal()">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                                Export PDF
+                                {{ __('Export PDF') }}
                             </button>
                         @endif
+
+                        <button type="button" class="btn btn-ghost btn-sm border border-base-300"
+                                onclick="loadSummary()">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                            Ringkas Dokumen
+                        </button>
                     </div>
 
                     @if(session('pdf_export'))
@@ -234,6 +303,77 @@
             </div>
 
             <!-- Content -->
+            <!-- Content -->
+            {{-- Ringkasan Dokumen (card, bukan modal) --}}
+            @php
+                $hasSummary = !empty($document->summary) && $document->summary_status === \App\Models\Document::SUMMARY_COMPLETED;
+                $isProcessing = $document->summary_status === \App\Models\Document::SUMMARY_PROCESSING;
+                $isFailed = $document->summary_status === \App\Models\Document::SUMMARY_FAILED;
+            @endphp
+            <div id="summary-card" class="card bg-base-100 border border-primary/20 shadow-md mb-6 {{ (!$hasSummary && !$isProcessing && !$isFailed) ? 'hidden' : '' }}">
+                <div class="card-body p-5 sm:p-6">
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-base-200 pb-3 mb-4">
+                        <div class="flex items-center gap-2.5">
+                            <span class="p-2 rounded-xl bg-primary/10 text-primary">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                            </span>
+                            <div>
+                                <h3 class="font-bold text-base text-base-content flex items-center gap-2">
+                                    Ringkasan AI Dokumen
+                                </h3>
+                                <p class="text-xs text-base-content/60">Ringkasan otomatis berbasis konten asli dokumen</p>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-4">
+                            <div class="flex items-center gap-2">
+                                <label for="summary-percentage" class="text-xs text-base-content/70">Kepadatan:</label>
+                                <input type="range" id="summary-percentage" min="20" max="80" value="30" step="1" class="range range-xs range-primary w-24" oninput="document.getElementById('pct-val').textContent = this.value + '%'" />
+                                <span id="pct-val" class="text-xs font-medium w-8">30%</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button type="button" id="summary-copy-btn" class="btn btn-ghost btn-xs border border-base-300 text-xs {{ !$hasSummary ? 'hidden' : '' }}" onclick="copySummaryText()">
+                                    <svg class="w-3.5 h-3.5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                    </svg>
+                                    <span id="copy-btn-label">Salin Ringkasan</span>
+                                </button>
+                                <button type="button" id="summary-regenerate" class="btn btn-primary btn-outline btn-xs text-xs" onclick="loadSummary(true)">
+                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                    Ringkas Ulang
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="summary-loading" class="{{ $isProcessing ? '' : 'hidden' }} my-3">
+                        <div class="summary-loading-bar mb-3" aria-hidden="true">
+                            <span class="summary-loading-shimmer"></span>
+                        </div>
+                        <p class="text-xs text-primary font-medium inline-flex items-center gap-2">
+                            <span class="loading loading-spinner loading-xs"></span>
+                            AI sedang membaca & meringkas dokumen... Mohon tunggu sebentar.
+                        </p>
+                    </div>
+
+                    <div id="summary-body-wrapper" class="{{ !$hasSummary || $isProcessing ? 'hidden' : '' }}">
+                        <div id="summary-body" class="bg-base-200/50 p-4 sm:p-5 rounded-xl border border-base-300/80 text-sm sm:text-base font-normal text-base-content leading-relaxed space-y-2">
+                            @if($hasSummary)
+                                {!! nl2br(e($document->summary)) !!}
+                            @endif
+                        </div>
+                    </div>
+
+                    <div id="summary-error" class="{{ $isFailed ? '' : 'hidden' }} alert alert-error text-sm mt-3">
+                        <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        <span>{{ $document->summary_error ?? 'Ringkasan gagal dibuat. Silakan coba lagi.' }}</span>
+                    </div>
+                </div>
+            </div>
+
             <div class="card bg-base-100 border border-base-300 shadow-sm mb-6">
                 <div class="card-body p-0">
                     @php $display = $document->displayVersion(); @endphp
@@ -242,6 +382,7 @@
                     @elseif($display)
                         @include('documents._paper', [
                             'content' => $display->content,
+                            'document' => $document,
                             'liveStorage' => 'doc-preview-' . $document->id,
                             'paperSize' => $document->paper_size ?? 'A4',
                             'paperMargin' => $document->paper_margin,
@@ -433,8 +574,8 @@
                                 Margin tetap mengikuti margin dokumen saat ini; kalau tidak muat di kertas yang dipilih, margin akan disesuaikan otomatis.
                             </p>
                             <div class="flex flex-wrap justify-end gap-2">
-                                <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('export-pdf-modal').close()">Batal</button>
-                                <button type="submit" class="btn btn-primary btn-sm">Export</button>
+                                <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('export-pdf-modal').close()">{{ __('Batal') }}</button>
+                                <button type="submit" class="btn btn-primary btn-sm">{{ __('Export') }}</button>
                             </div>
                         </form>
                     </div>
@@ -446,6 +587,161 @@
 
         </div>
     </div>
+
+    {{-- Ringkasan Dokumen: card di atas preview, bukan modal --}}
+    <style>
+        .summary-loading-bar {
+            position: relative;
+            height: 6px;
+            border-radius: 9999px;
+            background: var(--fallback-bc, oklch(0.278 0.033 256.848)) / 0.15;
+            background: color-mix(in oklab, var(--fallback-bc, oklch(0.278 0.033 256.848)) 15%, transparent);
+            overflow: hidden;
+        }
+        .summary-loading-shimmer {
+            position: absolute;
+            inset: 0;
+            width: 40%;
+            border-radius: 9999px;
+            background: linear-gradient(90deg, transparent, var(--fallback-p, oklch(0.546 0.245 262.881)), transparent);
+            animation: summary-shimmer 1.2s ease-in-out infinite;
+        }
+        @keyframes summary-shimmer {
+            0%   { transform: translateX(-100%); }
+            100% { transform: translateX(350%); }
+        }
+    </style>
+
+    <script>
+        const SUMMARY_KEY = 'dokuflow:summary:{{ $document->id }}';
+        const SUMMARY_STATUS_URL = '{{ route('documents.summary-status', $document) }}';
+        const SUMMARY_START_URL = '{{ route('documents.summarize', $document) }}';
+
+        /**
+         * Render teks ringkasan sebagai paragraf HTML sederhana.
+         * Memecah berdasarkan baris kosong, lalu setiap blok jadi satu <p>.
+         */
+        function renderParagraphs(text) {
+            if (!text) return '';
+            return text
+                .split(/\n\s*\n/)
+                .map(p => p.trim())
+                .filter(p => p.length > 0)
+                .map(p => {
+                    // Escape HTML
+                    let safe = p.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                    
+                    // Render bold (**text**)
+                    safe = safe.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                    
+                    // Render bullet list (* item)
+                    let lines = safe.split('\n');
+                    let isList = false;
+                    for (let i = 0; i < lines.length; i++) {
+                        if (lines[i].match(/^(\*|-)\s+/)) {
+                            lines[i] = '<li class="ml-5 list-disc">' + lines[i].replace(/^(\*|-)\s+/, '') + '</li>';
+                            isList = true;
+                        }
+                    }
+                    
+                    if (isList) {
+                        return '<ul class="mb-3 last:mb-0 leading-relaxed text-base-content space-y-1">' + lines.join('\n') + '</ul>';
+                    }
+
+                    // Biarkan newline dalam paragraf biasa jadi <br>
+                    safe = safe.replace(/\n/g, '<br>');
+                    return '<p class="mb-3 last:mb-0 leading-relaxed text-base-content">' + safe + '</p>';
+                })
+                .join('');
+        }
+
+        function loadSummary(force = false) {
+            const card = document.getElementById('summary-card');
+            const bodyWrapper = document.getElementById('summary-body-wrapper');
+            const loading = document.getElementById('summary-loading');
+            const error = document.getElementById('summary-error');
+            const copyBtn = document.getElementById('summary-copy-btn');
+
+            if (force) localStorage.removeItem(SUMMARY_KEY);
+
+            card.classList.remove('hidden');
+            bodyWrapper.classList.add('hidden');
+            error.classList.add('hidden');
+            loading.classList.remove('hidden');
+            if (copyBtn) copyBtn.classList.add('hidden');
+
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            const percentage = parseInt(document.getElementById('summary-percentage')?.value || 30);
+
+            fetch(SUMMARY_START_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ force: force, percentage: percentage }),
+            })
+            .then(r => r.json().then(data => ({ ok: r.ok, data })))
+            .then(({ ok, data }) => {
+                if (!ok) throw new Error(data.error || 'Gagal memulai ringkasan.');
+                if (data.status === 'completed' && data.summary) { finishSummary(data.summary); return; }
+                if (data.status === 'failed') { showError(data.error); return; }
+                pollSummary();
+            })
+            .catch(err => showError(err.message));
+        }
+
+        function pollSummary() {
+            fetch(SUMMARY_STATUS_URL, { headers: { 'Accept': 'application/json' } })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'completed' && data.summary) { finishSummary(data.summary); return; }
+                if (data.status === 'failed') { showError(data.error); return; }
+                setTimeout(pollSummary, 2000);
+            })
+            .catch(() => setTimeout(pollSummary, 2000));
+        }
+
+        function finishSummary(summary) {
+            document.getElementById('summary-loading').classList.add('hidden');
+            localStorage.setItem(SUMMARY_KEY, summary);
+            const body = document.getElementById('summary-body');
+            body.innerHTML = renderParagraphs(summary);
+            document.getElementById('summary-body-wrapper').classList.remove('hidden');
+            const copyBtn = document.getElementById('summary-copy-btn');
+            if (copyBtn) copyBtn.classList.remove('hidden');
+        }
+
+        function showError(msg) {
+            document.getElementById('summary-loading').classList.add('hidden');
+            const error = document.getElementById('summary-error');
+            const span = error.querySelector('span');
+            if (span) span.textContent = msg || 'Ringkasan gagal dibuat. Silakan coba lagi.';
+            error.classList.remove('hidden');
+        }
+
+        function copySummaryText() {
+            const text = localStorage.getItem(SUMMARY_KEY) || document.getElementById('summary-body').innerText;
+            const label = document.getElementById('copy-btn-label');
+            navigator.clipboard.writeText(text).then(() => {
+                label.textContent = 'Tersalin!';
+                setTimeout(() => { label.textContent = 'Salin'; }, 2000);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const saved = {!! json_encode($document->summary) !!};
+            if (saved) {
+                const body = document.getElementById('summary-body');
+                if (body) body.innerHTML = renderParagraphs(saved);
+            }
+            @if($document->summary_status === 'processing')
+                pollSummary();
+            @endif
+        });
+    </script>
 
     {{-- Share link modal (reusable) --}}
     <style>
@@ -762,13 +1058,12 @@
                                 && $version->status !== 'pending'
                                 && !($version->status === 'discarded' || $version->discarded_at)
                                 && !$document->hasPendingRollback())
-                                <form method="POST" action="{{ route('approvals.rollback', [$document, $version]) }}" class="inline">
-                                    @csrf
-                                    <button class="link link-primary inline-flex items-center gap-1">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                        Rollback
-                                    </button>
-                                </form>
+                                <button type="button"
+                                        class="btn btn-outline btn-warning btn-xs"
+                                        onclick="document.getElementById('version-modal').close(); window.dispatchEvent(new CustomEvent('open-modal', { detail: 'confirm-rollback-{{ $version->id }}' }))">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                    Rollback
+                                </button>
                             @endif
                         @endcan
                     </div>
@@ -841,7 +1136,7 @@
     <dialog id="edit-restricted-modal" class="modal">
         <div class="modal-box max-w-md max-h-[85vh] overflow-y-auto">
             <div class="flex flex-wrap items-center justify-between mb-4">
-                <h3 class="font-semibold">Dokumen Tidak Dapat Diedit Langsung</h3>
+                <h3 class="font-semibold">{{ __('Dokumen Tidak Dapat Diedit Langsung') }}</h3>
                 <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('edit-restricted-modal').close()">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -849,19 +1144,18 @@
                 </button>
             </div>
             <p class="text-sm text-base-content/70 mb-5">
-                Dokumen ini berasal dari berkas yang diunggah, bukan ditulis melalui editor, sehingga isinya tidak dapat diedit secara langsung.
-                Terdapat dua cara untuk memperbarui dokumen:
+                {{ __('Dokumen ini berasal dari berkas yang diunggah, bukan ditulis melalui editor, sehingga isinya tidak dapat diedit secara langsung. Terdapat dua cara untuk memperbarui dokumen:') }}
             </p>
             <ul class="text-sm space-y-2 mb-5 list-disc list-inside text-base-content/80">
-                <li><span class="font-medium">Rollback</span> ke versi sebelumnya yang masih tersimpan.</li>
-                <li><span class="font-medium">Unggah versi terbaru</span> untuk menggantikan isi dokumen saat ini.</li>
+                <li><span class="font-medium">{{ __('Rollback') }}</span> {{ __('ke versi sebelumnya yang masih tersimpan.') }}</li>
+                <li><span class="font-medium">{{ __('Unggah versi terbaru') }}</span> {{ __('untuk menggantikan isi dokumen saat ini.') }}</li>
             </ul>
             <div class="flex flex-wrap justify-end gap-2">
                 <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('edit-restricted-modal').close(); document.getElementById('version-modal').showModal();">
-                    Lihat Versi
+                    {{ __('Lihat Versi') }}
                 </button>
                 <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('edit-restricted-modal').close(); document.getElementById('upload-version-modal').showModal();">
-                    Unggah Versi Terbaru
+                    {{ __('Unggah Versi Terbaru') }}
                 </button>
             </div>
         </div>
@@ -874,7 +1168,7 @@
     <dialog id="upload-version-modal" class="modal">
         <div class="modal-box max-w-md max-h-[85vh] overflow-y-auto">
             <div class="flex flex-wrap items-center justify-between mb-4">
-                <h3 class="font-semibold">Unggah Versi Terbaru</h3>
+                <h3 class="font-semibold">{{ __('Unggah Versi Terbaru') }}</h3>
                 <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('upload-version-modal').close()">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -885,15 +1179,15 @@
                 @csrf
                 <div class="form-control w-full mb-4">
                     <label for="upload-version-file" class="label">
-                        <span class="label-text font-medium">Berkas Pengganti</span>
+                        <span class="label-text font-medium">{{ __('Berkas Pengganti') }}</span>
                     </label>
                     <input type="file" name="file" id="upload-version-file" accept=".pdf,.docx" class="file-input file-input-bordered w-full" required>
-                    <p class="text-xs text-base-content/50 mt-1">Hanya PDF atau DOCX, maksimal 10MB. Versi baru akan menunggu approval kepala divisi.</p>
+                    <p class="text-xs text-base-content/50 mt-1">{{ __('Hanya PDF atau DOCX, maksimal 10MB. Versi baru akan menunggu approval kepala divisi.') }}</p>
                     @error('file') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                 </div>
                 <div class="flex flex-wrap justify-end gap-2">
-                    <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('upload-version-modal').close()">Cancel</button>
-                    <button type="submit" class="btn btn-primary btn-sm">Upload</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('upload-version-modal').close()">{{ __('Batal') }}</button>
+                    <button type="submit" class="btn btn-primary btn-sm">{{ __('Unggah') }}</button>
                 </div>
             </form>
         </div>

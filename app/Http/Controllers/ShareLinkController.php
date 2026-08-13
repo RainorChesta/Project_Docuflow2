@@ -8,8 +8,10 @@ use App\Models\Document;
 use App\Models\DocumentAccessLink;
 use App\Services\AccessLinkService;
 use App\Services\AuditService;
+use App\Services\PdfExportService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class ShareLinkController extends Controller
@@ -78,7 +80,7 @@ class ShareLinkController extends Controller
             abort(404);
         }
 
-        if ($link->role === 'editor' && !auth()->check()) {
+        if (!auth()->check()) {
             return redirect()->guest(route('login'));
         }
 
@@ -131,6 +133,59 @@ class ShareLinkController extends Controller
         }
 
         return app(JoditController::class)->upload($request);
+    }
+
+    /**
+     * Export a document opened via a share link to PDF. Open to both
+     * viewer and editor roles — anyone who can open the link can export.
+     * Same flow as DocumentExportController::export, but keyed by the
+     * share-link token (no auth check against the owning user).
+     */
+    public function exportPdf(Request $request, string $token): RedirectResponse
+    {
+        $link = DocumentAccessLink::where('token', $token)->firstOrFail();
+
+        if ($link->isExpired()) {
+            abort(404);
+        }
+
+        if (!auth()->check()) {
+            return redirect()->guest(route('login'));
+        }
+
+        $document = $link->document;
+
+        $validated = $request->validate([
+            'paper_size' => 'nullable|string|in:A4,A5,A3,Letter,Legal',
+        ]);
+
+        try {
+            $result = app(PdfExportService::class)->export(
+                $document,
+                auth()->user(),
+                $validated['paper_size'] ?? null
+            );
+
+            $this->auditService->log(auth()->user(), 'document.exported', 'document', $document->id, [
+                'document_id' => $document->id,
+                'filename' => $result['filename'],
+                'paper_size' => $validated['paper_size'] ?? $document->paper_size ?? 'A4',
+                'link_token' => $token,
+            ]);
+
+            return back()->with('pdf_export', [
+                'filename' => $result['filename'],
+                'url' => Storage::disk('local')->temporaryUrl($result['path'], now()->addMinutes(5), [
+                    'filename' => $result['filename'],
+                ]),
+            ]);
+        } catch (BusinessLogicException $e) {
+            return back()->withErrors(['export' => $e->getMessage()]);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return back()->withErrors(['export' => 'PDF generation failed. Please try again.']);
+        }
     }
 
     public function discard(string $token): RedirectResponse

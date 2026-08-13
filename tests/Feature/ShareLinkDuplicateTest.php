@@ -24,14 +24,17 @@ class ShareLinkDuplicateTest extends TestCase
     {
         parent::setUp();
 
-        $this->owner = User::factory()->create(['division_id' => 1]);
+        $division = \App\Models\Division::create(['code' => 'HRD', 'name' => 'Human Resources']);
+        $docType = \App\Models\DocumentType::create(['name' => 'Surat Edaran', 'code' => 'S.ED']);
+        $this->owner = User::factory()->create(['division_id' => $division->id]);
         $this->admin = User::factory()->create(['system_role' => 'admin', 'is_active' => true]);
         $this->document = Document::create([
             'document_number' => 'TST/001',
             'title' => 'Test Doc',
             'visibility' => 'division',
-            'division_id' => 1,
+            'division_id' => $division->id,
             'owner_id' => $this->owner->id,
+            'document_type_id' => $docType->id,
         ]);
     }
 
@@ -132,7 +135,7 @@ class ShareLinkDuplicateTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $this->expectException(\Illuminate\Database\QueryException::class);
+        $this->expectException(\App\Exceptions\BusinessLogicException::class);
 
         DB::transaction(function () {
             app(AccessLinkService::class)->create($this->document, 'viewer', null, $this->admin);
