@@ -172,6 +172,15 @@
     .doku-paper-scope .doku-paper td {
         padding: 2px 5px;
         border: 1px solid #ccc;
+        /* FIX "teks otomatis ketengah": default UA stylesheet buat td/th
+           adalah vertical-align:middle. Sel yang isinya sedikit (1 baris)
+           jadi kelihatan center vertikal, sementara sel sebelahnya yang
+           isinya banyak baris kebetulan memenuhi tinggi sel jadi terlihat
+           rata atas — padahal dua-duanya sama-sama "middle". Dipaksa top
+           di sini supaya SEMUA sel konsisten rata atas seperti default
+           kolom pertama, sama seperti fix di iframeStyle editor
+           (resources/js/jodit.js). */
+        vertical-align: top;
     }
 
     .doku-paper-scope .doku-paper img {
