@@ -10,7 +10,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Document extends Model
 {
     protected $fillable = [
-        'document_number', 'title', 'visibility', 'division_id', 'owner_id',
+        'document_number', 'title', 'summary', 'summary_status', 'summary_error',
+        'summary_started_at', 'summary_completed_at', 'visibility', 'division_id', 'owner_id',
         'document_type_id', 'is_public', 'current_version_id',
         'pending_rollback_version_id', 'rollback_requested_by_id', 'rollback_requested_at',
         'paper_size', 'paper_margin',
@@ -21,8 +22,20 @@ class Document extends Model
         return [
             'is_public' => 'boolean',
             'rollback_requested_at' => 'datetime',
+            'summary_started_at' => 'datetime',
+            'summary_completed_at' => 'datetime',
             'paper_margin' => 'array',
         ];
+    }
+
+    public const SUMMARY_PENDING = 'pending';
+    public const SUMMARY_PROCESSING = 'processing';
+    public const SUMMARY_COMPLETED = 'completed';
+    public const SUMMARY_FAILED = 'failed';
+
+    public function isSummaryCompleted(): bool
+    {
+        return $this->summary_status === self::SUMMARY_COMPLETED;
     }
 
     public const VISIBILITY_GENERAL = 'general';

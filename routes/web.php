@@ -32,6 +32,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/document-numbers/preview', [DocumentController::class, 'nextNumber'])->name('documents.next-number');
     Route::get('/documents/{document}/edit', [DocumentController::class, 'edit'])->name('documents.edit');
     Route::get('/documents/{document}/preview', [DocumentController::class, 'preview'])->name('documents.preview');
+    Route::post('/documents/{document}/summarize', [DocumentController::class, 'summarize'])->name('documents.summarize');
+    Route::get('/documents/{document}/summary-status', [DocumentController::class, 'summaryStatus'])->name('documents.summary-status');
     Route::get('/documents/{document}/preview-content', [DocumentController::class, 'previewContent'])->name('documents.preview-content');
     Route::get('/documents/{document}/versions/{version}/preview', [DocumentController::class, 'previewVersion'])->name('documents.preview-version');
     Route::get('/documents/{document}/versions/{version}/file', [DocumentController::class, 'file'])->name('documents.file');

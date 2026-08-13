@@ -22,6 +22,7 @@
     }
     .doku-paper-scope .doku-paper {
         border: none !important;
+        outline: none !important;
         box-shadow: none !important;
         width: 100%;
         min-height: auto;
@@ -69,9 +70,9 @@
     min-height: 1123px;
     /* Border & shadow di layar biar batas kertas terlihat jelas — terutama
        saat ukuran kertas diubah (A4/A5/A3 dst), lebar kertas berubah dan
-       border ini mempertegas perbedaannya. Saat print, border & shadow
-       dimatikan (lihat @media print di atas) supaya tidak ikut tercetak. */
-    border: 1px solid #d1d5db;
+       border ini mempertegas perbedaannya. Menggunakan outline agar tidak
+       memakan ruang konten 2px (kiri-kanan) yang menyebabkan selisih teks melompat 1 baris. */
+    outline: 1px solid #d1d5db;
     box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.08);
     box-sizing: border-box;
     font-family: Times, "Times New Roman", serif;

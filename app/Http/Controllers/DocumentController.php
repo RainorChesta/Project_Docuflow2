@@ -182,6 +182,60 @@ class DocumentController extends Controller
         return view('documents.show', compact('document', 'divisions'));
     }
 
+    /**
+     * Mulai ringkasan AI secara asinkron. Request langsung balas dengan
+     * status processing — Groq dipanggil di queue job, bukan di sini.
+     */
+    public function summarize(Request $request, Document $document): JsonResponse
+    {
+        $this->authorize('view', $document);
+
+        $force = $request->boolean('force');
+        $percentage = (int) $request->input('percentage', 30);
+
+        // Sudah selesai & tidak dipaksa ringkas ulang → kirim hasil yang tersimpan.
+        if ($document->isSummaryCompleted() && !$force) {
+            return response()->json([
+                'status' => Document::SUMMARY_COMPLETED,
+                'summary' => $document->summary,
+            ]);
+        }
+
+        // Jika force ringkas ulang atau status sebelumnya failed → reset status
+        if ($force || $document->summary_status === Document::SUMMARY_FAILED) {
+            $document->update([
+                'summary_status' => Document::SUMMARY_PENDING,
+                'summary' => null,
+                'summary_error' => null,
+            ]);
+        }
+
+        $this->documentService->dispatchSummary($document, $percentage);
+
+        $document->refresh();
+
+        return response()->json([
+            'status' => $document->summary_status,
+            'summary' => $document->summary,
+            'error' => $document->summary_error,
+            'document_id' => $document->id,
+        ]);
+    }
+
+    /**
+     * Status ringkasan untuk polling frontend.
+     */
+    public function summaryStatus(Document $document): JsonResponse
+    {
+        $this->authorize('view', $document);
+
+        return response()->json([
+            'status' => $document->summary_status,
+            'summary' => $document->summary,
+            'error' => $document->summary_error,
+        ]);
+    }
+
     public function edit(Document $document): View
     {
         $this->authorize('update', $document);
