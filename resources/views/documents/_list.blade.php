@@ -14,8 +14,8 @@
         </div>
         <p class="text-sm text-base-content/60 truncate">
             {{ $doc->document_number }}
-            @if($doc->isGeneral()) <span class="text-success">· General</span>
-            @elseif($doc->isPersonal()) <span class="text-info">· Personal</span>
+            @if($doc->isGeneral()) <span class="text-success">· {{ __('Umum') }}</span>
+            @elseif($doc->isPersonal()) <span class="text-info">· {{ __('Personal') }}</span>
             @else <span>· {{ $doc->division?->code ?? '—' }}</span>
             @endif
             · {{ $doc->owner->name }}
@@ -25,13 +25,13 @@
         @if($doc->owner_id === auth()->id())
             <a href="{{ route('documents.edit', $doc) }}" class="btn btn-ghost btn-xs">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                Edit
+                {{ __('Edit') }}
             </a>
         @endif
         <a
             href="{{ route('documents.preview', $doc) }}"
             class="inline-flex items-center justify-center w-6 h-6 rounded-full shrink-0 text-base-content/60 hover:text-base-content hover:bg-base-200"
-            title="Preview Dokumen"
+            title="{{ __('Pratinjau') }}"
         >
             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -42,11 +42,11 @@
             @if($doc->currentVersion)
                 <span class="badge badge-success badge-sm w-16 justify-center">v{{ $doc->currentVersion->version_number }}</span>
             @elseif($hasPending)
-                <span class="badge badge-warning badge-sm w-16 justify-center">Pending</span>
+                <span class="badge badge-warning badge-sm w-16 justify-center">{{ __('Tertunda') }}</span>
             @elseif($hasDraft)
-                <span class="badge badge-warning badge-sm w-16 justify-center">Draft</span>
+                <span class="badge badge-warning badge-sm w-16 justify-center">{{ __('Draf') }}</span>
             @else
-                <span class="badge badge-ghost badge-sm w-16 justify-center">No version</span>
+                <span class="badge badge-ghost badge-sm w-16 justify-center">{{ __('Tanpa versi') }}</span>
             @endif
         </div>
     </div>

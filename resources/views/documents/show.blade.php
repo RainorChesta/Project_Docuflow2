@@ -4,11 +4,11 @@
     @if(!auth()->user()->isAdmin() && !auth()->user()->isHead())
         <x-confirm-modal
             name="confirm-discard-{{ $document->id }}"
-            title="Discard Document?"
-            message="Are you sure you want to discard this document?"
+            :title="__('Discard Document?')"
+            :message="__('Are you sure you want to discard this document?')"
             :action="route('documents.discard', $document)"
             method="POST"
-            confirmLabel="Discard"
+            :confirmLabel="__('Discard')"
         />
     @endif
 
@@ -66,25 +66,58 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
                             </svg>
                             <div>
-                                <p class="font-semibold text-sm">Permintaan rollback ke v{{ $document->pendingRollbackVersion->version_number }}</p>
+                                <p class="font-semibold text-sm">{{ __('Permintaan rollback ke') }} v{{ $document->pendingRollbackVersion->version_number }}</p>
                                 <p class="text-xs text-base-content/70">
-                                    Diajukan oleh {{ $document->rollbackRequestedBy?->name ?? '—' }}.
-                                    Versi setelah v{{ $document->pendingRollbackVersion->version_number }} akan dihapus permanen jika disetujui.
+                                    {{ __('Diajukan oleh') }} {{ $document->rollbackRequestedBy?->name ?? '—' }}.
+                                    {{ __('Versi setelah') }} v{{ $document->pendingRollbackVersion->version_number }} {{ __('akan dihapus permanen jika disetujui.') }}
                                 </p>
                             </div>
                         </div>
                         @can('approve', $document)
                             <div class="flex flex-wrap gap-2 shrink-0">
-                                <button type="button" class="btn btn-success btn-sm" x-on:click="$dispatch('open-modal', 'confirm-approve-rollback')">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                                    Approve Rollback
-                                </button>
-                                <form method="POST" action="{{ route('approvals.rollback-request.reject', $document) }}" class="inline">
-                                    @csrf
-                                    <button class="btn btn-outline btn-error btn-sm">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                        Reject
-                                    </button>
+<<<<<<< HEAD
+                             <div class="flex flex-wrap gap-2 shrink-0">
+    <button
+        type="button"
+        class="btn btn-success btn-sm"
+        x-on:click="$dispatch('open-modal', 'confirm-approve-rollback')"
+    >
+        <svg xmlns="http://www.w3.org/2000/svg"
+             class="w-4 h-4"
+             fill="none"
+             viewBox="0 0 24 24"
+             stroke="currentColor">
+            <path stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M5 13l4 4L19 7" />
+        </svg>
+        {{ __('Approve') }} Rollback
+    </button>
+
+    <form
+        method="POST"
+        action="{{ route('approvals.rollback-request.reject', $document) }}"
+        class="inline"
+    >
+        @csrf
+
+        <button type="submit" class="btn btn-outline btn-error btn-sm">
+            <svg xmlns="http://www.w3.org/2000/svg"
+                 class="w-4 h-4"
+                 fill="none"
+                 viewBox="0 0 24 24"
+                 stroke="currentColor">
+                <path stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            {{ __('Reject') }}
+        </button>
+    </form>
+</div>
+>>>>>>> 2-bahasa
                                 </form>
                             </div>
                         @endcan
@@ -102,8 +135,8 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                             </svg>
                             <div>
-                                <p class="font-semibold text-sm">Pending approval (v{{ $pendingVersion->version_number }})</p>
-                                <p class="text-xs text-base-content/70">Versi menunggu review oleh kepala divisi.</p>
+                                <p class="font-semibold text-sm">{{ __('Menunggu Persetujuan') }} (v{{ $pendingVersion->version_number }})</p>
+                                <p class="text-xs text-base-content/70">{{ __('Versi menunggu review oleh kepala divisi.') }}</p>
                             </div>
                         </div>
                         <div class="flex flex-wrap gap-2 shrink-0">
@@ -113,13 +146,13 @@
                                         @csrf
                                         <button class="btn btn-outline btn-warning btn-xs">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                            Discard
+                                            {{ __('Discard') }}
                                         </button>
                                     </form>
                                 @else
                                     <button type="button" class="btn btn-outline btn-warning btn-xs" x-on:click="$dispatch('open-modal', 'confirm-discard-{{ $document->id }}')">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                        Discard
+                                            {{ __('Discard') }}
                                     </button>
                                 @endif
                             @endcan
@@ -128,14 +161,14 @@
                                     @csrf
                                     <button class="btn btn-success btn-sm">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                                        Approve
+                                        {{ __('Approve') }}
                                     </button>
                                 </form>
                                 <form method="POST" action="{{ route('approvals.reject', [$document, $pendingVersion]) }}" class="inline">
                                     @csrf
                                     <button class="btn btn-error btn-sm">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                        Reject
+                                        {{ __('Reject') }}
                                     </button>
                                 </form>
                             @endcan
@@ -157,36 +190,36 @@
 
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-5 pt-4 text-sm">
                         <div>
-                            <span class="text-xs uppercase tracking-wide text-base-content/50">Division</span>
+                            <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Divisi') }}</span>
                             <p class="font-medium mt-1">{{ $document->division?->code ?? '—' }}</p>
                         </div>
                         <div>
-                            <span class="text-xs uppercase tracking-wide text-base-content/50">Owner</span>
+                            <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Pengguna') }}</span>
                             <p class="font-medium mt-1">{{ $document->owner->name }}</p>
                         </div>
                         <div>
-                            <span class="text-xs uppercase tracking-wide text-base-content/50">Status</span>
+                            <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Status') }}</span>
                             <p class="font-medium mt-1">
                                 @if($document->currentVersion)
-                                    Active (v{{ $document->currentVersion->version_number }})
+                                    {{ __('Aktif') }} (v{{ $document->currentVersion->version_number }})
                                 @elseif($pendingVersion)
-                                    <span class="text-warning">Pending approval (v{{ $pendingVersion->version_number }})</span>
+                                    <span class="text-warning">{{ __('Menunggu Persetujuan') }} (v{{ $pendingVersion->version_number }})</span>
                                 @elseif($hasDraft)
-                                    <span class="text-warning">Draft</span>
+                                    <span class="text-warning">{{ __('Draf') }}</span>
                                 @else
-                                    <span class="text-warning">Pending first approval</span>
+                                    <span class="text-warning">{{ __('Menunggu Persetujuan Pertama') }}</span>
                                 @endif
                             </p>
                         </div>
                         <div>
-                            <span class="text-xs uppercase tracking-wide text-base-content/50">Visibility</span>
+                            <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Visibilitas') }}</span>
                             <p class="font-medium mt-1">
                                 @if($document->isGeneral())
-                                    <span class="badge badge-success badge-sm">General</span>
+                                    <span class="badge badge-success badge-sm">{{ __('Umum') }}</span>
                                 @elseif($document->isPersonal())
-                                    <span class="badge badge-info badge-sm">Personal</span>
+                                    <span class="badge badge-info badge-sm">{{ __('Personal') }}</span>
                                 @else
-                                    <span class="badge badge-neutral badge-sm">{{ $document->division?->code ?? 'Division' }} only</span>
+                                    <span class="badge badge-neutral badge-sm">{{ $document->division?->code ?? __('Divisi') }} {{ __('saja') }}</span>
                                 @endif
                             </p>
                         </div>
@@ -198,21 +231,21 @@
                         @can('update', $document)
                             @if($isFileBased)
                                 <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('edit-restricted-modal').showModal()">
-                                    Edit Document
+                                    {{ __('Edit Dokumen') }}
                                 </button>
                             @elseif($hasDraft && !$pendingVersion && !$document->currentVersion)
                                 <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm">
-                                    Edit Draft
+                                    {{ __('Edit Draft') }}
                                 </a>
                             @else
                                 <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm">
-                                    Edit Document
+                                    {{ __('Edit Dokumen') }}
                                 </a>
                             @endif
                         @endcan
                         @can('update', $document)
                             <button type="button" onclick="document.getElementById('link-form').showModal()" class="btn btn-outline btn-primary btn-sm">
-                                Share Link
+                                {{ __('Link Berbagi') }}
                             </button>
                         @endcan
 
@@ -221,13 +254,13 @@
                             class="btn btn-ghost btn-sm border border-base-300"
                             onclick="document.getElementById('version-modal').showModal()"
                         >
-                            Lihat Versi ({{ $document->versions->count() }})
+                            {{ __('Lihat Versi') }} ({{ $document->versions->count() }})
                         </button>
 
                         @can('update', $document)
                             <button type="button" class="btn btn-ghost btn-sm border border-base-300" onclick="document.getElementById('scope-modal').showModal()">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                Change scope
+                                {{ __('Ubah Cakupan') }}
                             </button>
                         @endcan
 
@@ -239,7 +272,7 @@
                             <button type="button" class="btn btn-ghost btn-sm border border-base-300"
                                     onclick="document.getElementById('export-pdf-modal').showModal()">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                                Export PDF
+                                {{ __('Export PDF') }}
                             </button>
                         @endif
 
@@ -480,8 +513,8 @@
                                 Margin tetap mengikuti margin dokumen saat ini; kalau tidak muat di kertas yang dipilih, margin akan disesuaikan otomatis.
                             </p>
                             <div class="flex flex-wrap justify-end gap-2">
-                                <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('export-pdf-modal').close()">Batal</button>
-                                <button type="submit" class="btn btn-primary btn-sm">Export</button>
+                                <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('export-pdf-modal').close()">{{ __('Batal') }}</button>
+                                <button type="submit" class="btn btn-primary btn-sm">{{ __('Export') }}</button>
                             </div>
                         </form>
                     </div>
@@ -845,7 +878,7 @@
     <dialog id="edit-restricted-modal" class="modal">
         <div class="modal-box max-w-md max-h-[85vh] overflow-y-auto">
             <div class="flex flex-wrap items-center justify-between mb-4">
-                <h3 class="font-semibold">Dokumen Tidak Dapat Diedit Langsung</h3>
+                <h3 class="font-semibold">{{ __('Dokumen Tidak Dapat Diedit Langsung') }}</h3>
                 <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('edit-restricted-modal').close()">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -853,19 +886,18 @@
                 </button>
             </div>
             <p class="text-sm text-base-content/70 mb-5">
-                Dokumen ini berasal dari berkas yang diunggah, bukan ditulis melalui editor, sehingga isinya tidak dapat diedit secara langsung.
-                Terdapat dua cara untuk memperbarui dokumen:
+                {{ __('Dokumen ini berasal dari berkas yang diunggah, bukan ditulis melalui editor, sehingga isinya tidak dapat diedit secara langsung. Terdapat dua cara untuk memperbarui dokumen:') }}
             </p>
             <ul class="text-sm space-y-2 mb-5 list-disc list-inside text-base-content/80">
-                <li><span class="font-medium">Rollback</span> ke versi sebelumnya yang masih tersimpan.</li>
-                <li><span class="font-medium">Unggah versi terbaru</span> untuk menggantikan isi dokumen saat ini.</li>
+                <li><span class="font-medium">{{ __('Rollback') }}</span> {{ __('ke versi sebelumnya yang masih tersimpan.') }}</li>
+                <li><span class="font-medium">{{ __('Unggah versi terbaru') }}</span> {{ __('untuk menggantikan isi dokumen saat ini.') }}</li>
             </ul>
             <div class="flex flex-wrap justify-end gap-2">
                 <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('edit-restricted-modal').close(); document.getElementById('version-modal').showModal();">
-                    Lihat Versi
+                    {{ __('Lihat Versi') }}
                 </button>
                 <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('edit-restricted-modal').close(); document.getElementById('upload-version-modal').showModal();">
-                    Unggah Versi Terbaru
+                    {{ __('Unggah Versi Terbaru') }}
                 </button>
             </div>
         </div>
@@ -878,7 +910,7 @@
     <dialog id="upload-version-modal" class="modal">
         <div class="modal-box max-w-md max-h-[85vh] overflow-y-auto">
             <div class="flex flex-wrap items-center justify-between mb-4">
-                <h3 class="font-semibold">Unggah Versi Terbaru</h3>
+                <h3 class="font-semibold">{{ __('Unggah Versi Terbaru') }}</h3>
                 <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('upload-version-modal').close()">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -889,15 +921,15 @@
                 @csrf
                 <div class="form-control w-full mb-4">
                     <label for="upload-version-file" class="label">
-                        <span class="label-text font-medium">Berkas Pengganti</span>
+                        <span class="label-text font-medium">{{ __('Berkas Pengganti') }}</span>
                     </label>
                     <input type="file" name="file" id="upload-version-file" accept=".pdf,.docx" class="file-input file-input-bordered w-full" required>
-                    <p class="text-xs text-base-content/50 mt-1">Hanya PDF atau DOCX, maksimal 10MB. Versi baru akan menunggu approval kepala divisi.</p>
+                    <p class="text-xs text-base-content/50 mt-1">{{ __('Hanya PDF atau DOCX, maksimal 10MB. Versi baru akan menunggu approval kepala divisi.') }}</p>
                     @error('file') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                 </div>
                 <div class="flex flex-wrap justify-end gap-2">
-                    <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('upload-version-modal').close()">Cancel</button>
-                    <button type="submit" class="btn btn-primary btn-sm">Upload</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('upload-version-modal').close()">{{ __('Batal') }}</button>
+                    <button type="submit" class="btn btn-primary btn-sm">{{ __('Unggah') }}</button>
                 </div>
             </form>
         </div>

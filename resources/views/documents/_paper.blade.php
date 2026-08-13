@@ -225,6 +225,9 @@
 <div class="doku-paper-scope" @isset($liveStorage) data-live-storage="{{ $liveStorage }}" @endisset
      data-paper-size="{{ $paperSize ?? 'A4' }}"
      data-paper-margin="{{ json_encode($paperMargin ?? null) }}">
+    @isset($liveStorage)
+        <div class="doku-paper-toolbar">
+            <label class="text-base-content/70">{{ __('Ukuran Kertas') }}:</label>
     <div class="doku-paper-toolbar">
         @isset($liveStorage)
             <label class="text-base-content/70">Ukuran Kertas:</label>
