@@ -38,27 +38,27 @@
            class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
                   {{ request()->routeIs('documents.*') && request('type', '') === 'general' ? 'bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0'"
-           :title="open ? '' : 'General Dokumen'">
+           :title="open ? '' : '{{ __('Dokumen Umum') }}'">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">General Dokumen</span>
+            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Umum') }}</span>
         </a>
 
         <a href="{{ route('documents.index', ['type' => 'mine']) }}"
            class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
                   {{ request()->routeIs('documents.*') && request('type', '') === 'mine' ? 'bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0'"
-           :title="open ? '' : 'My Documents'">
+           :title="open ? '' : '{{ __('Dokumen Saya') }}'">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
-            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">My Documents</span>
+            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Saya') }}</span>
         </a>
 
         <a href="{{ route('documents.index', ['type' => 'division']) }}"
            class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
                   {{ request()->routeIs('documents.*') && request('type', '') === 'division' ? 'bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0'"
-           :title="open ? '' : 'Dokumen Divisi'">
+           :title="open ? '' : '{{ __('Dokumen Divisi') }}'">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">Dokumen Divisi</span>
+            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Divisi') }}</span>
         </a>
         @endif
 
@@ -67,9 +67,9 @@
            class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
                   {{ request()->routeIs('approvals.*') ? 'bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0'"
-           :title="open ? '' : 'Approvals'">
+           :title="open ? '' : '{{ __('Persetujuan') }}'">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">Approvals</span>
+            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Persetujuan') }}</span>
         </a>
         @endif
 
@@ -78,65 +78,64 @@
            class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
                   {{ request()->routeIs('documents.*') && request('type', '') === 'mine' ? 'bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0'"
-           :title="open ? '' : 'My Documents'">
+           :title="open ? '' : '{{ __('Dokumen Saya') }}'">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
-            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">My Documents</span>
+            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Saya') }}</span>
         </a>
         @endif
 
         @can('admin')
         <span class="px-3 pt-5 pb-1.5 text-xs font-semibold text-base-content/40 uppercase tracking-wider whitespace-nowrap"
-              :class="open ? '' : 'lg:hidden'">Administration</span>
+              :class="open ? '' : 'lg:hidden'">{{ __('Administrasi') }}</span>
 
         <a href="{{ route('admin.divisions.index') }}"
            class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
                   {{ request()->routeIs('admin.divisions.*') ? 'bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0'"
-           :title="open ? '' : 'Divisions'">
+           :title="open ? '' : '{{ __('Divisi') }}'">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">Divisions</span>
+            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Divisi') }}</span>
         </a>
 
         <a href="{{ route('admin.documents.index') }}"
            class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
                   {{ request()->routeIs('admin.documents.*') ? 'bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0'"
-           :title="open ? '' : 'All Documents'">
+           :title="open ? '' : '{{ __('Semua Dokumen') }}'">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">All Documents</span>
+            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Semua Dokumen') }}</span>
         </a>
 
         <a href="{{ route('admin.document-types.index') }}"
            class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
                   {{ request()->routeIs('admin.document-types.*') ? 'bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0'"
-           :title="open ? '' : 'Document Types'">
+           :title="open ? '' : '{{ __('Jenis Dokumen') }}'">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
-            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">Document Types</span>
+            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Jenis Dokumen') }}</span>
         </a>
 
         <a href="{{ route('admin.users.index') }}"
            class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
                   {{ request()->routeIs('admin.users.*') ? 'bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0'"
-           :title="open ? '' : 'Users'">
+           :title="open ? '' : '{{ __('Pengguna') }}'">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" /></svg>
-            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">Users</span>
+            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Pengguna') }}</span>
         </a>
 
         <a href="{{ route('admin.retention.edit') }}"
            class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
                   {{ request()->routeIs('admin.retention.*') ? 'bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0'"
-           :title="open ? '' : 'Retention'">
+           :title="open ? '' : '{{ __('Retensi') }}'">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">Retention</span>
+            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Retensi') }}</span>
         </a>
         @endcan
     </nav>
 
     <!-- User footer -->
-    <div class="border-t border-base-300 p-3">
     <div class="border-t border-base-300 p-3">
         <div class="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-base-content/60"
              :class="open ? '' : 'lg:justify-center lg:px-0'">
@@ -146,11 +145,10 @@
             </div>
             <form method="POST" action="{{ route('logout') }}" class="shrink-0">
                 @csrf
-                <button type="submit" class="text-base-content/30 hover:text-error transition-colors" title="Log Out">
+                <button type="submit" class="text-base-content/30 hover:text-error transition-colors" title="{{ __('Keluar') }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                 </button>
             </form>
         </div>
     </div>
 </aside>
-{{--  --}}

@@ -12,7 +12,10 @@ use App\Http\Controllers\DocumentExportController;
 use App\Http\Controllers\JoditController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ShareLinkController;
+use App\Http\Controllers\LanguageController;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/lang/{locale}', [LanguageController::class, 'switch'])->name('language.switch');
 
 Route::get('/', function () {
     return view('welcome');

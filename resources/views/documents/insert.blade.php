@@ -36,7 +36,7 @@
 
                     <button type="button" onclick="document.getElementById('discard-modal').showModal()" class="btn btn-ghost btn-sm">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                        Cancel
+                        {{ __('Batal') }}
                     </button>
 
                     <!-- @if(Route::has('documents.preview'))
@@ -138,7 +138,7 @@
                         <input type="hidden" name="paper_margin" id="draft-paper-margin-input" value="{{ $document->paper_margin ? json_encode($document->paper_margin) : '' }}">
                         <button type="submit" class="btn btn-neutral">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
-                            Save as Draft
+                            {{ __('Simpan Draft') }}
                         </button>
                     </form>
                     <form method="POST" action="{{ route('documents.destroy', $document) }}" class="inline">
@@ -154,15 +154,15 @@
                     </form>
                 </div>
             @else
-                <p class="text-sm text-base-content/60">Keluar tanpa menyimpan perubahan?</p>
+                <p class="text-sm text-base-content/60">{{ __('Keluar tanpa menyimpan perubahan?') }}</p>
                 <div class="modal-action">
                     <button type="button" class="btn btn-ghost" onclick="document.getElementById('discard-modal').close()">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                        Keep Editing
+                        {{ __('Lanjut Edit') }}
                     </button>
                     <a href="{{ url()->previous() }}" class="btn btn-neutral">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-                        Back
+                        {{ __('Kembali') }}
                     </a>
                 </div>
             @endif

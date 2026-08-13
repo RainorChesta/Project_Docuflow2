@@ -209,7 +209,7 @@
      data-paper-margin="{{ json_encode($paperMargin ?? null) }}">
     @isset($liveStorage)
         <div class="doku-paper-toolbar">
-            <label class="text-base-content/70">Ukuran Kertas:</label>
+            <label class="text-base-content/70">{{ __('Ukuran Kertas') }}:</label>
             <select data-paper-size-select>
                 @foreach(['A4', 'A5', 'A3', 'Letter', 'Legal'] as $paperKey)
                     <option value="{{ $paperKey }}">{{ $paperKey }}</option>
