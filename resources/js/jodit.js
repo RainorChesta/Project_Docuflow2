@@ -241,7 +241,8 @@ function buildSpacerElement(margin, gap, extraAttrs) {
             el.replaceWith(pageBreak);
         } else {
             el.remove();
-    }});
+        }
+    });
     const gapBandHeight = Math.max(2, Math.min(24, Math.round(gap * 0.3)));
     const remaining = gap - gapBandHeight;
     const beforeHeight = gap > 0 ? Math.round(remaining * (margin.bottom / gap)) : 0;
@@ -757,51 +758,51 @@ function buildSignaturePopup(editor, close) {
     fetch('/signatures/users', {
         headers: { 'Accept': 'application/json' }
     })
-    .then(res => res.json())
-    .then(data => {
-        loading.style.display = 'none';
-        listContainer.style.display = 'flex';
-        const users = data.users || [];
+        .then(res => res.json())
+        .then(data => {
+            loading.style.display = 'none';
+            listContainer.style.display = 'flex';
+            const users = data.users || [];
 
-        users.forEach(u => {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.style.cssText = 'display:flex; align-items:center; justify-content:space-between; width:100%; padding:6px 10px; border:none; background:transparent; border-radius:4px; text-align:left; cursor:pointer; font-size:13px; color:#1f2937; transition:background 0.15s;';
-            btn.onmouseover = () => btn.style.background = '#f3f4f6';
-            btn.onmouseout = () => btn.style.background = 'transparent';
+            users.forEach(u => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.style.cssText = 'display:flex; align-items:center; justify-content:space-between; width:100%; padding:6px 10px; border:none; background:transparent; border-radius:4px; text-align:left; cursor:pointer; font-size:13px; color:#1f2937; transition:background 0.15s;';
+                btn.onmouseover = () => btn.style.background = '#f3f4f6';
+                btn.onmouseout = () => btn.style.background = 'transparent';
 
-            const left = document.createElement('div');
-            left.style.cssText = 'display:flex; flex-direction:column;';
-            const name = document.createElement('span');
-            name.style.cssText = 'font-weight:500;';
-            name.textContent = u.is_me ? `✨ TTD Saya (${u.name})` : u.name;
+                const left = document.createElement('div');
+                left.style.cssText = 'display:flex; flex-direction:column;';
+                const name = document.createElement('span');
+                name.style.cssText = 'font-weight:500;';
+                name.textContent = u.is_me ? `✨ TTD Saya (${u.name})` : u.name;
 
-            const role = document.createElement('span');
-            role.style.cssText = 'font-size:11px; color:#6b7280;';
-            role.textContent = `${u.role} - ${u.division}`;
+                const role = document.createElement('span');
+                role.style.cssText = 'font-size:11px; color:#6b7280;';
+                role.textContent = `${u.role} - ${u.division}`;
 
-            left.appendChild(name);
-            left.appendChild(role);
+                left.appendChild(name);
+                left.appendChild(role);
 
-            const badge = document.createElement('span');
-            badge.style.cssText = 'font-size:11px; font-family:monospace; background:#e0e7ff; color:#3730a3; padding:2px 6px; border-radius:4px; font-weight:600;';
-            badge.textContent = u.placeholder;
+                const badge = document.createElement('span');
+                badge.style.cssText = 'font-size:11px; font-family:monospace; background:#e0e7ff; color:#3730a3; padding:2px 6px; border-radius:4px; font-weight:600;';
+                badge.textContent = u.placeholder;
 
-            btn.appendChild(left);
-            btn.appendChild(badge);
+                btn.appendChild(left);
+                btn.appendChild(badge);
 
-            btn.addEventListener('click', () => {
-                editor.selection.insertHTML(` ${u.placeholder} `);
-                if (typeof close === 'function') close();
+                btn.addEventListener('click', () => {
+                    editor.selection.insertHTML(` ${u.placeholder} `);
+                    if (typeof close === 'function') close();
+                });
+
+                listContainer.appendChild(btn);
             });
-
-            listContainer.appendChild(btn);
+        })
+        .catch(err => {
+            loading.textContent = 'Gagal memuat daftar pengguna.';
+            loading.style.color = '#ef4444';
         });
-    })
-    .catch(err => {
-        loading.textContent = 'Gagal memuat daftar pengguna.';
-        loading.style.color = '#ef4444';
-    });
 
     return wrapper;
 }
@@ -1058,7 +1059,7 @@ export function initJoditEditor(selector, overrides = {}) {
     // ─────────────────────────────────────────────────────────────────────
 
     const editor = Jodit.make(ta, {
-        height: 'auto',
+        height: '40vh',
         width: '100%',
         language: 'id',
         toolbarButtonSize: 'middle',
@@ -1081,7 +1082,7 @@ export function initJoditEditor(selector, overrides = {}) {
             'superscript', 'subscript', '|',
             'ul', 'ol', 'indent', 'outdent', '|',
             'font', 'fontsize', 'brush', 'paragraph', 'lineHeight', '|',
-            'image', 'video', 'file', 'table', 'link', 'hr','qrCode', 'signature', '|',
+            'image', 'video', 'file', 'table', 'link', 'hr', 'qrCode', 'signature', '|',
             // 'image', 'video', 'file', 'table', 'link', 'hr', 'qrCode', '|',
             'align', '|',
             'paperSize', 'margin', '|',
