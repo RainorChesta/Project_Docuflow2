@@ -635,6 +635,17 @@ function buildSignaturePopup(editor, close) {
     title.style.cssText = 'font-weight:600; margin-bottom:4px; color:#1a1a1a; font-size:14px;';
     wrapper.appendChild(title);
 
+    // --- Search input ---
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = 'Cari nama atau divisi...';
+    searchInput.style.cssText = 'width:100%; padding:6px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; color:#1f2937; outline:none; box-sizing:border-box; transition:border-color 0.15s;';
+    searchInput.addEventListener('focus', () => { searchInput.style.borderColor = '#6366f1'; });
+    searchInput.addEventListener('blur', () => { searchInput.style.borderColor = '#d1d5db'; });
+    // Hide search until data is loaded
+    searchInput.style.display = 'none';
+    wrapper.appendChild(searchInput);
+
     const loading = document.createElement('div');
     loading.textContent = 'Memuat daftar pengguna...';
     loading.style.cssText = 'font-size:12px; color:#6b7280; padding:8px 0;';
@@ -644,6 +655,12 @@ function buildSignaturePopup(editor, close) {
     listContainer.style.cssText = 'display:none; flex-direction:column; gap:4px; max-height:220px; overflow-y:auto; margin-top:4px; border:1px solid #e5e7eb; border-radius:6px; padding:4px;';
     wrapper.appendChild(listContainer);
 
+    // --- Empty state message (hidden by default) ---
+    const emptyState = document.createElement('div');
+    emptyState.textContent = 'Tidak ada tanda tangan ditemukan';
+    emptyState.style.cssText = 'display:none; font-size:12px; color:#9ca3af; text-align:center; padding:12px 0;';
+    wrapper.appendChild(emptyState);
+
     fetch('/signatures/users', {
         headers: { 'Accept': 'application/json' }
     })
@@ -651,7 +668,11 @@ function buildSignaturePopup(editor, close) {
     .then(data => {
         loading.style.display = 'none';
         listContainer.style.display = 'flex';
+        searchInput.style.display = '';
         const users = data.users || [];
+
+        // Keep references to each button and its searchable text
+        const entries = [];
 
         users.forEach(u => {
             const btn = document.createElement('button');
@@ -664,11 +685,13 @@ function buildSignaturePopup(editor, close) {
             left.style.cssText = 'display:flex; flex-direction:column;';
             const name = document.createElement('span');
             name.style.cssText = 'font-weight:500;';
-            name.textContent = u.is_me ? `✨ TTD Saya (${u.name})` : u.name;
+            const displayName = u.is_me ? `✨ TTD Saya (${u.name})` : u.name;
+            name.textContent = displayName;
 
             const role = document.createElement('span');
             role.style.cssText = 'font-size:11px; color:#6b7280;';
-            role.textContent = `${u.role} - ${u.division}`;
+            const roleText = `${u.role} - ${u.division}`;
+            role.textContent = roleText;
 
             left.appendChild(name);
             left.appendChild(role);
@@ -686,6 +709,28 @@ function buildSignaturePopup(editor, close) {
             });
 
             listContainer.appendChild(btn);
+
+            // Store searchable text (lowercase) alongside the button element
+            entries.push({
+                el: btn,
+                searchText: `${displayName} ${roleText} ${u.placeholder}`.toLowerCase()
+            });
+        });
+
+        // --- Wire up search/filter ---
+        searchInput.addEventListener('input', () => {
+            const query = searchInput.value.trim().toLowerCase();
+            let visibleCount = 0;
+
+            entries.forEach(entry => {
+                const matches = !query || entry.searchText.includes(query);
+                entry.el.style.display = matches ? '' : 'none';
+                if (matches) visibleCount++;
+            });
+
+            // Show/hide empty state
+            emptyState.style.display = visibleCount === 0 ? 'block' : 'none';
+            listContainer.style.display = visibleCount === 0 ? 'none' : 'flex';
         });
     })
     .catch(err => {

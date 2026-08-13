@@ -133,8 +133,6 @@
                                     }
                                 } elseif ($name === 'approvals.index') {
                                     $crumbs[] = ['label' => __('Persetujuan'), 'url' => null];
-                                } elseif ($name === 'shared.history') {
-                                    $crumbs[] = ['label' => __('Riwayat Edit via Share Link'), 'url' => null];
                                 } elseif ($name === 'profile.edit') {
                                     $crumbs[] = ['label' => __('Profil'), 'url' => null];
                                 }
