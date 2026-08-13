@@ -14,6 +14,7 @@ class Document extends Model
         'document_type_id', 'is_public', 'current_version_id',
         'pending_rollback_version_id', 'rollback_requested_by_id', 'rollback_requested_at',
         'paper_size', 'paper_margin',
+        'general_access', 'link_role', 'share_token',
     ];
 
     protected function casts(): array
@@ -111,6 +112,16 @@ class Document extends Model
         return $this->hasMany(DocumentAccessLink::class);
     }
 
+    public function shares(): HasMany
+    {
+        return $this->hasMany(DocumentShare::class);
+    }
+
+    public function divisionShares(): HasMany
+    {
+        return $this->hasMany(DocumentDivisionShare::class);
+    }
+
     public function scopeActive($query)
     {
         return $query->whereHas('versions', fn($q) => $q->where('status', 'active'));
@@ -153,7 +164,8 @@ class Document extends Model
     /**
      * Documents the given user is allowed to see (row-level visibility).
      * Admin sees everything. Regular users see: general docs, own docs
-     * (any scope), and division docs of any division they belong to.
+     * (any scope), division docs of any division they belong to, and
+     * docs where they have a personal share or a division share.
      */
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
@@ -169,7 +181,9 @@ class Document extends Model
                 ->orWhere(function (Builder $sub) use ($divisionIds) {
                     $sub->where('visibility', self::VISIBILITY_DIVISION)
                         ->whereIn('division_id', $divisionIds);
-                });
+                })
+                ->orWhereHas('shares', fn(Builder $s) => $s->where('user_id', $user->id))
+                ->orWhereHas('divisionShares', fn(Builder $ds) => $ds->whereIn('division_id', $divisionIds));
         });
     }
 

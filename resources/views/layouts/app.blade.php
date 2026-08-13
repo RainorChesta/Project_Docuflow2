@@ -147,5 +147,6 @@
                 </main>
             </div>
         </div>
+        <x-mandatory-signature-modal />
     </body>
 </html>

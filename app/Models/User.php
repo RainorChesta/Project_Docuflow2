@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -73,6 +74,31 @@ class User extends Authenticatable
     public function createdLinks(): HasMany
     {
         return $this->hasMany(DocumentAccessLink::class, 'created_by');
+    }
+
+    public function documentShares(): HasMany
+    {
+        return $this->hasMany(DocumentShare::class);
+    }
+
+    public function signature(): HasOne
+    {
+        return $this->hasOne(Signature::class);
+    }
+
+    public function requestedSignatures(): HasMany
+    {
+        return $this->hasMany(SignatureRequest::class, 'requester_id');
+    }
+
+    public function receivedSignatureRequests(): HasMany
+    {
+        return $this->hasMany(SignatureRequest::class, 'target_user_id');
+    }
+
+    public function hasSignature(): bool
+    {
+        return $this->signature !== null && file_exists($this->signature->absolute_path);
     }
 
     public function isAdmin(): bool

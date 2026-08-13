@@ -88,7 +88,8 @@ class PdfExportService
             throw new BusinessLogicException('Chrome/Edge tidak ditemukan di server untuk generate PDF.');
         }
 
-        $content = $this->normalizeContentFonts($display->content);
+        $content = app(\App\Services\SignatureResolverService::class)->resolve($display->content, $document, $user, true);
+        $content = $this->normalizeContentFonts($content);
         $html = $this->buildHtml($document, $this->resolveImagePaths($content), $paperSizeOverride);
 
         $filename = $this->filename($document);

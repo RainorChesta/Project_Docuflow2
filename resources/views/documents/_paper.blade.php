@@ -217,6 +217,6 @@
         </div>
     @endisset
     <div class="doku-paper">
-        {!! $content !!}
+        {!! app(\App\Services\SignatureResolverService::class)->resolve($content, $document ?? null, auth()->user()) !!}
     </div>
 </div>

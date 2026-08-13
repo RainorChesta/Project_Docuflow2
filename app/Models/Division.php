@@ -18,4 +18,9 @@ class Division extends Model
     {
         return $this->hasMany(Document::class);
     }
+
+    public function documentShares(): HasMany
+    {
+        return $this->hasMany(DocumentDivisionShare::class);
+    }
 }

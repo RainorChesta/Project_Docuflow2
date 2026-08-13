@@ -760,6 +760,76 @@ function buildMarginPopup(editor, close) {
     return wrapper;
 }
 
+function buildSignaturePopup(editor, close) {
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'padding:12px; display:flex; flex-direction:column; gap:8px; min-width:240px; max-width:320px; background:#fff;';
+
+    const title = document.createElement('div');
+    title.textContent = 'Sisipkan Tanda Tangan (TTD)';
+    title.style.cssText = 'font-weight:600; margin-bottom:4px; color:#1a1a1a; font-size:14px;';
+    wrapper.appendChild(title);
+
+    const loading = document.createElement('div');
+    loading.textContent = 'Memuat daftar pengguna...';
+    loading.style.cssText = 'font-size:12px; color:#6b7280; padding:8px 0;';
+    wrapper.appendChild(loading);
+
+    const listContainer = document.createElement('div');
+    listContainer.style.cssText = 'display:none; flex-direction:column; gap:4px; max-height:220px; overflow-y:auto; margin-top:4px; border:1px solid #e5e7eb; border-radius:6px; padding:4px;';
+    wrapper.appendChild(listContainer);
+
+    fetch('/signatures/users', {
+        headers: { 'Accept': 'application/json' }
+    })
+    .then(res => res.json())
+    .then(data => {
+        loading.style.display = 'none';
+        listContainer.style.display = 'flex';
+        const users = data.users || [];
+
+        users.forEach(u => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.style.cssText = 'display:flex; align-items:center; justify-content:space-between; width:100%; padding:6px 10px; border:none; background:transparent; border-radius:4px; text-align:left; cursor:pointer; font-size:13px; color:#1f2937; transition:background 0.15s;';
+            btn.onmouseover = () => btn.style.background = '#f3f4f6';
+            btn.onmouseout = () => btn.style.background = 'transparent';
+
+            const left = document.createElement('div');
+            left.style.cssText = 'display:flex; flex-direction:column;';
+            const name = document.createElement('span');
+            name.style.cssText = 'font-weight:500;';
+            name.textContent = u.is_me ? `✨ TTD Saya (${u.name})` : u.name;
+
+            const role = document.createElement('span');
+            role.style.cssText = 'font-size:11px; color:#6b7280;';
+            role.textContent = `${u.role} - ${u.division}`;
+
+            left.appendChild(name);
+            left.appendChild(role);
+
+            const badge = document.createElement('span');
+            badge.style.cssText = 'font-size:11px; font-family:monospace; background:#e0e7ff; color:#3730a3; padding:2px 6px; border-radius:4px; font-weight:600;';
+            badge.textContent = u.placeholder;
+
+            btn.appendChild(left);
+            btn.appendChild(badge);
+
+            btn.addEventListener('click', () => {
+                editor.selection.insertHTML(` ${u.placeholder} `);
+                if (typeof close === 'function') close();
+            });
+
+            listContainer.appendChild(btn);
+        });
+    })
+    .catch(err => {
+        loading.textContent = 'Gagal memuat daftar pengguna.';
+        loading.style.color = '#ef4444';
+    });
+
+    return wrapper;
+}
+
 // Popup tombol "print": pilih ukuran kertas fisik (A3/A4/A5/dst) lalu cetak.
 // Konten editor dicetak ulang dengan @page { size } sesuai pilihan, terlepas
 // dari ukuran kertas yang aktif di editor.
@@ -1031,7 +1101,7 @@ export function initJoditEditor(selector, overrides = {}) {
             'superscript', 'subscript', '|',
             'ul', 'ol', 'indent', 'outdent', '|',
             'font', 'fontsize', 'brush', 'paragraph', 'lineHeight', '|',
-            'image', 'video', 'file', 'table', 'link', 'hr', '|',
+            'image', 'video', 'file', 'table', 'link', 'hr', 'signature', '|',
             'align', '|',
             'paperSize', 'margin', '|',
             'undo', 'redo', 'eraser', 'copyformat', '|',
@@ -1042,6 +1112,13 @@ export function initJoditEditor(selector, overrides = {}) {
 
         // Tombol image: langsung buka file picker & upload, tanpa tab URL
         controls: {
+            signature: {
+                name: 'signature',
+                tooltip: 'Sisipkan Tanda Tangan (TTD)',
+                icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 19h6"/><path d="M19 16v6"/><path d="M12 4a4 4 0 0 1 4 4c0 4-5 6-5 6s-5-2-5-6a4 4 0 0 1 4-4z"/><path d="M17.8 13.9 14 21.5 10 18l-2 3.5"/></svg>',
+                popup: (editor, _current, _self, close) => buildSignaturePopup(editor, close),
+            },
+
             // Daftar font custom (Google Fonts) yang muncul di dropdown toolbar "font"
             font: {
                 list: Jodit.atom(FONT_LIST),

@@ -38,6 +38,11 @@ class DocumentController extends Controller
         } elseif ($type === 'mine') {
             // My Documents — semua dokumen milik user, apapun scopenya.
             $query->ownedBy($user);
+        } elseif ($type === 'shared') {
+            // Shared Documents — shared directly with user, excluding owned docs.
+            $query->whereHas('shares', fn($q) => $q->where('user_id', $user->id))
+                  ->where('owner_id', '!=', $user->id)
+                  ->with(['shares' => fn($q) => $q->where('user_id', $user->id)]);
         } else {
             // Division-scoped documents of divisions the user belongs to.
             $query->division($user);
@@ -80,6 +85,7 @@ class DocumentController extends Controller
         $view = match ($type) {
             'general' => 'documents.general',
             'mine' => 'documents.mine',
+            'shared' => 'documents.shared_index',
             default => 'documents.division',
         };
 
