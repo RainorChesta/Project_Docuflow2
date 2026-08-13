@@ -102,6 +102,10 @@ function buildIframeStyle(size, margin = DEFAULT_MARGIN) {
         '  background:#fff;',
         `  min-height:${size.height}px;`,
         '  box-shadow:0 1px 3px rgba(0,0,0,0.1);',
+        "  font-family: 'Times New Roman', Times, serif;",
+        '  font-size: 16px;',
+        '  line-height: normal;',
+        '  color: #111;',
         '}',
         'table { width:100%; border:none; border-collapse:collapse; empty-cells:show; max-width:100%; }',
         'th, td { padding:2px 5px; border:1px solid #ccc; }',
@@ -148,47 +152,6 @@ function applyPaperSize(editor, size, margin) {
     });
 }
 
-// Ambil HTML editor tanpa elemen spacer pagination (lihat repaginateEditor
-// di bawah) — WAJIB dipakai tiap kali konten mau disimpan/di-preview,
-// supaya jeda visual antar halaman di editor TIDAK ikut kesimpen sebagai
-// bagian dari dokumen asli.
-//
-// FIX ARSITEKTUR PRINT/EXPORT: dulu ada parameter forPrint yang mengubah
-// tiap spacer menjadi forced page-break (break-after:page) TEPAT di posisi
-// yang dihitung repaginateEditor di iframe EDITOR. Itu justru sumber utama
-// "teks amburadul saat margin ditambah" — repaginateEditor mengukur tinggi
-// elemen di iframe editor (yang punya kondisi render/font-loading sendiri),
-// sementara iframe print dibuat baru & fontnya di-fetch ulang secara
-// terpisah. Begitu margin besar (ruang tulis per halaman makin sempit),
-// selisih pengukuran sekecil apa pun antara dua iframe itu sudah cukup
-// membuat titik potong yang "dipaksakan" dari editor meleset dari tinggi
-// konten yang SEBENARNYA di iframe print — hasilnya 1 kalimat nyangkut di
-// atas/bawah dan sisa halaman kosong.
-//
-// Sekarang getCleanValue HANYA membuang spacer (untuk disimpan/preview).
-// Untuk cetak, TIDAK ADA LAGI titik potong yang dipaksakan dari editor —
-// browser sendiri yang menghitung page-break native saat print, karena
-// dialah satu-satunya pihak yang benar-benar tahu tinggi final tiap elemen
-// setelah font & layout di iframe print settle. Lihat doPrint() +
-// aturan `break-inside: avoid` di CSS print untuk cara barunya.
-// FIX AKAR MASALAH "ada spasi kosong gede sebelum list, list kepental utuh
-// ke halaman berikutnya": versi sebelumnya menganggap <ol>/<ul> sebagai SATU
-// elemen utuh yang "tidak boleh dipecah" — persis sama seperti paragraf atau
-// gambar. Begitu daftar bernomor (mis. 5 item) tidak muat lagi di sisa
-// halaman, SELURUH list didorong ke halaman berikutnya sebagai satu blok,
-// walau baru item ke-3 dst yang sebenarnya kepotong. Sisa ruang di halaman
-// sebelumnya (yang sebenarnya masih cukup buat item 1-2) jadi terbuang jadi
-// spasi kosong besar — itu yang muncul di screenshot: paragraf penutup di
-// atas, lalu blank sampai ke penanda halaman, baru listnya nongol utuh di
-// halaman berikutnya.
-//
-// FIX: list sekarang diperlakukan seperti di Word/Google Docs — boleh
-// terpotong ANTAR item (satu <li> boleh pindah halaman), tapi SATU <li>
-// sendiri tetap tidak boleh terpotong di tengah kalimat. Saat titik potong
-// jatuh di tengah sebuah <li>, list dipecah jadi DUA elemen <ol>/<ul>: satu
-// berisi item-item yang muat di halaman sekarang, satu lagi (mulai dari item
-// yang kepotong) diteruskan ke halaman berikutnya — dengan atribut `start`
-// di-set supaya nomor urutnya TETAP NYAMBUNG (bukan reset ke 1).
 function buildSpacerElement(margin, gap, extraAttrs) {
     const spacer = document.createElement('div');
     spacer.setAttribute('data-page-spacer', 'true');
@@ -202,46 +165,6 @@ function buildSpacerElement(margin, gap, extraAttrs) {
         userSelect: 'none',
     });
 
-    // FIX QR (print): saat forPrint, ganti placeholder QR (lihat control
-    // "qrCode" di atas) jadi <img> QR asli yang di-fetch dari server
-    // (route documents.qrcode, lihat data-qr-image-url di textarea) —
-    // supaya QR beneran ke-print & bisa di-scan. Saat forPrint=false
-    // (disimpan ke DB / draft localStorage), placeholder TETAP teks biasa
-    // — QR baru "hidup" saat konten ditampilkan lewat halaman show/preview
-    // (lihat QrCodeService::injectPlaceholder di server) atau saat print
-    // ini sendiri, bukan disimpan sebagai gambar beku.
-    if (forPrint) {
-        const qrImageUrl = editor.element?.dataset?.qrImageUrl;
-        if (qrImageUrl) {
-            // Ukuran QR di-baca dari TEKS placeholder ("[QR CODE DOKUMEN
-            // 150px]"), BUKAN dari atribut data-qr-size — Jodit membuang
-            // semua atribut data-* saat clean-html/save, jadi atribut tidak
-            // bisa diandalkan untuk menyimpan ukuran. Teks tidak pernah kena
-            // strip, jadi ukuran dijamin selalu ikut walau atribut
-            // data-qr-placeholder sendiri ikut hilang.
-            doc.querySelectorAll('[data-qr-placeholder], span[style*="dashed"]').forEach((el) => {
-                const match = el.textContent.match(/\[QR CODE DOKUMEN\s*(\d+)px\]/i);
-                if (!match) return;
-                const size = Math.max(40, Math.min(400, parseInt(match[1], 10) || 120));
-                const img = doc.createElement('img');
-                img.src = qrImageUrl;
-                img.alt = 'QR Code Dokumen';
-                img.style.cssText = `width:${size}px;height:${size}px;vertical-align:middle;`;
-                el.replaceWith(img);
-            });
-        }
-    }
-
-    doc.querySelectorAll('[data-page-spacer]').forEach((el) => {
-        if (forPrint) {
-            const pageBreak = doc.createElement('div');
-            pageBreak.setAttribute('data-page-break', 'true');
-            pageBreak.style.cssText = 'height:0;margin:0;padding:0;border:0;' +
-                'break-after:page;page-break-after:always;';
-            el.replaceWith(pageBreak);
-        } else {
-            el.remove();
-    }});
     const gapBandHeight = Math.max(2, Math.min(24, Math.round(gap * 0.3)));
     const remaining = gap - gapBandHeight;
     const beforeHeight = gap > 0 ? Math.round(remaining * (margin.bottom / gap)) : 0;
@@ -275,11 +198,6 @@ function buildSpacerElement(margin, gap, extraAttrs) {
     return spacer;
 }
 
-// Sebelum menghitung ulang pagination (atau sebelum ekstrak nilai bersih
-// buat disimpan), gabungkan lagi list yang sebelumnya sempat dipecah jadi
-// dua elemen oleh paginateList() — supaya perhitungan/penyimpanan selalu
-// mulai dari struktur dokumen yang FLAT (satu list utuh), bukan dari hasil
-// pecahan iterasi sebelumnya yang sudah basi.
 function mergeSplitLists(container) {
     container.querySelectorAll(':scope > [data-page-spacer][data-list-continuation]').forEach((spacer) => {
         const prevList = spacer.previousElementSibling;
@@ -296,118 +214,90 @@ function mergeSplitLists(container) {
     });
 }
 
-// Proses satu <ol>/<ul>: cari <li> pertama yang kepotong batas halaman,
-// pecah list di situ (item sebelumnya tetap di list asli, item itu dst
-// pindah ke list baru yang nomornya nyambung), sisipkan spacer di antara
-// keduanya, lalu lanjut evaluasi list baru itu terhadap batas halaman
-// berikutnya (jaga-jaga kalau dia sendiri masih kepanjangan untuk 1 halaman).
-function paginateList(list, containerTop, paddingTop, contentPerPage, gap, margin, startBoundary) {
-    let nextBoundary = startBoundary;
-    let current = list;
+function paginateList(list, nextBoundary, containerTop, paddingTop, margin, gap, contentPerPage) {
+    const items = Array.from(list.children).filter((el) => el.tagName === 'LI');
+    if (items.length === 0) return false;
 
-    while (current) {
-        const items = Array.from(current.children).filter((el) => el.tagName === 'LI');
-        if (items.length === 0) break;
+    let splitAt = null;
+    for (const li of items) {
+        const rect = li.getBoundingClientRect();
+        const relTop = rect.top - containerTop - paddingTop;
+        const relBottom = relTop + rect.height;
 
-        let splitAt = null;
-        for (const li of items) {
-            const rect = li.getBoundingClientRect();
-            const relTop = rect.top - containerTop - paddingTop;
-            const relBottom = relTop + rect.height;
-
-            if (
-                (relBottom > nextBoundary && relTop < nextBoundary) ||
-                (relTop >= nextBoundary && relTop < nextBoundary + contentPerPage)
-            ) {
-                splitAt = li;
-                const tallerThanPage = rect.height > contentPerPage;
-                nextBoundary += contentPerPage + gap;
-                // Jaga-jaga: kalau satu <li> ini sendiri masih melewati
-                // batas halaman BARU juga (item pendek tapi ada banyak
-                // halaman kosong dilompati sebelumnya), majukan terus
-                // batasnya sampai benar-benar mengapit item ini.
-                if (!tallerThanPage) {
-                    let stillCrossing = true;
-                    while (stillCrossing) {
-                        const r2 = li.getBoundingClientRect();
-                        const rt2 = r2.top - containerTop - paddingTop;
-                        const rb2 = rt2 + r2.height;
-                        stillCrossing = rb2 > nextBoundary && rt2 < nextBoundary;
-                        if (stillCrossing) nextBoundary += contentPerPage + gap;
-                    }
-                }
-                break;
-            }
-        }
-
-        if (!splitAt) break; // sisa item di list ini semua muat di halaman sekarang
-
-        if (splitAt === items[0]) {
-            // Item pertama SEGMEN INI saja sudah harus pindah halaman →
-            // seluruh sisa list (current) didorong utuh, cukup 1 spacer.
-            const spacer = buildSpacerElement(margin, gap);
-            current.parentNode.insertBefore(spacer, current);
+        if (relBottom > nextBoundary) {
+            // Jangan split jika ini item pertama dan itemnya lebih tinggi dari halaman
+            if (li === items[0] && rect.height > contentPerPage) return false;
+            splitAt = li;
             break;
         }
-
-        // Pecah: item sebelum splitAt tetap di `current`, splitAt dst
-        // dipindah ke list baru yang meneruskan nomor urut (atribut
-        // `start` untuk <ol>) supaya penomoran tidak reset ke 1.
-        const newList = document.createElement(current.tagName);
-        Array.from(current.attributes).forEach((attr) => newList.setAttribute(attr.name, attr.value));
-        if (current.tagName === 'OL') {
-            const priorStart = parseInt(current.getAttribute('start') || '1', 10);
-            const movedCount = items.indexOf(splitAt);
-            newList.setAttribute('start', String(priorStart + movedCount));
-        }
-
-        let node = splitAt;
-        while (node) {
-            const nextNode = node.nextSibling;
-            newList.appendChild(node);
-            node = nextNode;
-        }
-
-        const spacer = buildSpacerElement(margin, gap, { 'data-list-continuation': 'true' });
-        current.parentNode.insertBefore(spacer, current.nextSibling);
-        current.parentNode.insertBefore(newList, spacer.nextSibling);
-
-        current = newList; // lanjut evaluasi sisa item di segmen baru ini
     }
 
-    return { nextBoundary, nextChild: current ? current.nextElementSibling : null };
+    if (!splitAt) return false;
+
+    if (splitAt === items[0]) {
+        return false;
+    }
+
+    const newList = document.createElement(list.tagName);
+    Array.from(list.attributes).forEach((attr) => newList.setAttribute(attr.name, attr.value));
+    if (list.tagName === 'OL') {
+        const priorStart = parseInt(list.getAttribute('start') || '1', 10);
+        const movedCount = items.indexOf(splitAt);
+        newList.setAttribute('start', String(priorStart + movedCount));
+    }
+
+    let node = splitAt;
+    while (node) {
+        const nextNode = node.nextSibling;
+        newList.appendChild(node);
+        node = nextNode;
+    }
+
+    const spacer = buildSpacerElement(margin, gap, { 'data-list-continuation': 'true' });
+    list.parentNode.insertBefore(spacer, list.nextSibling);
+    list.parentNode.insertBefore(newList, spacer.nextSibling);
+    return true;
 }
 
-// Jalankan pagination di satu container (body editor ATAU .doku-paper
-// preview) — dipakai bareng oleh repaginateEditor & repaginatePreview supaya
-// logikanya SATU tempat, tidak dobel kode dan tidak bisa saling melenceng.
 function paginateContainer(container, contentPerPage, gap, margin) {
     const paddingTop = parseFloat(getComputedStyle(container).paddingTop) || 0;
     const containerTop = container.getBoundingClientRect().top;
     let nextBoundary = contentPerPage;
-    let child = container.firstElementChild;
 
+    let child = container.firstElementChild;
     while (child) {
-        if (child.tagName === 'OL' || child.tagName === 'UL') {
-            const result = paginateList(child, containerTop, paddingTop, contentPerPage, gap, margin, nextBoundary);
-            nextBoundary = result.nextBoundary;
-            child = result.nextChild;
+        if (child.hasAttribute('data-page-spacer')) {
+            child = child.nextElementSibling;
             continue;
         }
 
         const rect = child.getBoundingClientRect();
-        const relTop = rect.top - containerTop - paddingTop;
-        const relBottom = relTop + rect.height;
+        let relTop = rect.top - containerTop - paddingTop;
+        let relBottom = relTop + rect.height;
+
+        const isList = child.tagName === 'OL' || child.tagName === 'UL';
         const elementTallerThanPage = rect.height > contentPerPage;
 
-        while (
-            (relBottom > nextBoundary && relTop < nextBoundary) ||
-            (relTop >= nextBoundary && relTop < nextBoundary + contentPerPage)
-        ) {
-            const spacer = buildSpacerElement(margin, gap);
-            child.parentNode.insertBefore(spacer, child);
-            nextBoundary += contentPerPage + gap;
-            if (elementTallerThanPage) break;
+        if (isList) {
+            const splitDone = paginateList(child, nextBoundary, containerTop, paddingTop, margin, gap, contentPerPage);
+            if (splitDone) {
+                nextBoundary += contentPerPage + gap;
+                child = child.nextElementSibling;
+                continue;
+            }
+        }
+
+        while (relBottom > nextBoundary) {
+            if (relTop >= nextBoundary || !elementTallerThanPage) {
+                const spacer = buildSpacerElement(margin, gap);
+                child.parentNode.insertBefore(spacer, child);
+                nextBoundary += contentPerPage + gap;
+                
+                relTop += gap;
+                relBottom += gap;
+            } else {
+                nextBoundary += contentPerPage + gap;
+            }
         }
 
         child = child.nextElementSibling;
@@ -929,6 +819,8 @@ function buildPrintStyle(win, size, margin) {
                 min-height: 0 !important;
                 padding: 0 !important;
                 margin: 0 !important;
+                orphans: 1;
+                widows: 1;
             }
             /* FIX UTAMA: jangan paksa titik potong dari spacer editor.
                Biarkan browser menghitung native page-break sendiri
