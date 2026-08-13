@@ -75,12 +75,21 @@
 
                 <div>
                     <div class="bg-base-100 rounded-xl shadow-md border border-base-300 overflow-hidden">
+                        {{-- FIX MARGIN HILANG SAAT EDIT: textarea sekarang
+                             membawa ukuran kertas & margin yang tersimpan di
+                             dokumen (data-paper-size / data-paper-margin).
+                             initJoditEditor() (resources/js/jodit.js) baca
+                             dataset ini saat init, jadi editor mulai dari
+                             margin yang sama seperti di halaman preview —
+                             bukan selalu balik ke A4 + margin default. --}}
                         <textarea
                             name="content"
                             id="jodit-editor"
                             data-upload-url="{{ route('jodit.upload') }}"
                             data-csrf-token="{{ csrf_token() }}"
                             data-live-storage="doc-preview-{{ $document->id }}"
+                            data-paper-size="{{ $document->paper_size ?? 'A4' }}"
+                            data-paper-margin="{{ $document->paper_margin ? json_encode($document->paper_margin) : '' }}"
                         >{{ $document->displayVersion()->content ?? '' }}</textarea>
                     </div>
 

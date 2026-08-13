@@ -47,7 +47,12 @@ class PdfExportService
      * TERNORMALISASI (tanpa kutip, tanpa spasi ekstra).
      *
      * Google Fonts (Roboto/Open Sans/dst) diarahkan ke pengganti metrik
-     * terdekat yang umum tersedia sebagai font sistem.
+     * terdekat yang umum tersedia sebagai font sistem. PENTING: karena kita
+     * substitusi ke font sistem (bukan @import Google Fonts), tidak ada
+     * proses download font async saat export — layout langsung stabil
+     * begitu DOM ter-parse, jadi script pagination (lihat
+     * buildPaginationScript()) tidak perlu menunggu document.fonts.ready
+     * sama sekali.
      */
     private const PDF_SAFE_FONT_MAP = [
         'Arial,Helvetica,sans-serif' => 'Arial, sans-serif',
@@ -61,6 +66,14 @@ class PdfExportService
         'Lora,serif' => 'Georgia, serif',
         'Source Code Pro,monospace' => 'Courier New, monospace',
     ];
+
+    /**
+     * Batas waktu (ms) Chrome headless menunggu sebelum printToPDF
+     * dieksekusi — cukup untuk 'load' event (gambar file:// + script
+     * pagination inline) selesai jalan lebih dulu, bahkan pada dokumen
+     * panjang/banyak gambar.
+     */
+    private const VIRTUAL_TIME_BUDGET_MS = 8000;
 
     /**
      * Build a PDF for a document's display content via headless Chrome
@@ -88,7 +101,7 @@ class PdfExportService
             throw new BusinessLogicException('Chrome/Edge tidak ditemukan di server untuk generate PDF.');
         }
 
-        $content = $this->normalizeContentFonts($display->content);
+        $content = $display->content;
         $html = $this->buildHtml($document, $this->resolveImagePaths($content), $paperSizeOverride);
 
         $filename = $this->filename($document);
@@ -99,11 +112,23 @@ class PdfExportService
         $pdfPath = storage_path('app/private/' . $path);
 
         try {
+            if (!is_dir(dirname($htmlPath))) {
+                @mkdir(dirname($htmlPath), 0755, true);
+            }
             file_put_contents($htmlPath, $html);
 
+            // --virtual-time-budget dikasih margin cukup (ms) supaya Chrome
+            // headless benar-benar menunggu 'load' event (gambar via
+            // file:// + script pagination inline) selesai SEBELUM
+            // printToPDF dieksekusi. Tanpa ini, pada dokumen dengan banyak
+            // gambar ada risiko printToPDF terpicu sebelum script
+            // pagination sempat memasang break-before, sehingga hasil
+            // balik lagi mengandalkan heuristik native yang selisih dengan
+            // editor.
             $cmd = sprintf(
-                '%s --headless=new --disable-gpu --no-pdf-header-footer --print-to-pdf=%s %s 2>&1',
+                '%s --headless=new --disable-gpu --no-pdf-header-footer --virtual-time-budget=%d --print-to-pdf=%s %s 2>&1',
                 escapeshellarg($chrome),
+                self::VIRTUAL_TIME_BUDGET_MS,
                 escapeshellarg($pdfPath),
                 escapeshellarg($htmlPath)
             );
@@ -346,6 +371,119 @@ class PdfExportService
         ];
     }
 
+    /**
+     * Bangun script pagination inline yang dijalankan DI DALAM HTML export
+     * (bukan lagi mengandalkan heuristik native break-inside:avoid milik
+     * Chromium, yang terbukti bisa selisih beberapa baris/elemen dari
+     * hasil hitungan JS editor).
+     *
+     * INI ADALAH PORT LANGSUNG dari algoritma paginateContainer/paginateList
+     * di resources/js/jodit.js — tujuannya supaya export menghitung titik
+     * potong halaman dengan RUMUS YANG SAMA PERSIS dengan yang dipakai
+     * editor & preview (repaginateEditor/repaginatePreview), sehingga hasil
+     * PDF dijamin identik, bukan cuma "kemungkinan besar mirip".
+     *
+     * Beda pendekatan dari editor:
+     * - Editor menyisipkan <div data-page-spacer> (elemen visual asli) untuk
+     *   mensimulasikan jeda antar halaman di layar, makanya nextBoundary di
+     *   sana ikut menambahkan `gap` (tinggi spacer) supaya koordinat elemen
+     *   berikutnya (yang secara fisik terdorong oleh spacer) tetap sinkron.
+     * - Script ini TIDAK memasang elemen apa pun ke DOM (tidak ada spacer),
+     *   ia hanya MENANDAI elemen/<li> yang harus mulai halaman baru dengan
+     *   `break-before: page`. Karena tidak ada elemen yang benar-benar
+     *   digeser secara fisik, seluruh perhitungan tetap berada di sistem
+     *   koordinat "flat" (rata, non-tergeser) dari awal sampai akhir — jadi
+     *   TIDAK PERLU menambahkan `gap` ke nextBoundary sama sekali. Titik
+     *   potong yang dihasilkan (elemen/<li> mana yang jatuh di halaman
+     *   keberapa) tetap identik dengan hasil hitungan editor, karena "flat
+     *   layout dipotong tiap kelipatan contentPerPage" itulah yang
+     *   sebenarnya MENENTUKAN pembagian halaman di editor — spacer di sana
+     *   cuma representasi visualnya, bukan penentu pembagiannya.
+     * - List (<ul>/<ol>) TIDAK perlu dipecah jadi dua elemen terpisah
+     *   (seperti paginateList di editor, yang butuh trik atribut `start`
+     *   supaya nomor tetap nyambung) — karena break-before bisa langsung
+     *   ditempel ke <li> tanpa mengubah struktur DOM, nomor urut otomatis
+     *   tetap benar (masih satu <ol> yang sama).
+     *
+     * $contentPerPage: SAMA PERSIS dengan `size.height - margin.top -
+     * margin.bottom` yang dipakai repaginateEditor di jodit.js. Dihitung di
+     * buildHtml() dari margin & ukuran kertas yang SUDAH di-clamp, supaya
+     * konsisten dengan nilai yang dipakai @page di sana.
+     */
+    private function buildPaginationScript(int $contentPerPage): string
+    {
+        return <<<JS
+        <script>
+        (function () {
+            var CONTENT_PER_PAGE = {$contentPerPage};
+
+            function crosses(relTop, relBottom, boundary) {
+                return (relBottom > boundary && relTop < boundary)
+                    || (relTop >= boundary && relTop < boundary + CONTENT_PER_PAGE);
+            }
+
+            function markBreak(el) {
+                el.style.breakBefore = 'page';
+                el.style.pageBreakBefore = 'always';
+            }
+
+            function paginate() {
+                var container = document.querySelector('.paper');
+                if (!container || !container.firstElementChild) return;
+
+                var containerTop = container.getBoundingClientRect().top;
+                var nextBoundary = CONTENT_PER_PAGE;
+                var child = container.firstElementChild;
+
+                while (child) {
+                    if (child.tagName === 'OL' || child.tagName === 'UL') {
+                        var items = Array.prototype.filter.call(child.children, function (el) {
+                            return el.tagName === 'LI';
+                        });
+
+                        for (var i = 0; i < items.length; i++) {
+                            var li = items[i];
+                            var rect = li.getBoundingClientRect();
+                            var relTop = rect.top - containerTop;
+                            var relBottom = relTop + rect.height;
+                            var tallerThanPage = rect.height > CONTENT_PER_PAGE;
+
+                            while (crosses(relTop, relBottom, nextBoundary)) {
+                                markBreak(li);
+                                nextBoundary += CONTENT_PER_PAGE;
+                                if (tallerThanPage) break;
+                            }
+                        }
+
+                        child = child.nextElementSibling;
+                        continue;
+                    }
+
+                    var rect2 = child.getBoundingClientRect();
+                    var relTop2 = rect2.top - containerTop;
+                    var relBottom2 = relTop2 + rect2.height;
+                    var tallerThanPage2 = rect2.height > CONTENT_PER_PAGE;
+
+                    while (crosses(relTop2, relBottom2, nextBoundary)) {
+                        markBreak(child);
+                        nextBoundary += CONTENT_PER_PAGE;
+                        if (tallerThanPage2) break;
+                    }
+
+                    child = child.nextElementSibling;
+                }
+            }
+
+            if (document.readyState === 'complete') {
+                paginate();
+            } else {
+                window.addEventListener('load', paginate);
+            }
+        })();
+        </script>
+        JS;
+    }
+
     private function buildHtml(Document $document, string $content, ?string $paperSizeOverride = null): string
     {
         $margin = $this->resolveMargin($document);
@@ -376,12 +514,34 @@ class PdfExportService
         $bottomIn = $this->pxToIn($margin['bottom']);
         $leftIn = $this->pxToIn($margin['left']);
 
+        // Lebar tulis (px) — SAMA PERSIS dengan lebar konten editor:
+        // body.style.width = size.width (box-sizing:border-box, padding
+        // kiri+kanan termasuk di dalamnya) → lebar konten aktual =
+        // size.width - margin.left - margin.right. Di export, .paper TIDAK
+        // punya padding (margin fisik sudah ditangani @page), jadi kita
+        // beri width eksplisit = lebar konten itu langsung (content-box).
+        // WAJIB eksplisit (bukan mengandalkan lebar viewport headless
+        // Chrome yang bisa beda-beda) supaya word-wrap & tinggi tiap
+        // elemen persis sama dengan yang dihitung editor — tanpa ini,
+        // perhitungan pagination JS di buildPaginationScript() bisa salah
+        // walau rumusnya sama, karena teksnya membungkus di lebar berbeda.
+        $contentWidth = $page['width'] - $margin['left'] - $margin['right'];
+
+        // contentPerPage — SAMA PERSIS dengan `size.height - margin.top -
+        // margin.bottom` di repaginateEditor (jodit.js). Ini nilai tunggal
+        // yang menentukan tinggi satu halaman dari sisi konten (tanpa
+        // margin), dipakai oleh script pagination di bawah.
+        $contentPerPage = max($page['height'] - $margin['top'] - $margin['bottom'], 1);
+
+        $paginationScript = '';
+
         return <<<HTML
         <!DOCTYPE html>
         <html>
         <head>
             <meta charset="utf-8">
             <style>
+                @import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,400&family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Lora:ital,wght@0,400..700;1,400..700&family=Source+Code+Pro:ital,wght@0,400;0,700;1,400&display=swap');
                 /* Ukuran kertas & margin fisik — SAMA dengan @page yang
                    dibangun doPrint() di jodit.js (in, px/96). Browser
                    (Chrome headless) menerapkan margin ini ke SETIAP halaman,
@@ -390,20 +550,20 @@ class PdfExportService
                     size: {$paperSize} portrait;
                     margin: {$topIn}in {$rightIn}in {$bottomIn}in {$leftIn}in;
                 }
-                /* font-size & line-height sama persis dengan .doku-paper
-                   (_paper.blade.php): 16px / normal. */
-                body { font-family: 'Times New Roman', Times, serif; font-weight: normal; font-size: 16px; line-height: normal; color: #111; }
-                table { border-collapse: collapse; width: 100%; }
-                table th, table td { border: 1px solid #ccc; padding: 4px 6px; }
+                html, body { margin: 0; padding: 0; }
+                body { font-family: 'Times New Roman', Times, serif; font-weight: normal; font-size: 16px; line-height: normal; color: #111; overflow-wrap: break-word; word-break: break-word; orphans: 1; widows: 1; }
+                .paper {
+                    width: {$contentWidth}px;
+                    box-sizing: content-box;
+                }
+                table { width: 100%; border: none; border-collapse: collapse; empty-cells: show; max-width: 100%; }
+                table th, table td { border: 1px solid #ccc; padding: 2px 5px; }
                 img { max-width: 100%; height: auto; }
-                /* Elemen level atas tidak dipotong di tengah saat pindah
-                   halaman (break-inside: avoid) — konsisten dengan aturan
-                   doPrint/repaginateEditor di jodit.js. */
-                .paper > * { break-inside: avoid; page-break-inside: avoid; }
             </style>
         </head>
         <body>
             <div class="paper">{$content}</div>
+            {$paginationScript}
         </body>
         </html>
         HTML;
