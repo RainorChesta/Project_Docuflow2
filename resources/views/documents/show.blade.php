@@ -1,10 +1,5 @@
 <x-app-layout>
-    <x-slot name="header">
-        <div class="flex flex-wrap items-center gap-2 justify-between">
-            <span class="min-w-0 truncate">{{ $document->title }}</span>
-            <span class="text-sm font-normal text-base-content/60 shrink-0">{{ $document->document_number }}</span>
-        </div>
-    </x-slot>
+    <x-slot name="header">Document Detail</x-slot>
 
     @if(!auth()->user()->isAdmin() && !auth()->user()->isHead())
         <x-confirm-modal
@@ -381,6 +376,7 @@
                     @elseif($display)
                         @include('documents._paper', [
                             'content' => $display->content,
+                            'document' => $document,
                             'liveStorage' => 'doc-preview-' . $document->id,
                             'paperSize' => $document->paper_size ?? 'A4',
                             'paperMargin' => $document->paper_margin,

@@ -21,6 +21,9 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+// Public QR Code verification route
+Route::get('/d/{token}', [DocumentController::class, 'viewByHash'])->name('documents.hash');
+
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
@@ -37,6 +40,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/documents/{document}/preview-content', [DocumentController::class, 'previewContent'])->name('documents.preview-content');
     Route::get('/documents/{document}/versions/{version}/preview', [DocumentController::class, 'previewVersion'])->name('documents.preview-version');
     Route::get('/documents/{document}/versions/{version}/file', [DocumentController::class, 'file'])->name('documents.file');
+    Route::get('/documents/{document}/qrcode', [DocumentController::class, 'qrCode'])->name('documents.qrcode');
     Route::put('/documents/{document}/save', [DocumentController::class, 'save'])->name('documents.save');
     Route::put('/documents/{document}/save-draft', [DocumentController::class, 'saveDraft'])->name('documents.save-draft');
     Route::post('/documents/{document}/versions/upload', [DocumentController::class, 'uploadVersion'])->name('documents.upload-version');
@@ -83,5 +87,6 @@ Route::get('/share/{token}', [ShareLinkController::class, 'access'])->name('shar
 Route::post('/share/{token}/save', [ShareLinkController::class, 'save'])->name('shared.documents.save');
 Route::post('/share/{token}/discard', [ShareLinkController::class, 'discard'])->name('shared.documents.discard');
 Route::post('/share/{token}/upload', [ShareLinkController::class, 'upload'])->name('shared.documents.upload');
+Route::post('/share/{token}/export-pdf', [ShareLinkController::class, 'exportPdf'])->name('shared.documents.export-pdf');
 
 require __DIR__.'/auth.php';
