@@ -9,6 +9,7 @@ use App\Http\Controllers\ApprovalController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\DocumentExportController;
+use App\Http\Controllers\DocumentShareController;
 use App\Http\Controllers\JoditController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ShareLinkController;
@@ -21,6 +22,9 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+use App\Http\Controllers\SignatureController;
+
+Route::middleware(['auth', 'signature.required'])->group(function () {
 // Public QR Code verification route
 Route::get('/d/{token}', [DocumentController::class, 'viewByHash'])->name('documents.hash');
 
@@ -29,6 +33,15 @@ Route::middleware('auth')->group(function () {
 
     // Jodit image upload
     Route::post('/jodit-upload', [JoditController::class, 'upload'])->name('jodit.upload');
+
+    // Signatures
+    Route::get('/profile/signature', [SignatureController::class, 'show'])->name('profile.signature.show');
+    Route::post('/profile/signature', [SignatureController::class, 'store'])->name('profile.signature.store');
+    Route::delete('/profile/signature', [SignatureController::class, 'destroy'])->name('profile.signature.destroy');
+    Route::get('/signatures/users', [SignatureController::class, 'availableUsers'])->name('signatures.users');
+    Route::get('/signature-requests', [SignatureController::class, 'requestsIndex'])->name('signatures.requests.index');
+    Route::post('/signature-requests/{signatureRequest}/approve', [SignatureController::class, 'approve'])->name('signatures.requests.approve');
+    Route::post('/signature-requests/{signatureRequest}/reject', [SignatureController::class, 'reject'])->name('signatures.requests.reject');
 
     // Documents
     Route::resource('documents', DocumentController::class)->except(['edit', 'update']);
@@ -61,6 +74,17 @@ Route::middleware('auth')->group(function () {
     Route::delete('/documents/{document}/links/{link}', [ShareLinkController::class, 'destroy'])->name('links.destroy');
     Route::get('/my-shared-edits', [ShareLinkController::class, 'history'])->name('shared.history');
 
+    // Document Shares (Google Docs model)
+    Route::post('/documents/{document}/shares', [DocumentShareController::class, 'store'])->name('shares.store');
+    Route::patch('/documents/{document}/shares/{share}', [DocumentShareController::class, 'updateUserShare'])->name('shares.update');
+    Route::delete('/documents/{document}/shares/{share}', [DocumentShareController::class, 'destroyUserShare'])->name('shares.destroy');
+    Route::patch('/documents/{document}/division-shares/{divisionShare}', [DocumentShareController::class, 'updateDivisionShare'])->name('shares.division.update');
+    Route::delete('/documents/{document}/division-shares/{divisionShare}', [DocumentShareController::class, 'destroyDivisionShare'])->name('shares.division.destroy');
+    Route::patch('/documents/{document}/general-access', [DocumentShareController::class, 'updateGeneralAccess'])->name('shares.general-access.update');
+    Route::post('/documents/{document}/regenerate-token', [DocumentShareController::class, 'regenerateToken'])->name('shares.regenerate-token');
+    Route::get('/documents/{document}/share-data', [DocumentShareController::class, 'shareData'])->name('shares.data');
+    Route::get('/documents/{document}/search-sharees', [DocumentShareController::class, 'searchSharees'])->name('shares.search');
+
     // PDF Export
     Route::post('/documents/{document}/export-pdf', [DocumentExportController::class, 'export'])
         ->name('documents.export-pdf');
@@ -88,5 +112,8 @@ Route::post('/share/{token}/save', [ShareLinkController::class, 'save'])->name('
 Route::post('/share/{token}/discard', [ShareLinkController::class, 'discard'])->name('shared.documents.discard');
 Route::post('/share/{token}/upload', [ShareLinkController::class, 'upload'])->name('shared.documents.upload');
 Route::post('/share/{token}/export-pdf', [ShareLinkController::class, 'exportPdf'])->name('shared.documents.export-pdf');
+
+// Share-token link access (Google Docs model)
+Route::get('/d/{token}', [DocumentShareController::class, 'accessByToken'])->name('documents.shared');
 
 require __DIR__.'/auth.php';

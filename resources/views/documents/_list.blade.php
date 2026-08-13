@@ -11,6 +11,12 @@
             @if($doc->documentType)
                 <span class="badge badge-outline badge-sm shrink-0">{{ $doc->documentType->code }}</span>
             @endif
+            @if(isset($type) && $type === 'shared')
+                @php $shareRole = $doc->shares->first()?->role; @endphp
+                @if($shareRole)
+                    <span class="badge badge-sm {{ $shareRole === 'editor' ? 'badge-info' : 'badge-ghost' }} shrink-0 capitalize">{{ $shareRole }}</span>
+                @endif
+            @endif
         </div>
         <p class="text-sm text-base-content/60 truncate">
             {{ $doc->document_number }}
@@ -22,7 +28,10 @@
         </p>
     </div>
     <div class="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">
-        @if($doc->owner_id === auth()->id())
+        @php
+            $isEditorShare = isset($type) && $type === 'shared' && $doc->shares->first()?->role === 'editor';
+        @endphp
+        @if($doc->owner_id === auth()->id() || $isEditorShare)
             <a href="{{ route('documents.edit', $doc) }}" class="btn btn-ghost btn-xs">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                 {{ __('Edit') }}

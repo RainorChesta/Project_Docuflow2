@@ -248,6 +248,12 @@
                                 {{ __('Link Berbagi') }}
                             </button>
                         @endcan
+                        @can('manageAccess', $document)
+                            <button type="button" onclick="openShareModal()" class="btn btn-outline btn-primary btn-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 0a3 3 0 11-5.367 2.684 3 3 0 015.367-2.684z" /></svg>
+                                Bagikan
+                            </button>
+                        @endcan
 
                         <button
                             type="button"
@@ -472,6 +478,61 @@
                             @endforeach
                         </div>
                     @endif
+                </div>
+                <form method="dialog" class="modal-backdrop">
+                    <button>close</button>
+                </form>
+            </dialog>
+
+            {{-- Bagikan Modal (Google Docs model) --}}
+            <dialog id="share-modal" class="modal">
+                <div class="modal-box max-w-xl max-h-[85vh] overflow-y-auto">
+                    <div class="flex flex-wrap items-center justify-between mb-4">
+                        <h3 class="font-semibold">Bagikan "{{ $document->title }}"</h3>
+                        <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('share-modal').close()">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    {{-- Invite search --}}
+                    <div class="form-control mb-2 relative">
+                        <input id="share-search-input" type="text" placeholder="Cari nama pengguna atau divisi&hellip;"
+                               class="input input-bordered w-full" autocomplete="off">
+                        <div id="share-search-results" class="hidden absolute top-full left-0 right-0 z-10 mt-1 bg-base-100 border border-base-300 rounded-box shadow-lg max-h-64 overflow-y-auto"></div>
+                    </div>
+                    <p id="share-search-hint" class="text-xs text-base-content/50 mb-4">Tambahkan orang atau divisi untuk mengakses dokumen ini.</p>
+
+                    {{-- People with access --}}
+                    <div class="mb-5">
+                        <h4 class="text-sm font-medium text-base-content/70 mb-2">Orang dengan akses</h4>
+                        <div id="share-list" class="space-y-2 text-sm">
+                            <div class="text-base-content/50 italic">Memuat&hellip;</div>
+                        </div>
+                    </div>
+
+                    {{-- General access --}}
+                    <div class="border-t border-base-200 pt-4">
+                        <h4 class="text-sm font-medium text-base-content/70 mb-3">Akses umum</h4>
+                        <div class="flex flex-col gap-2">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="general_access" value="restricted" class="radio radio-sm" onchange="updateGeneralAccess()">
+                                <span class="text-sm">Restricted — hanya orang yang diundang</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="general_access" value="anyone_with_link" class="radio radio-sm" onchange="updateGeneralAccess()">
+                                <span class="text-sm">Siapa saja yang punya link</span>
+                            </label>
+                            <div class="flex flex-wrap items-center gap-2 mt-2">
+                                <button type="button" class="btn btn-outline btn-primary btn-sm" onclick="copyShareUrl()">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                                    Salin Link
+                                </button>
+                                <button type="button" class="btn btn-ghost btn-sm" onclick="regenerateToken()">Buat link baru</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <form method="dialog" class="modal-backdrop">
                     <button>close</button>
@@ -747,6 +808,203 @@
         @if($errors->has('file'))
             document.getElementById('upload-version-modal').showModal();
         @endif
+
+        // ---- Bagikan modal (Google Docs model) ----
+        const shareDataUrl = @json(route('shares.data', $document));
+        const shareStoreUrl = @json(route('shares.store', $document));
+        const shareSearchUrl = @json(route('shares.search', $document));
+        const shareGeneralUrl = @json(route('shares.general-access.update', $document));
+        const shareRegenUrl = @json(route('shares.regenerate-token', $document));
+        let shareState = null;
+
+        async function openShareModal() {
+            document.getElementById('share-modal').showModal();
+            await loadShareData();
+        }
+
+        async function loadShareData() {
+            const list = document.getElementById('share-list');
+            list.innerHTML = '<div class="text-base-content/50 italic">Memuat&hellip;</div>';
+            try {
+                const res = await fetch(shareDataUrl, { headers: { 'Accept': 'application/json' } });
+                shareState = await res.json();
+                renderShareList();
+                renderGeneralAccess();
+            } catch (e) {
+                list.innerHTML = '<div class="text-error">Gagal memuat data akses.</div>';
+            }
+        }
+
+        function renderShareList() {
+            const list = document.getElementById('share-list');
+            const rows = [];
+
+            rows.push(`<div class="flex items-center justify-between gap-2 py-1">
+                <div class="min-w-0">
+                    <p class="font-medium truncate">${escapeHtml(shareState.owner.name)}</p>
+                    <p class="text-xs text-base-content/50">Pemilik</p>
+                </div>
+                <span class="badge badge-primary badge-sm shrink-0">owner</span>
+            </div>`);
+
+            shareState.shares.forEach(s => {
+                rows.push(`<div class="flex items-center justify-between gap-2 py-1">
+                    <div class="min-w-0">
+                        <p class="font-medium truncate">${escapeHtml(s.name)}</p>
+                        <p class="text-xs text-base-content/50 truncate">${escapeHtml(s.email)}</p>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <select class="select select-bordered select-xs" onchange="updateUserShare(${s.id}, this.value)">
+                            <option value="viewer" ${s.role === 'viewer' ? 'selected' : ''}>Viewer</option>
+                            <option value="editor" ${s.role === 'editor' ? 'selected' : ''}>Editor</option>
+                        </select>
+                        <button type="button" class="text-error hover:underline text-xs" onclick="removeUserShare(${s.id})">Hapus</button>
+                    </div>
+                </div>`);
+            });
+
+            shareState.division_shares.forEach(s => {
+                rows.push(`<div class="flex items-center justify-between gap-2 py-1">
+                    <div class="min-w-0">
+                        <p class="font-medium truncate">${escapeHtml(s.name)}</p>
+                        <p class="text-xs text-base-content/50">Divisi</p>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <select class="select select-bordered select-xs" onchange="updateDivisionShare(${s.id}, this.value)">
+                            <option value="viewer" ${s.role === 'viewer' ? 'selected' : ''}>Viewer</option>
+                            <option value="editor" ${s.role === 'editor' ? 'selected' : ''}>Editor</option>
+                        </select>
+                        <button type="button" class="text-error hover:underline text-xs" onclick="removeDivisionShare(${s.id})">Hapus</button>
+                    </div>
+                </div>`);
+            });
+
+            list.innerHTML = rows.join('') || '<div class="text-base-content/50 italic">Belum ada akses lain.</div>';
+        }
+
+        function renderGeneralAccess() {
+            const restricted = document.querySelector('input[name="general_access"][value="restricted"]');
+            const anyone = document.querySelector('input[name="general_access"][value="anyone_with_link"]');
+            if (shareState.general_access === 'anyone_with_link') {
+                anyone.checked = true;
+            } else {
+                restricted.checked = true;
+            }
+        }
+
+        function escapeHtml(str) {
+            return String(str ?? '').replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
+        }
+
+        async function postForm(url, data) {
+            const body = new URLSearchParams(data);
+            body.append('_token', document.querySelector('meta[name="csrf-token"]')?.content ?? '');
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '' },
+                body,
+            });
+            if (!res.ok) throw new Error('Request failed');
+        }
+
+        async function updateUserShare(id, role) {
+            const url = @json(route('shares.update', [$document, '__id__'])).replace('__id__', id);
+            await postForm(url, { _method: 'PATCH', role });
+            await loadShareData();
+        }
+
+        async function removeUserShare(id) {
+            const url = @json(route('shares.destroy', [$document, '__id__'])).replace('__id__', id);
+            await postForm(url, { _method: 'DELETE' });
+            await loadShareData();
+        }
+
+        async function updateDivisionShare(id, role) {
+            const url = @json(route('shares.division.update', [$document, '__id__'])).replace('__id__', id);
+            await postForm(url, { _method: 'PATCH', role });
+            await loadShareData();
+        }
+
+        async function removeDivisionShare(id) {
+            const url = @json(route('shares.division.destroy', [$document, '__id__'])).replace('__id__', id);
+            await postForm(url, { _method: 'DELETE' });
+            await loadShareData();
+        }
+
+        async function updateGeneralAccess() {
+            const access = document.querySelector('input[name="general_access"]:checked').value;
+            await postForm(shareGeneralUrl, { _method: 'PATCH', general_access: access });
+            await loadShareData();
+        }
+
+        async function regenerateToken() {
+            await postForm(shareRegenUrl, {});
+            await loadShareData();
+        }
+
+        function copyShareUrl() {
+            if (!shareState?.share_url) return;
+            navigator.clipboard.writeText(shareState.share_url);
+        }
+
+        // Invite autocomplete
+        const searchInput = document.getElementById('share-search-input');
+        const searchResults = document.getElementById('share-search-results');
+        let searchTimer = null;
+
+        searchInput.addEventListener('input', () => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(async () => {
+                const q = searchInput.value.trim();
+                if (q.length < 1) { searchResults.classList.add('hidden'); return; }
+                const res = await fetch(shareSearchUrl + '?q=' + encodeURIComponent(q), { headers: { 'Accept': 'application/json' } });
+                const data = await res.json();
+                renderSearchResults(data);
+            }, 250);
+        });
+
+        function renderSearchResults(data) {
+            const items = [];
+            data.users.forEach(u => {
+                items.push(`<button type="button" class="w-full text-left px-3 py-2 hover:bg-base-200 flex items-center justify-between gap-2"
+                    onclick="inviteUser(${u.id}, '${escapeHtml(u.name).replace(/'/g, "\\'")}')">
+                    <span class="min-w-0"><span class="font-medium">${escapeHtml(u.name)}</span>
+                    <span class="text-xs text-base-content/50 block truncate">${escapeHtml(u.email)}</span></span>
+                    <span class="badge badge-ghost badge-sm shrink-0">Pengguna</span>
+                </button>`);
+            });
+            data.divisions.forEach(d => {
+                items.push(`<button type="button" class="w-full text-left px-3 py-2 hover:bg-base-200 flex items-center justify-between gap-2"
+                    onclick="inviteDivision(${d.id}, '${escapeHtml(d.name).replace(/'/g, "\\'")}')">
+                    <span class="font-medium">${escapeHtml(d.name)}</span>
+                    <span class="badge badge-ghost badge-sm shrink-0">Divisi</span>
+                </button>`);
+            });
+            searchResults.innerHTML = items.join('') || '<div class="px-3 py-2 text-base-content/50">Tidak ditemukan.</div>';
+            searchResults.classList.remove('hidden');
+        }
+
+        async function inviteUser(id, name) {
+            await postForm(shareStoreUrl, { type: 'user', user_id: id, role: 'viewer' });
+            searchInput.value = '';
+            searchResults.classList.add('hidden');
+            await loadShareData();
+        }
+
+        async function inviteDivision(id, name) {
+            await postForm(shareStoreUrl, { type: 'division', division_id: id, role: 'viewer' });
+            searchInput.value = '';
+            searchResults.classList.add('hidden');
+            await loadShareData();
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!searchResults.contains(e.target) && e.target !== searchInput) {
+                searchResults.classList.add('hidden');
+            }
+        });
     </script>
 
     {{-- Version History modal --}}

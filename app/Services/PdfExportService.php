@@ -105,6 +105,8 @@ class PdfExportService
             throw new BusinessLogicException('Chrome/Edge tidak ditemukan di server untuk generate PDF.');
         }
 
+        $content = app(\App\Services\SignatureResolverService::class)->resolve($display->content, $document, $user, true);
+        $content = $this->normalizeContentFonts($content);
         $content = $this->normalizeContentFonts($display->content);
         $content = $this->qrCodeService->injectPlaceholder($content, $document);
         $content = $display->content;

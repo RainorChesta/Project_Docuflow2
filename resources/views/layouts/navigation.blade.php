@@ -52,13 +52,48 @@
             <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Saya') }}</span>
         </a>
 
+        <a href="{{ route('documents.index', ['type' => 'shared']) }}"
+           class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
+                  {{ request()->routeIs('documents.*') && request('type', '') === 'shared' ? 'bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"
+           :class="open ? '' : 'lg:justify-center lg:px-0'"
+           :title="open ? '' : 'Shared Documents'">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">Shared Documents</span>
+        </a>
+
         <a href="{{ route('documents.index', ['type' => 'division']) }}"
            class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
                   {{ request()->routeIs('documents.*') && request('type', '') === 'division' ? 'bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0'"
+           :title="open ? '' : 'Dokumen Divisi'">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 14v6m-3-3h6M6 10h2a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v2a2 2 0 002 2zm10 0h2a2 2 0 002-2V6a2 2 0 00-2-2h-2a2 2 0 00-2 2v2a2 2 0 002 2zM6 20h2a2 2 0 002-2v-2a2 2 0 00-2-2H6a2 2 0 00-2 2v2a2 2 0 002 2z" /></svg>
+            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">Dokumen Divisi</span>
            :title="open ? '' : '{{ __('Dokumen Divisi') }}'">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
             <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Divisi') }}</span>
+        </a>
+
+        <a href="{{ route('signatures.requests.index') }}"
+           class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150
+                  {{ request()->routeIs('signatures.requests.*') ? 'bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"
+           :class="open ? '' : 'lg:justify-center lg:px-0'"
+           :title="open ? '' : 'Persetujuan TTD'">
+            <div class="relative shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                @php($pendingTtdCount = auth()->user()->receivedSignatureRequests()->where('status', 'pending')->count())
+                @if($pendingTtdCount > 0)
+                    <span class="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-error"></span>
+                    </span>
+                @endif
+            </div>
+            <span class="whitespace-nowrap flex-1 flex items-center justify-between" :class="open ? '' : 'lg:hidden'">
+                <span>Persetujuan TTD</span>
+                @if($pendingTtdCount > 0)
+                    <span class="badge badge-error badge-xs font-bold text-white px-1.5">{{ $pendingTtdCount }}</span>
+                @endif
+            </span>
         </a>
         @endif
 

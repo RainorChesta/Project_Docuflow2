@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\Document;
 use App\Models\User;
+use App\Services\DocumentShareService;
 
 class DocumentPolicy
 {
@@ -14,9 +15,14 @@ class DocumentPolicy
         if ($user->id === $document->owner_id) return true;
 
         // Division-scoped docs: visible to members of that division.
-        return $document->isDivision()
+        if ($document->isDivision()
             && $document->division_id
-            && in_array($document->division_id, $user->allDivisionIds(), true);
+            && in_array($document->division_id, $user->allDivisionIds(), true)) {
+            return true;
+        }
+
+        // Any share (personal, division, or link) grants view.
+        return app(DocumentShareService::class)->resolveEffectiveRole($document, $user) !== null;
     }
 
     public function create(User $user): bool
@@ -27,6 +33,15 @@ class DocumentPolicy
     }
 
     public function update(User $user, Document $document): bool
+    {
+        if ($user->id === $document->owner_id || $user->isAdmin()) return true;
+
+        $role = app(DocumentShareService::class)->resolveEffectiveRole($document, $user);
+
+        return in_array($role, ['owner', 'editor'], true);
+    }
+
+    public function manageAccess(User $user, Document $document): bool
     {
         return $user->id === $document->owner_id || $user->isAdmin();
     }

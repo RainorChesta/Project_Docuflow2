@@ -17,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         $middleware->alias([
             'share.link' => \App\Http\Middleware\ShareLinkAuth::class,
+            'signature.required' => \App\Http\Middleware\EnsureUserHasSignature::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

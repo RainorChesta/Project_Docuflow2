@@ -243,6 +243,7 @@
         <button type="button" class="doku-paper-zoom-btn" data-paper-zoom-reset>Reset</button>
     </div>
     <div class="doku-paper">
+        {!! app(\App\Services\SignatureResolverService::class)->resolve($content, $document ?? null, auth()->user()) !!}
         {!! isset($document) ? app(\App\Services\QrCodeService::class)->injectPlaceholder($content, $document) : $content !!}
     </div>
 </div>
