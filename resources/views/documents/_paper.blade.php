@@ -5,6 +5,10 @@
        seperti iframeStyle editor di resources/js/jodit.js. Tanpa ini font
        Google tidak tampil di preview halaman → beda dgn pratinjau Jodit. */
     @import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,400&family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Lora:ital,wght@0,400..700;1,400..700&family=Source+Code+Pro:ital,wght@0,400;0,700;1,400&display=swap');
+    /* Impor shared styles — satu sumber kebenaran untuk tipografi dokumen.
+       Semua aturan (.doku-paper scope) didefinisikan di sana, bukan di sini,
+       supaya Preview dan Editor selalu sinkron tanpa duplikasi kode. */
+    @import url('/css/document-shared.css');
 
     /* Fix scroll hilang saat live-sync render: preview.blade.php merender
        ulang konten draft dari localStorage dengan menimpa innerHTML
@@ -75,14 +79,10 @@
     outline: 1px solid #d1d5db;
     box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.08);
     box-sizing: border-box;
-    font-family: Times, "Times New Roman", serif;
-    font-size: 16px;
-    line-height: normal;
-    color: #000;
-    /* Kata/teks panjang (URL, kode, font lebar) dipecah biar tidak
-       meluber keluar kotak kertas preview. */
-    overflow-wrap: break-word;
-    word-break: break-word;
+    /* font-family, font-size, line-height, color, overflow-wrap, word-break
+       sekarang berasal dari .doku-paper dalam document-shared.css
+       (line-height: 1.5 — sama persis dengan yang diterapkan editor via
+       .doku-content). Tidak perlu di-set ulang di sini. */
 }
 
     /* Responsif: di layar sempit, kertas mengikuti lebar device dan
@@ -150,16 +150,24 @@
         clear: both;
     }
 
-    /* Netralkan preflight Tailwind di dalam paper: semua elemen konten
-       dikembalikan ke default browser (UA stylesheet) — persis seperti
-       render di iframe editor Jodit yang TIDAK kena preflight. Tanpa ini
-       margin h1-h6, ukuran heading, list-style, dsb. di-reset preflight
-       → tinggi konten beda → elemen yang di editor jatuh ke halaman
-       berikutnya (di bawah garis) malah sejajar dengan garis di preview. */
-    .doku-paper-scope .doku-paper :is(p, h1, h2, h3, h4, h5, h6, ul, ol, li, blockquote, pre, figure, dl, dd, dt, hr) {
-        all: revert;
-    }
+    /* FIX: Netralkan preflight Tailwind di luar paper yang bisa "bocor"
+       masuk ke dalam .doku-paper dan menimpa aturan document-shared.css.
+       Tailwind preflight me-reset margin/padding/font-size semua elemen ke
+       nol — di sisi luar halaman itu normal, tapi di dalam .doku-paper kita
+       perlu UA stylesheet + document-shared.css, bukan reset Tailwind.
+       Dengan mengembalikan elemen konten ke nilai yang sudah kita definisikan
+       secara eksplisit di document-shared.css (via .doku-paper scope),
+       preflight tidak punya kesempatan menimpa mereka.
+       CATATAN: Blok "all: revert" yang sebelumnya ada di sini DIHAPUS —
+       revert mengembalikan ke UA defaults yang berbeda-beda antar browser
+       DAN dapat membatalkan aturan dari document-shared.css. Sebaliknya,
+       kita mengandalkan aturan eksplisit di document-shared.css (.doku-paper
+       scope) yang sudah SAMA PERSIS dengan aturan editor (.doku-content scope),
+       sehingga preview dan editor selalu konsisten. */
 
+    /* High-specificity overrides untuk tabel — .doku-paper-scope .doku-paper
+       lebih spesifik dari .doku-paper di document-shared.css, jadi ini aman
+       tanpa !important kecuali untuk vertical-align yang perlu menang atas UA. */
     .doku-paper-scope .doku-paper table {
         width: 100%;
         border: none;
@@ -172,6 +180,15 @@
     .doku-paper-scope .doku-paper td {
         padding: 2px 5px;
         border: 1px solid #ccc;
+        /* FIX "teks otomatis ketengah": default UA stylesheet buat td/th
+           adalah vertical-align:middle. Sel yang isinya sedikit (1 baris)
+           jadi kelihatan center vertikal, sementara sel sebelahnya yang
+           isinya banyak baris kebetulan memenuhi tinggi sel jadi terlihat
+           rata atas — padahal dua-duanya sama-sama "middle". Dipaksa top
+           di sini supaya SEMUA sel konsisten rata atas seperti default
+           kolom pertama, sama seperti fix di iframeStyle editor
+           (resources/js/jodit.js). */
+        vertical-align: top;
     }
 
     .doku-paper-scope .doku-paper img {
@@ -225,12 +242,9 @@
 <div class="doku-paper-scope" @isset($liveStorage) data-live-storage="{{ $liveStorage }}" @endisset
      data-paper-size="{{ $paperSize ?? 'A4' }}"
      data-paper-margin="{{ json_encode($paperMargin ?? null) }}">
-    @isset($liveStorage)
-        <div class="doku-paper-toolbar">
-            <label class="text-base-content/70">{{ __('Ukuran Kertas') }}:</label>
     <div class="doku-paper-toolbar">
         @isset($liveStorage)
-            <label class="text-base-content/70">Ukuran Kertas:</label>
+            <label class="text-base-content/70">{{ __('Ukuran Kertas') }}:</label>
             <select data-paper-size-select>
                 @foreach(['A4', 'A5', 'A3', 'Letter', 'Legal'] as $paperKey)
                     <option value="{{ $paperKey }}">{{ $paperKey }}</option>
@@ -252,7 +266,6 @@
         {!! $finalContent !!}
     </div>
 </div>
-@endisset
 
 @once
 <script>
