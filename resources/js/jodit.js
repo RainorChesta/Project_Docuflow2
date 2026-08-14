@@ -93,6 +93,7 @@ function buildIframeStyle(size, margin = DEFAULT_MARGIN) {
     const padding = `${margin.top}px ${margin.right}px ${margin.bottom}px ${margin.left}px`;
     return [
         `@import url('${GOOGLE_FONTS_URL}');`,
+        `@import url('/css/document-shared.css');`,
         'html { margin:0; padding:0; background:#e5e7eb; }',
         'body {',
         '  box-sizing:border-box;',
@@ -734,79 +735,79 @@ function buildSignaturePopup(editor, close) {
     fetch('/signatures/users', {
         headers: { 'Accept': 'application/json' }
     })
-    .then(res => res.json())
-    .then(data => {
-        loading.style.display = 'none';
-        listContainer.style.display = 'flex';
-        searchInput.style.display = '';
-        const users = data.users || [];
+        .then(res => res.json())
+        .then(data => {
+            loading.style.display = 'none';
+            listContainer.style.display = 'flex';
+            searchInput.style.display = '';
+            const users = data.users || [];
 
-        // Keep references to each button and its searchable text
-        const entries = [];
+            // Keep references to each button and its searchable text
+            const entries = [];
 
-        users.forEach(u => {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.style.cssText = 'display:flex; align-items:center; justify-content:space-between; width:100%; padding:6px 10px; border:none; background:transparent; border-radius:4px; text-align:left; cursor:pointer; font-size:13px; color:#1f2937; transition:background 0.15s;';
-            btn.onmouseover = () => btn.style.background = '#f3f4f6';
-            btn.onmouseout = () => btn.style.background = 'transparent';
+            users.forEach(u => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.style.cssText = 'display:flex; align-items:center; justify-content:space-between; width:100%; padding:6px 10px; border:none; background:transparent; border-radius:4px; text-align:left; cursor:pointer; font-size:13px; color:#1f2937; transition:background 0.15s;';
+                btn.onmouseover = () => btn.style.background = '#f3f4f6';
+                btn.onmouseout = () => btn.style.background = 'transparent';
 
-            const left = document.createElement('div');
-            left.style.cssText = 'display:flex; flex-direction:column;';
-            const name = document.createElement('span');
-            name.style.cssText = 'font-weight:500;';
-            const displayName = u.is_me ? `✨ TTD Saya (${u.name})` : u.name;
-            name.textContent = displayName;
+                const left = document.createElement('div');
+                left.style.cssText = 'display:flex; flex-direction:column;';
+                const name = document.createElement('span');
+                name.style.cssText = 'font-weight:500;';
+                const displayName = u.is_me ? `✨ TTD Saya (${u.name})` : u.name;
+                name.textContent = displayName;
 
-            const role = document.createElement('span');
-            role.style.cssText = 'font-size:11px; color:#6b7280;';
-            const roleText = `${u.role} - ${u.division}`;
-            role.textContent = roleText;
+                const role = document.createElement('span');
+                role.style.cssText = 'font-size:11px; color:#6b7280;';
+                const roleText = `${u.role} - ${u.division}`;
+                role.textContent = roleText;
 
-            left.appendChild(name);
-            left.appendChild(role);
+                left.appendChild(name);
+                left.appendChild(role);
 
-            const badge = document.createElement('span');
-            badge.style.cssText = 'font-size:11px; font-family:monospace; background:#e0e7ff; color:#3730a3; padding:2px 6px; border-radius:4px; font-weight:600;';
-            badge.textContent = u.placeholder;
+                const badge = document.createElement('span');
+                badge.style.cssText = 'font-size:11px; font-family:monospace; background:#e0e7ff; color:#3730a3; padding:2px 6px; border-radius:4px; font-weight:600;';
+                badge.textContent = u.placeholder;
 
-            btn.appendChild(left);
-            btn.appendChild(badge);
+                btn.appendChild(left);
+                btn.appendChild(badge);
 
-            btn.addEventListener('click', () => {
-                editor.selection.insertHTML(` ${u.placeholder} `);
-                if (typeof close === 'function') close();
+                btn.addEventListener('click', () => {
+                    editor.selection.insertHTML(` ${u.placeholder} `);
+                    if (typeof close === 'function') close();
+                });
+
+                listContainer.appendChild(btn);
+
+                // Store searchable text (lowercase) alongside the button element
+                entries.push({
+                    el: btn,
+                    searchText: `${displayName} ${roleText} ${u.placeholder}`.toLowerCase()
+                });
             });
 
-            listContainer.appendChild(btn);
+            // --- Wire up search/filter ---
+            searchInput.addEventListener('input', () => {
+                const query = searchInput.value.trim().toLowerCase();
+                let visibleCount = 0;
 
-            // Store searchable text (lowercase) alongside the button element
-            entries.push({
-                el: btn,
-                searchText: `${displayName} ${roleText} ${u.placeholder}`.toLowerCase()
+                entries.forEach(entry => {
+                    const matches = !query || entry.searchText.includes(query);
+                    entry.el.style.display = matches ? '' : 'none';
+                    if (matches) visibleCount++;
+                });
+
+                // Show/hide empty state
+                emptyState.style.display = visibleCount === 0 ? 'block' : 'none';
+                listContainer.style.display = visibleCount === 0 ? 'none' : 'flex';
             });
+        })
+        .catch(err => {
+            loading.textContent = 'Gagal memuat daftar pengguna.';
+            loading.style.color = '#ef4444';
         });
-
-        // --- Wire up search/filter ---
-        searchInput.addEventListener('input', () => {
-            const query = searchInput.value.trim().toLowerCase();
-            let visibleCount = 0;
-
-            entries.forEach(entry => {
-                const matches = !query || entry.searchText.includes(query);
-                entry.el.style.display = matches ? '' : 'none';
-                if (matches) visibleCount++;
-            });
-
-            // Show/hide empty state
-            emptyState.style.display = visibleCount === 0 ? 'block' : 'none';
-            listContainer.style.display = visibleCount === 0 ? 'none' : 'flex';
-        });
-    })
-    .catch(err => {
-        loading.textContent = 'Gagal memuat daftar pengguna.';
-        loading.style.color = '#ef4444';
-    });
 
     return wrapper;
 }
@@ -913,6 +914,8 @@ function buildPrintStyle(win, size, margin) {
     const mLeftIn = (margin.left / 96).toFixed(4);
     const style = win.document.createElement('style');
     style.innerHTML = `
+        @import url('${GOOGLE_FONTS_URL}');
+        @import url('/css/document-shared.css');
         @page {
             size: ${widthIn}in ${heightIn}in;
             /* Margin WAJIB lewat @page, bukan padding body — @page margin
@@ -995,8 +998,8 @@ function doPrint(jodit, size) {
     jodit.e.fire('generateDocumentStructure.iframe', myWindow.document, jodit);
     // getCleanValue(jodit, true): buang spacer DAN ganti placeholder QR jadi
     // <img> asli. Tidak ada titik potong halaman yang dipaksakan — browser
-    // yang menghitung sendiri.
     myWindow.document.body.innerHTML = getCleanValue(jodit, true);
+    myWindow.document.body.classList.add('doku-content');
 
     const margin = jodit.currentMargin || DEFAULT_MARGIN;
     buildPrintStyle(myWindow, size, margin);
@@ -1352,6 +1355,9 @@ export function initJoditEditor(selector, overrides = {}) {
     // supaya editor benar-benar mulai dari margin yang sudah tersimpan.
     applyPaperSize(editor, initialSize, initialMargin);
     editor.e.on('afterInit', () => {
+        if (editor.editor) {
+            editor.editor.classList.add('doku-content');
+        }
         applyPaperSize(editor, initialSize, initialMargin);
         repaginateEditor(editor);
 

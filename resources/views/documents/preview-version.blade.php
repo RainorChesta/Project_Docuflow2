@@ -39,7 +39,12 @@
                     @if($version->file_path)
                         @include('documents._file-preview', ['document' => $document, 'version' => $version])
                     @else
-                        @include('documents._paper', ['content' => $version->content ?? '', 'document' => $document])
+                        @include('documents._paper', [
+                            'content'     => $version->content ?? '',
+                            'document'    => $document,
+                            'paperSize'   => $document->paper_size ?? 'A4',
+                            'paperMargin' => $document->paper_margin,
+                        ])
                     @endif
                 </div>
             </div>
