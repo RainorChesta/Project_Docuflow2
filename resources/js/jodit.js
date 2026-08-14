@@ -166,6 +166,47 @@ function buildSpacerElement(margin, gap, extraAttrs) {
         userSelect: 'none',
     });
 
+    // FIX QR (print): saat forPrint, ganti placeholder QR (lihat control
+    // "qrCode" di atas) jadi <img> QR asli yang di-fetch dari server
+    // (route documents.qrcode, lihat data-qr-image-url di textarea) —
+    // supaya QR beneran ke-print & bisa di-scan. Saat forPrint=false
+    // (disimpan ke DB / draft localStorage), placeholder TETAP teks biasa
+    // — QR baru "hidup" saat konten ditampilkan lewat halaman show/preview
+    // (lihat QrCodeService::injectPlaceholder di server) atau saat print
+    // ini sendiri, bukan disimpan sebagai gambar beku.
+    if (forPrint) {
+        const qrImageUrl = editor.element?.dataset?.qrImageUrl;
+        if (qrImageUrl) {
+            // Ukuran QR di-baca dari TEKS placeholder ("[QR CODE DOKUMEN
+            // 150px]"), BUKAN dari atribut data-qr-size — Jodit membuang
+            // semua atribut data-* saat clean-html/save, jadi atribut tidak
+            // bisa diandalkan untuk menyimpan ukuran. Teks tidak pernah kena
+            // strip, jadi ukuran dijamin selalu ikut walau atribut
+            // data-qr-placeholder sendiri ikut hilang.
+            doc.querySelectorAll('[data-qr-placeholder], span[style*="dashed"]').forEach((el) => {
+                const match = el.textContent.match(/\[QR CODE DOKUMEN\s*(\d+)px\]/i);
+                if (!match) return;
+                const size = Math.max(40, Math.min(400, parseInt(match[1], 10) || 120));
+                const img = doc.createElement('img');
+                img.src = qrImageUrl;
+                img.alt = 'QR Code Dokumen';
+                img.style.cssText = `width:${size}px;height:${size}px;vertical-align:middle;`;
+                el.replaceWith(img);
+            });
+        }
+    }
+
+    doc.querySelectorAll('[data-page-spacer]').forEach((el) => {
+        if (forPrint) {
+            const pageBreak = doc.createElement('div');
+            pageBreak.setAttribute('data-page-break', 'true');
+            pageBreak.style.cssText = 'height:0;margin:0;padding:0;border:0;' +
+                'break-after:page;page-break-after:always;';
+            el.replaceWith(pageBreak);
+        } else {
+            el.remove();
+        }
+    });
     const gapBandHeight = Math.max(2, Math.min(24, Math.round(gap * 0.3)));
     const remaining = gap - gapBandHeight;
     const beforeHeight = gap > 0 ? Math.round(remaining * (margin.bottom / gap)) : 0;
@@ -1056,7 +1097,7 @@ export function initJoditEditor(selector, overrides = {}) {
     // ─────────────────────────────────────────────────────────────────────
 
     const editor = Jodit.make(ta, {
-        height: 'auto',
+        height: '40vh',
         width: '100%',
         language: 'id',
         toolbarButtonSize: 'middle',
@@ -1080,6 +1121,7 @@ export function initJoditEditor(selector, overrides = {}) {
             'ul', 'ol', 'indent', 'outdent', '|',
             'font', 'fontsize', 'brush', 'paragraph', 'lineHeight', '|',
             'image', 'video', 'file', 'table', 'link', 'hr', 'qrCode', 'signature', '|',
+            // 'image', 'video', 'file', 'table', 'link', 'hr', 'qrCode', '|',
             'align', '|',
             'paperSize', 'margin', '|',
             'undo', 'redo', 'eraser', 'copyformat', '|',

@@ -1,4 +1,5 @@
 <x-app-layout>
+
     @if(!auth()->user()->isAdmin() && !auth()->user()->isHead())
         <x-confirm-modal
             name="confirm-discard-{{ $document->id }}"
@@ -15,11 +16,11 @@
         $hasDraftOnly = !$pending && !$document->currentVersion;
     @endphp
 
-    <div class="min-h-screen bg-base-200/50">
+    <div class="h-full overflow-hidden bg-base-200/50 flex flex-col">
 
         {{-- Canvas / Dokumen --}}
-        <div class="py-10 px-2 sm:px-4">
-            <div class="max-w-6xl mx-auto">
+        <div class="flex-1 flex flex-col min-h-0 py-4 px-2 sm:px-4">
+            <div class="max-w-6xl mx-auto w-full flex-1 flex flex-col min-h-0">
 
                 @if(session('success'))
                     <div class="mb-4">
@@ -97,15 +98,15 @@
                     </div>
                 @endif
 
-                <form method="POST" action="{{ route('documents.save', $document) }}" id="editor-form">
+                <form method="POST" action="{{ route('documents.save', $document) }}" id="editor-form" class="flex flex-col flex-1 min-h-0">
                     @csrf
                     @method('PUT')
 
                     {{-- Kotak gabungan: title bar + toolbar + editor Jodit jadi satu kotak --}}
-                    <div id="jodit-merge-box" class="bg-base-100 rounded-xl shadow-md border border-base-300 overflow-hidden">
+                    <div id="jodit-merge-box" class="bg-base-100 rounded-xl shadow-md border border-base-300 flex flex-col flex-1 min-h-0">
 
-                        {{-- Title/Action row (tanpa border/radius sendiri — menyatu lewat overflow-hidden induk) --}}
-                        <div class="bg-base-100 px-3 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+                        {{-- Title/Action row --}}
+                        <div class="bg-base-100 px-3 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3 rounded-t-xl">
 
                             <div class="flex items-center gap-3 min-w-0">
                                 <svg class="w-6 h-6 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -215,37 +216,44 @@
     </div>
 
     <style>
-        /* Jodit membungkus dirinya sendiri dalam .jodit-container yang punya
-           border/border-radius/box-shadow bawaan (dari jodit.min.css),
-           independen dari div pembungkus kita (#jodit-merge-box). Itu sebabnya
-           walau textarea sudah satu div dengan title row, Jodit tetap
-           menggambar kotaknya sendiri di dalamnya → kelihatan dua kotak
-           terpisah (border/shadow ganda). Override ini di-scope KHUSUS ke
-           #jodit-merge-box (tidak global) supaya instance Jodit lain di
-           halaman lain tidak ikut terdampak. */
-        /* Jodit membungkus toolbar+editor dalam .jodit-container yang punya
-           border/border-radius/box-shadow/margin bawaan sendiri (dari
-           jodit.min.css) — itulah kotak terpisah dengan sudut membulat &
-           shadow yang masih kelihatan. Override ini menghapus SEMUA styling
-           luar itu supaya .jodit-container rata/flat dan menyatu sempurna
-           dengan #jodit-merge-box (parent). Sudut membulat yang tersisa di
-           kotak gabungan sepenuhnya berasal dari overflow-hidden + rounded-xl
-           milik #jodit-merge-box, bukan dari Jodit. Di-scope ke
-           #jodit-merge-box saja (bukan global) supaya instance Jodit lain di
-           halaman lain tidak terdampak. */
+        /* ── Jodit container: hapus border/shadow/radius bawaan, jadikan flex
+           child yang mengisi sisa ruang #jodit-merge-box. ── */
         #jodit-merge-box .jodit-container {
             border: none !important;
             border-radius: 0 !important;
             box-shadow: none !important;
             margin: 0 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            flex: 1 1 auto !important;
+            min-height: 0 !important;
         }
 
-        /* jodit-toolbar_box (pembungkus toolbar) juga bisa punya radius/margin
-           sendiri di sudut atasnya — dimatikan juga supaya benar-benar rata
-           menyambung ke title row di atasnya tanpa celah/sudut membulat. */
+        /* ── Toolbar: rata tanpa radius, TIDAK BOLEH menyusut. ── */
+        #jodit-merge-box .jodit-toolbar__box,
         #jodit-merge-box .jodit-toolbar_box {
             border-radius: 0 !important;
             margin: 0 !important;
+            flex-shrink: 0 !important;        /* kunci: toolbar tidak boleh collapse */
+            z-index: 20 !important;
+        }
+
+        /* ── Workplace: flex-grow mengisi sisa, tapi TIDAK scroll sendiri.
+           Scroll terjadi di dalam <iframe> (lihat rule berikutnya). ── */
+        #jodit-merge-box .jodit-workplace {
+            flex: 1 1 auto !important;
+            min-height: 0 !important;
+            overflow: hidden !important;       /* workplace sendiri tidak scroll */
+        }
+
+        /* ── KUNCI UTAMA: paksa <iframe> editor tinggi 100% dari workplace,
+           bukan auto-grow mengikuti dokumen. Scroll terjadi di DALAM iframe
+           (browser otomatis scroll isi iframe kalau kontennya lebih tinggi
+           dari frame-nya). ── */
+        #jodit-merge-box .jodit-workplace iframe {
+            height: 100% !important;
+            min-height: 0 !important;
+            max-height: none !important;
         }
     </style>
 
