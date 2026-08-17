@@ -63,6 +63,26 @@ const DEFAULT_MARGIN = { top: 48, right: 56, bottom: 48, left: 56 };
 // "memakan" seluruh halaman.
 const MIN_PAGE_CONTENT_PX = 60;
 
+// Toleransi (px) untuk perbandingan boundary pagination. getBoundingClientRect()
+// bisa berbeda sub-pixel antara iframe editor dan render halaman show/preview
+// walau CSS-nya identik (rounding browser berbeda-beda). Tanpa epsilon ini,
+// selisih < 1px bisa membuat sebuah elemen/list "dianggap" melewati batas
+// halaman di satu tempat tapi tidak di tempat lain — menyebabkan hasil
+// pagination editor vs show/detail terlihat beda padahal margin & ukuran
+// kertas yang dipakai sama persis.
+const BOUNDARY_EPS = 0.5;
+
+// Cari nama key ukuran kertas (A4/A5/...) dari objek size — dipakai untuk
+// menyimpan pilihan kertas ke localStorage supaya halaman preview tahu
+// ukuran mana yang aktif di editor. Pencocokan by reference aman karena
+// semua pemanggil selalu meneruskan objek dari PAPER_SIZES yang sama.
+function findPaperKey(size) {
+    for (const key of Object.keys(PAPER_SIZES)) {
+        if (PAPER_SIZES[key] === size) return key;
+    }
+    return null;
+}
+
 // Clamp margin ke ukuran kertas: margin gabungan (top+bottom / left+right)
 // tidak boleh melebihi ukuran kertas dikurangi ruang tulis minimum.
 function clampMarginToPage(size, margin) {
@@ -76,37 +96,61 @@ function clampMarginToPage(size, margin) {
     return clamped;
 }
 
-// Cari nama key ukuran kertas (A4/A5/...) dari objek size — dipakai untuk
-// menyimpan pilihan kertas ke localStorage supaya halaman preview tahu
-// ukuran mana yang aktif di editor. Pencocokan by reference aman karena
-// semua pemanggil selalu meneruskan objek dari PAPER_SIZES yang sama.
-function findPaperKey(size) {
-    for (const key of Object.keys(PAPER_SIZES)) {
-        if (PAPER_SIZES[key] === size) return key;
-    }
-    return null;
-}
-
 // Bangun CSS iframeStyle dari ukuran kertas + margin. Dipakai saat init
 // editor DAN saat preview/print (yang regenerate dokumen via iframeStyle).
 function buildIframeStyle(size, margin = DEFAULT_MARGIN) {
     const padding = `${margin.top}px ${margin.right}px ${margin.bottom}px ${margin.left}px`;
     return [
         `@import url('${GOOGLE_FONTS_URL}');`,
-        `@import url('/css/document-shared.css');`,
         'html { margin:0; padding:0; background:#e5e7eb; }',
         'body {',
-        '  box-sizing:border-box;',
-        `  width:${size.width}px;`,
-        '  margin:0 auto;',
-        `  padding:${padding};`,
+        '  box-sizing:border-box !important;',
+        `  width:${size.width}px !important;`,
+        '  margin:0 auto !important;',
+        `  padding:${padding} !important;`,
         '  background:#fff;',
         `  min-height:${size.height}px;`,
         '  box-shadow:0 1px 3px rgba(0,0,0,0.1);',
         '}',
-        'table { width:100%; border:none; border-collapse:collapse; empty-cells:show; max-width:100%; }',
-        'th, td { padding:2px 5px; border:1px solid #ccc; vertical-align:top !important; }',
-        'body, p, div, td, th, li, h1, h2, h3, h4, h5, h6 { overflow-wrap:break-word; word-break:break-word; }',
+        '.doku-content, .doku-paper, .jodit-wysiwyg { font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5; color: #000; word-wrap: break-word; text-align: left; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) p { margin-top: 0; margin-bottom: 1em; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) ul, :is(.doku-content, .doku-paper, .jodit-wysiwyg) ol { margin-top: 0; margin-bottom: 1em; padding-left: 40px !important; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) ul { list-style-type: disc !important; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) ul ul { list-style-type: circle !important; margin-bottom: 0; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) ul ul ul { list-style-type: square !important; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) ol { list-style-type: decimal !important; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) ol ol { list-style-type: lower-alpha !important; margin-bottom: 0; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) ol ol ol { list-style-type: lower-roman !important; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) li { margin-bottom: 4px; display: list-item !important; text-align: match-parent; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) li > ul, :is(.doku-content, .doku-paper, .jodit-wysiwyg) li > ol { margin-bottom: 0; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) h1, :is(.doku-content, .doku-paper, .jodit-wysiwyg) h2, :is(.doku-content, .doku-paper, .jodit-wysiwyg) h3, :is(.doku-content, .doku-paper, .jodit-wysiwyg) h4, :is(.doku-content, .doku-paper, .jodit-wysiwyg) h5, :is(.doku-content, .doku-paper, .jodit-wysiwyg) h6 { margin-top: 1.2em; margin-bottom: 0.5em; font-weight: bold !important; line-height: 1.2; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) h1 { font-size: 2em !important; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) h2 { font-size: 1.5em !important; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) h3 { font-size: 1.17em !important; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) h4 { font-size: 1em !important; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) h5 { font-size: 0.83em !important; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) h6 { font-size: 0.67em !important; }',
+        // FIX: table border hilang di editor. Jodit inject base editing
+        // style ke iframe (untuk cell-selection/resize handle) yang punya
+        // border lebih ringan pada td/th. Tanpa !important di sini, style
+        // Jodit menang sehingga border tabel "hilang" hanya saat mode edit
+        // (show/preview yang tidak lewat Jodit tetap tampil normal).
+        // Menambahkan !important menyamakan prioritas dengan aturan lain
+        // di file ini (li, heading, b/i/u) yang sudah lebih dulu !important
+        // karena alasan yang sama.
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) table { border-collapse: collapse !important; width: 100%; margin-bottom: 1em; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) th, :is(.doku-content, .doku-paper, .jodit-wysiwyg) td { border: 1px solid #ccc !important; padding: 8px; text-align: left; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) th { font-weight: bold !important; background-color: #f9fafb !important; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) blockquote { margin: 1em 40px; border-left: 4px solid #ccc; padding-left: 1em; color: #666; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) pre { background: #f4f4f4; padding: 1em; overflow-x: auto; font-family: monospace; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) b, :is(.doku-content, .doku-paper, .jodit-wysiwyg) strong { font-weight: bold !important; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) i, :is(.doku-content, .doku-paper, .jodit-wysiwyg) em { font-style: italic !important; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) u { text-decoration: underline !important; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) img { display: inline; max-width: 100%; height: auto; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) a { color: #1a0dab; text-decoration: underline; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) hr { margin: 1em 0; border: none; border-top: 1px solid #ccc; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) sub { vertical-align: sub; font-size: smaller; }',
+        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) sup { vertical-align: super; font-size: smaller; }',
     ].join('\n');
 }
 
@@ -136,10 +180,8 @@ function applyPaperSize(editor, size, margin) {
 
     const body = editor.editor;
     if (!body) return;
-    Object.assign(body.style, {
-        width: size.width + 'px',
-        padding: `${margin.top}px ${margin.right}px ${margin.bottom}px ${margin.left}px`,
-    });
+    body.style.setProperty('width', size.width + 'px', 'important');
+    body.style.setProperty('padding', `${margin.top}px ${margin.right}px ${margin.bottom}px ${margin.left}px`, 'important');
     const containerH = size.height + margin.top + margin.bottom + 64 + 15;
     editor.container.style.minHeight = containerH + 'px';
     editor.e.fire('resize');
@@ -166,47 +208,6 @@ function buildSpacerElement(margin, gap, extraAttrs) {
         userSelect: 'none',
     });
 
-    // FIX QR (print): saat forPrint, ganti placeholder QR (lihat control
-    // "qrCode" di atas) jadi <img> QR asli yang di-fetch dari server
-    // (route documents.qrcode, lihat data-qr-image-url di textarea) —
-    // supaya QR beneran ke-print & bisa di-scan. Saat forPrint=false
-    // (disimpan ke DB / draft localStorage), placeholder TETAP teks biasa
-    // — QR baru "hidup" saat konten ditampilkan lewat halaman show/preview
-    // (lihat QrCodeService::injectPlaceholder di server) atau saat print
-    // ini sendiri, bukan disimpan sebagai gambar beku.
-    if (forPrint) {
-        const qrImageUrl = editor.element?.dataset?.qrImageUrl;
-        if (qrImageUrl) {
-            // Ukuran QR di-baca dari TEKS placeholder ("[QR CODE DOKUMEN
-            // 150px]"), BUKAN dari atribut data-qr-size — Jodit membuang
-            // semua atribut data-* saat clean-html/save, jadi atribut tidak
-            // bisa diandalkan untuk menyimpan ukuran. Teks tidak pernah kena
-            // strip, jadi ukuran dijamin selalu ikut walau atribut
-            // data-qr-placeholder sendiri ikut hilang.
-            doc.querySelectorAll('[data-qr-placeholder], span[style*="dashed"]').forEach((el) => {
-                const match = el.textContent.match(/\[QR CODE DOKUMEN\s*(\d+)px\]/i);
-                if (!match) return;
-                const size = Math.max(40, Math.min(400, parseInt(match[1], 10) || 120));
-                const img = doc.createElement('img');
-                img.src = qrImageUrl;
-                img.alt = 'QR Code Dokumen';
-                img.style.cssText = `width:${size}px;height:${size}px;vertical-align:middle;`;
-                el.replaceWith(img);
-            });
-        }
-    }
-
-    doc.querySelectorAll('[data-page-spacer]').forEach((el) => {
-        if (forPrint) {
-            const pageBreak = doc.createElement('div');
-            pageBreak.setAttribute('data-page-break', 'true');
-            pageBreak.style.cssText = 'height:0;margin:0;padding:0;border:0;' +
-                'break-after:page;page-break-after:always;';
-            el.replaceWith(pageBreak);
-        } else {
-            el.remove();
-        }
-    });
     const gapBandHeight = Math.max(2, Math.min(24, Math.round(gap * 0.3)));
     const remaining = gap - gapBandHeight;
     const beforeHeight = gap > 0 ? Math.round(remaining * (margin.bottom / gap)) : 0;
@@ -280,9 +281,12 @@ function paginateList(list, containerTop, paddingTop, contentPerPage, gap, margi
             const relTop = rect.top - containerTop - paddingTop;
             const relBottom = relTop + rect.height;
 
+            // FIX: pakai BOUNDARY_EPS supaya perbandingan tidak "flip" akibat
+            // selisih sub-pixel antara render iframe editor vs render halaman
+            // show/preview (lihat komentar definisi BOUNDARY_EPS di atas).
             if (
-                (relBottom > nextBoundary && relTop < nextBoundary) ||
-                (relTop >= nextBoundary && relTop < nextBoundary + contentPerPage)
+                (relBottom > nextBoundary + BOUNDARY_EPS && relTop < nextBoundary - BOUNDARY_EPS) ||
+                (relTop >= nextBoundary - BOUNDARY_EPS && relTop < nextBoundary + contentPerPage - BOUNDARY_EPS)
             ) {
                 splitAt = li;
                 const tallerThanPage = rect.height > contentPerPage;
@@ -297,7 +301,7 @@ function paginateList(list, containerTop, paddingTop, contentPerPage, gap, margi
                         const r2 = li.getBoundingClientRect();
                         const rt2 = r2.top - containerTop - paddingTop;
                         const rb2 = rt2 + r2.height;
-                        stillCrossing = rb2 > nextBoundary && rt2 < nextBoundary;
+                        stillCrossing = rb2 > nextBoundary + BOUNDARY_EPS && rt2 < nextBoundary - BOUNDARY_EPS;
                         if (stillCrossing) nextBoundary += contentPerPage + gap;
                     }
                 }
@@ -365,9 +369,12 @@ function paginateContainer(container, contentPerPage, gap, margin) {
         const relBottom = relTop + rect.height;
         const elementTallerThanPage = rect.height > contentPerPage;
 
+        // FIX: sama seperti paginateList, pakai BOUNDARY_EPS supaya
+        // hasil pagination tidak bergeser akibat rounding sub-pixel yang
+        // berbeda antara iframe editor dan halaman show/preview.
         while (
-            (relBottom > nextBoundary && relTop < nextBoundary) ||
-            (relTop >= nextBoundary && relTop < nextBoundary + contentPerPage)
+            (relBottom > nextBoundary + BOUNDARY_EPS && relTop < nextBoundary - BOUNDARY_EPS) ||
+            (relTop >= nextBoundary - BOUNDARY_EPS && relTop < nextBoundary + contentPerPage - BOUNDARY_EPS)
         ) {
             const spacer = buildSpacerElement(margin, gap);
             child.parentNode.insertBefore(spacer, child);
@@ -379,27 +386,49 @@ function paginateContainer(container, contentPerPage, gap, margin) {
     }
 }
 
+// Ambil HTML editor untuk keperluan LIVE PREVIEW DRAFT saja (localStorage,
+// tab lain). BEDA dengan getCleanValue(): signature (.doku-sig-editor) dan
+// QR placeholder TETAP dibiarkan sebagai span berstyle (kotak 150x88 /
+// kotak QR dashed) — SAMA PERSIS seperti yang terlihat di editor —
+// supaya tab preview yang cuma nge-innerHTML draft mentah tanpa proses
+// server tetap punya tinggi/layout elemen yang identik dengan editor.
+// Spacer pagination tetap dibuang seperti biasa karena itu murni artefak
+// visual editor, bukan bagian dari konten.
+function getDraftValue(editor) {
+    const raw = editor.value;
+    const doc = new DOMParser().parseFromString(raw, 'text/html');
+    mergeSplitLists(doc.body);
+    doc.querySelectorAll('[data-page-spacer]').forEach((el) => el.remove());
+    return doc.body.innerHTML;
+}
+
 // Ambil HTML editor tanpa elemen spacer pagination — WAJIB dipakai tiap kali
-// konten mau disimpan/di-preview, supaya jeda visual antar halaman di editor
+// konten mau DISIMPAN KE DB, supaya jeda visual antar halaman di editor
 // TIDAK ikut kesimpen sebagai bagian dari dokumen asli.
+//
+// BEDA dengan getDraftValue(): di sini signature (.doku-sig-editor) di-FLATTEN
+// balik jadi teks polos [ttd:nama@x] — server (SignatureResolverService) yang
+// nanti resolve teks ini jadi tampilan final. getDraftValue() TIDAK melakukan
+// ini supaya tab preview tetap punya box 150x88px yang identik dengan editor.
 //
 // forPrint (opsional, default false): HANYA dipakai oleh doPrint() untuk
 // mengganti placeholder QR ("[QR CODE DOKUMEN 120px]") jadi <img> QR asli
 // yang di-fetch dari server (lihat data-qr-image-url di textarea), supaya
-// QR beneran ke-print & bisa discan. Saat forPrint=false (disimpan ke DB /
-// draft localStorage), placeholder TETAP teks biasa — QR baru "hidup" saat
-// konten ditampilkan lewat halaman show/preview (server-side, lihat
-// QrCodeService::injectPlaceholder) atau saat print via jalur ini sendiri,
-// bukan disimpan sebagai gambar beku.
-//
-// PENTING: forPrint TIDAK mengubah pagination sama sekali — arsitektur
-// print/export TIDAK LAGI memaksakan titik potong dari spacer editor (lihat
-// catatan di buildPrintStyle()); ini murni penggantian placeholder QR.
+// QR beneran ke-print & bisa discan. Saat forPrint=false (disimpan ke DB),
+// placeholder TETAP teks biasa — QR baru "hidup" saat konten ditampilkan
+// lewat halaman show/preview (server-side, lihat QrCodeService::injectPlaceholder)
+// atau saat print via jalur ini sendiri, bukan disimpan sebagai gambar beku.
 function getCleanValue(editor, forPrint = false) {
     const raw = editor.value;
     const doc = new DOMParser().parseFromString(raw, 'text/html');
     mergeSplitLists(doc.body);
     doc.querySelectorAll('[data-page-spacer]').forEach((el) => el.remove());
+
+    // Kembalikan placeholder TTD ke teks murni tanpa wrapper span untuk disimpan di DB
+    doc.querySelectorAll('.doku-sig-editor').forEach((span) => {
+        const textNode = doc.createTextNode(span.textContent);
+        span.parentNode.replaceChild(textNode, span);
+    });
 
     if (forPrint) {
         const qrImageUrl = editor.element?.dataset?.qrImageUrl;
@@ -537,6 +566,18 @@ function readStoredPaper(storageKey) {
 
 // Inisialisasi pagination untuk halaman preview: cari .doku-paper, baca
 // ukuran kertas dari localStorage, lalu sisipkan spacer.
+//
+// PENTING (fix inkonsistensi editor vs show/detail): fungsi ini HANYA boleh
+// membaca dari localStorage (readStoredPaper) kalau scope memang punya
+// data-live-storage — dan data-live-storage HANYA boleh dipasang pada
+// halaman yang benar-benar merepresentasikan draft/live-preview editor
+// (mis. tab preview di samping editor). Halaman show/detail dokumen yang
+// menampilkan versi resmi/approved TIDAK BOLEH diberi liveStorage, supaya
+// dia selalu memakai paper_size/paper_margin yang tersimpan di DB (lewat
+// scope.dataset.paperSize/paperMargin) — bukan draft margin yang mungkin
+// masih tersisa di localStorage dari sesi edit yang belum disimpan.
+// Lihat resources/views/documents/show.blade.php: include _paper TIDAK
+// lagi mengirim `liveStorage` untuk konten yang sudah di-approve.
 function initPreviewPagination(scopeSelector = '.doku-paper-scope') {
     const scope = typeof scopeSelector === 'string'
         ? document.querySelector(scopeSelector)
@@ -635,10 +676,11 @@ function buildQrPopup(editor, close) {
         // ke default. Teks konten tidak pernah kena strip, jadi aman.
         editor.s.insertHTML(
             '<span data-qr-placeholder="true" contenteditable="false" ' +
-            'style="display:inline-block;padding:4px 10px;margin:0 2px;' +
+            'style="display:inline-flex;align-items:center;justify-content:center;' +
+            'width:' + size + 'px;height:' + size + 'px;margin:0 2px;' +
             'border:1px dashed #94a3b8;border-radius:4px;background:#f1f5f9;' +
-            'font-family:monospace;font-size:12px;color:#475569;' +
-            'vertical-align:middle;user-select:none;">[QR CODE DOKUMEN ' + size + 'px]</span>'
+            'font-family:monospace;font-size:12px;color:#475569;text-align:center;' +
+            'vertical-align:middle;user-select:none;box-sizing:border-box;">[QR CODE DOKUMEN ' + size + 'px]</span>'
         );
         if (typeof close === 'function') close();
         editor.e.fire('closeAllPopups');
@@ -783,13 +825,21 @@ function buildSignaturePopup(editor, close) {
             searchInput.style.display = '';
             const users = data.users || [];
 
+            // Pin "My Signature" (is_me) to the top
+            users.sort((a, b) => {
+                if (a.is_me && !b.is_me) return -1;
+                if (!a.is_me && b.is_me) return 1;
+                return 0;
+            });
+
             // Keep references to each button and its searchable text
             const entries = [];
 
             users.forEach(u => {
                 const btn = document.createElement('button');
                 btn.type = 'button';
-                btn.style.cssText = 'display:flex; align-items:center; justify-content:space-between; width:100%; padding:6px 10px; border:none; background:transparent; border-radius:4px; text-align:left; cursor:pointer; font-size:13px; color:#1f2937; transition:background 0.15s;';
+                btn.style.cssText = 'display:flex; align-items:center; justify-content:between; width:100%; padding:6px 10px; border:none; background:transparent; border-radius:4px; text-align:left; cursor:pointer; font-size:13px; color:#1f2937; transition:background 0.15s;';
+                btn.style.justifyContent = 'space-between';
                 btn.onmouseover = () => btn.style.background = '#f3f4f6';
                 btn.onmouseout = () => btn.style.background = 'transparent';
 
@@ -816,7 +866,7 @@ function buildSignaturePopup(editor, close) {
                 btn.appendChild(badge);
 
                 btn.addEventListener('click', () => {
-                    editor.selection.insertHTML(` ${u.placeholder} `);
+                    editor.selection.insertHTML(`<span data-sig-placeholder="true" class="doku-sig-editor" contenteditable="false" style="display:inline-flex; align-items:center; justify-content:center; min-width:150px; height:88px; margin:4px; border:1px dashed #94a3b8; background:#f1f5f9; color:#475569; font-family:monospace; font-size:12px; border-radius:4px; box-sizing:border-box;">${u.placeholder}</span>`);
                     if (typeof close === 'function') close();
                 });
 
@@ -1055,6 +1105,42 @@ export function initJoditEditor(selector, overrides = {}) {
     const ta = document.querySelector(selector);
     if (!ta) return null;
 
+    // --- FIX LAYOUT: Beri dimensi akurat pada placeholder TTD & QR sebelum load ke Editor ---
+    function wrapPlaceholders(html) {
+        if (!html) return html;
+        const div = document.createElement('div');
+        div.innerHTML = html;
+        
+        // 1. Wrap [TTD:...]
+        const walk = document.createTreeWalker(div, NodeFilter.SHOW_TEXT, null, false);
+        let node;
+        const ttdNodes = [];
+        while ((node = walk.nextNode())) {
+            if (/\[ttd[:.][a-zA-Z0-9_\-\.\@]+\]/i.test(node.nodeValue)) {
+                if (!node.parentNode.closest('.doku-sig-editor')) {
+                    ttdNodes.push(node);
+                }
+            }
+        }
+        ttdNodes.forEach(n => {
+            const frag = document.createDocumentFragment();
+            const temp = document.createElement('div');
+            temp.innerHTML = n.nodeValue.replace(/(\[ttd[:.][a-zA-Z0-9_\-\.\@]+\])/gi, '<span data-sig-placeholder="true" class="doku-sig-editor" contenteditable="false" style="display:inline-flex; align-items:center; justify-content:center; min-width:150px; height:88px; margin:4px; border:1px dashed #94a3b8; background:#f1f5f9; color:#475569; font-family:monospace; font-size:12px; border-radius:4px; box-sizing:border-box;">$1</span>');
+            while(temp.firstChild) frag.appendChild(temp.firstChild);
+            n.parentNode.replaceChild(frag, n);
+        });
+
+        // 2. Resize [QR CODE...]
+        div.querySelectorAll('span[data-qr-placeholder="true"]').forEach(span => {
+            const match = span.textContent.match(/\[QR CODE DOKUMEN\s*(\d+)px\]/i);
+            const size = match ? match[1] : 120;
+            span.style.cssText = `display:inline-flex; align-items:center; justify-content:center; width:${size}px; height:${size}px; margin:0 2px; border:1px dashed #94a3b8; border-radius:4px; background:#f1f5f9; font-family:monospace; font-size:12px; color:#475569; text-align:center; vertical-align:middle; user-select:none; box-sizing:border-box;`;
+        });
+        
+        return div.innerHTML;
+    }
+    ta.value = wrapPlaceholders(ta.value);
+
     const uploadUrl = ta.dataset.uploadUrl;
     const csrfToken = ta.dataset.csrfToken;
     const storageKey = ta.dataset.liveStorage;
@@ -1103,6 +1189,7 @@ export function initJoditEditor(selector, overrides = {}) {
         toolbarButtonSize: 'middle',
         toolbarAdaptive: false,   // jangan sembunyikan tombol ke menu "…" — semua tombol selalu tampil
         toolbarSticky: false,
+        askBeforePasteHTML: false,   // avoids the "Paste as HTML" confirm dialog, which crashes on click due to a Jodit 4.13.x bug
 
         iframeStyle: buildIframeStyle(initialSize, initialMargin),
 
@@ -1375,8 +1462,9 @@ export function initJoditEditor(selector, overrides = {}) {
             probe.innerHTML = draft;
             const hasContent = probe.textContent.trim().length > 0 || probe.querySelector('img, table, iframe');
             if (hasContent) {
-                editor.value = draft;
-                ta.value = draft;
+                const wrappedDraft = wrapPlaceholders(draft);
+                editor.value = wrappedDraft;
+                ta.value = wrappedDraft;
             }
         }
 
@@ -1384,7 +1472,9 @@ export function initJoditEditor(selector, overrides = {}) {
         editor.events.on('change', () => {
             if (draftSaved) return;
             clearTimeout(timer);
-            timer = setTimeout(() => localStorage.setItem(storageKey, getCleanValue(editor)), 250);
+            // FIX: pakai getDraftValue, BUKAN getCleanValue — supaya box TTD
+            // tidak ke-flatten jadi teks polos di tab preview lain.
+            timer = setTimeout(() => localStorage.setItem(storageKey, getDraftValue(editor)), 250);
         });
     }
 
@@ -1411,7 +1501,7 @@ export function initJoditEditor(selector, overrides = {}) {
         }
     });
 
-    editor.e.on('paste', () => {
+    editor.e.on('afterPaste', () => {
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
                 scheduleRepaginate(editor);
@@ -1537,4 +1627,4 @@ window.__initPreviewPagination = initPreviewPagination;
 window.__paperSizes = PAPER_SIZES;
 window.__findPaperKey = findPaperKey;
 
-export { initPreviewPagination, repaginatePreview, readStoredPaper };
+export { initPreviewPagination, repaginatePreview, readStoredPaper, getDraftValue };

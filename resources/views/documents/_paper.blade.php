@@ -5,10 +5,84 @@
        seperti iframeStyle editor di resources/js/jodit.js. Tanpa ini font
        Google tidak tampil di preview halaman → beda dgn pratinjau Jodit. */
     @import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,400&family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Lora:ital,wght@0,400..700;1,400..700&family=Source+Code+Pro:ital,wght@0,400;0,700;1,400&display=swap');
-    /* Impor shared styles — satu sumber kebenaran untuk tipografi dokumen.
-       Semua aturan (.doku-paper scope) didefinisikan di sana, bukan di sini,
-       supaya Preview dan Editor selalu sinkron tanpa duplikasi kode. */
-    @import url('/css/document-shared.css');
+
+    /* NUCLEAR RESET: batalkan SEMUA efek Tailwind Preflight di dalam area
+       dokumen. Tailwind mereset *, ::before, ::after { box-sizing: border-box;
+       border-width: 0; ... }, img { display: block }, h1-h6 { font-size:
+       inherit }, ol/ul { list-style: none; padding: 0 }, p { margin: 0 },
+       dll. Di editor Jodit (iframe), Tailwind TIDAK ADA — elemen pakai
+       browser defaults. Mengejar satu-satu aturan Tailwind tidak realistis
+       dan selalu ada yang terlewat (penyebab list lompat ke halaman 2 di
+       preview tapi muat di editor). `all: revert` mengembalikan SEMUA
+       properti ke User-Agent stylesheet (= browser defaults) sekaligus.
+       Aturan eksplisit kita di bawah punya specificity lebih tinggi
+       (0,1,1 vs 0,1,0) sehingga tetap menang. Inline style dari Jodit
+       (specificity 1,0,0) juga tetap terjaga. */
+    .doku-paper *,
+    .doku-paper *::before,
+    .doku-paper *::after {
+        all: revert;
+    }
+
+    /* ---------- Base ---------- */
+    .doku-content, .doku-paper, .jodit-wysiwyg { font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5; color: #000; word-wrap: break-word; text-align: left; }
+
+    /* ---------- Paragraf ---------- */
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) p { margin-top: 0; margin-bottom: 1em; }
+
+    /* ---------- List (ul, ol, li) ---------- */
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) ul, :is(.doku-content, .doku-paper, .jodit-wysiwyg) ol { margin-top: 0; margin-bottom: 1em; padding-left: 40px !important; }
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) ul { list-style-type: disc !important; }
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) ul ul { list-style-type: circle !important; margin-bottom: 0; }
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) ul ul ul { list-style-type: square !important; }
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) ol { list-style-type: decimal !important; }
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) ol ol { list-style-type: lower-alpha !important; margin-bottom: 0; }
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) ol ol ol { list-style-type: lower-roman !important; }
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) li { margin-bottom: 4px; display: list-item !important; text-align: match-parent; }
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) li > ul, :is(.doku-content, .doku-paper, .jodit-wysiwyg) li > ol { margin-bottom: 0; }
+
+    /* ---------- Headings ---------- */
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) h1, :is(.doku-content, .doku-paper, .jodit-wysiwyg) h2, :is(.doku-content, .doku-paper, .jodit-wysiwyg) h3, :is(.doku-content, .doku-paper, .jodit-wysiwyg) h4, :is(.doku-content, .doku-paper, .jodit-wysiwyg) h5, :is(.doku-content, .doku-paper, .jodit-wysiwyg) h6 { margin-top: 1.2em; margin-bottom: 0.5em; font-weight: bold !important; line-height: 1.2; }
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) h1 { font-size: 2em !important; }
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) h2 { font-size: 1.5em !important; }
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) h3 { font-size: 1.17em !important; }
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) h4 { font-size: 1em !important; }
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) h5 { font-size: 0.83em !important; }
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) h6 { font-size: 0.67em !important; }
+
+    /* ---------- Table ---------- */
+    /* FIX: samakan prioritas dengan aturan lain (li, heading, dst) yang
+       sudah !important. Tanpa !important di sini, style bawaan Jodit yang
+       diinject ke iframe editor (untuk cell-selection/resize handle) bisa
+       menimpa border tabel ini sehingga border "hilang" hanya saat mode
+       edit. Nilai di sini WAJIB SAMA PERSIS dengan blok table di
+       resources/js/jodit.js (buildIframeStyle) supaya editor & show/preview
+       selalu konsisten. */
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) table { border-collapse: collapse !important; width: 100%; margin-bottom: 1em; }
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) th, :is(.doku-content, .doku-paper, .jodit-wysiwyg) td { border: 1px solid #ccc !important; padding: 8px; text-align: left; }
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) th { font-weight: bold !important; background-color: #f9fafb !important; }
+
+    /* ---------- Blockquote / Pre ---------- */
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) blockquote { margin: 1em 40px; border-left: 4px solid #ccc; padding-left: 1em; color: #666; }
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) pre { background: #f4f4f4; padding: 1em; overflow-x: auto; font-family: monospace; }
+
+    /* ---------- Inline formatting ---------- */
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) b, :is(.doku-content, .doku-paper, .jodit-wysiwyg) strong { font-weight: bold !important; }
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) i, :is(.doku-content, .doku-paper, .jodit-wysiwyg) em { font-style: italic !important; }
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) u { text-decoration: underline !important; }
+
+    /* ---------- Elemen yang di-reset Tailwind Preflight tapi BELUM ditangani ---------- */
+    /* Tailwind: img { display: block } — Browser default: inline. Ini bikin
+       gambar di preview jadi block (ada gap bawah) padahal di editor inline. */
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) img { display: inline; max-width: 100%; height: auto; }
+    /* Tailwind: a { color: inherit; text-decoration: inherit } */
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) a { color: #1a0dab; text-decoration: underline; }
+    /* Tailwind: hr { height: 0; border-top-width: 1px; color: inherit } */
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) hr { margin: 1em 0; border: none; border-top: 1px solid #ccc; }
+    /* Tailwind: sub/sup { font-size: 75%; line-height: 0 } — benar, tapi kita
+       pastikan vertical-align supaya posisinya sama dengan default browser. */
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) sub { vertical-align: sub; font-size: smaller; }
+    :is(.doku-content, .doku-paper, .jodit-wysiwyg) sup { vertical-align: super; font-size: smaller; }
 
     /* Fix scroll hilang saat live-sync render: preview.blade.php merender
        ulang konten draft dari localStorage dengan menimpa innerHTML
@@ -164,37 +238,6 @@
        kita mengandalkan aturan eksplisit di document-shared.css (.doku-paper
        scope) yang sudah SAMA PERSIS dengan aturan editor (.doku-content scope),
        sehingga preview dan editor selalu konsisten. */
-
-    /* High-specificity overrides untuk tabel — .doku-paper-scope .doku-paper
-       lebih spesifik dari .doku-paper di document-shared.css, jadi ini aman
-       tanpa !important kecuali untuk vertical-align yang perlu menang atas UA. */
-    .doku-paper-scope .doku-paper table {
-        width: 100%;
-        border: none;
-        border-collapse: collapse;
-        empty-cells: show;
-        max-width: 100%;
-    }
-
-    .doku-paper-scope .doku-paper th,
-    .doku-paper-scope .doku-paper td {
-        padding: 2px 5px;
-        border: 1px solid #ccc;
-        /* FIX "teks otomatis ketengah": default UA stylesheet buat td/th
-           adalah vertical-align:middle. Sel yang isinya sedikit (1 baris)
-           jadi kelihatan center vertikal, sementara sel sebelahnya yang
-           isinya banyak baris kebetulan memenuhi tinggi sel jadi terlihat
-           rata atas — padahal dua-duanya sama-sama "middle". Dipaksa top
-           di sini supaya SEMUA sel konsisten rata atas seperti default
-           kolom pertama, sama seperti fix di iframeStyle editor
-           (resources/js/jodit.js). */
-        vertical-align: top;
-    }
-
-    .doku-paper-scope .doku-paper img {
-        max-width: 100%;
-        height: auto;
-    }
 
     /* Toolbar kecil di atas kertas: dropdown ukuran kertas (hanya jika ada
        editor terkait) + kontrol zoom in/out/reset — selalu tampil di semua

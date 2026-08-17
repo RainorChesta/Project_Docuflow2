@@ -59,7 +59,7 @@
 
             <!-- Pending Rollback Banner -->
             @if($document->hasPendingRollback())
-                <div class="alert alert-warning mb-6 shadow-sm">
+                <div class="alert alert-warning mb-6 shadow-sm print:hidden">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div class="flex items-start sm:items-center gap-3 min-w-0">
                             <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -98,7 +98,7 @@
             <!-- Pending Banner (paling atas) -->
             @php $pendingVersion = $document->versions->firstWhere('status', 'pending'); @endphp
             @if($pendingVersion)
-                <div class="alert alert-warning mb-6 shadow-sm">
+                <div class="alert alert-warning mb-6 shadow-sm print:hidden">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div class="flex items-start sm:items-center gap-3 min-w-0">
                             <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -151,7 +151,7 @@
             @php
                 $hasDraft = $document->versions->contains('status', 'draft');
             @endphp
-            <div class="card bg-base-100 border border-base-300 shadow-sm mb-6">
+            <div class="card bg-base-100 border border-base-300 shadow-sm mb-6 print:hidden">
                 <div class="card-body">
                     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-base-200 pb-4">
                         <h1 class="text-xl font-bold text-base-content truncate min-w-0">{{ $document->title }}</h1>
@@ -277,7 +277,7 @@
                 $isProcessing = $document->summary_status === \App\Models\Document::SUMMARY_PROCESSING;
                 $isFailed = $document->summary_status === \App\Models\Document::SUMMARY_FAILED;
             @endphp
-            <div id="summary-card" class="card bg-base-100 border border-primary/20 shadow-md mb-6 {{ (!$hasSummary && !$isProcessing && !$isFailed) ? 'hidden' : '' }}">
+            <div id="summary-card" class="card bg-base-100 border border-primary/20 shadow-md mb-6 print:hidden {{ (!$hasSummary && !$isProcessing && !$isFailed) ? 'hidden' : '' }}">
                 <div class="card-body p-5 sm:p-6">
                     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-base-200 pb-3 mb-4">
                         <div class="flex items-center gap-2.5">
@@ -341,16 +341,43 @@
                 </div>
             </div>
 
-            <div class="card bg-base-100 border border-base-300 shadow-sm mb-6">
+            <div class="card bg-base-100 border border-base-300 shadow-sm mb-6 print:border-none print:shadow-none print:bg-transparent print:mb-0 print:rounded-none">
                 <div class="card-body p-0">
                     @php $display = $document->displayVersion(); @endphp
                     @if($display && $display->file_path)
                         @include('documents._file-preview', ['document' => $document, 'version' => $display])
                     @elseif($display)
+                        {{--
+                            FIX: halaman ini menampilkan versi dokumen yang SUDAH
+                            DISETUJUI (bukan draft editor). Sebelumnya include ini
+                            mengirim 'liveStorage' => 'doc-preview-' . $document->id,
+                            yang membuat initPreviewPagination() (resources/js/jodit.js)
+                            mencoba membaca localStorage['doc-preview-{id}:paper']
+                            LEBIH DULU sebelum memakai paper_size/paper_margin dari
+                            database.
+
+                            Masalahnya, key localStorage itu ditulis LIVE oleh
+                            applyPaperSize() setiap kali tombol "Ukuran Kertas" /
+                            "Margin Halaman" disentuh di editor — bahkan SEBELUM
+                            form disimpan (baru dibersihkan saat submit form
+                            berhasil). Kalau di browser yang sama user pernah
+                            membuka editor dan mengubah margin/ukuran kertas tanpa
+                            menyimpan, halaman show/detail ini diam-diam ikut
+                            memakai margin draft yang BUKAN margin resmi dokumen —
+                            menyebabkan pagination (posisi list, dsb) di show/detail
+                            berbeda dari editor walau kontennya identik (mis. list
+                            yang di editor muat di halaman 1 tapi di show malah
+                            kepental ke halaman 2).
+
+                            Karena halaman ini menampilkan versi resmi/approved,
+                            dia HARUS selalu memakai paper_size/paper_margin dari
+                            kolom dokumen di DB (lewat atribut data-paper-size /
+                            data-paper-margin di scope), bukan draft localStorage
+                            milik editor. Makanya 'liveStorage' TIDAK dikirim di sini.
+                        --}}
                         @include('documents._paper', [
                             'content' => $display->content,
                             'document' => $document,
-                            'liveStorage' => 'doc-preview-' . $document->id,
                             'paperSize' => $document->paper_size ?? 'A4',
                             'paperMargin' => $document->paper_margin,
                         ])

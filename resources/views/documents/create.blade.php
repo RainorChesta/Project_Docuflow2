@@ -12,14 +12,66 @@
                             <label for="document_type_id" class="label">
                                 <span class="label-text font-medium">{{ __('Tipe Dokumen') }}</span>
                             </label>
-                            <select name="document_type_id" id="document_type_id" class="select select-bordered w-full" required>
-                                <option value="">{{ __('Pilih tipe dokumen...') }}</option>
-                                @foreach($documentTypes as $type)
-                                    <option value="{{ $type->id }}" {{ old('document_type_id') == $type->id ? 'selected' : '' }}>
-                                        {{ $type->code }} - {{ $type->name }}
-                                    </option>
-                                @endforeach
-                            </select>
+                            <div x-data="{
+                                    search: '',
+                                    open: false,
+                                    selectedId: '{{ old('document_type_id') }}',
+                                    options: [
+                                        @foreach($documentTypes as $type)
+                                            { id: '{{ $type->id }}', label: '{{ $type->code }} - {{ $type->name }}' },
+                                        @endforeach
+                                    ],
+                                    get filteredOptions() {
+                                        if (this.search === '') return this.options;
+                                        const searchLower = this.search.toLowerCase();
+                                        return this.options.filter(opt => opt.label.toLowerCase().includes(searchLower));
+                                    },
+                                    get selectedLabel() {
+                                        let selected = this.options.find(opt => opt.id == this.selectedId);
+                                        return selected ? selected.label : '{{ __('Pilih tipe dokumen...') }}';
+                                    },
+                                    selectOption(id) {
+                                        this.selectedId = id;
+                                        this.open = false;
+                                        this.search = '';
+                                        $nextTick(() => {
+                                            document.getElementById('document_type_id').dispatchEvent(new Event('change'));
+                                        });
+                                    }
+                                }"
+                                class="relative w-full"
+                                @click.away="open = false"
+                            >
+                                <!-- Hidden input for form submission and JS events -->
+                                <input type="hidden" name="document_type_id" id="document_type_id" :value="selectedId">
+                            
+                                <!-- Trigger button -->
+                                <button type="button" @click="open = !open; if(open) $nextTick(() => $refs.searchInput.focus())" class="select select-bordered w-full flex items-center justify-between font-normal" :class="{'!outline-none !ring-2 !ring-primary/20 !border-primary': open}">
+                                    <span x-text="selectedLabel" :class="{'text-base-content/50': !selectedId}"></span>
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </button>
+                            
+                                <!-- Dropdown menu -->
+                                <div x-show="open" style="display: none;" class="absolute z-10 w-full mt-1 bg-base-100 border border-base-300 rounded-box shadow-lg">
+                                    <div class="p-2 border-b border-base-300">
+                                        <input x-ref="searchInput" type="text" x-model="search" class="input input-sm input-bordered w-full" placeholder="{{ __('Cari tipe dokumen...') }}" @keydown.enter.prevent="">
+                                    </div>
+                                    <ul class="max-h-60 overflow-y-auto p-1">
+                                        <template x-for="option in filteredOptions" :key="option.id">
+                                            <li>
+                                                <button type="button" @click="selectOption(option.id)" class="w-full text-left px-3 py-2 rounded-lg hover:bg-base-200 transition-colors" :class="{'bg-base-200 font-medium': selectedId == option.id}">
+                                                    <span x-text="option.label"></span>
+                                                </button>
+                                            </li>
+                                        </template>
+                                        <li x-show="filteredOptions.length === 0" class="text-center py-3 text-base-content/50 text-sm">
+                                            {{ __('Tipe dokumen tidak ditemukan.') }}
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
                             @error('document_type_id') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                         </div>
 
