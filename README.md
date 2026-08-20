@@ -1,58 +1,118 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# DokuFlow — Document Management System with ONLYOFFICE Integration
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+DokuFlow is an enterprise-grade document management system built with Laravel 12 and integrated with **ONLYOFFICE Docs Community Edition** for rich DOCX document editing, version tracking, multi-division approvals, digital signatures, AI document summarization, and fine-grained access sharing.
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Requirements
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- **PHP**: 8.3+
+- **Composer**: 2.x
+- **Node.js**: 20+ & NPM
+- **Database**: MySQL 8+ or SQLite
+- **Docker & Docker Compose**: For running ONLYOFFICE Docs Community Edition
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+---
 
-## Learning Laravel
+## Quick Start & Setup
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+### 1. Clone & Install Dependencies
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+composer install
+npm install
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+### 2. Environment Configuration
 
-## Contributing
+```bash
+cp .env.example .env
+php artisan key:generate
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Configure your `.env` settings:
+```env
+APP_NAME=DokuFlow
+APP_URL=http://localhost:8000
 
-## Code of Conduct
+# ONLYOFFICE Document Server Configuration
+ONLYOFFICE_URL=http://localhost:8080
+ONLYOFFICE_INTERNAL_URL=http://host.docker.internal:8000
+ONLYOFFICE_JWT_ENABLED=false
+ONLYOFFICE_JWT_SECRET=
+DOCUMENT_STORAGE_DISK=local
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### 3. Run Database Migrations & Build Assets
 
-## Security Vulnerabilities
+```bash
+php artisan migrate
+npm run build
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+---
 
-## License
+## Running ONLYOFFICE Docs
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Start the ONLYOFFICE Docs Community Edition Docker container:
+
+```bash
+docker compose up -d
+```
+
+The ONLYOFFICE Docs API will be accessible at:
+```text
+http://localhost:8080/web-apps/apps/api/documents/api.js
+```
+
+To verify the container is running:
+```bash
+docker ps
+```
+
+---
+
+## Running the Application
+
+Start the development server:
+
+```bash
+php artisan serve
+```
+
+Run background workers (for AI summarization & queues):
+```bash
+php artisan queue:listen
+```
+
+---
+
+## ONLYOFFICE Architecture & Networking
+
+```text
+Browser
+   │
+   ├── 1. Opens Editor (/documents/{id}/edit) ───────► Laravel
+   │                                                   │
+   ├── 2. Loads ONLYOFFICE API (api.js) ◄──────────────┤ Returns ONLYOFFICE Config
+   │         │
+   ▼         ▼
+ONLYOFFICE Docs Server (http://localhost:8080)
+   │
+   ├── 3. Fetches DOCX (/onlyoffice/documents/{id}/versions/{v}/file) ──► Laravel Storage
+   │
+   └── 4. Sends Save Callback (/onlyoffice/documents/{id}/callback) ────► Laravel VersionService
+```
+
+### Networking Tips:
+- **`ONLYOFFICE_URL`**: Accessible by the client browser (`http://localhost:8080` in local dev).
+- **`ONLYOFFICE_INTERNAL_URL`**: Accessible by the ONLYOFFICE Docker container to reach Laravel (`http://host.docker.internal:8000` on Windows/Mac Docker Desktop, or the host machine's IP).
+- **Server Callbacks**: The callback route `/onlyoffice/documents/{document}/callback` is exempted from CSRF middleware for server-to-server communication.
+
+---
+
+## Running Tests
+
+```bash
+php artisan test
+```

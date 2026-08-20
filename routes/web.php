@@ -57,6 +57,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('documents', DocumentController::class)->except(['edit', 'update']);
     Route::get('/document-numbers/preview', [DocumentController::class, 'nextNumber'])->name('documents.next-number');
     Route::get('/documents/{document}/edit', [DocumentController::class, 'edit'])->name('documents.edit');
+    Route::get('/documents/{document}/download', [DocumentController::class, 'download'])->name('documents.download');
     Route::get('/documents/{document}/preview', [DocumentController::class, 'preview'])->name('documents.preview');
     Route::post('/documents/{document}/summarize', [DocumentController::class, 'summarize'])->name('documents.summarize');
     Route::get('/documents/{document}/summary-status', [DocumentController::class, 'summaryStatus'])->name('documents.summary-status');
@@ -112,7 +113,12 @@ Route::middleware('auth')->group(function () {
     });
 });
 
+// ONLYOFFICE Routes (Accessed server-to-server by ONLYOFFICE Document Server)
+Route::get('/onlyoffice/documents/{document}/versions/{version}/file', [\App\Http\Controllers\OnlyOfficeController::class, 'file'])->name('onlyoffice.file');
+Route::post('/onlyoffice/documents/{document}/callback', [\App\Http\Controllers\OnlyOfficeController::class, 'callback'])->name('onlyoffice.callback')->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class]);
+
 // Share-token link access (Google Docs model)
 Route::get('/shared/{token}', [DocumentShareController::class, 'accessByToken'])->name('documents.shared');
 
 require __DIR__.'/auth.php';
+

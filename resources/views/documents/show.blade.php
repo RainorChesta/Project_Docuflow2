@@ -184,22 +184,19 @@
                     @php $isFileBased = $document->displayVersion()?->file_path; @endphp
                     <div class="flex flex-wrap items-center gap-2 mt-5 pt-4 border-t border-base-200">
                         @can('update', $document)
-                            @if($isFileBased)
-                                <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('edit-restricted-modal').showModal()">
-                                    {{ __('Edit Dokumen') }}
-                                </button>
-                            @elseif($hasDraft && !$pendingVersion && !$document->currentVersion)
-                                <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm">
-                                    {{ __('Edit Draft') }}
-                                </a>
-                            @else
-                                <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm">
-                                    {{ __('Edit Dokumen') }}
-                                </a>
-                            @endif
+                            <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                {{ __('Edit Dokumen') }}
+                            </a>
                         @endcan
-                        @can('update', $document)
-                        @endcan
+                        <a href="{{ route('documents.download', $document) }}" class="btn btn-outline btn-primary btn-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            {{ __('Download DOCX') }}
+                        </a>
                         @can('manageAccess', $document)
                             <button type="button" onclick="openShareModal()" class="btn btn-outline btn-primary btn-sm">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 0a3 3 0 11-5.367 2.684 3 3 0 015.367-2.684z" /></svg>

@@ -15,6 +15,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             \App\Http\Middleware\SetLocale::class,
         ]);
+        $middleware->validateCsrfTokens(except: [
+            'onlyoffice/documents/*/callback',
+        ]);
         $middleware->alias([
             'share.link' => \App\Http\Middleware\ShareLinkAuth::class,
             'signature.required' => \App\Http\Middleware\EnsureUserHasSignature::class,

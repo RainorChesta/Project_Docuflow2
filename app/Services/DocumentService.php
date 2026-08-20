@@ -12,8 +12,46 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
+use PhpOffice\PhpWord\PhpWord;
+use PhpOffice\PhpWord\IOFactory;
+use Illuminate\Support\Facades\Storage;
+
 class DocumentService
 {
+    /**
+     * Create a minimal blank DOCX file in storage.
+     */
+    public function createBlankDocx(int $documentId, int $versionNumber = 1): string
+    {
+        $phpWord = new PhpWord();
+        $section = $phpWord->addSection([
+            'pageSizeW' => 11906, // A4 in twips
+            'pageSizeH' => 16838,
+            'marginTop' => 1440,  // 1 inch
+            'marginBottom' => 1440,
+            'marginLeft' => 1440,
+            'marginRight' => 1440,
+        ]);
+        $section->addText(' ', ['name' => 'Arial', 'size' => 11]);
+
+        $relativeDir = 'documents/' . $documentId;
+        $fileName = 'v' . $versionNumber . '.docx';
+        $relativeFilePath = $relativeDir . '/' . $fileName;
+
+        $tempPath = tempnam(sys_get_temp_dir(), 'docx_');
+        $objWriter = IOFactory::createWriter($phpWord, 'Word2007');
+        $objWriter->save($tempPath);
+
+        Storage::disk(config('onlyoffice.storage_disk', 'local'))
+            ->put($relativeFilePath, file_get_contents($tempPath));
+
+        if (file_exists($tempPath)) {
+            @unlink($tempPath);
+        }
+
+        return $relativeFilePath;
+    }
+
     /**
      * Generate the final, authoritative document number. Locks the row
      * range to avoid duplicate sequences under concurrent submissions.
@@ -105,9 +143,14 @@ class DocumentService
         return DB::transaction(function () use ($data) {
             $doc = Document::create($data);
 
+            $storedPath = $this->createBlankDocx($doc->id, 1);
+
             $doc->versions()->create([
                 'version_number' => 1,
                 'content' => '',
+                'file_path' => $storedPath,
+                'file_original_name' => $doc->title . '.docx',
+                'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                 'author_id' => $data['owner_id'],
                 'author_name' => User::find($data['owner_id'])->name,
                 'status' => 'draft',

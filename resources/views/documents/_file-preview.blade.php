@@ -6,10 +6,16 @@
 <div class="p-4">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-3 px-2">
         <div class="text-sm text-base-content/60">
-            <span class="font-medium text-base-content">{{ $version->file_original_name }}</span>
-            — dokumen diunggah, bukan hasil editor.
+            <span class="font-medium text-base-content">{{ $version->file_original_name ?? ($document->title . '.docx') }}</span>
         </div>
-        <a href="{{ $fileUrl }}" class="btn btn-ghost btn-xs">Unduh</a>
+        <div class="flex items-center gap-2">
+            <a href="{{ route('documents.download', $document) }}" class="btn btn-primary btn-xs">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                {{ __('Download DOCX') }}
+            </a>
+        </div>
     </div>
 
     @if($isPdf)

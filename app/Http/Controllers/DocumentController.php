@@ -24,6 +24,7 @@ class DocumentController extends Controller
         protected VersionService $versionService,
         protected AuditService $auditService,
         protected QrCodeService $qrCodeService,
+        protected \App\Services\OnlyOfficeService $onlyOfficeService,
     ) {}
 
     public function index(Request $request): View
@@ -157,7 +158,7 @@ class DocumentController extends Controller
 
         if ($isUpload) {
             $doc = $this->documentService->createFromUpload($validated, $user->id, $request->file('file'));
-            $message = 'Dokumen diunggah. Menunggu approval kepala divisi.';
+            $message = 'Dokumen berhasil diunggah. Silakan edit dokumen di editor.';
         } else {
             $doc = $this->documentService->create($validated, $user->id);
             $message = 'Document created. Fill in the content.';
@@ -170,9 +171,7 @@ class DocumentController extends Controller
             'via_upload' => $isUpload,
         ]);
 
-        return $isUpload
-            ? redirect()->route('documents.show', $doc)->with('success', $message)
-            : redirect()->route('documents.edit', $doc)->with('success', $message);
+        return redirect()->route('documents.edit', $doc)->with('success', $message);
     }
 
     public function show(Document $document): View
@@ -250,15 +249,20 @@ class DocumentController extends Controller
 
         $document->load('currentVersion', 'versions');
 
-        $latest = $document->versions()->latest('version_number')->first();
+        $version = $document->displayVersion();
 
-        abort_if(
-            $latest && $latest->file_path,
-            403,
-            'Dokumen ini berasal dari unggahan berkas dan tidak bisa diedit lewat editor. Gunakan rollback untuk mengubah isinya.'
+        if (!$version) {
+            abort(404, 'Document version not found.');
+        }
+
+        $onlyOfficeConfig = $this->onlyOfficeService->generateEditorConfig(
+            $document,
+            $version,
+            auth()->user(),
+            'edit'
         );
 
-        return view('documents.edit', compact('document'));
+        return view('documents.edit', compact('document', 'version', 'onlyOfficeConfig'));
     }
 
     public function preview(Document $document): View
@@ -421,6 +425,27 @@ class DocumentController extends Controller
     }
 
     /**
+     * Download the latest version of the document as DOCX.
+     */
+    public function download(Document $document)
+    {
+        $this->authorize('view', $document);
+
+        $version = $document->displayVersion();
+        abort_unless($version && $version->file_path, 404, 'File not found');
+
+        $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
+        abort_unless($disk->exists($version->file_path), 404, 'Physical file not found');
+
+        $downloadName = $document->title;
+        if (!str_ends_with(strtolower($downloadName), '.docx') && !str_ends_with(strtolower($downloadName), '.pdf')) {
+            $downloadName .= '.docx';
+        }
+
+        return $disk->download($version->file_path, $downloadName);
+    }
+
+    /**
      * Stream berkas unggahan secara privat. Akses tetap tunduk pada
      * policy 'view' dokumen — tidak pernah lewat disk publik.
      */
@@ -431,10 +456,10 @@ class DocumentController extends Controller
         abort_unless($version->document_id === $document->id, 404);
         abort_unless($version->file_path, 404);
 
-        return Storage::disk('local')->response(
+        return Storage::disk(config('onlyoffice.storage_disk', 'local'))->response(
             $version->file_path,
-            $version->file_original_name,
-            ['Content-Disposition' => 'inline; filename="' . $version->file_original_name . '"']
+            $version->file_original_name ?? ($document->title . '.docx'),
+            ['Content-Disposition' => 'inline; filename="' . ($version->file_original_name ?? ($document->title . '.docx')) . '"']
         );
     }
 

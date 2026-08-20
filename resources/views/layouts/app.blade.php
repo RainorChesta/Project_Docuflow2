@@ -85,7 +85,8 @@
                 </header>
 
                 <!-- Page Content -->
-                <main class="flex-1 p-3 sm:p-6 overflow-y-auto print:block print:h-auto print:overflow-visible print:p-0">
+                <main class="flex-1 {{ request()->routeIs('documents.edit') ? 'p-0 flex flex-col min-h-0' : 'p-3 sm:p-6 overflow-y-auto' }} print:block print:h-auto print:overflow-visible print:p-0">
+                    @if(!request()->routeIs('documents.edit'))
                     <div class="print:hidden">
                     @php
                         $crumbs = [];
@@ -152,6 +153,7 @@
                         <x-breadcrumbs :items="$crumbs" />
                     @endif
                     </div>
+                    @endif
 
                     {{ $slot }}
                 </main>
@@ -159,5 +161,6 @@
         </div>
         <x-mandatory-signature-modal />
         <x-search-modal />
+        @stack('scripts')
     </body>
 </html>

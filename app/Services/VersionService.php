@@ -70,6 +70,73 @@ class VersionService
     }
 
     /**
+     * Save DOCX binary content received from ONLYOFFICE callback into document versions.
+     */
+    public function savePendingDocx(Document $document, string $docxBinaryContent, User $author): DocumentVersion
+    {
+        return DB::transaction(function () use ($document, $docxBinaryContent, $author) {
+            $pending = $document->versions()->pending()
+                ->whereNull('discarded_at')
+                ->orderBy('version_number', 'desc')
+                ->first();
+
+            $disk = config('onlyoffice.storage_disk', 'local');
+
+            if ($pending) {
+                $document->versions()->where('status', 'draft')->delete();
+
+                $storedPath = 'documents/' . $document->id . '/v' . $pending->version_number . '.docx';
+                Storage::disk($disk)->put($storedPath, $docxBinaryContent);
+
+                $pending->update([
+                    'file_path' => $storedPath,
+                    'file_original_name' => $document->title . '.docx',
+                    'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'author_id' => $author->id,
+                    'author_name' => $author->name,
+                ]);
+
+                return $pending;
+            }
+
+            $draft = $document->versions()->where('status', 'draft')
+                ->orderBy('version_number', 'desc')
+                ->first();
+
+            if ($draft) {
+                $storedPath = 'documents/' . $document->id . '/v' . $draft->version_number . '.docx';
+                Storage::disk($disk)->put($storedPath, $docxBinaryContent);
+
+                $draft->update([
+                    'file_path' => $storedPath,
+                    'file_original_name' => $document->title . '.docx',
+                    'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'author_id' => $author->id,
+                    'author_name' => $author->name,
+                    'status' => 'pending',
+                ]);
+
+                return $draft;
+            }
+
+            $versionNumber = ($document->versions()->max('version_number') ?? 0) + 1;
+            $storedPath = 'documents/' . $document->id . '/v' . $versionNumber . '.docx';
+            Storage::disk($disk)->put($storedPath, $docxBinaryContent);
+
+            return $document->versions()->create([
+                'version_number' => $versionNumber,
+                'content' => '',
+                'file_path' => $storedPath,
+                'file_original_name' => $document->title . '.docx',
+                'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'author_id' => $author->id,
+                'author_name' => $author->name,
+                'status' => 'pending',
+            ]);
+        });
+    }
+
+    /**
      * Sama seperti savePending(), tapi sumbernya berkas unggahan (bukan
      * konten editor). Dipakai untuk fitur "unggah versi terbaru" pada
      * dokumen yang isinya memang berasal dari berkas.

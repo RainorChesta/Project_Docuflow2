@@ -9,10 +9,12 @@
         "php": "^8.3",
         "dompdf/dompdf": "^3.1",
         "endroid/qr-code": "^6.0",
+        "firebase/php-jwt": "^7.1",
         "laravel/framework": "^13.8",
         "laravel/reverb": "*",
         "laravel/tinker": "^3.0",
         "mews/purifier": "^3.4",
+        "phpoffice/phpword": "^1.4",
         "smalot/pdfparser": "^2.12"
     },
     "require-dev": {
