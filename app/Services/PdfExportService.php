@@ -22,10 +22,10 @@ class PdfExportService
      * nilai ini harus ikut disesuaikan.
      */
     private const DEFAULT_MARGIN = [
-        'top' => 48,
-        'right' => 56,
-        'bottom' => 48,
-        'left' => 56,
+        'top' => 96,
+        'right' => 96,
+        'bottom' => 96,
+        'left' => 96,
     ];
 
     private const CHROME_CANDIDATES = [

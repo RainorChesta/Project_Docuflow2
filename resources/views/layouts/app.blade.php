@@ -51,7 +51,7 @@
                 <header class="h-16 bg-base-100 border-b border-base-300 flex items-center justify-between px-3 sm:px-6 shrink-0 sticky top-0 z-30 print:hidden">
                     <div class="flex items-center gap-2 sm:gap-3 min-w-0">
                         <button type="button"
-                                class="btn btn-ghost btn-sm px-2 shrink-0"
+                                class="btn btn-ghost btn-sm px-2 shrink-0 lg:hidden"
                                 aria-label="Toggle sidebar"
                                 x-on:click="toggle()">
                             <svg x-show="!open" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
@@ -68,15 +68,19 @@
                         {{-- Theme Toggle: follows OS until user picks Light/Dark --}}
                         <x-theme-toggle />
 
-                        <div class="dropdown dropdown-end">
-                            <div tabindex="0" role="button" class="flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-lg hover:bg-base-200 transition-colors max-w-full">
-                                <span class="text-sm font-medium text-base-content hidden sm:block truncate max-w-[120px]">{{ Auth::user()->name }}</span>
-                                <svg class="w-4 h-4 text-base-content/40 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-                            </div>
-                            <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box shadow-lg border border-base-300 w-48 mt-2 p-2">
-                                <li><a href="{{ route('profile.edit') }}" class="text-sm">Profile</a></li>
-                            </ul>
-                        </div>
+                        {{-- Global Search --}}
+                        <button type="button"
+                                class="btn btn-ghost btn-sm btn-square"
+                                title="{{ __('Cari Dokumen') }}"
+                                aria-label="{{ __('Cari Dokumen') }}"
+                                @click="$dispatch('open-search')">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </button>
+
+                        {{-- Notification Bell --}}
+                        <x-notification-bell />
                     </div>
                 </header>
 
@@ -154,5 +158,6 @@
             </div>
         </div>
         <x-mandatory-signature-modal />
+        <x-search-modal />
     </body>
 </html>

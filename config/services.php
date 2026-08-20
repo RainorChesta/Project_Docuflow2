@@ -39,7 +39,7 @@ return [
         'key' => env('GROQ_API_KEY'),
         'model' => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
         'temperature' => env('GROQ_TEMPERATURE', 0.2),
-        'max_tokens' => env('GROQ_MAX_TOKENS', 800),
+        'max_tokens' => env('GROQ_MAX_TOKENS', 4096),
         'timeout' => env('GROQ_TIMEOUT', 90),
     ],
 
@@ -47,7 +47,7 @@ return [
         'key' => env('DEEPSEEK_API_KEY'),
         'model' => env('DEEPSEEK_MODEL', 'deepseek-v4-flash'),
         'temperature' => env('DEEPSEEK_TEMPERATURE', 0.2),
-        'max_tokens' => env('DEEPSEEK_MAX_TOKENS', 800),
+        'max_tokens' => env('DEEPSEEK_MAX_TOKENS', 4096),
         'timeout' => env('DEEPSEEK_TIMEOUT', 90),
     ],
 

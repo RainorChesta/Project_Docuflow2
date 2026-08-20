@@ -1,5 +1,5 @@
 <x-app-layout>
-    <x-slot name="header">Pending Approvals</x-slot>
+    <x-slot name="header">{{ __('Pending Approvals') }}</x-slot>
 
     <div class="py-6">
         <div class="max-w-7xl mx-auto w-full">
@@ -11,7 +11,7 @@
                 <div class="card bg-base-100 border border-base-300 shadow-sm mb-6">
                     <div class="card-body p-0">
                         <div class="px-4 sm:px-5 py-3 border-b border-base-300">
-                            <h3 class="font-semibold">Permintaan Rollback</h3>
+                            <h3 class="font-semibold">{{ __('Permintaan Rollback') }}</h3>
                         </div>
                         <div class="divide-y divide-base-200">
                             @foreach($pendingRollbacks as $doc)
@@ -20,7 +20,7 @@
                                         <div class="min-w-0">
                                             <p class="font-medium break-words">{{ $doc->title }}</p>
                                             <p class="text-sm text-base-content/60">
-                                                Rollback ke v{{ $doc->pendingRollbackVersion->version_number }} · oleh {{ $doc->rollbackRequestedBy?->name ?? '—' }} · {{ $doc->rollback_requested_at?->diffForHumans() }}
+                                                {{ __('Rollback') }} v{{ $doc->pendingRollbackVersion->version_number }} · {{ __('oleh') }} {{ $doc->rollbackRequestedBy?->name ?? '—' }} · {{ $doc->rollback_requested_at?->diffForHumans() }}
                                             </p>
                                         </div>
                                         <div class="flex flex-wrap gap-2 items-center shrink-0">
@@ -32,16 +32,16 @@
                                             </a>
                                             <form method="POST" action="{{ route('approvals.rollback-request.approve', $doc) }}" class="inline">
                                                 @csrf
-                                                <button class="btn btn-success btn-sm" onclick="return confirm('Yakin? Versi setelah v{{ $doc->pendingRollbackVersion->version_number }} akan dihapus permanen.')">
+                                                <button class="btn btn-success btn-sm" onclick="return confirm('{{ __('Rollback request will be submitted to the division head. If approved, all versions after v:version will be permanently deleted.', ['version' => $doc->pendingRollbackVersion->version_number]) }}')">
                                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                                                    Approve
+                                                    {{ __('Approve') }}
                                                 </button>
                                             </form>
                                             <form method="POST" action="{{ route('approvals.rollback-request.reject', $doc) }}" class="inline">
                                                 @csrf
                                                 <button class="btn btn-outline btn-error btn-sm">
                                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                                    Reject
+                                                    {{ __('Reject') }}
                                                 </button>
                                             </form>
                                         </div>
@@ -62,7 +62,7 @@
                                     <div class="min-w-0">
                                         <p class="font-medium break-words">{{ $version->document->title }}</p>
                                         <p class="text-sm text-base-content/60">
-                                            v{{ $version->version_number }} · by {{ $version->author_name }} · {{ $version->created_at->diffForHumans() }}
+                                            v{{ $version->version_number }} · {{ __('oleh') }} {{ $version->author_name }} · {{ $version->created_at->diffForHumans() }}
                                         </p>
                                     </div>
                                     <div class="flex flex-wrap gap-2 items-center shrink-0">
@@ -76,14 +76,14 @@
                                             @csrf
                                             <button class="btn btn-success btn-sm">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                                                Approve
+                                                {{ __('Approve') }}
                                             </button>
                                         </form>
                                         <form method="POST" action="{{ route('approvals.reject', [$version->document, $version]) }}" class="inline">
                                             @csrf
                                             <button class="btn btn-error btn-sm">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                                Reject
+                                                {{ __('Reject') }}
                                             </button>
                                         </form>
                                     </div>
@@ -93,7 +93,7 @@
                                 </div>
                             </div>
                         @empty
-                            <div class="p-4 sm:p-6 text-base-content/60">No pending approvals.</div>
+                            <div class="p-4 sm:p-6 text-base-content/60">{{ __('No pending approvals.') }}</div>
                         @endforelse
                     </div>
                 </div>

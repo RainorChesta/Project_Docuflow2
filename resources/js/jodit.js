@@ -55,7 +55,7 @@ const PAPER_SIZES = {
 //
 // PENTING: nilai ini WAJIB SAMA PERSIS dengan DEFAULT_MARGIN di
 // app/Services/PdfExportService.php.
-const DEFAULT_MARGIN = { top: 48, right: 56, bottom: 48, left: 56 };
+const DEFAULT_MARGIN = { top: 96, right: 96, bottom: 96, left: 96 };
 
 // Ruang tulis minimum per halaman (px) — SAMA PERSIS dengan
 // MIN_PAGE_CONTENT_PX di app/Services/PdfExportService.php. Dipakai oleh
@@ -102,15 +102,15 @@ function buildIframeStyle(size, margin = DEFAULT_MARGIN) {
     const padding = `${margin.top}px ${margin.right}px ${margin.bottom}px ${margin.left}px`;
     return [
         `@import url('${GOOGLE_FONTS_URL}');`,
-        'html { margin:0; padding:0; background:#e5e7eb; }',
+        'html { margin:0; padding:0; background:#f8f9fa; overflow-y:auto; overflow-x:auto; }',
         'body {',
         '  box-sizing:border-box !important;',
         `  width:${size.width}px !important;`,
-        '  margin:0 auto !important;',
+        '  margin: 20px auto !important;',
         `  padding:${padding} !important;`,
         '  background:#fff;',
         `  min-height:${size.height}px;`,
-        '  box-shadow:0 1px 3px rgba(0,0,0,0.1);',
+        '  box-shadow: 0 1px 3px 0 rgba(60,64,67,0.3);',
         '}',
         '.doku-content, .doku-paper, .jodit-wysiwyg { font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5; color: #000; word-wrap: break-word; text-align: left; }',
         ':is(.doku-content, .doku-paper, .jodit-wysiwyg) p { margin-top: 0; margin-bottom: 1em; }',
@@ -131,16 +131,12 @@ function buildIframeStyle(size, margin = DEFAULT_MARGIN) {
         ':is(.doku-content, .doku-paper, .jodit-wysiwyg) h5 { font-size: 0.83em !important; }',
         ':is(.doku-content, .doku-paper, .jodit-wysiwyg) h6 { font-size: 0.67em !important; }',
         // FIX: table border hilang di editor. Jodit inject base editing
-        // style ke iframe (untuk cell-selection/resize handle) yang punya
-        // border lebih ringan pada td/th. Tanpa !important di sini, style
-        // Jodit menang sehingga border tabel "hilang" hanya saat mode edit
-        // (show/preview yang tidak lewat Jodit tetap tampil normal).
-        // Menambahkan !important menyamakan prioritas dengan aturan lain
-        // di file ini (li, heading, b/i/u) yang sudah lebih dulu !important
-        // karena alasan yang sama.
-        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) table { border-collapse: collapse !important; width: 100%; margin-bottom: 1em; }',
-        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) th, :is(.doku-content, .doku-paper, .jodit-wysiwyg) td { border: 1px solid #ccc !important; padding: 8px; text-align: left; }',
-        ':is(.doku-content, .doku-paper, .jodit-wysiwyg) th { font-weight: bold !important; background-color: #f9fafb !important; }',
+        'body:is(.doku-content, .doku-paper, .jodit-wysiwyg) table, :is(.doku-content, .doku-paper, .jodit-wysiwyg) table { border-collapse: collapse; width: 100%; margin-bottom: 1em; }',
+        'body:is(.doku-content, .doku-paper, .jodit-wysiwyg) th, body:is(.doku-content, .doku-paper, .jodit-wysiwyg) td, :is(.doku-content, .doku-paper, .jodit-wysiwyg) th, :is(.doku-content, .doku-paper, .jodit-wysiwyg) td { border: 1px solid #ccc; padding: 8px; text-align: left; }',
+        'body:is(.doku-content, .doku-paper, .jodit-wysiwyg) th, :is(.doku-content, .doku-paper, .jodit-wysiwyg) th { font-weight: bold; background-color: #f9fafb; }',
+        '.jodit-wysiwyg table, .jodit-wysiwyg th, .jodit-wysiwyg td { outline: 1px dashed #cbd5e1; outline-offset: -1px; }',
+        '.doku-paper table.doku-table-no-border th, .doku-paper table.doku-table-no-border td { border: none !important; }',
+        '.jodit-wysiwyg table.doku-table-no-border th, .jodit-wysiwyg table.doku-table-no-border td { border: none !important; outline: 1px dashed #cbd5e1; outline-offset: -1px; }',
         ':is(.doku-content, .doku-paper, .jodit-wysiwyg) blockquote { margin: 1em 40px; border-left: 4px solid #ccc; padding-left: 1em; color: #666; }',
         ':is(.doku-content, .doku-paper, .jodit-wysiwyg) pre { background: #f4f4f4; padding: 1em; overflow-x: auto; font-family: monospace; }',
         ':is(.doku-content, .doku-paper, .jodit-wysiwyg) b, :is(.doku-content, .doku-paper, .jodit-wysiwyg) strong { font-weight: bold !important; }',
@@ -208,7 +204,7 @@ function buildSpacerElement(margin, gap, extraAttrs) {
         userSelect: 'none',
     });
 
-    const gapBandHeight = Math.max(2, Math.min(24, Math.round(gap * 0.3)));
+    const gapBandHeight = 20;
     const remaining = gap - gapBandHeight;
     const beforeHeight = gap > 0 ? Math.round(remaining * (margin.bottom / gap)) : 0;
     const afterHeight = remaining - beforeHeight;
@@ -217,15 +213,14 @@ function buildSpacerElement(margin, gap, extraAttrs) {
     Object.assign(endPart.style, {
         height: beforeHeight + 'px',
         background: '#fff',
-        boxShadow: '0 2px 4px -1px rgba(0,0,0,0.15)',
     });
 
     const gapLine = document.createElement('div');
     Object.assign(gapLine.style, {
         height: gapBandHeight + 'px',
-        background: '#cbd5e1',
-        borderTop: '1px solid #94a3b8',
-        borderBottom: '1px solid #94a3b8',
+        background: '#f8f9fa',
+        borderTop: '1px solid #dadce0',
+        borderBottom: '1px solid #dadce0',
         boxSizing: 'border-box',
     });
 
@@ -281,6 +276,12 @@ function paginateList(list, containerTop, paddingTop, contentPerPage, gap, margi
             const relTop = rect.top - containerTop - paddingTop;
             const relBottom = relTop + rect.height;
 
+            // FIX: Fast-forward nextBoundary supaya tidak tertinggal kalau ada
+            // elemen yang sangat tinggi atau lompatan margin yang besar di dalam list.
+            while (relTop >= nextBoundary + contentPerPage - BOUNDARY_EPS) {
+                nextBoundary += contentPerPage + gap;
+            }
+
             // FIX: pakai BOUNDARY_EPS supaya perbandingan tidak "flip" akibat
             // selisih sub-pixel antara render iframe editor vs render halaman
             // show/preview (lihat komentar definisi BOUNDARY_EPS di atas).
@@ -316,7 +317,11 @@ function paginateList(list, containerTop, paddingTop, contentPerPage, gap, margi
             // seluruh sisa list (current) didorong utuh, cukup 1 spacer.
             const spacer = buildSpacerElement(margin, gap);
             current.parentNode.insertBefore(spacer, current);
-            break;
+            
+            // JANGAN break! Setelah list didorong ke halaman baru, bisa jadi list
+            // ini sangat panjang dan melintasi halaman berikutnya lagi. Lanjut
+            // evaluasi `current` (list yang sama) terhadap nextBoundary yang baru.
+            continue;
         }
 
         // Pecah: item sebelum splitAt tetap di `current`, splitAt dst
@@ -368,6 +373,12 @@ function paginateContainer(container, contentPerPage, gap, margin) {
         const relTop = rect.top - containerTop - paddingTop;
         const relBottom = relTop + rect.height;
         const elementTallerThanPage = rect.height > contentPerPage;
+
+        // FIX: Fast-forward nextBoundary supaya tidak tertinggal kalau ada
+        // elemen yang sangat tinggi atau lompatan margin yang besar.
+        while (relTop >= nextBoundary + contentPerPage - BOUNDARY_EPS) {
+            nextBoundary += contentPerPage + gap;
+        }
 
         // FIX: sama seperti paginateList, pakai BOUNDARY_EPS supaya
         // hasil pagination tidak bergeser akibat rounding sub-pixel yang
@@ -489,6 +500,13 @@ function repaginateEditor(editor) {
     editor._isRepaginating = true; // cegah rekursi dari 'change' yang terpicu oleh mutasi kita sendiri
     editor._suppressSpacerObserver = true;
     try {
+        const currentScrollHeight = body.scrollHeight;
+        const currentScrollTop = editor.editorWindow.scrollY || 0;
+        
+        // Kunci tinggi body sementara agar scrollbar tidak melompat (shrink)
+        // saat spacer dibuang atau dihitung ulang.
+        body.style.minHeight = currentScrollHeight + 'px';
+
         // 1. Gabungkan lagi list yang sempat dipecah, LALU buang semua
         //    spacer lama → perhitungan selalu mulai dari kondisi "flat"
         //    (posisi & struktur asli elemen tanpa jeda/pecahan buatan).
@@ -496,12 +514,42 @@ function repaginateEditor(editor) {
         body.querySelectorAll(':scope > [data-page-spacer]').forEach((el) => el.remove());
 
         if (!body.firstElementChild) {
+            body.style.minHeight = size.height + 'px';
             editor.synchronizeValues();
             return;
         }
 
         const contentPerPage = Math.max(size.height - margin.top - margin.bottom, 1);
         paginateContainer(body, contentPerPage, gap, margin);
+
+        // Setelah paginasi, pastikan tinggi halaman editor pas kelipatan ukuran kertas
+        let contentHeight = 0;
+        const lastChild = body.lastElementChild;
+        if (lastChild) {
+            const bodyRect = body.getBoundingClientRect();
+            const lastRect = lastChild.getBoundingClientRect();
+            const pb = parseFloat(getComputedStyle(body).paddingBottom) || 0;
+            contentHeight = (lastRect.bottom - bodyRect.top) + pb;
+        }
+
+        let numPages = Math.ceil((contentHeight - 2) / size.height);
+        if (numPages < 1) numPages = 1;
+        body.style.minHeight = (numPages * size.height) + 'px';
+
+        editor.editorWindow.scrollTo(0, currentScrollTop);
+        
+        // Jika kursor (selection) terdorong ke halaman baru oleh spacer,
+        // pastikan kursor tetap terlihat di layar.
+        const sel = editor.editorWindow.getSelection();
+        if (sel && sel.rangeCount > 0) {
+            const range = sel.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+            if (rect.bottom > editor.editorWindow.innerHeight) {
+                editor.editorWindow.scrollBy(0, rect.bottom - editor.editorWindow.innerHeight + 40);
+            } else if (rect.top < 0) {
+                editor.editorWindow.scrollBy(0, rect.top - 40);
+            }
+        }
 
         editor.synchronizeValues();
     } finally {
@@ -533,17 +581,51 @@ function repaginatePreview(paperEl, size, margin) {
     margin = clampMarginToPage(size, margin || DEFAULT_MARGIN);
     const gap = margin.top + margin.bottom;
 
+    // PENTING: Reset zoom sebelum mengukur ukuran dan paginasi!
+    // Jika kertas sedang di-zoom (misal karena autoFit di layar kecil), 
+    // getBoundingClientRect() akan mengembalikan ukuran yang sudah disusutkan.
+    // Hal ini akan mengacaukan perhitungan halaman (1 halaman jadi muat lebih banyak).
+    const originalZoom = paperEl.style.zoom;
+    const originalTransform = paperEl.style.transform;
+    paperEl.style.zoom = 1;
+    paperEl.style.transform = 'none';
+
+    const currentScrollHeight = paperEl.scrollHeight;
+    paperEl.style.minHeight = currentScrollHeight + 'px';
+
     paperEl.style.width = size.width + 'px';
-    paperEl.style.minHeight = size.height + 'px';
     paperEl.style.padding = `${margin.top}px ${margin.right}px ${margin.bottom}px ${margin.left}px`;
 
     mergeSplitLists(paperEl);
     paperEl.querySelectorAll(':scope > [data-page-spacer]').forEach((el) => el.remove());
 
-    if (!paperEl.firstElementChild) return;
+    if (!paperEl.firstElementChild) {
+        paperEl.style.minHeight = size.height + 'px';
+        paperEl.style.zoom = originalZoom;
+        paperEl.style.transform = originalTransform;
+        return;
+    }
 
     const contentPerPage = Math.max(size.height - margin.top - margin.bottom, 1);
     paginateContainer(paperEl, contentPerPage, gap, margin);
+
+    // Setelah paginasi, pastikan tinggi kotak preview pas kelipatan ukuran kertas
+    let contentHeight = 0;
+    const lastChild = paperEl.lastElementChild;
+    if (lastChild) {
+        const bodyRect = paperEl.getBoundingClientRect();
+        const lastRect = lastChild.getBoundingClientRect();
+        const pb = parseFloat(getComputedStyle(paperEl).paddingBottom) || 0;
+        contentHeight = (lastRect.bottom - bodyRect.top) + pb;
+    }
+
+    let numPages = Math.ceil((contentHeight - 2) / size.height);
+    if (numPages < 1) numPages = 1;
+    paperEl.style.minHeight = (numPages * size.height) + 'px';
+
+    // Kembalikan zoom ke state awal
+    paperEl.style.zoom = originalZoom;
+    paperEl.style.transform = originalTransform;
 }
 
 // Baca ukuran kertas & margin yang disimpan editor untuk dokumen ini.
@@ -720,7 +802,7 @@ function buildMarginPopup(editor, close) {
         input.type = 'number';
         input.min = '0';
         input.step = '0.1';
-        input.value = (current[key] / PX_PER_CM).toFixed(2);
+        input.value = Number((current[key] / PX_PER_CM).toFixed(2));
         input.style.cssText = 'width:70px; padding:4px 6px; border:1px solid #ccc; border-radius:4px;';
 
         inputs[key] = input;
@@ -751,7 +833,7 @@ function buildMarginPopup(editor, close) {
                 infoMsg.style.display = 'none';
                 return;
             }
-            next[key] = Math.round(v * PX_PER_CM);
+            next[key] = Number((v * PX_PER_CM).toFixed(2));
         }
         errorMsg.style.display = 'none';
 
@@ -765,7 +847,7 @@ function buildMarginPopup(editor, close) {
             infoMsg.textContent = `Margin disesuaikan otomatis (maks ~${((size.height - MIN_PAGE_CONTENT_PX) / PX_PER_CM).toFixed(1)}cm atas+bawah, ~${((size.width - MIN_PAGE_CONTENT_PX) / PX_PER_CM).toFixed(1)}cm kiri+kanan) supaya tetap muat di kertas.`;
             infoMsg.style.display = 'block';
             fields.forEach(({ key }) => {
-                inputs[key].value = (clamped[key] / PX_PER_CM).toFixed(2);
+                inputs[key].value = Number((clamped[key] / PX_PER_CM).toFixed(2));
             });
             return; // biarkan popup tetap terbuka biar user lihat pesannya
         }
@@ -1214,8 +1296,33 @@ export function initJoditEditor(selector, overrides = {}) {
             'undo', 'redo', 'eraser', 'copyformat', '|',
             'symbol', 'speechRecognize', '|',
             'cut', 'copy', 'paste', 'selectall', 'find', '|',
-            'preview', 'print', 'fullsize', 'about',
+                'preview', 'print', 'fullsize', 'about',
         ],
+
+        // FIX INSERT TABLE: JANGAN sentuh `controls.table` — property
+        // `popup` di situ punya arti KHUSUS bawaan Jodit (fungsi grid-picker
+        // untuk MENYISIPKAN tabel baru, lihat plugins/table/config.js).
+        // Menimpanya dengan array/objek "cells" (seperti sebelumnya) bikin
+        // grid-picker hilang → tombol "table" di toolbar utama mati total.
+        //
+        // Toolbar mini yang muncul saat klik/seleksi SEL tabel (merge,
+        // split, border, warna, dst) itu config-nya TERPISAH: opsi
+        // top-level `popup.cells` di bawah (lihat plugins/inline-popup),
+        // BUKAN bagian dari `controls.table`.
+        popup: {
+            cells: [
+                'tableNoBorder',
+                'tableCellColor', // Custom table cell color
+                'valign',
+                'splitv',   // dropdown split vertical/horizontal bawaan (nama 'splitg' terpisah TIDAK ada)
+                'align',
+                '|',
+                'merge',
+                'addcolumn',
+                'addrow',
+                'deleteTable',
+            ],
+        },
 
         controls: {
             // Daftar font custom (Google Fonts) yang muncul di dropdown toolbar "font"
@@ -1400,6 +1507,89 @@ export function initJoditEditor(selector, overrides = {}) {
                     doPrint(jodit, size);
                 },
             },
+
+            tableNoBorder: {
+                name: 'tableNoBorder',
+                tooltip: 'Toggle Tabel Tanpa Border',
+                icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke-dasharray="4 4"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>',
+                exec: (editor, current) => {
+                    const table = current ? current.closest('table') : null;
+                    if (!table) return;
+                    editor.s.save();
+                    if (table.classList.contains('doku-table-no-border')) {
+                        table.classList.remove('doku-table-no-border');
+                    } else {
+                        table.classList.add('doku-table-no-border');
+                    }
+                    editor.s.restore();
+                    editor.events.fire('change');
+                }
+            },
+
+            tableCellColor: {
+                name: 'tableCellColor',
+                tooltip: 'Warna Background Sel',
+                icon: 'brush', // use built-in Jodit brush icon
+                popup: (editor, current, self, close) => {
+                    const colors = [
+                        '#ffffff', '#f4f4f4', '#e0e0e0', '#ffcdd2', '#f8bbd0', '#e1bee7', '#d1c4e9', '#c5cae9', '#bbdefb', '#b3e5fc', '#b2ebf2', '#b2dfdb', '#c8e6c9', '#dcedc8', '#f0f4c3', '#fff9c4', '#ffecb3', '#ffe082', '#ffcc80', '#ffab91', '#bcaaa4', '#eeeeee', '#cfd8dc',
+                        '#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800', '#ff5722', '#795548', '#9e9e9e', '#607d8b'
+                    ];
+                    
+                    const wrapper = document.createElement('div');
+                    wrapper.style.cssText = 'padding:8px; display:grid; grid-template-columns:repeat(7, 24px); gap:4px; background:#fff; width:204px;';
+                    
+                    const getSelectedTds = () => {
+                        let cells = Array.from(editor.editor.querySelectorAll('td[data-jodit-selected-cell], th[data-jodit-selected-cell], td.jodit-selected-cell, th.jodit-selected-cell'));
+                        if (cells.length > 0) return cells;
+                        
+                        const sel = editor.s.window.getSelection();
+                        if (sel && sel.rangeCount > 0 && !sel.getRangeAt(0).collapsed) {
+                            const table = current ? current.closest('table') : null;
+                            if (table) {
+                                table.querySelectorAll('td, th').forEach(cell => {
+                                    if (sel.containsNode(cell, true)) cells.push(cell);
+                                });
+                            }
+                        }
+                        
+                        if (cells.length === 0) {
+                            const td = current ? current.closest('td, th') : null;
+                            if (td) cells.push(td);
+                        }
+                        return [...new Set(cells)];
+                    };
+                    
+                    colors.forEach(color => {
+                        const btn = document.createElement('div');
+                        btn.style.cssText = `width:24px; height:24px; background-color:${color}; border:1px solid #d1d5db; cursor:pointer; border-radius:2px; box-sizing:border-box;`;
+                        btn.addEventListener('click', () => {
+                            const cells = getSelectedTds();
+                            editor.s.save();
+                            cells.forEach(cell => cell.style.backgroundColor = color);
+                            editor.s.restore();
+                            editor.events.fire('change');
+                            if (close) close();
+                        });
+                        wrapper.appendChild(btn);
+                    });
+                    
+                    const clearBtn = document.createElement('div');
+                    clearBtn.style.cssText = `grid-column: span 7; text-align:center; padding:4px; margin-top:4px; font-size:12px; cursor:pointer; border:1px solid #d1d5db; background:#f9fafb; border-radius:2px;`;
+                    clearBtn.textContent = 'Hapus Warna';
+                    clearBtn.addEventListener('click', () => {
+                        const cells = getSelectedTds();
+                        editor.s.save();
+                        cells.forEach(cell => cell.style.backgroundColor = '');
+                        editor.s.restore();
+                        editor.events.fire('change');
+                        if (close) close();
+                    });
+                    wrapper.appendChild(clearBtn);
+                    
+                    return wrapper;
+                }
+            },
         },
 
 
@@ -1476,6 +1666,16 @@ export function initJoditEditor(selector, overrides = {}) {
             // tidak ke-flatten jadi teks polos di tab preview lain.
             timer = setTimeout(() => localStorage.setItem(storageKey, getDraftValue(editor)), 250);
         });
+
+        // Expose discardDraft: batalkan timer autosave, set flag supaya
+        // change handler tidak menulis lagi, lalu hapus draft dari
+        // localStorage. Dipanggil oleh tombol Cancel di edit.blade.php.
+        editor.discardDraft = function () {
+            draftSaved = true;
+            clearTimeout(timer);
+            localStorage.removeItem(storageKey);
+            localStorage.removeItem(storageKey + ':paper');
+        };
     }
 
     if (window.__joditInstances) {

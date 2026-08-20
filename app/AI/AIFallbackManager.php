@@ -21,7 +21,7 @@ class AIFallbackManager implements AIClientInterface
 
     public function chat(string $system, string $content): string
     {
-        $lastException = null;
+        $errors = [];
 
         foreach ($this->clients as $client) {
             try {
@@ -29,16 +29,16 @@ class AIFallbackManager implements AIClientInterface
             } catch (Throwable $e) {
                 // Log exception if needed, then continue to the next client
                 report($e);
-                $lastException = $e;
+                $errors[] = class_basename($client) . ': ' . $e->getMessage();
             }
         }
 
-        throw new RuntimeException('All AI clients failed. Last error: ' . $lastException?->getMessage(), 0, $lastException);
+        throw new RuntimeException("Semua AI client gagal.\nDetail Error:\n" . implode("\n", $errors));
     }
 
     public function chatBatch(array $payloads, int $concurrency = 3): array
     {
-        $lastException = null;
+        $errors = [];
 
         foreach ($this->clients as $client) {
             try {
@@ -46,10 +46,10 @@ class AIFallbackManager implements AIClientInterface
             } catch (Throwable $e) {
                 // Log exception if needed, then continue to the next client
                 report($e);
-                $lastException = $e;
+                $errors[] = class_basename($client) . ': ' . $e->getMessage();
             }
         }
 
-        throw new RuntimeException('All AI clients failed on batch request. Last error: ' . $lastException?->getMessage(), 0, $lastException);
+        throw new RuntimeException("Semua AI client gagal pada batch request.\nDetail Error:\n" . implode("\n", $errors));
     }
 }

@@ -28,8 +28,7 @@ class DocumentExportPdfTest extends TestCase
         Storage::fake('local');
 
         $division = Division::create(['code' => '01', 'name' => 'JBM']);
-        $type = DocumentType::create(['code' => 'S.ED', 'name' => 'Surat Edaran']);
-        $docType = \App\Models\DocumentType::create(['name' => 'Surat Edaran', 'code' => 'S.ED']);
+        $docType = DocumentType::create(['name' => 'Surat Edaran Test Type', 'code' => 'S.ED.TEST']);
         $this->owner = User::factory()->create(['division_id' => $division->id]);
         $this->admin = User::factory()->create(['system_role' => 'admin', 'is_active' => true]);
         $this->document = Document::create([
@@ -37,7 +36,6 @@ class DocumentExportPdfTest extends TestCase
             'title' => 'Surat Edaran Test',
             'visibility' => 'division',
             'division_id' => $division->id,
-            'document_type_id' => $type->id,
             'owner_id' => $this->owner->id,
             'document_type_id' => $docType->id,
         ]);

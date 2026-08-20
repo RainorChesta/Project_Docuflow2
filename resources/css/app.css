@@ -43,6 +43,26 @@
        di atas bg gelap (outline button, teks primary, active menu). */
     --color-primary: oklch(0.62 0.12 265);
     --color-primary-content: oklch(0.15 0.03 265);
+    /* Secondary — sedikit lebih terang biar terbaca */
+    --color-secondary: oklch(0.68 0.04 260);
+    --color-secondary-content: oklch(0.15 0.03 260);
+    /* Accent — lebih cerah, desaturasi sedikit */
+    --color-accent: oklch(0.68 0.13 245);
+    --color-accent-content: oklch(0.15 0.03 245);
+    /* Neutral — lebih terang dari base */
+    --color-neutral: oklch(0.4 0.03 250);
+    --color-neutral-content: oklch(0.95 0.005 250);
+    /* Info — sama dengan accent di dark */
+    --color-info: oklch(0.68 0.13 245);
+    /* Success — hijau lebih lembut */
+    --color-success: oklch(0.72 0.17 150);
+    --color-success-content: oklch(0.15 0.04 150);
+    /* Warning — oranye/kuning lebih lembut */
+    --color-warning: oklch(0.78 0.13 75);
+    --color-warning-content: oklch(0.15 0.04 75);
+    /* Error — merah lebih lembut */
+    --color-error: oklch(0.65 0.18 25);
+    --color-error-content: oklch(0.15 0.04 25);
   }
 }
 
@@ -71,17 +91,129 @@
   --border: 1px;
 }
 
-/* Dark mode: primary lebih terang biar outline button, teks primary,
-   dan active menu kebaca di atas bg gelap. Unlayered supaya menang
-   atas :root unlayered di atas (specificity sama, urutan menang). */
+/* Dark mode: semua semantic colors disesuaikan biar terbaca di atas
+   bg gelap. Unlayered supaya menang atas :root unlayered di atas
+   (specificity sama, urutan menang). */
 .dark {
   --color-primary: oklch(0.62 0.12 265);
   --color-primary-content: oklch(0.15 0.03 265);
+  --color-secondary: oklch(0.68 0.04 260);
+  --color-secondary-content: oklch(0.15 0.03 260);
+  --color-accent: oklch(0.68 0.13 245);
+  --color-accent-content: oklch(0.15 0.03 245);
+  --color-neutral: oklch(0.4 0.03 250);
+  --color-neutral-content: oklch(0.95 0.005 250);
+  --color-info: oklch(0.68 0.13 245);
+  --color-success: oklch(0.72 0.17 150);
+  --color-success-content: oklch(0.15 0.04 150);
+  --color-warning: oklch(0.78 0.13 75);
+  --color-warning-content: oklch(0.15 0.04 75);
+  --color-error: oklch(0.65 0.18 25);
+  --color-error-content: oklch(0.15 0.04 25);
 }
 
 /* Alpine x-cloak: hide element until Alpine initializes */
 [x-cloak] {
     display: none !important;
+}
+
+/* ─── Sidebar Nav Micro-interactions ─────────────────────────────── */
+
+/* Base nav item — smooth transitions for bg, color, transform */
+.nav-item {
+    position: relative;
+    transition: background-color 200ms ease,
+                color 200ms ease,
+                transform 150ms ease;
+}
+
+/* Hover lift + bg tint */
+.nav-item:hover {
+    transform: translateX(2px);
+}
+
+/* Subtle icon bounce on hover */
+.nav-item:hover .nav-item-icon {
+    animation: nav-icon-bounce 400ms ease;
+}
+
+@keyframes nav-icon-bounce {
+    0%, 100% { transform: scale(1); }
+    40% { transform: scale(1.18); }
+    70% { transform: scale(0.95); }
+}
+
+/* Active item — animated left pill indicator */
+.nav-item-active {
+    position: relative;
+}
+
+.nav-item-active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3.5px;
+    height: 60%;
+    border-radius: 0 4px 4px 0;
+    background-color: var(--color-primary);
+    animation: nav-pill-slide 300ms ease-out;
+}
+
+/* Dark Theme High Contrast Sidebar Active State */
+[data-theme="dark"] .nav-item-active,
+.dark .nav-item-active {
+    background-color: rgba(255, 255, 255, 0.12) !important;
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] .nav-item-active svg,
+.dark .nav-item-active svg {
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] .nav-item-active::before,
+.dark .nav-item-active::before {
+    background-color: #ffffff !important;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+}
+
+[data-theme="dark"] .nav-item:hover,
+.dark .nav-item:hover {
+    color: #ffffff !important;
+}
+
+@keyframes nav-pill-slide {
+    0% {
+        opacity: 0;
+        height: 0%;
+        top: 50%;
+    }
+    100% {
+        opacity: 1;
+        height: 60%;
+        top: 50%;
+    }
+}
+
+/* Section label fade-in */
+.nav-section-label {
+    animation: nav-label-fade 300ms ease-out;
+}
+
+@keyframes nav-label-fade {
+    0% { opacity: 0; transform: translateY(-4px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+/* User footer hover effect */
+.nav-user-footer {
+    transition: background-color 200ms ease;
+}
+
+.nav-user-footer:hover {
+    background-color: var(--color-base-200);
 }
 
 /* Document tables (prose) — visible grid borders for any structure (with/without thead) */

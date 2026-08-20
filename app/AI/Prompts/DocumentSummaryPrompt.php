@@ -9,78 +9,107 @@ namespace App\AI\Prompts;
 class DocumentSummaryPrompt
 {
     /**
+     * Resolve locale code ke nama bahasa yang dipahami LLM.
+     */
+    private static function languageName(string $locale): string
+    {
+        return match ($locale) {
+            'id' => 'Indonesian',
+            'en' => 'English',
+            default => 'Indonesian',
+        };
+    }
+
+    /**
+     * Contoh filler-word yang harus dihindari, disesuaikan per bahasa.
+     */
+    private static function fillerExamples(string $locale): string
+    {
+        return match ($locale) {
+            'en' => '"This document discusses...", "Summary:", or "The following is..."',
+            default => '"Dokumen ini membahas...", "Ringkasan:", or "Berikut adalah..."',
+        };
+    }
+
+    /**
      * Instruksi sistem untuk meringkas SATU chunk. Satu-satunya sumber
      * kebenaran adalah teks chunk yang dikirim — dilarang menambah
      * pengetahuan eksternal.
      */
-    public static function chunkSystem(int $percentage = 30): string
+    public static function chunkSystem(int $percentage = 30, string $locale = 'id'): string
     {
-        $lengthInstruction = $percentage <= 30
-            ? "Extract ONLY the absolute core essence. Discard all fluff and minor details. Write strictly in ONE short, continuous paragraph."
-            : ($percentage <= 50
-                ? "Provide a balanced summary covering main points and key supporting details. Write in 1-2 paragraphs."
-                : "Provide a detailed and comprehensive summary retaining most of the original information. Write in multiple well-structured paragraphs.");
+        $language = self::languageName($locale);
+        $fillers = self::fillerExamples($locale);
+
+        if ($percentage <= 30) {
+            $brevityRule = "EXTREME BREVITY: The summary MUST be very short (around {$percentage}% of the original length). MAXIMUM LENGTH: 3 to 5 sentences. The summary MUST be strictly ONE single continuous paragraph.";
+        } elseif ($percentage <= 50) {
+            $brevityRule = "CONCISE SUMMARY: The summary MUST be concise (around {$percentage}% of the original length). MAXIMUM LENGTH: 2 short paragraphs.";
+        } elseif ($percentage <= 70) {
+            $brevityRule = "MODERATE SUMMARY: Provide a moderately detailed summary (around {$percentage}% of the original length). It should capture main points and important details.";
+        } else {
+            $brevityRule = "DETAILED SUMMARY: Provide a highly detailed and comprehensive summary (around {$percentage}% of the original length). Capture almost all information but rephrased continuously.";
+        }
 
         return <<<PROMPT
-You are a document summarization system.
+You are a highly disciplined document summarizer. 
 
-Your task is to summarize ONLY the information contained in the provided document text.
+Task: Summarize the provided document text in {$language}.
 
-Rules:
-1. Use only information explicitly present in the document.
-2. Do not add external knowledge.
-3. Do not infer facts that are not supported by the document.
-4. Do not invent names, dates, numbers, conclusions, or events.
-5. If information is unclear or missing, state that it is not specified in the document.
-6. Preserve important names, dates, numbers, terminology, and factual details.
-7. The output must be a faithful summary of the provided text.
-8. LENGTH & FORMAT: Kamu adalah seorang sekretaris yang handal. Ringkas dokumen ini sehingga panjangnya menjadi sekitar {$percentage}% dari ukuran aslinya. {$lengthInstruction} Output MUST be in Indonesian.
-9. FORBIDDEN: You must NEVER use bullet points (*, -), numbered lists, or asterisks. Output must be raw paragraph text only.
-10. Output only the summary content — no preamble, no commentary, no headings.
+ABSOLUTE RULES (YOU MUST OBEY THESE OR YOU WILL BE PENALIZED):
+1. NO LISTS: You are STRICTLY FORBIDDEN from using bullet points, numbered lists, hyphens (-), or asterisks (*).
+2. ONLY PARAGRAPHS: The entire output MUST be written as plain, continuous paragraphs.
+3. {$brevityRule}
+4. NO FILLER WORDS: Do not use introductory phrases like {$fillers}. Start immediately with the main facts.
+5. NO HALLUCINATION: Only use facts explicitly stated in the document.
 PROMPT;
     }
 
-    public static function chunkContent(string $chunk): string
+    public static function chunkContent(string $chunk, string $locale = 'id'): string
     {
-        return "DOCUMENT CONTENT:\n---\n{$chunk}\n---";
+        $language = self::languageName($locale);
+
+        return "DOCUMENT CONTENT:\n---\n{$chunk}\n---\n\nNow, generate the summary in {$language} following ALL the rules above. DO NOT include the rules or any other text. OUTPUT ONLY THE SUMMARY:";
     }
 
     /**
      * Instruksi sistem untuk menggabungkan ringkasan chunk menjadi satu
      * ringkasan final. Hanya boleh memakai info yang ada di ringkasan chunk.
      */
-    public static function combineSystem(int $percentage = 30): string
+    public static function combineSystem(int $percentage = 30, string $locale = 'id'): string
     {
-        $lengthInstruction = $percentage <= 30
-            ? "Extract ONLY the absolute core essence from the partial summaries. Discard all fluff. Write strictly in ONE short, continuous paragraph."
-            : ($percentage <= 50
-                ? "Provide a balanced summary merging the partial summaries covering main points and key details. Write in 1-2 paragraphs."
-                : "Provide a detailed and comprehensive summary merging the partial summaries. Retain most of the information. Write in multiple well-structured paragraphs.");
+        $language = self::languageName($locale);
+        $fillers = self::fillerExamples($locale);
+
+        if ($percentage <= 30) {
+            $brevityRule = "EXTREME BREVITY: The final summary MUST be very short (around {$percentage}% of the combined length). MAXIMUM LENGTH: 3 to 5 sentences. The final summary MUST be strictly ONE single continuous paragraph.";
+        } elseif ($percentage <= 50) {
+            $brevityRule = "CONCISE SUMMARY: The final summary MUST be concise (around {$percentage}% of the combined length). MAXIMUM LENGTH: 2 short paragraphs.";
+        } elseif ($percentage <= 70) {
+            $brevityRule = "MODERATE SUMMARY: Provide a moderately detailed summary (around {$percentage}% of the combined length). It should capture main points and important details cohesively.";
+        } else {
+            $brevityRule = "DETAILED SUMMARY: Provide a highly detailed and comprehensive final summary (around {$percentage}% of the combined length). Combine all information smoothly.";
+        }
 
         return <<<PROMPT
-You are a document summarization system.
+You are a highly disciplined document summarizer. 
 
-The document was too large to summarize in one pass, so it was split into parts and each part was summarized separately.
+Task: Combine the provided partial summaries into ONE final cohesive summary in {$language}.
 
-Your task: combine the partial summaries below into ONE final summary.
-
-Rules:
-1. Use only information present in the partial summaries.
-2. Do not add external knowledge.
-3. Do not invent names, dates, numbers, conclusions, or events.
-4. Merge overlapping points, remove repetition.
-5. Preserve important names, dates, numbers, terminology, and factual details.
-6. The final summary must be a faithful summary of the provided text.
-7. LENGTH & FORMAT: You are a highly capable secretary. Summarize the combined documents to approximately {$percentage}% of the original total text length. {$lengthInstruction} The output MUST be in Indonesian.
-8. FORBIDDEN: You must NEVER use bullet points (*, -), numbered lists, or asterisks. Output must be raw paragraph text only.
-9. Output only the summary content — no preamble, no commentary, no headings.
+ABSOLUTE RULES (YOU MUST OBEY THESE OR YOU WILL BE PENALIZED):
+1. NO LISTS: You are STRICTLY FORBIDDEN from using bullet points, numbered lists, hyphens (-), or asterisks (*).
+2. ONLY PARAGRAPHS: The entire output MUST be written as plain, continuous paragraphs.
+3. {$brevityRule}
+4. NO FILLER WORDS: Do not use introductory phrases like {$fillers}. Start immediately with the main facts.
+5. NO HALLUCINATION: Only use facts explicitly stated in the partial summaries.
 PROMPT;
     }
 
-    public static function combineContent(array $chunkSummaries): string
+    public static function combineContent(array $chunkSummaries, string $locale = 'id'): string
     {
+        $language = self::languageName($locale);
         $parts = implode("\n\n---\n\n", $chunkSummaries);
 
-        return "PARTIAL SUMMARIES:\n---\n{$parts}\n---";
+        return "PARTIAL SUMMARIES:\n---\n{$parts}\n---\n\nNow, generate the final combined summary in {$language} following ALL the rules above. DO NOT include the rules or any other text. OUTPUT ONLY THE FINAL SUMMARY:";
     }
 }

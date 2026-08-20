@@ -24,7 +24,7 @@ class DeepseekClient implements AIClientInterface
                     ['role' => 'user', 'content' => $content],
                 ],
                 'temperature' => (float) config('services.deepseek.temperature', 0.2),
-                'max_tokens' => (int) config('services.deepseek.max_tokens', 800),
+                'max_tokens' => (int) config('services.deepseek.max_tokens', 8192),
             ]);
 
         if ($response->failed()) {
@@ -33,8 +33,14 @@ class DeepseekClient implements AIClientInterface
 
         $text = trim($response->json('choices.0.message.content') ?? '');
 
+        // Hapus token reasoning <think> ... </think> jika model menggunakan Chain of Thought
+        $text = preg_replace('/<think>.*?<\/think>/is', '', $text);
+        // Hapus juga jika token <think> tidak ditutup (karena max_tokens habis)
+        $text = preg_replace('/<think>.*$/is', '', $text);
+        $text = trim($text);
+
         if ($text === '') {
-            throw new RuntimeException('Deepseek API mengembalikan respons kosong.');
+            throw new RuntimeException('Deepseek API mengembalikan respons kosong atau terpotong sebelum selesai berpikir.');
         }
 
         return $text;
@@ -47,7 +53,7 @@ class DeepseekClient implements AIClientInterface
         
         $timeout = (int) config('services.deepseek.timeout', 90);
         $temperature = (float) config('services.deepseek.temperature', 0.2);
-        $maxTokens = (int) config('services.deepseek.max_tokens', 800);
+        $maxTokens = (int) config('services.deepseek.max_tokens', 8192);
 
         foreach ($batches as $batch) {
             $responses = Http::pool(function (\Illuminate\Http\Client\Pool $pool) use ($batch, $timeout, $temperature, $maxTokens) {
@@ -79,8 +85,15 @@ class DeepseekClient implements AIClientInterface
                 }
 
                 $text = trim($response->json('choices.0.message.content') ?? '');
+                
+                // Hapus token reasoning <think> ... </think> jika model menggunakan Chain of Thought
+                $text = preg_replace('/<think>.*?<\/think>/is', '', $text);
+                // Hapus juga jika token <think> tidak ditutup (karena max_tokens habis)
+                $text = preg_replace('/<think>.*$/is', '', $text);
+                $text = trim($text);
+
                 if ($text === '') {
-                    throw new RuntimeException('Deepseek API mengembalikan respons kosong pada batch request.');
+                    throw new RuntimeException('Deepseek API mengembalikan respons kosong atau terpotong sebelum selesai berpikir pada batch request.');
                 }
                 $results[$key] = $text;
             }

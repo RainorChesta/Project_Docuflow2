@@ -29,13 +29,13 @@ class DocumentSummarizer
      * Ringkas dokumen dan simpan hasilnya. Dipanggil dari queue job.
      * Meng-update status dokumen: processing → completed | failed.
      */
-    public function summarize(Document $document, int $percentage = 30): void
+    public function summarize(Document $document, int $percentage = 30, string $locale = 'id'): void
     {
         $this->markProcessing($document);
 
         try {
             $source = $this->extractContent($document);
-            $summary = $this->summarizeText($source, $percentage);
+            $summary = $this->summarizeText($source, $percentage, $locale);
 
             Document::whereKey($document->id)->update([
                 'summary' => $summary,
@@ -53,7 +53,7 @@ class DocumentSummarizer
         }
     }
 
-    public function summarizeText(string $text, int $percentage = 30): string
+    public function summarizeText(string $text, int $percentage = 30, string $locale = 'id'): string
     {
         $text = $this->clean($text);
 
@@ -66,8 +66,8 @@ class DocumentSummarizer
         // Satu chunk → satu panggilan langsung, hemat panggilan API.
         if (mb_strlen($text) <= $chunkSize) {
             return $this->aiClient->chat(
-                DocumentSummaryPrompt::chunkSystem($percentage),
-                DocumentSummaryPrompt::chunkContent($text),
+                DocumentSummaryPrompt::chunkSystem($percentage, $locale),
+                DocumentSummaryPrompt::chunkContent($text, $locale),
             );
         }
 
@@ -76,8 +76,8 @@ class DocumentSummarizer
 
         foreach ($chunks as $chunk) {
             $payloads[] = [
-                'system' => DocumentSummaryPrompt::chunkSystem($percentage),
-                'content' => DocumentSummaryPrompt::chunkContent($chunk),
+                'system' => DocumentSummaryPrompt::chunkSystem($percentage, $locale),
+                'content' => DocumentSummaryPrompt::chunkContent($chunk, $locale),
             ];
         }
 
@@ -96,8 +96,8 @@ class DocumentSummarizer
         }
 
         return $this->aiClient->chat(
-            DocumentSummaryPrompt::combineSystem($percentage),
-            DocumentSummaryPrompt::combineContent($summaries),
+            DocumentSummaryPrompt::combineSystem($percentage, $locale),
+            DocumentSummaryPrompt::combineContent($summaries, $locale),
         );
     }
 
@@ -187,8 +187,18 @@ class DocumentSummarizer
      */
     private function friendlyMessage(\Throwable $e): string
     {
-        if ($e instanceof RuntimeException && stripos($e->getMessage(), 'groq') === false && stripos($e->getMessage(), 'http') === false) {
+        if (config('app.env') === 'local') {
             return $e->getMessage();
+        }
+
+        if ($e instanceof RuntimeException) {
+            if ($e->getMessage() === 'AIFallbackManager requires at least one AI client.') {
+                return 'API Key belum dikonfigurasi. Silakan isi konfigurasi AI di file .env.';
+            }
+
+            if (stripos($e->getMessage(), 'groq') === false && stripos($e->getMessage(), 'http') === false) {
+                return $e->getMessage();
+            }
         }
 
         return 'Ringkasan gagal dibuat. Silakan coba lagi.';

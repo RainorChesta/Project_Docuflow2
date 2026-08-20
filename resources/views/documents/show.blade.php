@@ -4,11 +4,11 @@
     @if(!auth()->user()->isAdmin() && !auth()->user()->isHead())
         <x-confirm-modal
             name="confirm-discard-{{ $document->id }}"
-            :title="__('Discard Document?')"
-            :message="__('Are you sure you want to discard this document?')"
-            :action="route('documents.discard', $document)"
-            method="POST"
-            :confirmLabel="__('Discard')"
+            :title="__('Delete Document?')"
+            :message="__('Are you sure you want to delete this document and all its changes?')"
+            :action="route('documents.destroy', $document)"
+            method="DELETE"
+            :confirmLabel="__('Delete Document')"
         />
     @endif
 
@@ -16,8 +16,8 @@
     @if($document->hasPendingRollback() && auth()->user()->can('approve', $document))
         <x-confirm-modal
             name="confirm-approve-rollback"
-            title="Approve Rollback?"
-            message="Versi setelah v{{ $document->pendingRollbackVersion->version_number }} akan dihapus permanen dan tidak bisa dikembalikan. Lanjutkan?"
+            title="{{ __('Approve') }} Rollback?"
+            message="{{ __('Rollback request will be submitted to the division head. If approved, all versions after v:version will be permanently deleted.', ['version' => $document->pendingRollbackVersion->version_number]) }}"
             :action="route('approvals.rollback-request.approve', $document)"
             method="POST"
             confirmLabel="Approve Rollback"
@@ -34,11 +34,11 @@
             && auth()->user()->can('update', $document))
             <x-confirm-modal
                 name="confirm-rollback-{{ $version->id }}"
-                title="Rollback ke v{{ $version->version_number }}?"
-                message="Permintaan rollback akan diajukan ke kepala divisi. Jika disetujui, semua versi setelah v{{ $version->version_number }} akan dihapus permanen."
+                title="{{ __('Rollback to v:version?', ['version' => $version->version_number]) }}"
+                message="{{ __('Rollback request will be submitted to the division head. If approved, all versions after v:version will be permanently deleted.', ['version' => $version->version_number]) }}"
                 :action="route('approvals.rollback', [$document, $version])"
                 method="POST"
-                confirmLabel="Ajukan Rollback"
+                confirmLabel="{{ __('Submit Rollback') }}"
                 reopenOnCancel="version-modal"
             />
         @endif
@@ -110,22 +110,7 @@
                             </div>
                         </div>
                         <div class="flex flex-wrap gap-2 shrink-0">
-                            @can('update', $document)
-                                @if(auth()->user()->isAdmin() || auth()->user()->isHead())
-                                    <form method="POST" action="{{ route('documents.discard', $document) }}" class="inline">
-                                        @csrf
-                                        <button class="btn btn-outline btn-warning btn-xs">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                            {{ __('Discard') }}
-                                        </button>
-                                    </form>
-                                @else
-                                    <button type="button" class="btn btn-outline btn-warning btn-xs" x-on:click="$dispatch('open-modal', 'confirm-discard-{{ $document->id }}')">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                            {{ __('Discard') }}
-                                    </button>
-                                @endif
-                            @endcan
+
                             @can('approve', $document)
                                 <form method="POST" action="{{ route('approvals.approve', [$document, $pendingVersion]) }}" class="inline">
                                     @csrf
@@ -218,7 +203,7 @@
                         @can('manageAccess', $document)
                             <button type="button" onclick="openShareModal()" class="btn btn-outline btn-primary btn-sm">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 0a3 3 0 11-5.367 2.684 3 3 0 015.367-2.684z" /></svg>
-                                Bagikan
+                                {{ __('Share') }}
                             </button>
                         @endcan
 
@@ -252,14 +237,14 @@
                         <button type="button" class="btn btn-ghost btn-sm border border-base-300"
                                 onclick="loadSummary()">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                            Ringkas Dokumen
+                            {{ __('Summarize Document') }}
                         </button>
                     </div>
 
                     @if(session('pdf_export'))
                         <div class="alert alert-success mt-3">
                             <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 w-full">
-                                <span>PDF berhasil dibuat. <span class="font-medium">{{ session('pdf_export.filename') }}</span></span>
+                                <span>{{ __('PDF successfully created.') }} <span class="font-medium">{{ session('pdf_export.filename') }}</span></span>
                                 <a href="{{ session('pdf_export.url') }}" target="_blank" rel="noopener" class="btn btn-primary btn-sm shrink-0">
                                     Download PDF
                                 </a>
@@ -269,7 +254,6 @@
                 </div>
             </div>
 
-            <!-- Content -->
             <!-- Content -->
             {{-- Ringkasan Dokumen (card, bukan modal) --}}
             @php
@@ -288,14 +272,23 @@
                             </span>
                             <div>
                                 <h3 class="font-bold text-base text-base-content flex items-center gap-2">
-                                    Ringkasan AI Dokumen
+                                    {{ __('AI Document Summary') }}
                                 </h3>
-                                <p class="text-xs text-base-content/60">Ringkasan otomatis berbasis konten asli dokumen</p>
+                                <p class="text-xs text-base-content/60">{{ __('Automatic summary based on original document content') }}</p>
                             </div>
                         </div>
                         <div class="flex flex-wrap items-center gap-4">
                             <div class="flex items-center gap-2">
-                                <label for="summary-percentage" class="text-xs text-base-content/70">Kepadatan:</label>
+                                <label for="summary-model" class="text-xs text-base-content/70">{{ __('AI Model:') }}</label>
+                                <select id="summary-model" class="select select-bordered select-xs w-36">
+                                    <option value="auto">Auto (Fallback)</option>
+                                    <option value="groq">Groq (Llama)</option>
+                                    <option value="deepseek">DeepSeek</option>
+                                    <option value="ollama">Ollama (Custom AI)</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <label for="summary-percentage" class="text-xs text-base-content/70">{{ __('Density:') }}</label>
                                 <input type="range" id="summary-percentage" min="20" max="80" value="30" step="1" class="range range-xs range-primary w-24" oninput="document.getElementById('pct-val').textContent = this.value + '%'" />
                                 <span id="pct-val" class="text-xs font-medium w-8">30%</span>
                             </div>
@@ -304,13 +297,13 @@
                                     <svg class="w-3.5 h-3.5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                     </svg>
-                                    <span id="copy-btn-label">Salin Ringkasan</span>
+                                    <span id="copy-btn-label">{{ __('Copy Summary') }}</span>
                                 </button>
                                 <button type="button" id="summary-regenerate" class="btn btn-primary btn-outline btn-xs text-xs" onclick="loadSummary(true)">
                                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                     </svg>
-                                    Ringkas Ulang
+                                    {{ __('Re-summarize') }}
                                 </button>
                             </div>
                         </div>
@@ -322,7 +315,7 @@
                         </div>
                         <p class="text-xs text-primary font-medium inline-flex items-center gap-2">
                             <span class="loading loading-spinner loading-xs"></span>
-                            AI sedang membaca & meringkas dokumen... Mohon tunggu sebentar.
+                            {{ __('AI is reading & summarizing the document... Please wait a moment.') }}
                         </p>
                     </div>
 
@@ -332,11 +325,20 @@
                                 {!! nl2br(e($document->summary)) !!}
                             @endif
                         </div>
+                        <div class="mt-3 text-xs text-base-content/60 italic flex gap-2 p-3 bg-base-200/30 rounded-lg border border-base-200">
+                            <svg class="w-4 h-4 shrink-0 text-primary mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <div>
+                                <span class="font-semibold">{{ __('Dihasilkan oleh AI') }}:</span> 
+                                {{ __('Ringkasan ini dihasilkan oleh kecerdasan buatan otomatis. AI mungkin membuat kesalahan, melewatkan konteks, atau menghilangkan detail penting. Selalu tinjau dokumen asli sebelum mengambil tindakan.') }}
+                            </div>
+                        </div>
                     </div>
 
                     <div id="summary-error" class="{{ $isFailed ? '' : 'hidden' }} alert alert-error text-sm mt-3">
                         <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                        <span>{{ $document->summary_error ?? 'Ringkasan gagal dibuat. Silakan coba lagi.' }}</span>
+                        <span>{{ $document->summary_error ?? __('Failed to create summary. Please try again.') }}</span>
                     </div>
                 </div>
             </div>
@@ -348,32 +350,40 @@
                         @include('documents._file-preview', ['document' => $document, 'version' => $display])
                     @elseif($display)
                         {{--
-                            FIX: halaman ini menampilkan versi dokumen yang SUDAH
-                            DISETUJUI (bukan draft editor). Sebelumnya include ini
-                            mengirim 'liveStorage' => 'doc-preview-' . $document->id,
-                            yang membuat initPreviewPagination() (resources/js/jodit.js)
-                            mencoba membaca localStorage['doc-preview-{id}:paper']
-                            LEBIH DULU sebelum memakai paper_size/paper_margin dari
-                            database.
+                            Halaman ini menampilkan versi dokumen yang SUDAH
+                            DISETUJUI (bukan draft editor). Karena itu, include
+                            ini TIDAK mengirim 'liveStorage'.
 
-                            Masalahnya, key localStorage itu ditulis LIVE oleh
-                            applyPaperSize() setiap kali tombol "Ukuran Kertas" /
-                            "Margin Halaman" disentuh di editor — bahkan SEBELUM
-                            form disimpan (baru dibersihkan saat submit form
+                            Alasannya: initPreviewPagination() (resources/js/
+                            jodit.js) akan membaca localStorage[storageKey+':paper']
+                            LEBIH DULU sebelum memakai paper_size/paper_margin
+                            dari database, KALAU liveStorage dikirim. Key
+                            localStorage itu ditulis LIVE oleh applyPaperSize()
+                            setiap kali tombol "Ukuran Kertas" / "Margin
+                            Halaman" disentuh di editor — bahkan SEBELUM form
+                            disimpan (baru dibersihkan saat submit form
                             berhasil). Kalau di browser yang sama user pernah
-                            membuka editor dan mengubah margin/ukuran kertas tanpa
-                            menyimpan, halaman show/detail ini diam-diam ikut
-                            memakai margin draft yang BUKAN margin resmi dokumen —
-                            menyebabkan pagination (posisi list, dsb) di show/detail
-                            berbeda dari editor walau kontennya identik (mis. list
-                            yang di editor muat di halaman 1 tapi di show malah
-                            kepental ke halaman 2).
+                            membuka editor dan mengubah margin/ukuran kertas
+                            tanpa menyimpan, halaman show/detail ini diam-diam
+                            ikut memakai margin draft yang BUKAN margin resmi
+                            dokumen — menyebabkan pagination (posisi list, dsb)
+                            di show/detail berbeda dari editor walau kontennya
+                            identik.
 
                             Karena halaman ini menampilkan versi resmi/approved,
                             dia HARUS selalu memakai paper_size/paper_margin dari
                             kolom dokumen di DB (lewat atribut data-paper-size /
                             data-paper-margin di scope), bukan draft localStorage
-                            milik editor. Makanya 'liveStorage' TIDAK dikirim di sini.
+                            milik editor. Makanya 'liveStorage' TIDAK dikirim di
+                            sini.
+
+                            CATATAN: dropdown "Ukuran Kertas" pada partial
+                            _paper.blade.php TIDAK lagi bergantung pada
+                            $liveStorage (lihat fix di _paper.blade.php), jadi
+                            walau liveStorage tidak dikirim di sini, dropdown
+                            tetap tampil dan bisa dipakai untuk mengganti
+                            tampilan ukuran kertas secara lokal di halaman ini
+                            saja (tanpa menulis apa pun ke localStorage).
                         --}}
                         @include('documents._paper', [
                             'content' => $display->content,
@@ -389,7 +399,7 @@
 
             @if($errors->has('export'))
                 <div class="alert alert-error mb-6">
-                    <span>{{ $errors->first('export') }} Silakan coba lagi.</span>
+                    <span>{{ $errors->first('export') }} {{ __('Please try again.') }}</span>
                 </div>
             @endif
 
@@ -397,7 +407,7 @@
             <dialog id="share-modal" class="modal">
                 <div class="modal-box max-w-xl max-h-[85vh] overflow-y-auto">
                     <div class="flex flex-wrap items-center justify-between mb-4">
-                        <h3 class="font-semibold">Bagikan "{{ $document->title }}"</h3>
+                        <h3 class="font-semibold">{{ __('Share ":title"', ['title' => $document->title]) }}</h3>
                         <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('share-modal').close()">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -407,15 +417,15 @@
 
                     {{-- Invite search --}}
                     <div class="form-control mb-2 relative">
-                        <input id="share-search-input" type="text" placeholder="Cari nama pengguna atau divisi&hellip;"
+                        <input id="share-search-input" type="text" placeholder="{{ __('Search user name or division…') }}"
                                class="input input-bordered w-full" autocomplete="off">
                         <div id="share-search-results" class="hidden absolute top-full left-0 right-0 z-10 mt-1 bg-base-100 border border-base-300 rounded-box shadow-lg max-h-64 overflow-y-auto"></div>
                     </div>
-                    <p id="share-search-hint" class="text-xs text-base-content/50 mb-4">Tambahkan orang atau divisi untuk mengakses dokumen ini.</p>
+                    <p id="share-search-hint" class="text-xs text-base-content/50 mb-4">{{ __('Add people or divisions to access this document.') }}</p>
 
                     {{-- People with access --}}
                     <div class="mb-5">
-                        <h4 class="text-sm font-medium text-base-content/70 mb-2">Orang dengan akses</h4>
+                        <h4 class="text-sm font-medium text-base-content/70 mb-2">{{ __('People with access') }}</h4>
                         <div id="share-list" class="space-y-2 text-sm">
                             <div class="text-base-content/50 italic">Memuat&hellip;</div>
                         </div>
@@ -423,15 +433,15 @@
 
                     {{-- General access --}}
                     <div class="border-t border-base-200 pt-4">
-                        <h4 class="text-sm font-medium text-base-content/70 mb-3">Akses umum</h4>
+                        <h4 class="text-sm font-medium text-base-content/70 mb-3">{{ __('General access') }}</h4>
                         <div class="flex flex-col gap-2">
                             <label class="flex items-center gap-2 cursor-pointer">
                                 <input type="radio" name="general_access" value="restricted" class="radio radio-sm" onchange="updateGeneralAccess()">
-                                <span class="text-sm">Restricted — hanya orang yang diundang</span>
+                                <span class="text-sm">{{ __('Restricted — invited people only') }}</span>
                             </label>
                             <label class="flex items-center gap-2 cursor-pointer">
                                 <input type="radio" name="general_access" value="anyone_with_link" class="radio radio-sm" onchange="updateGeneralAccess()">
-                                <span class="text-sm">Siapa saja yang punya link</span>
+                                <span class="text-sm">{{ __('Anyone with the link') }}</span>
                             </label>
                             <div class="flex flex-wrap items-center gap-2 mt-2">
                                 <button type="button" class="btn btn-outline btn-primary btn-sm" onclick="copyShareUrl(this)">
@@ -440,7 +450,7 @@
                                 </button>
                                 <button type="button" id="regenerate-token-btn" class="btn btn-ghost btn-sm" onclick="regenerateToken(this)">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                    Buat link baru
+                                    {{ __('Create new link') }}
                                 </button>
                             </div>
                             {{-- Feedback: link disalin --}}
@@ -471,7 +481,7 @@
                 <dialog id="export-pdf-modal" class="modal">
                 <div class="modal-box max-w-sm max-h-[85vh] overflow-y-auto">
                         <div class="flex flex-wrap items-center justify-between mb-4">
-                            <h3 class="font-semibold">Export ke PDF</h3>
+                            <h3 class="font-semibold">{{ __('Export to PDF') }}</h3>
                             <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('export-pdf-modal').close()">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -481,7 +491,7 @@
                         <form method="POST" action="{{ route('documents.export-pdf', $document) }}"
                               onsubmit="this.querySelector('button[type=submit]').disabled = true;
                                         this.querySelector('button[type=submit]').classList.add('loading');
-                                        this.querySelector('button[type=submit]').innerHTML = 'Membuat PDF&hellip;';
+                                        this.querySelector('button[type=submit]').innerHTML = '{{ __('Creating PDF…') }}';
                                         return true;">
                             @csrf
                             <div class="form-control w-full mb-2">
@@ -493,7 +503,7 @@
                                 </select>
                             </div>
                             <p class="text-xs text-base-content/50 mb-4">
-                                Margin tetap mengikuti margin dokumen saat ini; kalau tidak muat di kertas yang dipilih, margin akan disesuaikan otomatis.
+                                {{ __('Margin follows current document margin; if it doesn\'t fit in the selected paper, the margin will be adjusted automatically.') }}
                             </p>
                             <div class="flex flex-wrap justify-end gap-2">
                                 <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('export-pdf-modal').close()">{{ __('Batal') }}</button>
@@ -595,6 +605,7 @@
             card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
             const percentage = parseInt(document.getElementById('summary-percentage')?.value || 30);
+            const model = document.getElementById('summary-model')?.value || 'auto';
 
             fetch(SUMMARY_START_URL, {
                 method: 'POST',
@@ -603,7 +614,7 @@
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                     'Accept': 'application/json',
                 },
-                body: JSON.stringify({ force: force, percentage: percentage }),
+                body: JSON.stringify({ force: force, percentage: percentage, model: model }),
             })
             .then(r => r.json().then(data => ({ ok: r.ok, data })))
             .then(({ ok, data }) => {
@@ -689,14 +700,14 @@
 
         async function loadShareData() {
             const list = document.getElementById('share-list');
-            list.innerHTML = '<div class="text-base-content/50 italic">Memuat&hellip;</div>';
+            list.innerHTML = '<div class="text-base-content/50 italic">' + @json(__('Loading…')) + '</div>';
             try {
                 const res = await fetch(shareDataUrl, { headers: { 'Accept': 'application/json' } });
                 shareState = await res.json();
                 renderShareList();
                 renderGeneralAccess();
             } catch (e) {
-                list.innerHTML = '<div class="text-error">Gagal memuat data akses.</div>';
+                list.innerHTML = '<div class="text-error">' + @json(__('Failed to load access data.')) + '</div>';
             }
         }
 
@@ -744,7 +755,7 @@
                 </div>`);
             });
 
-            list.innerHTML = rows.join('') || '<div class="text-base-content/50 italic">Belum ada akses lain.</div>';
+            list.innerHTML = rows.join('') || '<div class="text-base-content/50 italic">' + @json(__('No other access yet.')) + '</div>';
         }
 
         function renderGeneralAccess() {
@@ -811,7 +822,7 @@
             // Save original button content and show loading state
             const originalHtml = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> Memproses…';
+            btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> ' + @json(__('Processing…'));
             feedbackDiv.classList.add('hidden');
 
             try {
@@ -825,7 +836,7 @@
 
                 if (!res.ok) {
                     const errData = await res.json().catch(() => ({}));
-                    throw new Error(errData.message || 'Gagal membuat link baru.');
+                    throw new Error(errData.message || @json(__('Failed to create new link.')));
                 }
 
                 const data = await res.json();
@@ -841,7 +852,7 @@
                 feedbackDiv.innerHTML = `
                     <p class="text-xs font-semibold text-success flex items-center gap-1.5 mb-1.5">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                        Link baru berhasil dibuat
+                        ${@json(__('New link created successfully'))}
                     </p>
                     <input type="text" class="input input-bordered input-sm w-full text-xs bg-base-100" readonly value="${escapeHtml(data.share_url)}" onclick="this.select()" />
                 `;
@@ -874,7 +885,7 @@
             if (!shareState?.share_url) return;
 
             const fallbackCopy = () => {
-                prompt("Gagal menyalin otomatis. Silakan salin link berikut secara manual:", shareState.share_url);
+                prompt(@json(__('Failed to copy automatically. Please copy the link below manually:')), shareState.share_url);
             };
 
             const showFeedback = () => {
@@ -886,7 +897,7 @@
                 
                 // Ubah state tombol
                 const originalHtml = btn.innerHTML;
-                btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg> Tersalin`;
+                btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg> ' + @json(__('Copied'));
                 btn.classList.add('btn-success', 'text-success-content');
                 btn.classList.remove('btn-outline', 'btn-primary');
 
@@ -940,7 +951,7 @@
                     <span class="badge badge-ghost badge-sm shrink-0">Divisi</span>
                 </button>`);
             });
-            searchResults.innerHTML = items.join('') || '<div class="px-3 py-2 text-base-content/50">Tidak ditemukan.</div>';
+            searchResults.innerHTML = items.join('') || '<div class="px-3 py-2 text-base-content/50">' + @json(__('Not found.')) + '</div>';
             searchResults.classList.remove('hidden');
         }
 
@@ -1153,4 +1164,6 @@
             <button>close</button>
         </form>
     </dialog>
+
+    
 </x-app-layout>

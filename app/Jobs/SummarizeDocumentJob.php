@@ -26,9 +26,11 @@ class SummarizeDocumentJob implements ShouldQueue
     public function __construct(
         public int $documentId,
         public int $percentage = 30,
+        public string $model = 'auto',
+        public string $locale = 'id',
     ) {}
 
-    public function handle(DocumentSummarizer $summarizer): void
+    public function handle(\App\Services\PdfTextExtractor $pdfExtractor): void
     {
         $document = Document::find($this->documentId);
 
@@ -50,9 +52,37 @@ class SummarizeDocumentJob implements ShouldQueue
         }
 
         try {
-            $summarizer->summarize($document, $this->percentage);
+            if ($this->model === 'auto') {
+                $client = app(\App\AI\Contracts\AIClientInterface::class);
+            } else {
+                $client = match ($this->model) {
+                    'groq' => app(\App\AI\GroqClient::class),
+                    'deepseek' => app(\App\AI\DeepseekClient::class),
+                    'ollama' => app(\App\AI\OllamaClient::class),
+                    default => null,
+                };
+
+                if (!$client) {
+                    throw new \Exception("Model AI '{$this->model}' belum dikonfigurasi (Konfigurasi / API Key tidak ditemukan).");
+                }
+            }
+
+            $summarizer = new DocumentSummarizer($client, $pdfExtractor);
+            $summarizer->summarize($document, $this->percentage, $this->locale);
         } finally {
             $lock->release();
+        }
+    }
+
+    public function failed(\Throwable $exception): void
+    {
+        $document = Document::find($this->documentId);
+
+        if ($document) {
+            $document->update([
+                'summary_status' => Document::SUMMARY_FAILED,
+                'summary_error' => 'Gagal meringkas: ' . $exception->getMessage(),
+            ]);
         }
     }
 }

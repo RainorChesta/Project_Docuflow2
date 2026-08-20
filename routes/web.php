@@ -13,6 +13,8 @@ use App\Http\Controllers\DocumentShareController;
 use App\Http\Controllers\JoditController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\LanguageController;
+use App\Http\Controllers\SearchController;
+use App\Http\Controllers\NotificationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/lang/{locale}', [LanguageController::class, 'switch'])->name('language.switch');
@@ -32,6 +34,15 @@ Route::middleware('auth')->group(function () {
 
     // Jodit image upload
     Route::post('/jodit-upload', [JoditController::class, 'upload'])->name('jodit.upload');
+
+    // Global Document Search (respects visibility)
+    Route::get('/search', [SearchController::class, 'search'])->name('search');
+
+    // Notifications API
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read');
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
+    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
 
     // Signatures
     Route::get('/profile/signature', [SignatureController::class, 'show'])->name('profile.signature.show');

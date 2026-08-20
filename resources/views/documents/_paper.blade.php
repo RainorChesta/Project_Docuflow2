@@ -50,17 +50,18 @@
     :is(.doku-content, .doku-paper, .jodit-wysiwyg) h5 { font-size: 0.83em !important; }
     :is(.doku-content, .doku-paper, .jodit-wysiwyg) h6 { font-size: 0.67em !important; }
 
-    /* ---------- Table ---------- */
-    /* FIX: samakan prioritas dengan aturan lain (li, heading, dst) yang
-       sudah !important. Tanpa !important di sini, style bawaan Jodit yang
-       diinject ke iframe editor (untuk cell-selection/resize handle) bisa
-       menimpa border tabel ini sehingga border "hilang" hanya saat mode
-       edit. Nilai di sini WAJIB SAMA PERSIS dengan blok table di
-       resources/js/jodit.js (buildIframeStyle) supaya editor & show/preview
-       selalu konsisten. */
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) table { border-collapse: collapse !important; width: 100%; margin-bottom: 1em; }
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) th, :is(.doku-content, .doku-paper, .jodit-wysiwyg) td { border: 1px solid #ccc !important; padding: 8px; text-align: left; }
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) th { font-weight: bold !important; background-color: #f9fafb !important; }
+    /* FIX: Hapus !important pada border dan background agar inline style Jodit 
+       (seperti "No Border" atau highlight warna/multi-selection) bisa bekerja.
+       Untuk mencegah tertimpa default Jodit, specificity dinaikkan (body.jodit-wysiwyg). */
+    body:is(.doku-content, .doku-paper, .jodit-wysiwyg) table, :is(.doku-content, .doku-paper, .jodit-wysiwyg) table { border-collapse: collapse; width: 100%; margin-bottom: 1em; }
+    body:is(.doku-content, .doku-paper, .jodit-wysiwyg) th, body:is(.doku-content, .doku-paper, .jodit-wysiwyg) td, :is(.doku-content, .doku-paper, .jodit-wysiwyg) th, :is(.doku-content, .doku-paper, .jodit-wysiwyg) td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    body:is(.doku-content, .doku-paper, .jodit-wysiwyg) th, :is(.doku-content, .doku-paper, .jodit-wysiwyg) th { font-weight: bold; background-color: #f9fafb; }
+    
+    /* Tampilkan garis bantu putus-putus HANYA SAAT MENGEDIT untuk elemen yang tidak memiliki border. */
+    .jodit-wysiwyg table, .jodit-wysiwyg th, .jodit-wysiwyg td { outline: 1px dashed #cbd5e1; outline-offset: -1px; }
+    
+    .doku-paper table.doku-table-no-border th, .doku-paper table.doku-table-no-border td { border: none !important; }
+    .jodit-wysiwyg table.doku-table-no-border th, .jodit-wysiwyg table.doku-table-no-border td { border: none !important; outline: 1px dashed #cbd5e1; outline-offset: -1px; }
 
     /* ---------- Blockquote / Pre ---------- */
     :is(.doku-content, .doku-paper, .jodit-wysiwyg) blockquote { margin: 1em 40px; border-left: 4px solid #ccc; padding-left: 1em; color: #666; }
@@ -127,7 +128,7 @@
         max-height: 75vh;
         overflow-y: auto;
         overflow-x: auto;
-        background: #e5e7eb;
+        background: #f8f9fa;
         padding: 20px;
         box-sizing: border-box;
         border-radius: 8px;
@@ -143,15 +144,15 @@
     /* padding default di-set inline oleh repaginatePreview (resources/js/
        jodit.js) sesuai margin aktif; nilai di sini hanya fallback saat JS
        belum jalan (mis. render server-side pertama). */
-    padding: 48px 56px;
+    padding: 96px;
     background-color: #fff;
     min-height: 1123px;
     /* Border & shadow di layar biar batas kertas terlihat jelas — terutama
        saat ukuran kertas diubah (A4/A5/A3 dst), lebar kertas berubah dan
        border ini mempertegas perbedaannya. Menggunakan outline agar tidak
        memakan ruang konten 2px (kiri-kanan) yang menyebabkan selisih teks melompat 1 baris. */
-    outline: 1px solid #d1d5db;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.08);
+    outline: none;
+    box-shadow: 0 1px 3px 0 rgba(60,64,67,0.3);
     box-sizing: border-box;
     /* font-family, font-size, line-height, color, overflow-wrap, word-break
        sekarang berasal dari .doku-paper dalam document-shared.css
@@ -159,64 +160,14 @@
        .doku-content). Tidak perlu di-set ulang di sini. */
 }
 
-    /* Responsif: di layar sempit, kertas mengikuti lebar device dan
-       margin halaman dikecilkan biar konten tidak kepotong. !important
-       dipakai karena repaginatePreview (resources/js/jodit.js) menulis
-       width/min-height sebagai inline style — media query ini harus
-       menang biar preview pas dengan lebar layar kecil. Garis pembatas
-       antar halaman TETAP ditampilkan (hanya dirampingkan) supaya
-       user tetap melihat di mana halaman berikutnya dimulai — sama
-       seperti di layar lebar.
-       Ukuran teks ikut dikecilkan (px fix, bukan em) supaya konten
-       tetap terbaca di device kecil. Pakai px agar tidak kompaun pada
-       elemen bersarang (em berlipat tiap level) dan mengalahkan
-       font-size inline dari Jodit. Pagination tetap akurat karena
-       dihitung dari layout yang sudah berskala ini. */
+    /* Responsif: di layar sempit, kertas di-zoom out secara otomatis
+       oleh script auto-fit agar tetap muat di dalam viewport tanpa
+       merusak layout atau pagination asli. */
     @media (max-width: 640px) {
         .doku-paper-scope {
             padding: 8px;
             max-height: 90vh;
         }
-        .doku-paper-scope .doku-paper {
-            width: 100% !important;
-            min-height: auto !important;
-            font-size: 14px !important;
-        }
-        .doku-paper-scope .doku-paper :is(p, li, td, th, div, span, blockquote, pre, figcaption, dd, dt) {
-            font-size: 14px !important;
-        }
-        .doku-paper-scope .doku-paper h1 { font-size: 28px !important; }
-        .doku-paper-scope .doku-paper h2 { font-size: 21px !important; }
-        .doku-paper-scope .doku-paper h3 { font-size: 17px !important; }
-        .doku-paper-scope .doku-paper h4 { font-size: 14px !important; }
-        .doku-paper-scope .doku-paper h5 { font-size: 12px !important; }
-        .doku-paper-scope .doku-paper h6 { font-size: 11px !important; }
-        .doku-paper-scope .doku-paper [data-page-spacer] {
-            display: block !important;
-        }
-        .doku-paper-scope .doku-paper [data-page-spacer] > div {
-            background: #fff !important;
-        }
-        .doku-paper-scope .doku-paper [data-page-spacer] > div:nth-child(2) {
-            height: 6px !important;
-            background: #cbd5e1 !important;
-            border-top: 1px solid #94a3b8 !important;
-            border-bottom: 1px solid #94a3b8 !important;
-        }
-    }
-    @media (max-width: 400px) {
-        .doku-paper-scope .doku-paper {
-            font-size: 13px !important;
-        }
-        .doku-paper-scope .doku-paper :is(p, li, td, th, div, span, blockquote, pre, figcaption, dd, dt) {
-            font-size: 13px !important;
-        }
-        .doku-paper-scope .doku-paper h1 { font-size: 24px !important; }
-        .doku-paper-scope .doku-paper h2 { font-size: 18px !important; }
-        .doku-paper-scope .doku-paper h3 { font-size: 15px !important; }
-        .doku-paper-scope .doku-paper h4 { font-size: 13px !important; }
-        .doku-paper-scope .doku-paper h5 { font-size: 11px !important; }
-        .doku-paper-scope .doku-paper h6 { font-size: 10px !important; }
     }
     .doku-paper-scope .doku-paper::after {
         content: "";
@@ -239,9 +190,17 @@
        scope) yang sudah SAMA PERSIS dengan aturan editor (.doku-content scope),
        sehingga preview dan editor selalu konsisten. */
 
-    /* Toolbar kecil di atas kertas: dropdown ukuran kertas (hanya jika ada
-       editor terkait) + kontrol zoom in/out/reset — selalu tampil di semua
-       preview dokumen. */
+    /* Toolbar kecil di atas kertas: dropdown ukuran kertas + kontrol
+       zoom in/out/reset — SELALU tampil di semua preview dokumen, baik
+       yang punya liveStorage (editor) maupun yang tidak (show / versi
+       resmi). Sebelumnya dropdown ukuran kertas digembok di dalam
+       @@isset($liveStorage), sehingga ikut hilang ketika show.blade.php
+       sengaja TIDAK mengirim liveStorage (perbaikan yang benar untuk
+       menghindari baca localStorage draft basi di halaman versi resmi).
+       Padahal listener JS-nya (initPreviewPagination di jodit.js) sudah
+       aman dipakai tanpa storageKey — dia cuma menulis ke localStorage
+       KALAU storageKey ada, jadi dropdown ini tetap aman ditampilkan di
+       halaman show tanpa liveStorage sekalipun. */
     .doku-paper-scope .doku-paper-toolbar {
         display: flex;
         flex-wrap: wrap;
@@ -285,15 +244,14 @@
 <div class="doku-paper-scope" @isset($liveStorage) data-live-storage="{{ $liveStorage }}" @endisset
      data-paper-size="{{ $paperSize ?? 'A4' }}"
      data-paper-margin="{{ json_encode($paperMargin ?? null) }}">
+
     <div class="doku-paper-toolbar">
-        @isset($liveStorage)
-            <label class="text-base-content/70">{{ __('Ukuran Kertas') }}:</label>
-            <select data-paper-size-select>
-                @foreach(['A4', 'A5', 'A3', 'Letter', 'Legal'] as $paperKey)
-                    <option value="{{ $paperKey }}">{{ $paperKey }}</option>
-                @endforeach
-            </select>
-        @endisset
+        <label class="text-base-content/70">{{ __('Ukuran Kertas') }}:</label>
+        <select data-paper-size-select>
+            @foreach(['A4', 'A5', 'A3', 'Letter', 'Legal'] as $paperKey)
+                <option value="{{ $paperKey }}">{{ $paperKey }}</option>
+            @endforeach
+        </select>
         <button type="button" class="doku-paper-zoom-btn" data-paper-zoom-out title="Perkecil" aria-label="Zoom out">−</button>
         <span class="doku-paper-zoom-label" data-paper-zoom-label>100%</span>
         <button type="button" class="doku-paper-zoom-btn" data-paper-zoom-in title="Perbesar" aria-label="Zoom in">+</button>
@@ -312,6 +270,30 @@
 
 @once
 <script>
+    function autoFitDokuPaper(scope, force = false) {
+        if (!scope) return;
+        var paper = scope.querySelector('.doku-paper');
+        if (!paper) return;
+
+        if (!force && scope.dataset.manualZoom) return;
+
+        var paperWidth = parseFloat(paper.style.width) || 794;
+        var scopeStyle = getComputedStyle(scope);
+        var paddingX = parseFloat(scopeStyle.paddingLeft) + parseFloat(scopeStyle.paddingRight);
+        var availableWidth = scope.clientWidth - paddingX;
+
+        var zoom = 100;
+        if (availableWidth > 0 && availableWidth < paperWidth) {
+            zoom = Math.floor((availableWidth / paperWidth) * 100);
+        }
+
+        scope.dataset.zoom = zoom;
+        paper.style.zoom = zoom / 100;
+        
+        var label = scope.querySelector('[data-paper-zoom-label]');
+        if (label) label.textContent = zoom + '%';
+    }
+
     // Zoom in/out kertas preview — pakai event delegation supaya tetap hidup
     // walau preview.blade.php me-render ulang .doku-paper-scope (innerHTML
     // #live-preview-content ditimpa). State zoom disimpan di data-zoom scope.
@@ -320,6 +302,9 @@
         if (!btn) return;
         var scope = btn.closest('.doku-paper-scope');
         if (!scope) return;
+        
+        scope.dataset.manualZoom = 'true';
+        
         var zoom = parseInt(scope.dataset.zoom || '100', 10);
         if (btn.hasAttribute('data-paper-zoom-in')) {
             zoom = Math.min(200, zoom + 10);
@@ -327,12 +312,53 @@
             zoom = Math.max(50, zoom - 10);
         } else {
             zoom = 100;
+            delete scope.dataset.manualZoom;
         }
+        
         scope.dataset.zoom = zoom;
         var paper = scope.querySelector('.doku-paper');
         if (paper) paper.style.zoom = zoom / 100;
+        
         var label = scope.querySelector('[data-paper-zoom-label]');
         if (label) label.textContent = zoom + '%';
+        
+        if (btn.hasAttribute('data-paper-zoom-reset')) {
+             autoFitDokuPaper(scope, true);
+        }
     });
+
+    const paperResizeObserver = new ResizeObserver(function(entries) {
+        entries.forEach(function(entry) {
+            autoFitDokuPaper(entry.target);
+        });
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.doku-paper-scope').forEach(function(scope) {
+            paperResizeObserver.observe(scope);
+            setTimeout(() => autoFitDokuPaper(scope, true), 100);
+        });
+    });
+
+    const paperDomObserver = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.type === 'childList') {
+                mutation.addedNodes.forEach(function(node) {
+                    if (node.nodeType === 1) {
+                        if (node.classList && node.classList.contains('doku-paper-scope')) {
+                            paperResizeObserver.observe(node);
+                            setTimeout(() => autoFitDokuPaper(node, true), 10);
+                        } else if (node.querySelectorAll) {
+                            node.querySelectorAll('.doku-paper-scope').forEach(function(scope) {
+                                paperResizeObserver.observe(scope);
+                                setTimeout(() => autoFitDokuPaper(scope, true), 10);
+                            });
+                        }
+                    }
+                });
+            }
+        });
+    });
+    paperDomObserver.observe(document.body, { childList: true, subtree: true });
 </script>
 @endonce

@@ -13,12 +13,20 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password', 'division_id', 'system_role', 'is_active'])]
+#[Fillable(['name', 'email', 'password', 'division_id', 'system_role', 'is_active', 'profile_picture'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
+
+    /**
+     * Get avatar URL (storage or null).
+     */
+    public function getAvatarUrlAttribute(): ?string
+    {
+        return $this->profile_picture ? asset('storage/' . $this->profile_picture) : null;
+    }
 
     protected function casts(): array
     {

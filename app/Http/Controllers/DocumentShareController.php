@@ -34,9 +34,10 @@ class DocumentShareController extends Controller
         $invitedBy = auth()->user();
 
         if ($validated['type'] === 'user') {
+            $targetUser = User::findOrFail($validated['user_id']);
             $share = $this->shareService->addUserShare(
                 $document,
-                User::findOrFail($validated['user_id']),
+                $targetUser,
                 $validated['role'],
                 $invitedBy,
             );
@@ -45,6 +46,11 @@ class DocumentShareController extends Controller
                 'user_id' => $validated['user_id'],
                 'role' => $validated['role'],
             ]);
+
+            // Notify the user about the shared document
+            if ($targetUser->id !== $invitedBy->id) {
+                $targetUser->notify(new \App\Notifications\DocumentSharedWithUser($document, $validated['role'], $invitedBy->name));
+            }
         } else {
             $share = $this->shareService->addDivisionShare(
                 $document,
@@ -211,11 +217,14 @@ class DocumentShareController extends Controller
             abort(404);
         }
 
-        if (!auth()->check()) {
-            return redirect()->guest(route('login'));
-        }
-
         $this->authorize('view', $document);
+
+        $currentUser = auth()->user();
+
+        // Notify document owner when another user opens the document via the share link
+        if ($document->owner_id && $currentUser && $currentUser->id !== $document->owner_id) {
+            $document->owner?->notify(new \App\Notifications\DocumentOpenedViaLink($document, $currentUser->name));
+        }
 
         $document->load('owner', 'division', 'currentVersion', 'versions.author');
 

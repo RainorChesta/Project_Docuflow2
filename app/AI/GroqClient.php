@@ -28,6 +28,7 @@ class GroqClient implements AIClientInterface
     public function chat(string $system, string $content): string
     {
         $response = Http::withToken($this->apiKey)
+            ->withoutVerifying()
             ->timeout((int) config('services.groq.timeout', 90))
             ->post('https://api.groq.com/openai/v1/chat/completions', [
                 'model' => $this->model,
@@ -36,17 +37,23 @@ class GroqClient implements AIClientInterface
                     ['role' => 'user', 'content' => $content],
                 ],
                 'temperature' => (float) config('services.groq.temperature', 0.2),
-                'max_tokens' => (int) config('services.groq.max_tokens', 800),
+                'max_tokens' => (int) config('services.groq.max_tokens', 8192),
             ]);
 
         if ($response->failed()) {
-            throw new RuntimeException('Groq API error: HTTP ' . $response->status());
+            throw new RuntimeException('Groq API error: HTTP ' . $response->status() . ' - ' . $response->body());
         }
 
         $text = trim($response->json('choices.0.message.content') ?? '');
 
+        // Hapus token reasoning <think> ... </think> jika model menggunakan Chain of Thought
+        $text = preg_replace('/<think>.*?<\/think>/is', '', $text);
+        // Hapus juga jika token <think> tidak ditutup (karena max_tokens habis)
+        $text = preg_replace('/<think>.*$/is', '', $text);
+        $text = trim($text);
+
         if ($text === '') {
-            throw new RuntimeException('Groq API mengembalikan respons kosong.');
+            throw new RuntimeException('Groq API mengembalikan respons kosong atau terpotong sebelum selesai berpikir.');
         }
 
         return $text;
@@ -66,7 +73,7 @@ class GroqClient implements AIClientInterface
         
         $timeout = (int) config('services.groq.timeout', 90);
         $temperature = (float) config('services.groq.temperature', 0.2);
-        $maxTokens = (int) config('services.groq.max_tokens', 800);
+        $maxTokens = (int) config('services.groq.max_tokens', 9000);
 
         foreach ($batches as $batch) {
             $responses = Http::pool(function (\Illuminate\Http\Client\Pool $pool) use ($batch, $timeout, $temperature, $maxTokens) {
@@ -74,6 +81,7 @@ class GroqClient implements AIClientInterface
                 foreach ($batch as $key => $payload) {
                     $reqs[] = $pool->as((string) $key)
                         ->withToken($this->apiKey)
+                        ->withoutVerifying()
                         ->timeout($timeout)
                         ->post('https://api.groq.com/openai/v1/chat/completions', [
                             'model' => $this->model,
@@ -94,12 +102,19 @@ class GroqClient implements AIClientInterface
                 }
                 
                 if ($response->failed()) {
-                    throw new RuntimeException('Groq API error pada batch request: HTTP ' . $response->status());
+                    throw new RuntimeException('Groq API error pada batch request: HTTP ' . $response->status() . ' - ' . $response->body());
                 }
 
                 $text = trim($response->json('choices.0.message.content') ?? '');
+                
+                // Hapus token reasoning <think> ... </think> jika model menggunakan Chain of Thought
+                $text = preg_replace('/<think>.*?<\/think>/is', '', $text);
+                // Hapus juga jika token <think> tidak ditutup (karena max_tokens habis)
+                $text = preg_replace('/<think>.*$/is', '', $text);
+                $text = trim($text);
+
                 if ($text === '') {
-                    throw new RuntimeException('Groq API mengembalikan respons kosong pada batch request.');
+                    throw new RuntimeException('Groq API mengembalikan respons kosong atau terpotong sebelum selesai berpikir pada batch request.');
                 }
                 $results[$key] = $text;
             }

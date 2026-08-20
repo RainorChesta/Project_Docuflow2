@@ -170,7 +170,7 @@
             function fetchPreview() {
                 var typeId = typeSelect.value;
                 if (!typeId) {
-                    numberField.value = 'Pilih tipe dokumen dahulu...';
+                    numberField.value = @json(__('Pilih tipe dokumen dahulu...'));
                     lastPreview = '';
                     return;
                 }
@@ -186,7 +186,7 @@
                         }
                     })
                     .catch(function () {
-                        numberField.value = 'Gagal memuat preview';
+                        numberField.value = @json(__('Failed to load preview'));
                     });
             }
 
@@ -196,13 +196,13 @@
                     numberField.name = 'document_number';
                     numberField.classList.remove('bg-base-200');
                     numberField.value = lastPreview || '';
-                    numberHint.textContent = 'Isi manual sesuai berkas';
+                    numberHint.textContent = @json(__('Manual input based on file'));
                 } else {
                     numberField.disabled = true;
                     numberField.removeAttribute('name');
                     numberField.classList.add('bg-base-200');
-                    numberField.value = lastPreview || 'Pilih tipe dokumen dahulu...';
-                    numberHint.textContent = 'Preview otomatis';
+                    numberField.value = lastPreview || @json(__('Pilih tipe dokumen dahulu...'));
+                    numberHint.textContent = @json(__('Preview otomatis'));
                 }
             }
 

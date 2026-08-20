@@ -4,10 +4,19 @@
         <x-confirm-modal
             name="confirm-discard-{{ $document->id }}"
             title="Discard Document?"
-            message="Are you sure you want to discard this document?"
+            message="Are you sure you want to discard this document and all its changes?"
+            :action="route('documents.destroy', $document)"
+            method="DELETE"
+            confirmLabel="Discard"
+        />
+
+        <x-confirm-modal
+            name="confirm-discard-version-{{ $document->id }}"
+            title="Discard Changes?"
+            message="Are you sure you want to discard the pending changes? The approved version will remain intact."
             :action="route('documents.discard', $document)"
             method="POST"
-            confirmLabel="Discard"
+            confirmLabel="Discard Changes"
         />
     @endif
 
@@ -48,25 +57,10 @@
                             <div class="flex items-start sm:items-center gap-2 text-sm min-w-0">
                                 <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                                 <span>
-                                    Ada versi pending (v{{ $pending->version_number }}) yang belum di-review.
-                                    <strong>Save akan memperbarui versi pending tersebut (tanpa versi baru).</strong>
+                                    {{ __('There is a pending version (v:version) not yet reviewed. Save will update the pending version (no new version).', ['version' => $pending->version_number]) }}
                                 </span>
                             </div>
                             <div class="flex items-center gap-2 shrink-0">
-                                @if(!auth()->user()->isAdmin() && !auth()->user()->isHead())
-                                    <button type="button" class="btn btn-outline btn-warning btn-sm" x-on:click="$dispatch('open-modal', 'confirm-discard-{{ $document->id }}')">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                        {{ __('Discard pending (v:version)', ['version' => $pending->version_number]) }}
-                                    </button>
-                                @else
-                                    <form method="POST" action="{{ route('documents.discard', $document) }}" class="shrink-0">
-                                        @csrf
-                                        <button type="submit" class="btn btn-outline btn-warning btn-sm">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                            Discard pending (v{{ $pending->version_number }})
-                                        </button>
-                                    </form>
-                                @endif
                                 <button type="button" @click="show = false" class="btn btn-ghost btn-sm btn-circle" aria-label="Close">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
@@ -98,34 +92,55 @@
                             </div>
 
                             <div class="flex flex-wrap items-center gap-2 shrink-0">
-                                <div class="hidden md:flex items-center gap-2 pr-3 mr-1 border-r border-base-300">
-                                    <div class="avatar placeholder">
-                                        <div class="bg-neutral text-neutral-content rounded-full w-8">
-                                            <span class="text-xs">{{ substr(auth()->user()->name, 0, 1) }}</span>
-                                        </div>
-                                    </div>
-                                    <span class="text-sm font-medium">{{ auth()->user()->name }}</span>
-                                </div>
-
-                                <a href="{{ route('documents.show', $document) }}" class="btn btn-ghost btn-sm">
+                                <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('cancel-modal').showModal()">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                    Cancel
-                                </a>
+                                    {{ __('Batal') }} 
+                                </button>
 
+                                @if($document->currentVersion)
+                                    @can('update', $document)
+                                        @if(!auth()->user()->isAdmin() && !auth()->user()->isHead())
+                                            <button type="button" class="btn btn-outline btn-primary btn-sm" x-on:click="$dispatch('open-modal', 'confirm-discard-version-{{ $document->id }}')">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                {{ __('Discard') }}
+                                            </button>
+                                        @else
+                                            <form method="POST" action="{{ route('documents.discard', $document) }}" class="shrink-0">
+                                                @csrf
+                                                <button type="submit" class="btn btn-outline btn-primary btn-sm">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                    {{ __('Discard') }}
+                                                </button>
+                                            </form>
+                                        @endif
+                                    @endcan
+                                @else
+                                    @can('delete', $document)
+                                        @if(!auth()->user()->isAdmin() && !auth()->user()->isHead())
+                                            <button type="button" class="btn btn-outline btn-primary btn-sm" x-on:click="$dispatch('open-modal', 'confirm-discard-{{ $document->id }}')">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                {{ __('Discard') }}
+                                            </button>
+                                        @else
+                                            <form method="POST" action="{{ route('documents.destroy', $document) }}" class="shrink-0">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-outline btn-primary btn-sm">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                    {{ __('Discard') }}
+                                                </button>
+                                            </form>
+                                        @endif
+                                    @endcan
+                                @endif
+                                
                                 <button type="submit" form="editor-form" class="btn btn-primary btn-sm px-6">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                                    Save Changes
+                                    {{ __('Simpan Perubahan') }}
                                 </button>
-                                @if($hasDraftOnly)
-                                    <button type="submit" form="draft-form" class="btn btn-neutral btn-sm">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
-                                        Save as Draft
-                                    </button>
-                                @endif
                             </div>
                         </div>
 
-                        {{-- Jodit Editor (toolbar akan muncul langsung menyambung di bawah title row di atas) --}}
                         <textarea
                             name="content"
                             id="jodit-editor"
@@ -133,6 +148,8 @@
                             data-csrf-token="{{ csrf_token() }}"
                             data-live-storage="doc-preview-{{ $document->id }}"
                             data-qr-image-url="{{ route('documents.qrcode', $document) }}"
+                            data-paper-size="{{ $document->paper_size ?? 'A4' }}"
+                            data-paper-margin="{{ json_encode($document->paper_margin) }}"
                         >{{ $document->displayVersion()->content ?? '' }}</textarea>
                     </div>
 
@@ -141,12 +158,12 @@
 
                     <p class="text-center text-xs text-base-content/50 mt-4 px-2">
                         @if($hasDraftOnly)
-                            <strong>Save Changes</strong> mengirim draft untuk approval (status jadi pending).
+                            {!! __('Save Changes submits the draft for approval (status becomes pending).') !!}
                         @else
-                            Save akan membuat versi baru yang menunggu approval Head.
+                            {{ __('Save will create a new version awaiting Head approval.') }}
                         @endif
                         @if($pending ?? null)
-                            Versi pending yang ada akan diperbarui (bukan versi baru).
+                            <br>{{ __('The existing pending version will be updated (not a new version).') }}
                         @endif
                     </p>
                 </form>
@@ -161,12 +178,9 @@
                     </form>
                 @endif
 
-                {{-- Live preview: merender ulang konten editor secara real-time
-                     dengan pipeline yang SAMA PERSIS dengan show.blade.php dan
-                     preview.blade.php — .doku-paper-scope > .doku-paper —
-                     sehingga tampilan di sini adalah WYSIWYG sejati terhadap
-                     yang akan dilihat user di halaman preview/show. --}}
-                <div class="mt-10">
+                
+                     
+                <!-- <div class="mt-10">
                     <div class="bg-base-100 rounded-xl shadow-md border border-base-300 overflow-hidden">
                         <div class="px-4 py-2 bg-base-200 border-b border-base-300 text-xs text-base-content/50 font-medium tracking-wide uppercase">
                             Preview
@@ -188,8 +202,10 @@
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
+                </div> -->
+            <!-- </div> -->
+
+            
         </div>
     </div>
 
@@ -237,6 +253,76 @@
 
     <script>
         (function () {
+            let isDirty = false;
+            let intendedUrl = null;
+
+            // Monitor changes in Jodit
+            function hookDirty() {
+                const ta = document.getElementById('jodit-editor');
+                const inst = window.__joditInstances?.get(ta.id);
+                if (!inst) {
+                    requestAnimationFrame(hookDirty);
+                    return;
+                }
+                inst.e.on('change', () => {
+                    isDirty = true;
+                });
+            }
+            hookDirty();
+
+            // Clear dirty flag on any form submit (save, discard, draft)
+            document.querySelectorAll('form').forEach(form => {
+                form.addEventListener('submit', () => {
+                    isDirty = false;
+                });
+            });
+
+            // Handle URL changes, tab closes, reload
+            window.addEventListener('beforeunload', (e) => {
+                if (isDirty) {
+                    e.preventDefault();
+                    e.returnValue = ''; // Native browser dialog
+                }
+            });
+
+            // Handle browser back button via popstate hack
+            history.pushState({ page: 'edit' }, null, location.href);
+            window.addEventListener('popstate', (e) => {
+                if (isDirty) {
+                    // Restore state so URL doesn't change
+                    history.pushState({ page: 'edit' }, null, location.href);
+                    intendedUrl = 'back';
+                    document.getElementById('cancel-modal').showModal();
+                } else {
+                    history.back();
+                }
+            });
+
+            // Handle internal link clicks
+            document.addEventListener('click', (e) => {
+                const link = e.target.closest('a');
+                if (link && isDirty && !link.hasAttribute('target') && !e.ctrlKey && !e.metaKey && link.hostname === window.location.hostname) {
+                    if (link.closest('#cancel-modal')) return;
+                    e.preventDefault();
+                    intendedUrl = link.href;
+                    document.getElementById('cancel-modal').showModal();
+                }
+            });
+
+            window.proceedCancel = function() {
+                localStorage.removeItem('doc-preview-{{ $document->id }}');
+                localStorage.removeItem('doc-preview-{{ $document->id }}:paper');
+                isDirty = false;
+
+                if (intendedUrl === 'back') {
+                    history.go(-2);
+                } else if (intendedUrl) {
+                    window.location.href = intendedUrl;
+                } else {
+                    window.location.href = "{{ route('documents.show', $document) }}";
+                }
+            };
+
             const target = document.getElementById('live-preview-content');
             const storageKey = 'doc-preview-{{ $document->id }}';
 
@@ -270,38 +356,139 @@
                 }
             }
 
-            // Dengarkan perubahan dari editor (Jodit menulis ke localStorage
-            // setiap 250ms saat ada perubahan — lihat event 'change' di jodit.js).
+            // FIX #3 (preview di halaman Edit tidak sinkron / beda posisi
+            // elemen dari editor): dipakai untuk refresh panel Preview baik
+            // karena konten berubah (ada draft baru di localStorage) maupun
+            // karena HANYA margin/ukuran kertas yang berubah (kontennya sama,
+            // cukup repaginate ulang scope yang sudah ada).
+            function refreshPreview() {
+                const draft = localStorage.getItem(storageKey);
+                if (draft && draft.trim().length) {
+                    renderPaper(draft);
+                    return;
+                }
+                // Tidak ada draft konten baru — repaginate ulang scope yang
+                // sudah ada memakai ukuran kertas & margin TERBARU (dibaca
+                // window.__initPreviewPagination dari localStorage ':paper',
+                // yang di-update applyPaperSize() setiap kali tombol Margin /
+                // Ukuran Kertas dipakai di toolbar editor).
+                const scope = target.querySelector('.doku-paper-scope');
+                if (scope && window.__initPreviewPagination) {
+                    window.__initPreviewPagination(scope);
+                }
+            }
+
+            // Cross-tab: event bawaan browser 'storage' HANYA fire di tab
+            // LAIN (bukan tab yang memanggil localStorage.setItem). Ini
+            // dipertahankan untuk kasus user membuka tab preview terpisah.
             window.addEventListener('storage', (e) => {
                 if (e.key === storageKey && e.newValue && e.newValue.trim().length) {
                     renderPaper(e.newValue);
                 }
             });
 
-            // Isi hidden input draft-form dengan konten editor saat submit
-            const draftForm = document.getElementById('draft-form');
-            if (draftForm) {
-                draftForm.addEventListener('submit', () => {
-                    const ta = document.getElementById('jodit-editor');
-                    const inst = window.__joditInstances?.get(ta.id);
-                    document.getElementById('draft-content').value = inst ? inst.value : ta.value;
+            // Same-tab (perbaikan utama): jodit.js sekarang mem-broadcast
+            // CustomEvent 'doku:draft-updated' setiap kali draft konten
+            // ditulis ke localStorage (event 'storage' bawaan browser TIDAK
+            // PERNAH fire di tab yang sama dengan yang menulis, sehingga
+            // sebelumnya panel Preview DI HALAMAN EDIT ITU SENDIRI tidak
+            // pernah ter-refresh saat mengetik/mengubah konten — inilah
+            // salah satu penyebab preview terlihat "basi"/beda dari editor).
+            window.addEventListener('doku:draft-updated', (e) => {
+                if (e.detail?.storageKey === storageKey) {
+                    refreshPreview();
+                }
+            });
 
-                    // FIX: draft-form tidak lewat submit handler bawaan
-                    // initJoditEditor (yang cuma dipasang di form terdekat
-                    // dari textarea, yaitu #editor-form) — jadi paper_size &
-                    // paper_margin harus diisi manual di sini juga, dari
-                    // instance editor yang sama (window.__joditInstances),
-                    // supaya draft yang disimpan juga membawa margin yang
-                    // sedang aktif, bukan cuma konten.
-                    const sizeKey = inst && window.__findPaperKey
-                        ? (window.__findPaperKey(inst.currentPaperSize) || 'A4')
-                        : 'A4';
-                    document.getElementById('draft-paper-size').value = sizeKey;
-                    document.getElementById('draft-paper-margin').value = inst
-                        ? JSON.stringify(inst.currentMargin || {})
-                        : '';
-                });
-            }
+            // Same-tab, khusus perubahan Margin Halaman / Ukuran Kertas:
+            // tombol-tombol itu memanggil applyPaperSize() yang HANYA
+            // fire event 'resize' / 'afterResize' pada instance Jodit
+            // (bukan 'change'), jadi tidak lewat jalur draft-updated di
+            // atas. Tanpa hook ini, preview di halaman edit tidak ikut
+            // berubah saat margin/ukuran kertas diganti — persis gejala
+            // "beda 1 baris peletakan elemen antara editor dan preview
+            // saat ukuran kertas diubah", karena preview yang ditampilkan
+            // masih pakai pagination lama.
+            (function hookEditorInstance() {
+                const ta = document.getElementById('jodit-editor');
+                const inst = window.__joditInstances?.get(ta.id);
+                if (!inst) {
+                    requestAnimationFrame(hookEditorInstance);
+                    return;
+                }
+                let raf = null;
+                const scheduleRefresh = () => {
+                    if (raf) return;
+                    raf = requestAnimationFrame(() => {
+                        raf = null;
+                        refreshPreview();
+                    });
+                };
+                inst.e.on('afterResize.livePreview', scheduleRefresh);
+            })();
+
+            // Isi hidden input draft-form dengan konten editor saat submit
+// Isi hidden input draft-form dengan konten editor saat submit
+const draftForm = document.getElementById('draft-form');
+if (draftForm) {
+    draftForm.addEventListener('submit', () => {
+        const ta = document.getElementById('jodit-editor');
+        const inst = window.__joditInstances?.get(ta.id);
+        document.getElementById('draft-content').value = inst ? inst.value : ta.value;
+
+        const sizeKey = inst && window.__findPaperKey
+            ? (window.__findPaperKey(inst.currentPaperSize) || 'A4')
+            : 'A4';
+        document.getElementById('draft-paper-size').value = sizeKey;
+        document.getElementById('draft-paper-margin').value = inst
+            ? JSON.stringify(inst.currentMargin || {})
+            : '';
+
+        // FIX: konten sudah resmi tersimpan ke DB — draft lokal tidak
+        // perlu lagi, hapus supaya tidak menimpa data baru saat edit dibuka lagi.
+        localStorage.removeItem(storageKey);
+        localStorage.removeItem(storageKey + ':paper');
+    });
+}
         })();
     </script>
+
+    <dialog id="cancel-modal" class="modal">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg">Batal Edit Dokumen?</h3>
+            <p class="py-4">
+                @if($hasDraftOnly)
+                    Apa yang ingin Anda lakukan dengan perubahan pada dokumen draft ini?
+                @else
+                    Perubahan yang belum Anda simpan akan dibatalkan. Lanjutkan?
+                @endif
+            </p>
+            <div class="modal-action flex justify-between w-full">
+                <form method="dialog">
+                    <button class="btn btn-ghost">Keep Editing</button>
+                </form>
+                <div class="flex gap-2">
+                    @if($hasDraftOnly)
+                        <button type="submit" form="draft-form" class="btn btn-neutral" onclick="isDirty = false;">
+                            Save Draft
+                        </button>
+                        <form action="{{ route('documents.destroy', $document) }}" method="POST">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="btn btn-error" onclick="localStorage.removeItem('doc-preview-{{ $document->id }}'); localStorage.removeItem('doc-preview-{{ $document->id }}:paper'); isDirty = false;">
+                                Discard
+                            </button>
+                        </form>
+                    @else
+                        <button type="button" class="btn btn-error" onclick="proceedCancel()">
+                            Cancel
+                        </button>
+                    @endif
+                </div>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>tutup</button>
+        </form>
+    </dialog>
 </x-app-layout>

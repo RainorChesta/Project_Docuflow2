@@ -157,7 +157,7 @@ class DocumentService
      * Kirim job ringkasan AI ke antrian. Job hanya membawa document id —
      * payload kecil, dan request web tidak menunggu Groq selesai.
      */
-    public function dispatchSummary(Document $document, int $percentage = 30): void
+    public function dispatchSummary(Document $document, int $percentage = 30, string $model = 'auto', string $locale = 'id'): void
     {
         // Lepas kunci lama (kalau ada) supaya job baru tidak di-skip.
         Cache::lock('summarize:' . $document->id)->forceRelease();
@@ -168,7 +168,7 @@ class DocumentService
             'summary_error' => null,
         ]);
 
-        SummarizeDocumentJob::dispatch($document->id, $percentage);
+        SummarizeDocumentJob::dispatch($document->id, $percentage, $model, $locale);
     }
 
     private function toRomanMonth(int $month): string

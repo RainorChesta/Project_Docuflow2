@@ -198,6 +198,8 @@ class DocumentController extends Controller
 
         $force = $request->boolean('force');
         $percentage = (int) $request->input('percentage', 30);
+        $model = $request->input('model', 'auto');
+        $locale = app()->getLocale();
 
         // Sudah selesai & tidak dipaksa ringkas ulang → kirim hasil yang tersimpan.
         if ($document->isSummaryCompleted() && !$force) {
@@ -216,7 +218,7 @@ class DocumentController extends Controller
             ]);
         }
 
-        $this->documentService->dispatchSummary($document, $percentage);
+        $this->documentService->dispatchSummary($document, $percentage, $model, $locale);
 
         $document->refresh();
 
@@ -256,7 +258,7 @@ class DocumentController extends Controller
             'Dokumen ini berasal dari unggahan berkas dan tidak bisa diedit lewat editor. Gunakan rollback untuk mengubah isinya.'
         );
 
-        return view('documents.insert', compact('document'));
+        return view('documents.edit', compact('document'));
     }
 
     public function preview(Document $document): View
@@ -307,12 +309,25 @@ class DocumentController extends Controller
         ]);
 
         // savePending updates the existing pending version in place — no new version.
-        $version = $this->versionService->savePending($document, $validated['content'], auth()->user());
+        $user = auth()->user();
+        $version = $this->versionService->savePending($document, $validated['content'], $user);
 
-        $this->auditService->log(auth()->user(), 'version.created', 'document_version', $version->id, [
+        $this->auditService->log($user, 'version.created', 'document_version', $version->id, [
             'document_id' => $document->id,
             'version_number' => $version->version_number,
         ]);
+
+        // Notify Division Heads about pending approval
+        if ($document->division_id) {
+            $heads = \App\Models\User::where('division_id', $document->division_id)
+                ->where('system_role', 'head')
+                ->where('id', '!=', $user->id)
+                ->get();
+
+            foreach ($heads as $head) {
+                $head->notify(new \App\Notifications\DocumentApprovalRequested($document, $version, $user->name));
+            }
+        }
 
         $message = $version->wasRecentlyCreated
             ? 'Edit saved. Pending approval.'
@@ -382,12 +397,25 @@ class DocumentController extends Controller
             'file' => 'required|file|mimes:pdf,docx|max:10240',
         ]);
 
-        $version = $this->versionService->savePendingFile($document, $request->file('file'), auth()->user());
+        $user = auth()->user();
+        $version = $this->versionService->savePendingFile($document, $request->file('file'), $user);
 
-        $this->auditService->log(auth()->user(), 'version.uploaded', 'document_version', $version->id, [
+        $this->auditService->log($user, 'version.uploaded', 'document_version', $version->id, [
             'document_id' => $document->id,
             'version_number' => $version->version_number,
         ]);
+
+        // Notify Division Heads about pending approval
+        if ($document->division_id) {
+            $heads = \App\Models\User::where('division_id', $document->division_id)
+                ->where('system_role', 'head')
+                ->where('id', '!=', $user->id)
+                ->get();
+
+            foreach ($heads as $head) {
+                $head->notify(new \App\Notifications\DocumentApprovalRequested($document, $version, $user->name));
+            }
+        }
 
         return redirect()->route('documents.show', $document)->with('success', 'Versi baru diunggah. Menunggu approval.');
     }

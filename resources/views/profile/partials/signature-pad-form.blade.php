@@ -81,6 +81,7 @@
                     {{-- Server-rendered on initial page load --}}
                     <div class="bg-white p-4 rounded-lg shadow-sm border border-base-300 w-full">
                         <img src="{{ asset('storage/' . auth()->user()->signature->file_path) }}"
+
                              alt="Tanda tangan {{ auth()->user()->name }}"
                              class="max-h-36 max-w-full object-contain mx-auto">
                     </div>

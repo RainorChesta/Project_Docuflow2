@@ -170,7 +170,20 @@ class VersionService
             ->first();
 
         if ($pending) {
-            $pending->update(['status' => 'discarded', 'discarded_at' => now()]);
+            if ($pending->file_path) {
+                Storage::disk('local')->delete($pending->file_path);
+            }
+            $pending->delete();
+        }
+        
+        // Hapus juga semua versi yang sebelumnya sudah ditandai discarded (jika ada)
+        // agar perhitungan max('version_number') kembali normal.
+        $discardedVersions = $document->versions()->where('status', 'discarded')->get();
+        foreach ($discardedVersions as $dv) {
+            if ($dv->file_path) {
+                Storage::disk('local')->delete($dv->file_path);
+            }
+            $dv->delete();
         }
 
         return $pending;

@@ -40,12 +40,24 @@ class ApprovalController extends Controller
     {
         $this->authorize('approve', $document);
 
-        $this->versionService->approve($version, auth()->user(), $request->input('notes'));
+        $reviewer = auth()->user();
+        $this->versionService->approve($version, $reviewer, $request->input('notes'));
 
-        $this->auditService->log(auth()->user(), 'version.approved', 'document_version', $version->id, [
+        $this->auditService->log($reviewer, 'version.approved', 'document_version', $version->id, [
             'document_id' => $document->id,
             'version_number' => $version->version_number,
         ]);
+
+        // Notify document author
+        if ($version->author_id && $version->author_id !== $reviewer->id) {
+            $version->author?->notify(new \App\Notifications\DocumentApprovalResult(
+                $document,
+                $version,
+                'approved',
+                $reviewer->name,
+                $request->input('notes')
+            ));
+        }
 
         return redirect()->route('approvals.index')->with('success', 'Version approved and activated.');
     }
@@ -55,13 +67,25 @@ class ApprovalController extends Controller
         $this->authorize('approve', $document);
 
         $validated = $request->validate(['notes' => 'nullable|string|max:500']);
+        $reviewer = auth()->user();
 
-        $this->versionService->reject($version, auth()->user(), $validated['notes'] ?? null);
+        $this->versionService->reject($version, $reviewer, $validated['notes'] ?? null);
 
-        $this->auditService->log(auth()->user(), 'version.rejected', 'document_version', $version->id, [
+        $this->auditService->log($reviewer, 'version.rejected', 'document_version', $version->id, [
             'document_id' => $document->id,
             'version_number' => $version->version_number,
         ]);
+
+        // Notify document author
+        if ($version->author_id && $version->author_id !== $reviewer->id) {
+            $version->author?->notify(new \App\Notifications\DocumentApprovalResult(
+                $document,
+                $version,
+                'rejected',
+                $reviewer->name,
+                $validated['notes'] ?? null
+            ));
+        }
 
         return redirect()->route('approvals.index')->with('success', 'Version rejected.');
     }
@@ -74,15 +98,29 @@ class ApprovalController extends Controller
     {
         $this->authorize('update', $document);
 
+        $user = auth()->user();
+
         try {
-            $this->versionService->requestRollback($document, $version, auth()->user());
+            $this->versionService->requestRollback($document, $version, $user);
         } catch (RuntimeException $e) {
             return back()->with('error', $e->getMessage());
         }
 
-        $this->auditService->log(auth()->user(), 'rollback.requested', 'document', $document->id, [
+        $this->auditService->log($user, 'rollback.requested', 'document', $document->id, [
             'target_version' => $version->version_number,
         ]);
+
+        // Notify Division Heads about rollback request
+        if ($document->division_id) {
+            $heads = \App\Models\User::where('division_id', $document->division_id)
+                ->where('system_role', 'head')
+                ->where('id', '!=', $user->id)
+                ->get();
+
+            foreach ($heads as $head) {
+                $head->notify(new \App\Notifications\DocumentRollbackRequested($document, $version, $user->name));
+            }
+        }
 
         return redirect()->route('documents.show', $document)->with('success', 'Permintaan rollback diajukan. Menunggu approval kepala divisi.');
     }

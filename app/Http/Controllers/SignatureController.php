@@ -24,7 +24,7 @@ class SignatureController extends Controller
             $sig = $user->signature;
             return response()->json([
                 'success' => true,
-                'url'        => $sig->url,
+                'url'        => asset('storage/' . $sig->file_path),
                 'updated_at' => $sig->updated_at->toISOString(),
             ]);
         }
@@ -86,7 +86,7 @@ class SignatureController extends Controller
             return response()->json([
                 'success'    => true,
                 'message'    => 'Tanda tangan digital berhasil disimpan.',
-                'url'        => $signature->url,
+                'url'        => asset('storage/' . $signature->file_path),
                 'updated_at' => $signature->updated_at->toISOString(),
             ]);
         }
