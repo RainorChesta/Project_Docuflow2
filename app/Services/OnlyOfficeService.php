@@ -18,14 +18,20 @@ class OnlyOfficeService
      */
     public function generateDocumentKey(Document $document, DocumentVersion $version): string
     {
-        $raw = sprintf(
-            'doc_%d_v%d_%s',
-            $document->id,
-            $version->version_number,
-            $version->updated_at ? $version->updated_at->timestamp : $document->updated_at->timestamp
-        );
+        $cacheKey = 'onlyoffice_doc_key_' . $document->id;
+        
+        return \Illuminate\Support\Facades\Cache::remember($cacheKey, now()->addDays(1), function () use ($document, $version) {
+            $timeKey = uniqid() . '_' . microtime(true);
+            
+            $raw = sprintf(
+                'doc_%d_v%d_%s',
+                $document->id,
+                $version->version_number,
+                $timeKey
+            );
 
-        return substr(preg_replace('/[^0-9a-zA-Z_\-]/', '_', $raw), 0, 128);
+            return substr(preg_replace('/[^0-9a-zA-Z_\-]/', '_', $raw), 0, 128);
+        });
     }
 
     /**
@@ -123,8 +129,8 @@ class OnlyOfficeService
                     'name' => $user->name,
                 ],
                 'customization' => [
-                    'autosave' => true,
-                    'forcesave' => true,
+                    'autosave' => (bool) config('onlyoffice.autosave', true),
+                    'forcesave' => (bool) config('onlyoffice.forcesave', true),
                     'chat' => false,
                     'comments' => false,
                     'compactHeader' => false,

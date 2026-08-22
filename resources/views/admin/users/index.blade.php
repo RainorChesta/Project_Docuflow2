@@ -22,9 +22,10 @@
                     <table class="table min-w-[640px]">
                         <thead>
                             <tr>
-                                <th>Name</th>
-                                <th>Email</th>
+                                <th>Name / NIP</th>
+                                <th>Email / Phone</th>
                                 <th>Division</th>
+                                <th>Company & Cabang</th>
                                 <th>Role</th>
                                 <th>Active</th>
                                 <th></th>
@@ -33,11 +34,31 @@
                         <tbody>
                             @foreach($users as $user)
                                 <tr>
-                                    <td>{{ $user->name }}</td>
-                                    <td>{{ $user->email }}</td>
+                                    <td>
+                                        <div class="font-medium">{{ $user->name }}</div>
+                                        @if($user->nip)
+                                            <div class="text-xs text-base-content/50">NIP: {{ $user->nip }}</div>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <div>{{ $user->email }}</div>
+                                        @if($user->phone_number)
+                                            <div class="text-xs text-base-content/50">{{ $user->phone_number }}</div>
+                                        @endif
+                                    </td>
                                     <td>{{ $user->division?->code ?? '-' }}</td>
                                     <td>
-                                        <span class="badge {{ $user->system_role === 'admin' ? 'badge-accent' : ($user->system_role === 'head' ? 'badge-warning' : 'badge-ghost') }} badge-sm">
+                                        @if($user->isDirector())
+                                            <span class="badge badge-sm badge-info">{{ __('Semua PT & Cabang') }}</span>
+                                        @else
+                                            <div class="text-xs">
+                                                <span class="font-semibold">{{ $user->companies->pluck('code')->join(', ') ?: '-' }}</span>
+                                                <div class="text-base-content/60">{{ $user->branches->pluck('name')->join(', ') ?: '-' }}</div>
+                                            </div>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <span class="badge {{ $user->system_role === 'admin' ? 'badge-accent' : ($user->system_role === 'direktur' ? 'badge-info' : ($user->system_role === 'head' ? 'badge-warning' : 'badge-ghost')) }} badge-sm uppercase font-semibold">
                                             {{ $user->system_role }}
                                         </span>
                                     </td>

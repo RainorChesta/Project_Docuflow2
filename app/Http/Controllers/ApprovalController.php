@@ -20,14 +20,16 @@ class ApprovalController extends Controller
     public function index(): \Illuminate\View\View
     {
         $user = auth()->user();
+        $divisionIds = $user->allDivisionIds();
+
         $pendingVersions = DocumentVersion::where('status', 'pending')
             ->whereNull('discarded_at')
-            ->whereHas('document', fn($q) => $q->where('division_id', $user->division_id))
+            ->whereHas('document', fn($q) => $q->whereIn('division_id', $divisionIds))
             ->with('document', 'author')
             ->latest()
             ->get();
 
-        $pendingRollbacks = Document::where('division_id', $user->division_id)
+        $pendingRollbacks = Document::whereIn('division_id', $divisionIds)
             ->whereNotNull('pending_rollback_version_id')
             ->with('pendingRollbackVersion', 'rollbackRequestedBy')
             ->latest()

@@ -14,17 +14,23 @@ use Illuminate\Support\Facades\Storage;
 class SignatureController extends Controller
 {
     /**
-     * Return the current user's saved signature data (for AJAX page-load fetch).
+     * Return the user's saved signature data (for AJAX fetch).
      */
     public function show(Request $request): JsonResponse
     {
-        $user = Auth::user();
+        $userId = $request->query('user_id');
+        $user = $userId ? User::find($userId) : Auth::user();
 
-        if ($user->hasSignature()) {
+        if ($user && $user->hasSignature()) {
             $sig = $user->signature;
+            $internalBase = rtrim(config('onlyoffice.internal_url'), '/');
+            $relativeUrl = Storage::disk('public')->url($sig->file_path);
+
             return response()->json([
                 'success' => true,
-                'url'        => asset('storage/' . $sig->file_path),
+                'url'        => $internalBase . $relativeUrl,
+                'client_url' => asset('storage/' . $sig->file_path),
+                'data_uri'   => 'data:image/png;base64,' . base64_encode(Storage::disk('public')->get($sig->file_path)),
                 'updated_at' => $sig->updated_at->toISOString(),
             ]);
         }

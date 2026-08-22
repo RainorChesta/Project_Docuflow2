@@ -56,44 +56,57 @@ class DocumentService
      * Generate the final, authoritative document number. Locks the row
      * range to avoid duplicate sequences under concurrent submissions.
      */
-    public function generateId(?Division $division, ?DocumentType $documentType): string
+    public function generateId(?Division $division, ?DocumentType $documentType, ?\App\Models\Branch $branch = null): string
     {
-        return DB::transaction(function () use ($division, $documentType) {
-            $lastDoc = Document::where('division_id', $division?->id)
-                ->where('document_type_id', $documentType?->id)
-                ->whereYear('created_at', now()->year)
-                ->lockForUpdate()
+        return DB::transaction(function () use ($division, $documentType, $branch) {
+            $query = Document::where('document_type_id', $documentType?->id)
+                ->whereYear('created_at', now()->year);
+
+            if ($branch) {
+                $query->where('branch_id', $branch->id);
+            }
+
+            if ($division) {
+                $query->where('division_id', $division->id);
+            }
+
+            $lastDoc = $query->lockForUpdate()
                 ->orderByDesc('id')
                 ->first();
 
             $seq = $this->nextSequenceFrom($lastDoc);
 
-            return $this->formatNumber($division, $documentType, $seq);
+            return $this->formatNumber($division, $documentType, $seq, $branch);
         });
     }
 
     /**
      * Non-locking preview of the next number, purely indicative for the
-     * create form. The authoritative number is recalculated (with a lock)
-     * when the form is actually submitted, so this may occasionally be
-     * off by one under concurrent submissions — that's expected/accepted.
+     * create form.
      */
-    public function previewNumber(?Division $division, ?DocumentType $documentType): string
+    public function previewNumber(?Division $division, ?DocumentType $documentType, ?\App\Models\Branch $branch = null): string
     {
-        $lastDoc = Document::where('division_id', $division?->id)
-            ->where('document_type_id', $documentType?->id)
-            ->whereYear('created_at', now()->year)
-            ->orderByDesc('id')
-            ->first();
+        $query = Document::where('document_type_id', $documentType?->id)
+            ->whereYear('created_at', now()->year);
+
+        if ($branch) {
+            $query->where('branch_id', $branch->id);
+        }
+
+        if ($division) {
+            $query->where('division_id', $division->id);
+        }
+
+        $lastDoc = $query->orderByDesc('id')->first();
 
         $seq = $this->nextSequenceFrom($lastDoc);
 
-        return $this->formatNumber($division, $documentType, $seq);
+        return $this->formatNumber($division, $documentType, $seq, $branch);
     }
 
     private function nextSequenceFrom(?Document $lastDoc): int
     {
-        if (!$lastDoc) {
+        if (!$lastDoc || empty($lastDoc->document_number)) {
             return 1;
         }
 
@@ -104,12 +117,13 @@ class DocumentService
         return (int) $firstSegment + 1;
     }
 
-    private function formatNumber(?Division $division, ?DocumentType $documentType, int $seq): string
+    private function formatNumber(?Division $division, ?DocumentType $documentType, int $seq, ?\App\Models\Branch $branch = null): string
     {
         $now = Carbon::now();
         $year = $now->year;
         $romanMonth = $this->toRomanMonth($now->month);
-        $centralCode = config('dokuflow.central_code', 'JBM');
+        
+        $branchCode = $branch ? $branch->effective_code : config('dokuflow.central_code', 'JBM');
 
         // Non-division scopes (general/personal) pakai kode generik karena
         // tidak terikat divisi manapun.
@@ -125,7 +139,7 @@ class DocumentService
             $seq,
             $typeCodeForNumber,
             $divisionCode,
-            $centralCode,
+            $branchCode,
             $romanMonth,
             $year
         );
@@ -133,10 +147,15 @@ class DocumentService
 
     public function create(array $data, int $ownerId): Document
     {
-        $division = $data['division_id'] ? Division::findOrFail($data['division_id']) : null;
+        $division = !empty($data['division_id']) ? Division::find($data['division_id']) : null;
         $documentType = DocumentType::findOrFail($data['document_type_id']);
+        $branch = !empty($data['branch_id']) ? \App\Models\Branch::with('company')->find($data['branch_id']) : null;
 
-        $data['document_number'] = $this->generateId($division, $documentType);
+        if ($branch && empty($data['company_id'])) {
+            $data['company_id'] = $branch->company_id;
+        }
+
+        $data['document_number'] = $this->generateId($division, $documentType, $branch);
         $data['visibility'] ??= Document::VISIBILITY_DIVISION;
         $data['owner_id'] = $ownerId;
 

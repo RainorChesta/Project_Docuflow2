@@ -75,8 +75,18 @@ class DashboardController extends Controller
             ->take(5)
             ->get();
 
+        $expiringDocuments = $user->documents()->with('division')
+            ->where('is_expired', false)
+            ->get()
+            ->filter(function ($doc) {
+                if (!$doc->expires_at) return false;
+                $days = now()->startOfDay()->diffInDays($doc->expires_at->startOfDay(), false);
+                return $days >= 0 && $days <= 30;
+            })
+            ->sortBy(fn($doc) => $doc->expires_at);
+
         $documentTypes = DocumentType::orderBy('name')->get();
 
-        return view('dashboard', compact('results', 'recent', 'documentTypes'));
+        return view('dashboard', compact('results', 'recent', 'documentTypes', 'expiringDocuments'));
     }
 }

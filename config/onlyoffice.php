@@ -44,4 +44,15 @@ return [
     |
     */
     'storage_disk' => env('DOCUMENT_STORAGE_DISK', 'local'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Editor Customization Options
+    |--------------------------------------------------------------------------
+    |
+    | Controls editor autosave and forcesave behavior.
+    |
+    */
+    'autosave' => env('ONLYOFFICE_AUTOSAVE', true),
+    'forcesave' => env('ONLYOFFICE_FORCESAVE', true),
 ];

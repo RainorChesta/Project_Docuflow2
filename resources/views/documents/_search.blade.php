@@ -1,5 +1,5 @@
 <form method="GET" action="{{ route('documents.index') }}" class="mb-4 flex flex-col sm:flex-row gap-2">
-    <input type="hidden" name="type" value="{{ $type }}">
+    <input type="hidden" name="type" value="{{ $type ?? request('type', 'general') }}">
     <input type="text" name="search" value="{{ request('search') }}" placeholder="{{ __('Search title or number...') }}"
            class="input input-bordered input-sm w-full sm:flex-1">
     <select name="document_type_id" class="select select-bordered select-sm w-full sm:w-auto" onchange="this.form.submit()">

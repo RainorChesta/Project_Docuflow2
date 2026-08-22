@@ -28,6 +28,20 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        $user = $request->user();
+        $expiringCount = \App\Models\Document::visibleTo($user)
+            ->where('is_expired', false)
+            ->get()
+            ->filter(function ($doc) {
+                if (!$doc->expires_at) return false;
+                $days = now()->startOfDay()->diffInDays($doc->expires_at->startOfDay(), false);
+                return $days >= 0 && $days <= 3;
+            })->count();
+
+        if ($expiringCount > 0) {
+            $request->session()->flash('urgent_expiring_count', $expiringCount);
+        }
+
         return redirect()->intended(route('dashboard', absolute: false));
     }
 

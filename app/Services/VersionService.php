@@ -94,7 +94,10 @@ class VersionService
                     'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                     'author_id' => $author->id,
                     'author_name' => $author->name,
+                    'updated_at' => now(),
                 ]);
+
+                $document->touch();
 
                 return $pending;
             }
@@ -114,7 +117,10 @@ class VersionService
                     'author_id' => $author->id,
                     'author_name' => $author->name,
                     'status' => 'pending',
+                    'updated_at' => now(),
                 ]);
+
+                $document->touch();
 
                 return $draft;
             }
@@ -122,6 +128,8 @@ class VersionService
             $versionNumber = ($document->versions()->max('version_number') ?? 0) + 1;
             $storedPath = 'documents/' . $document->id . '/v' . $versionNumber . '.docx';
             Storage::disk($disk)->put($storedPath, $docxBinaryContent);
+
+            $document->touch();
 
             return $document->versions()->create([
                 'version_number' => $versionNumber,
@@ -132,6 +140,7 @@ class VersionService
                 'author_id' => $author->id,
                 'author_name' => $author->name,
                 'status' => 'pending',
+                'updated_at' => now(),
             ]);
         });
     }

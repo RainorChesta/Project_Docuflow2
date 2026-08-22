@@ -21,25 +21,50 @@
     @if($isPdf)
         <iframe src="{{ $fileUrl }}" class="w-full border-0" style="height: 80vh;" title="Pratinjau dokumen"></iframe>
     @else
-        <div id="docx-preview-{{ $version->id }}" class="prose max-w-none px-4 py-6 border border-base-300 rounded-lg min-h-[200px]">
-            <p class="text-base-content/50 text-sm">Memuat isi dokumen…</p>
-        </div>
+        @if(isset($onlyOfficeConfig))
+            <div class="w-full border border-base-300 rounded-lg overflow-hidden" style="width: 100%; height: 850px; min-height: 80vh;">
+                <div id="docx-preview-{{ $version->id }}"></div>
+            </div>
 
-        <script src="https://cdn.jsdelivr.net/npm/mammoth@1.7.0/mammoth.browser.min.js"></script>
-        <script>
-            (function () {
-                fetch('{{ $fileUrl }}')
-                    .then(function (res) { return res.arrayBuffer(); })
-                    .then(function (buffer) { return mammoth.convertToHtml({ arrayBuffer: buffer }); })
-                    .then(function (result) {
+            <script src="{{ rtrim(config('onlyoffice.url'), '/') }}/web-apps/apps/api/documents/api.js"></script>
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    if (typeof DocsAPI === 'undefined') {
                         document.getElementById('docx-preview-{{ $version->id }}').innerHTML =
-                            result.value || '<p class="text-base-content/50 text-sm">Dokumen kosong.</p>';
-                    })
-                    .catch(function () {
+                            '<p class="text-error text-sm p-4">Gagal memuat editor ONLYOFFICE.</p>';
+                        return;
+                    }
+                    try {
+                        const config = @json($onlyOfficeConfig);
+                        new DocsAPI.DocEditor("docx-preview-{{ $version->id }}", config);
+                    } catch (e) {
+                        console.error('ONLYOFFICE initialization error:', e);
                         document.getElementById('docx-preview-{{ $version->id }}').innerHTML =
-                            '<p class="text-error text-sm">Gagal memuat pratinjau. Silakan unduh dokumen untuk melihat isinya.</p>';
-                    });
-            })();
-        </script>
+                            '<p class="text-error text-sm p-4">Gagal memuat pratinjau. Silakan unduh dokumen untuk melihat isinya.</p>';
+                    }
+                });
+            </script>
+        @else
+            <div id="docx-preview-{{ $version->id }}" class="prose max-w-none px-4 py-6 border border-base-300 rounded-lg min-h-[200px]">
+                <p class="text-base-content/50 text-sm">Memuat isi dokumen…</p>
+            </div>
+
+            <script src="https://cdn.jsdelivr.net/npm/mammoth@1.7.0/mammoth.browser.min.js"></script>
+            <script>
+                (function () {
+                    fetch('{{ $fileUrl }}')
+                        .then(function (res) { return res.arrayBuffer(); })
+                        .then(function (buffer) { return mammoth.convertToHtml({ arrayBuffer: buffer }); })
+                        .then(function (result) {
+                            document.getElementById('docx-preview-{{ $version->id }}').innerHTML =
+                                result.value || '<p class="text-base-content/50 text-sm">Dokumen kosong.</p>';
+                        })
+                        .catch(function () {
+                            document.getElementById('docx-preview-{{ $version->id }}').innerHTML =
+                                '<p class="text-error text-sm">Gagal memuat pratinjau. Silakan unduh dokumen untuk melihat isinya.</p>';
+                        });
+                })();
+            </script>
+        @endif
     @endif
 </div>

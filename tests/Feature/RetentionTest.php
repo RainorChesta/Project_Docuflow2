@@ -27,13 +27,17 @@ class RetentionTest extends TestCase
     {
         $this->actingAs($this->admin());
 
-        $this->get('/admin/retention')->assertOk()->assertSee('Retention period');
+        $this->get('/admin/retention')->assertOk()->assertSee('Version Retention');
 
-        $this->put('/admin/retention', ['retention_days' => 30])
+        $this->put('/admin/retention', [
+            'retention_days' => 30,
+            'document_retention_years' => 3,
+        ])
             ->assertRedirect()
             ->assertSessionHas('success');
 
         $this->assertSame('30', Setting::get('version_retention_days'));
+        $this->assertSame('3', Setting::get('document_retention_years'));
     }
 
     public function test_retention_days_requires_valid_integer(): void

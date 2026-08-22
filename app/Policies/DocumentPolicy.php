@@ -10,7 +10,7 @@ class DocumentPolicy
 {
     public function view(User $user, Document $document): bool
     {
-        if ($user->isAdmin()) return true;
+        if ($user->isAdmin() || $user->isDirector()) return true;
         if ($document->isGeneral()) return true;
         if ($user->id === $document->owner_id) return true;
 
@@ -27,6 +27,7 @@ class DocumentPolicy
 
     public function create(User $user): bool
     {
+        if ($user->isDirector()) return false;
         // Any active user may create documents; personal/general docs
         // do not require a division.
         return $user->is_active;
@@ -34,6 +35,7 @@ class DocumentPolicy
 
     public function update(User $user, Document $document): bool
     {
+        if ($user->isDirector()) return false;
         if ($user->id === $document->owner_id || $user->isAdmin()) return true;
 
         $role = app(DocumentShareService::class)->resolveEffectiveRole($document, $user);
@@ -43,17 +45,20 @@ class DocumentPolicy
 
     public function manageAccess(User $user, Document $document): bool
     {
+        if ($user->isDirector()) return false;
         return $user->id === $document->owner_id || $user->isAdmin();
     }
 
     public function approve(User $user, Document $document): bool
     {
+        if ($user->isDirector()) return false;
         if ($user->isAdmin()) return true;
         return $user->isHead() && $user->division_id === $document->division_id;
     }
 
     public function delete(User $user, Document $document): bool
     {
+        if ($user->isDirector()) return false;
         if ($user->isAdmin()) return true;
 
         // Owner boleh hapus dokumen selama belum punya versi approved (active).

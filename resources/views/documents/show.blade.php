@@ -143,7 +143,14 @@
                         <span class="badge badge-outline badge-sm shrink-0">{{ $document->document_number }}</span>
                     </div>
 
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-5 pt-4 text-sm">
+                    <div class="grid grid-cols-2 md:grid-cols-6 gap-x-4 gap-y-5 pt-4 text-sm">
+                        <div>
+                            <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Perusahaan / Cabang') }}</span>
+                            <p class="font-medium mt-1">
+                                {{ $document->company?->code ?? ($document->branch?->company?->code ?? '—') }} / 
+                                {{ $document->branch?->name ?? '—' }}
+                            </p>
+                        </div>
                         <div>
                             <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Divisi') }}</span>
                             <p class="font-medium mt-1">{{ $document->division?->code ?? '—' }}</p>
@@ -155,6 +162,9 @@
                         <div>
                             <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Status') }}</span>
                             <p class="font-medium mt-1">
+                                @if($document->is_expired)
+                                    <span class="badge badge-error badge-sm mb-1">{{ __('Kedaluwarsa') }}</span><br>
+                                @endif
                                 @if($document->currentVersion)
                                     {{ __('Aktif') }} (v{{ $document->currentVersion->version_number }})
                                 @elseif($pendingVersion)
@@ -178,18 +188,41 @@
                                 @endif
                             </p>
                         </div>
+                        <div>
+                            <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Kedaluwarsa') }}</span>
+                            <p class="font-medium mt-1">
+                                @if($document->expires_at)
+                                    <span class="{{ $document->is_expired ? 'text-error font-semibold' : '' }}">
+                                        {{ $document->expires_at->format('d M Y') }}
+                                    </span>
+                                @else
+                                    —
+                                @endif
+                            </p>
+                        </div>
                     </div>
 
                     {{-- Actions (di bawah keterangan, sejajar menyamping) --}}
                     @php $isFileBased = $document->displayVersion()?->file_path; @endphp
                     <div class="flex flex-wrap items-center gap-2 mt-5 pt-4 border-t border-base-200">
                         @can('update', $document)
-                            <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                </svg>
-                                {{ __('Edit Dokumen') }}
-                            </a>
+                            @if(request('saving') == 1)
+                                <a href="{{ route('documents.edit', $document) }}" id="btn-edit-document" class="btn btn-primary btn-sm pointer-events-none opacity-50">
+                                    <span id="spinner-edit-document" class="loading loading-spinner loading-xs"></span>
+                                    <svg id="icon-edit-document" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                    <span id="text-edit-document">{{ __('Menyimpan...') }}</span>
+                                </a>
+                            @else
+                                <a href="{{ route('documents.edit', $document) }}" id="btn-edit-document" class="btn btn-primary btn-sm">
+                                    <span id="spinner-edit-document" class="loading loading-spinner loading-xs hidden"></span>
+                                    <svg id="icon-edit-document" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                    <span id="text-edit-document">{{ __('Edit Dokumen') }}</span>
+                                </a>
+                            @endif
                         @endcan
                         <a href="{{ route('documents.download', $document) }}" class="btn btn-outline btn-primary btn-sm">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1162,5 +1195,65 @@
         </form>
     </dialog>
 
-    
+    <script>
+        @if(request('saving') == 1)
+        document.addEventListener('DOMContentLoaded', function() {
+            const initialUpdatedAt = "{{ $document->displayVersion()?->updated_at?->timestamp }}";
+            const btn = document.getElementById('btn-edit-document');
+            const spinner = document.getElementById('spinner-edit-document');
+            const icon = document.getElementById('icon-edit-document');
+            const text = document.getElementById('text-edit-document');
+            let pollTimer = null;
+            let fallbackTimer = null;
+            let timerSeconds = 0;
+            let counterInterval = null;
+            
+            function unlockButton() {
+                if (btn) {
+                    btn.classList.remove('pointer-events-none', 'opacity-50');
+                    if (spinner) spinner.classList.add('hidden');
+                    if (icon) icon.classList.remove('hidden');
+                    if (text) text.textContent = '{{ __('Edit Dokumen') }}';
+                }
+                
+                if (pollTimer) clearTimeout(pollTimer);
+                if (fallbackTimer) clearTimeout(fallbackTimer);
+                if (counterInterval) clearInterval(counterInterval);
+
+                const url = new URL(window.location);
+                url.searchParams.delete('saving');
+                window.location.replace(url.toString());
+            }
+
+            function pollStatus() {
+                fetch("{{ route('documents.onlyoffice-status', $document) }}")
+                    .then(r => r.json())
+                    .then(data => {
+                        // Safe to edit if NO active session OR the document was successfully updated
+                        const isSafe = (!data.active) || (data.updated_at != initialUpdatedAt);
+                        if (isSafe) {
+                            unlockButton();
+                        } else {
+                            pollTimer = setTimeout(pollStatus, 2000);
+                        }
+                    })
+                    .catch(() => {
+                        pollTimer = setTimeout(pollStatus, 2000);
+                    });
+            }
+            
+            pollStatus();
+            
+            if (text) {
+                counterInterval = setInterval(() => {
+                    timerSeconds++;
+                    text.textContent = '{{ __('Menyimpan...') }} (' + timerSeconds + 's)';
+                }, 1000);
+            }
+            
+            // Fallback unlock after 45 seconds just in case network fails
+            fallbackTimer = setTimeout(unlockButton, 45000);
+        });
+        @endif
+    </script>
 </x-app-layout>

@@ -31,10 +31,23 @@ class DocumentController extends Controller
     {
         $user = auth()->user();
 
+        // If director accesses index without type specified or generally, redirect to director browsing view
+        if ($user->isDirector() && !$request->has('type')) {
+            return redirect()->route('director.documents.index');
+        }
+
         // Tab selection: general | mine | division
         $type = $request->get('type', 'general');
 
-        $query = Document::with('owner', 'division', 'currentVersion', 'versions');
+        $query = Document::with('owner', 'division', 'company', 'branch', 'currentVersion', 'versions');
+
+        $contextService = app(\App\Services\CompanyContextService::class);
+        $activeBranchId = $contextService->getActiveBranchId($user);
+
+        // Apply active branch filtering if not admin looking at global
+        if ($activeBranchId && !$user->isAdmin() && !$user->isDirector()) {
+            $query->where('branch_id', $activeBranchId);
+        }
 
         if ($type === 'general') {
             // General (public) — visible to everyone.
@@ -79,18 +92,13 @@ class DocumentController extends Controller
         }
 
         $documents = $query->latest()->paginate(15)->withQueryString();
-
-        $divisions = $user->isAdmin()
-            ? Division::all()
-            : Division::whereIn('id', $user->allDivisionIds())->get();
-
         $documentTypes = DocumentType::orderBy('name')->get();
 
         $view = match ($type) {
-            'general' => 'documents.general',
             'mine' => 'documents.mine',
+            'division' => 'documents.division',
             'shared' => 'documents.shared_index',
-            default => 'documents.division',
+            default => 'documents.general',
         };
 
         return view($view, compact('documents', 'documentTypes', 'type'));
@@ -98,30 +106,40 @@ class DocumentController extends Controller
 
     public function create(): View
     {
-        $divisions = auth()->user()->isAdmin()
+        $user = auth()->user();
+        $divisions = $user->isAdmin()
             ? Division::all()
-            : Division::whereIn('id', auth()->user()->allDivisionIds())->get();
-             $documentTypes = DocumentType::all(); 
-        return view('documents.create', compact('divisions','documentTypes'));
+            : Division::whereIn('id', $user->allDivisionIds())->get();
+        $documentTypes = DocumentType::all();
+
+        $contextService = app(\App\Services\CompanyContextService::class);
+        $activeBranchId = $contextService->getActiveBranchId($user);
+        $activeBranch = $activeBranchId ? \App\Models\Branch::with('company')->find($activeBranchId) : null;
+        $availableBranches = $contextService->getAvailableBranches($user);
+
+        return view('documents.create', compact('divisions', 'documentTypes', 'activeBranch', 'availableBranches'));
     }
 
     /**
-     * Preview nomor dokumen berikutnya untuk tipe dokumen tertentu, di
-     * divisi milik user yang sedang login. Murni indikatif — nomor final
-     * dihitung ulang (dengan lock) saat form benar-benar disubmit.
+     * Preview nomor dokumen berikutnya untuk tipe dokumen tertentu.
      */
     public function nextNumber(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'document_type_id' => 'required|exists:document_types,id',
+            'branch_id' => 'nullable|exists:branches,id',
         ]);
 
         $user = auth()->user();
         $division = $user->division_id ? Division::find($user->division_id) : null;
         $documentType = DocumentType::findOrFail($validated['document_type_id']);
 
+        $contextService = app(\App\Services\CompanyContextService::class);
+        $branchId = $validated['branch_id'] ?? $contextService->getActiveBranchId($user);
+        $branch = $branchId ? \App\Models\Branch::with('company')->find($branchId) : null;
+
         return response()->json([
-            'number' => $this->documentService->previewNumber($division, $documentType),
+            'number' => $this->documentService->previewNumber($division, $documentType, $branch),
         ]);
     }
 
@@ -135,6 +153,8 @@ class DocumentController extends Controller
         $rules = [
             'title' => 'required|string|max:255',
             'document_type_id' => 'required|exists:document_types,id',
+            'branch_id' => 'nullable|exists:branches,id',
+            'expiration_date' => 'nullable|date',
         ];
 
         if ($isUpload) {
@@ -155,6 +175,15 @@ class DocumentController extends Controller
 
         $validated['division_id'] = $user->division_id;
         $validated['visibility'] = Document::VISIBILITY_DIVISION;
+        $validated['expiration_date'] = $validated['expiration_date'] ?? null;
+
+        $contextService = app(\App\Services\CompanyContextService::class);
+        $branchId = $validated['branch_id'] ?? $contextService->getActiveBranchId($user);
+        if ($branchId) {
+            $branch = \App\Models\Branch::find($branchId);
+            $validated['branch_id'] = $branchId;
+            $validated['company_id'] = $branch?->company_id;
+        }
 
         if ($isUpload) {
             $doc = $this->documentService->createFromUpload($validated, $user->id, $request->file('file'));
@@ -184,7 +213,18 @@ class DocumentController extends Controller
             ? Division::all()
             : Division::whereIn('id', auth()->user()->allDivisionIds())->get();
 
-        return view('documents.show', compact('document', 'divisions'));
+        $version = $document->displayVersion();
+        $onlyOfficeConfig = null;
+        if ($version) {
+            $onlyOfficeConfig = $this->onlyOfficeService->generateEditorConfig(
+                $document,
+                $version,
+                auth()->user(),
+                'view'
+            );
+        }
+
+        return view('documents.show', compact('document', 'divisions', 'onlyOfficeConfig', 'version'));
     }
 
     /**
@@ -243,6 +283,20 @@ class DocumentController extends Controller
         ]);
     }
 
+    /**
+     * Poll ONLYOFFICE editor state (active session or compilation state)
+     */
+    public function onlyofficeStatus(Document $document): JsonResponse
+    {
+        $this->authorize('view', $document);
+        $version = $document->displayVersion();
+
+        return response()->json([
+            'active' => \Illuminate\Support\Facades\Cache::has('onlyoffice_active_' . $document->id),
+            'updated_at' => $version?->updated_at?->timestamp,
+        ]);
+    }
+
     public function edit(Document $document): View
     {
         $this->authorize('update', $document);
@@ -262,7 +316,24 @@ class DocumentController extends Controller
             'edit'
         );
 
-        return view('documents.edit', compact('document', 'version', 'onlyOfficeConfig'));
+        $qrCodeDataUri = $this->qrCodeService->dataUri($this->qrCodeService->qrcodeUrl($document));
+        $currentUser = auth()->user();
+        $internalBase = rtrim(config('onlyoffice.internal_url'), '/');
+        $userSignatureUrl = ($currentUser->hasSignature() && $currentUser->signature?->file_path)
+            ? $internalBase . Storage::disk('public')->url($currentUser->signature->file_path)
+            : null;
+        $userSignatureDataUri = ($currentUser->hasSignature() && $currentUser->signature?->file_path && Storage::disk('public')->exists($currentUser->signature->file_path))
+            ? 'data:image/png;base64,' . base64_encode(Storage::disk('public')->get($currentUser->signature->file_path))
+            : null;
+
+        return view('documents.edit', compact(
+            'document',
+            'version',
+            'onlyOfficeConfig',
+            'qrCodeDataUri',
+            'userSignatureUrl',
+            'userSignatureDataUri'
+        ));
     }
 
     public function preview(Document $document): View

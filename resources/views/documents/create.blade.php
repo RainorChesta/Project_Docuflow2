@@ -90,6 +90,27 @@
                         </div>
 
                         <div class="form-control w-full mb-4">
+                            <label for="branch_id" class="label">
+                                <span class="label-text font-medium">{{ __('Cabang (Branch)') }}</span>
+                            </label>
+                            @if(auth()->user()->isAdmin())
+                                <select name="branch_id" id="branch_id" class="select select-bordered w-full" required>
+                                    @foreach($availableBranches as $branch)
+                                        <option value="{{ $branch->id }}" {{ (old('branch_id', $activeBranch?->id) == $branch->id) ? 'selected' : '' }}>
+                                            {{ $branch->company?->name }} — {{ $branch->name }} @if($branch->is_pusat)(Pusat - {{ $branch->effective_code }})@else({{ $branch->code }})@endif
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <p class="text-xs text-base-content/50 mt-1">{{ __('Kode cabang akan masuk ke struktur penomoran dokumen.') }}</p>
+                            @else
+                                <input type="text" value="{{ $activeBranch ? $activeBranch->company?->name . ' — ' . $activeBranch->name . ' (' . $activeBranch->effective_code . ')' : '—' }}" class="input input-bordered w-full bg-base-200" disabled>
+                                <input type="hidden" name="branch_id" id="branch_id" value="{{ $activeBranch?->id }}">
+                                <p class="text-xs text-base-content/50 mt-1">{{ __('Sesuai cabang aktif yang dipilih di switcher atas.') }}</p>
+                            @endif
+                            @error('branch_id') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div class="form-control w-full mb-4">
                             <label for="title" class="label">
                                 <span class="label-text font-medium">{{ __('Judul') }}</span>
                             </label>
@@ -121,6 +142,71 @@
                         </div>
 
                         <div class="divider"></div>
+
+                        <div class="bg-base-200/50 p-4 rounded-xl border border-base-300 mb-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <label class="font-medium text-sm text-base-content flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                    {{ __('Masa Berlaku & Tanggal Kedaluwarsa (Opsional)') }}
+                                </label>
+                                <button type="button" id="btn-clear-expiration" class="btn btn-ghost btn-xs text-base-content/60 hover:text-error">
+                                    {{ __('Reset') }}
+                                </button>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <!-- Input Hari -->
+                                <div class="form-control w-full">
+                                    <label for="expiration_days" class="label py-1">
+                                        <span class="label-text text-xs font-medium text-base-content/70">{{ __('Masa Berlaku (Hari)') }}</span>
+                                    </label>
+                                    <div class="relative">
+                                        <input type="number" id="expiration_days" min="1" step="1"
+                                               placeholder="{{ __('Contoh: 30') }}"
+                                               class="input input-bordered w-full pr-14">
+                                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-base-content/50 pointer-events-none">
+                                            {{ __('Hari') }}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Input Tanggal -->
+                                <div class="form-control w-full">
+                                    <label for="expiration_date" class="label py-1">
+                                        <span class="label-text text-xs font-medium text-base-content/70">{{ __('Tanggal Kedaluwarsa') }}</span>
+                                    </label>
+                                    <input type="date" name="expiration_date" id="expiration_date"
+                                           value="{{ old('expiration_date') }}"
+                                           min="{{ date('Y-m-d') }}"
+                                           class="input input-bordered w-full">
+                                </div>
+                            </div>
+
+                            <!-- Quick Presets -->
+                            <div class="flex flex-wrap items-center gap-1.5 mt-3">
+                                <span class="text-xs text-base-content/60 mr-1">{{ __('Pintasan:') }}</span>
+                                <button type="button" class="btn btn-xs btn-outline btn-primary rounded-full font-normal expiration-preset-btn" data-days="30">+30 Hari</button>
+                                <button type="button" class="btn btn-xs btn-outline btn-primary rounded-full font-normal expiration-preset-btn" data-days="90">+90 Hari (3 Bln)</button>
+                                <button type="button" class="btn btn-xs btn-outline btn-primary rounded-full font-normal expiration-preset-btn" data-days="180">+180 Hari (6 Bln)</button>
+                                <button type="button" class="btn btn-xs btn-outline btn-primary rounded-full font-normal expiration-preset-btn" data-days="365">+1 Tahun</button>
+                                <button type="button" class="btn btn-xs btn-outline btn-primary rounded-full font-normal expiration-preset-btn" data-days="730">+2 Tahun</button>
+                            </div>
+
+                            <!-- Info / Display Result -->
+                            <div id="expiration_info_display" class="text-xs font-medium text-primary mt-2.5 hidden flex items-center gap-1.5">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span id="expiration_info_text"></span>
+                            </div>
+
+                            <p class="text-xs text-base-content/50 mt-2">
+                                {{ __('Jika dikosongkan, dokumen akan otomatis kedaluwarsa sesuai masa retensi default yang diatur admin.') }}
+                            </p>
+                            @error('expiration_date') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
+                        </div>
 
                         <div class="form-control mb-2">
                             <label class="label cursor-pointer justify-start gap-3">
@@ -167,6 +253,8 @@
 
             var lastPreview = numberField.value;
 
+            var branchSelect = document.getElementById('branch_id');
+
             function fetchPreview() {
                 var typeId = typeSelect.value;
                 if (!typeId) {
@@ -175,7 +263,13 @@
                     return;
                 }
 
-                fetch('{{ route('documents.next-number') }}?document_type_id=' + encodeURIComponent(typeId), {
+                var branchId = branchSelect ? branchSelect.value : '';
+                var url = '{{ route('documents.next-number') }}?document_type_id=' + encodeURIComponent(typeId);
+                if (branchId) {
+                    url += '&branch_id=' + encodeURIComponent(branchId);
+                }
+
+                fetch(url, {
                     headers: { 'Accept': 'application/json' }
                 })
                     .then(function (res) { return res.json(); })
@@ -207,6 +301,9 @@
             }
 
             typeSelect.addEventListener('change', fetchPreview);
+            if (branchSelect) {
+                branchSelect.addEventListener('change', fetchPreview);
+            }
 
             uploadCheckbox.addEventListener('change', function () {
                 if (uploadCheckbox.checked) {
@@ -228,6 +325,116 @@
             }
             if (uploadCheckbox.checked) {
                 uploadField.classList.remove('hidden');
+            }
+
+            // Expiration bidirectional synchronization
+            var expirationDateInput = document.getElementById('expiration_date');
+            var expirationDaysInput = document.getElementById('expiration_days');
+            var expirationInfoDisplay = document.getElementById('expiration_info_display');
+            var expirationInfoText = document.getElementById('expiration_info_text');
+            var clearExpirationBtn = document.getElementById('btn-clear-expiration');
+            var presetButtons = document.querySelectorAll('.expiration-preset-btn');
+
+            function getTodayDate() {
+                var now = new Date();
+                return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            }
+
+            function formatDateString(d) {
+                var year = d.getFullYear();
+                var month = String(d.getMonth() + 1).padStart(2, '0');
+                var day = String(d.getDate()).padStart(2, '0');
+                return year + '-' + month + '-' + day;
+            }
+
+            function updateDisplayInfo(targetDate, daysCount) {
+                if (!targetDate) {
+                    expirationInfoDisplay.classList.add('hidden');
+                    expirationInfoText.textContent = '';
+                    return;
+                }
+
+                var locale = '{{ app()->getLocale() }}';
+                var dayFormatter = new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+                var formattedReadable = dayFormatter.format(targetDate);
+
+                var daysText = daysCount !== undefined ? daysCount : Math.round((targetDate.getTime() - getTodayDate().getTime()) / (1000 * 60 * 60 * 24));
+                
+                if (daysText === 0) {
+                    expirationInfoText.textContent = @json(__('Kedaluwarsa hari ini: ')) + formattedReadable;
+                } else if (daysText > 0) {
+                    expirationInfoText.textContent = @json(__('Kedaluwarsa pada: ')) + formattedReadable + ' (' + daysText + ' ' + @json(__('hari lagi')) + ')';
+                } else {
+                    expirationInfoText.textContent = @json(__('Kedaluwarsa pada: ')) + formattedReadable + ' (' + Math.abs(daysText) + ' ' + @json(__('hari lalu')) + ')';
+                }
+                expirationInfoDisplay.classList.remove('hidden');
+            }
+
+            function onDaysChanged() {
+                var daysVal = parseInt(expirationDaysInput.value, 10);
+                if (isNaN(daysVal) || daysVal <= 0) {
+                    expirationDateInput.value = '';
+                    updateDisplayInfo(null);
+                    return;
+                }
+
+                var today = getTodayDate();
+                var targetDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + daysVal);
+                expirationDateInput.value = formatDateString(targetDate);
+                updateDisplayInfo(targetDate, daysVal);
+            }
+
+            function onDateChanged() {
+                var dateVal = expirationDateInput.value;
+                if (!dateVal) {
+                    expirationDaysInput.value = '';
+                    updateDisplayInfo(null);
+                    return;
+                }
+
+                var parts = dateVal.split('-');
+                if (parts.length === 3) {
+                    var selectedDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+                    var today = getTodayDate();
+                    var diffMs = selectedDate.getTime() - today.getTime();
+                    var diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+                    if (diffDays > 0) {
+                        expirationDaysInput.value = diffDays;
+                    } else {
+                        expirationDaysInput.value = '';
+                    }
+                    updateDisplayInfo(selectedDate, diffDays);
+                }
+            }
+
+            function clearExpiration() {
+                expirationDaysInput.value = '';
+                expirationDateInput.value = '';
+                updateDisplayInfo(null);
+            }
+
+            expirationDaysInput.addEventListener('input', onDaysChanged);
+            expirationDateInput.addEventListener('change', onDateChanged);
+            expirationDateInput.addEventListener('input', onDateChanged);
+
+            if (clearExpirationBtn) {
+                clearExpirationBtn.addEventListener('click', clearExpiration);
+            }
+
+            presetButtons.forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var days = parseInt(this.getAttribute('data-days'), 10);
+                    if (days > 0) {
+                        expirationDaysInput.value = days;
+                        onDaysChanged();
+                    }
+                });
+            });
+
+            // Initialize on load if expiration_date is already present (e.g. from old input)
+            if (expirationDateInput.value) {
+                onDateChanged();
             }
         })();
     </script>

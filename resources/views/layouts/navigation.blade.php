@@ -7,7 +7,7 @@
 <aside class="bg-base-100 border-r border-base-300 flex flex-col shrink-0
               {{-- Mobile: off-canvas drawer --}}
               fixed inset-y-0 left-0 z-50 -translate-x-full lg:static lg:translate-x-0
-              lg:sticky lg:top-0 lg:h-screen
+              h-full
               overflow-hidden transition-[width,transform] duration-300 ease-in-out"
        :class="open ? 'translate-x-0 w-60 max-w-[85vw]' : '-translate-x-full lg:translate-x-0 lg:w-[72px]'">
     <!-- Logo -->
@@ -124,8 +124,33 @@
                   {{ request()->routeIs('approvals.*') ? 'nav-item-active bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0'"
            :title="open ? '' : '{{ __('Persetujuan') }}'">
-            <svg xmlns="http://www.w3.org/2000/svg" class="nav-item-icon h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Persetujuan') }}</span>
+            <div class="relative shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="nav-item-icon h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                @php($pendingApprovalCount = auth()->user()->pendingApprovalsCount())
+                @if($pendingApprovalCount > 0)
+                    <span class="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-error"></span>
+                    </span>
+                @endif
+            </div>
+            <span class="whitespace-nowrap flex-1 flex items-center justify-between" :class="open ? '' : 'lg:hidden'">
+                <span>{{ __('Persetujuan') }}</span>
+                @if($pendingApprovalCount > 0)
+                    <span class="badge badge-error badge-xs font-bold text-white px-1.5">{{ $pendingApprovalCount }}</span>
+                @endif
+            </span>
+        </a>
+        @endif
+
+        @if(auth()->user()->isDirector())
+        <a href="{{ route('director.documents.index') }}"
+           class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                  {{ request()->routeIs('director.documents.*') ? 'nav-item-active bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"
+           :class="open ? '' : 'lg:justify-center lg:px-0'"
+           :title="open ? '' : '{{ __('Semua Dokumen PT & Cabang') }}'">
+            <svg xmlns="http://www.w3.org/2000/svg" class="nav-item-icon h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Semua Dokumen (Direktur)') }}</span>
         </a>
         @endif
 
@@ -143,6 +168,24 @@
         @can('admin')
         <span class="nav-section-label px-3 pt-5 pb-1.5 text-xs font-semibold text-base-content/40 uppercase tracking-wider whitespace-nowrap"
               :class="open ? '' : 'lg:hidden'">{{ __('Administrasi') }}</span>
+
+        <a href="{{ route('admin.companies.index') }}"
+           class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                  {{ request()->routeIs('admin.companies.*') ? 'nav-item-active bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"
+           :class="open ? '' : 'lg:justify-center lg:px-0'"
+           :title="open ? '' : '{{ __('Perusahaan') }}'">
+            <svg xmlns="http://www.w3.org/2000/svg" class="nav-item-icon h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Perusahaan') }}</span>
+        </a>
+
+        <a href="{{ route('admin.branches.index') }}"
+           class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                  {{ request()->routeIs('admin.branches.*') ? 'nav-item-active bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"
+           :class="open ? '' : 'lg:justify-center lg:px-0'"
+           :title="open ? '' : '{{ __('Cabang') }}'">
+            <svg xmlns="http://www.w3.org/2000/svg" class="nav-item-icon h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" /></svg>
+            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Cabang') }}</span>
+        </a>
 
         <a href="{{ route('signatures.requests.index') }}"
            class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
@@ -172,7 +215,7 @@
                   {{ request()->routeIs('admin.divisions.*') ? 'nav-item-active bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0'"
            :title="open ? '' : '{{ __('Divisi') }}'">
-            <svg xmlns="http://www.w3.org/2000/svg" class="nav-item-icon h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" class="nav-item-icon h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
             <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Divisi') }}</span>
         </a>
 

@@ -64,6 +64,12 @@ class OnlyOfficeController extends Controller
         }
 
         $status = (int) ($payload['status'] ?? 0);
+        $cacheKey = 'onlyoffice_active_' . $document->id;
+
+        if ($status === 1) {
+            \Illuminate\Support\Facades\Cache::put($cacheKey, true, now()->addMinutes(10));
+        }
+
 
         // Status 2 = Ready for saving (user closed editor or autosave interval reached)
         // Status 6 = Mustsave / ForceSave
@@ -107,17 +113,34 @@ class OnlyOfficeController extends Controller
                 ]);
 
                 Log::info("Document {$document->id} saved successfully from ONLYOFFICE to v{$version->version_number}.");
-
-                return response()->json(['error' => 0]);
             } catch (\Throwable $e) {
                 Log::error("Exception processing ONLYOFFICE callback: " . $e->getMessage(), [
                     'exception' => $e,
                 ]);
                 return response()->json(['error' => 1, 'message' => $e->getMessage()], 500);
             }
+        } elseif ($status === 4) {
+            // Document closed without changes. We MUST touch the version so the documentKey changes 
+            // for the next session, preventing ONLYOFFICE "Version Changed" cache collisions.
+            $activeVersion = $document->versions()->whereIn('status', ['pending', 'draft'])
+                ->whereNull('discarded_at')
+                ->orderBy('version_number', 'desc')
+                ->first();
+            
+            if ($activeVersion) {
+                $activeVersion->touch();
+            } else {
+                $document->touch();
+            }
+            Log::info("ONLYOFFICE closed without changes for document {$document->id}. Version touched to rotate key.");
         }
 
-        // For other statuses (1 = editing, 3 = saving error, 4 = closed without changes, 7 = corrupt):
+        if (in_array($status, [2, 3, 4, 7], true)) {
+            \Illuminate\Support\Facades\Cache::forget($cacheKey);
+            \Illuminate\Support\Facades\Cache::forget('onlyoffice_doc_key_' . $document->id);
+        }
+
+        // For other statuses (1 = editing, 3 = saving error, 7 = corrupt):
         return response()->json(['error' => 0]);
     }
 }

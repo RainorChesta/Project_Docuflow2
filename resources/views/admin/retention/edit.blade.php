@@ -23,11 +23,27 @@
 
                         <div class="form-control">
                             <label class="label" for="retention_days">
-                                <span class="label-text">Retention period (days)</span>
+                                <span class="label-text">Version Retention Period (days)</span>
                             </label>
                             <input type="number" name="retention_days" id="retention_days"
                                    class="input input-bordered w-full" min="1" max="3650"
                                    value="{{ old('retention_days', $retentionDays) }}" required>
+                        </div>
+                        
+                        <div class="divider"></div>
+                        
+                        <h2 class="card-title text-base mt-4">Document Expiration</h2>
+                        <p class="text-sm text-base-content/60">
+                            Documents without a manually specified expiration date will automatically expire after this many years.
+                        </p>
+                        
+                        <div class="form-control mt-4">
+                            <label class="label" for="document_retention_years">
+                                <span class="label-text">Default Document Retention Period (years)</span>
+                            </label>
+                            <input type="number" name="document_retention_years" id="document_retention_years"
+                                   class="input input-bordered w-full" min="1" max="100"
+                                   value="{{ old('document_retention_years', $documentRetentionYears) }}" required>
                         </div>
 
                         <div class="flex flex-wrap justify-end">

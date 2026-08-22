@@ -56,6 +56,60 @@
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
+                {{-- Quick Actions: QR Code & Signature --}}
+                <button type="button"
+                        onclick="insertQrCodeToEditor()"
+                        class="btn btn-sm btn-outline btn-primary gap-1.5"
+                        title="{{ __('Sisipkan QR Code Verifikasi Dokumen') }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                    </svg>
+                    <span>{{ __('Sisip QR Code') }}</span>
+                </button>
+
+                <div class="dropdown dropdown-end">
+                    <label tabindex="0" class="btn btn-sm btn-outline btn-secondary gap-1.5 cursor-pointer">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                        <span>{{ __('Sisip TTD') }}</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </label>
+                    <ul tabindex="0" class="dropdown-content z-30 menu p-2 shadow-lg bg-base-100 rounded-box w-64 border border-base-300 mt-1">
+                        <li class="menu-title text-xs font-semibold px-2 py-1 text-base-content/60">{{ __('Pilih Tanda Tangan') }}</li>
+                        @if($userSignatureUrl || $userSignatureDataUri)
+                            <li>
+                                <button type="button" onclick="insertMySignature()" class="flex items-center justify-between text-sm py-2">
+                                    <span class="font-medium text-primary">{{ __('Tanda Tangan Saya') }}</span>
+                                    <span class="badge badge-primary badge-xs">{{ __('Tersimpan') }}</span>
+                                </button>
+                            </li>
+                        @else
+                            <li>
+                                <a href="{{ route('profile.signature.show') }}" class="text-xs text-warning flex items-center gap-1.5 py-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    <span>{{ __('Buat TTD Saya di Profil') }}</span>
+                                </a>
+                            </li>
+                        @endif
+                        <div class="divider my-1"></div>
+                        <li>
+                            <button type="button" onclick="openSignatureSelectorModal()" class="text-xs text-base-content/80 flex items-center gap-1.5">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                                <span>{{ __('Pilih Pengguna Lain...') }}</span>
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="h-4 w-px bg-base-300 mx-1 hidden sm:block"></div>
+
                 <a href="{{ route('documents.download', $document) }}" class="btn btn-ghost btn-sm">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -96,12 +150,16 @@
                     @endcan
                 @endif
 
-                <a href="{{ route('documents.show', $document) }}" class="btn btn-primary btn-sm px-5">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <button type="button"
+                        id="btn-selesai-edit"
+                        onclick="finishEditingDocument()"
+                        class="btn btn-primary btn-sm px-5 gap-2">
+                    <svg id="icon-selesai-edit" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                     </svg>
-                    {{ __('Selesai Edit') }}
-                </a>
+                    <span id="spinner-selesai-edit" class="loading loading-spinner loading-xs hidden"></span>
+                    <span id="text-selesai-edit">{{ __('Selesai Edit') }}</span>
+                </button>
             </div>
         </div>
 
@@ -137,10 +195,31 @@
 
     </div>
 
+    {{-- Signature User Selector Modal --}}
+    <dialog id="signature-users-modal" class="modal">
+        <div class="modal-box max-w-md">
+            <h3 class="font-bold text-base mb-3">{{ __('Pilih Tanda Tangan Pengguna') }}</h3>
+            <div id="signature-users-list" class="space-y-2 max-h-64 overflow-y-auto pr-1">
+                <div class="flex justify-center py-6 text-sm text-base-content/60">
+                    <span class="loading loading-spinner loading-sm mr-2"></span> {{ __('Memuat pengguna...') }}
+                </div>
+            </div>
+            <div class="modal-action">
+                <form method="dialog">
+                    <button class="btn btn-ghost btn-sm">{{ __('Tutup') }}</button>
+                </form>
+            </div>
+        </div>
+    </dialog>
+
     @push('scripts')
         <script src="{{ rtrim(config('onlyoffice.url'), '/') }}/web-apps/apps/api/documents/api.js"
                 onerror="document.getElementById('onlyoffice-fallback').classList.remove('hidden');"></script>
         <script>
+            const qrCodeDataUri = @json($qrCodeDataUri);
+            const mySignatureDataUri = @json($userSignatureDataUri ?? null);
+            const mySignatureUrl = @json($userSignatureUrl ?? null);
+
             document.addEventListener('DOMContentLoaded', function() {
                 if (typeof DocsAPI === 'undefined') {
                     document.getElementById('onlyoffice-fallback')?.classList.remove('hidden');
@@ -149,12 +228,175 @@
 
                 try {
                     const config = @json($onlyOfficeConfig);
+                    
+                    config.events = config.events || {};
+                    config.events.onAppReady = function() {
+                        console.log('ONLYOFFICE editor ready');
+                    };
+                    config.events.onDocumentStateChange = function(event) {
+                        const isModified = event.data;
+                        
+                        if (typeof window.setNavigationDirty === 'function') {
+                            window.setNavigationDirty(isModified);
+                        }
+                        
+                        const btnSelesai = document.getElementById('btn-selesai-edit');
+                        const textSelesai = document.getElementById('text-selesai-edit');
+                        
+                        if (btnSelesai && textSelesai) {
+                            if (isModified) {
+                                btnSelesai.disabled = true;
+                                btnSelesai.classList.remove('btn-primary');
+                                btnSelesai.classList.add('btn-disabled');
+                                textSelesai.textContent = "{{ __('Belum Disimpan') }}";
+                            } else {
+                                btnSelesai.disabled = false;
+                                btnSelesai.classList.remove('btn-disabled');
+                                btnSelesai.classList.add('btn-primary');
+                                textSelesai.textContent = "{{ __('Selesai Edit') }}";
+                            }
+                        }
+                    };
+                    config.events.onError = function(event) {
+                        console.error('ONLYOFFICE error event:', event);
+                    };
+
                     window.docEditor = new DocsAPI.DocEditor("onlyoffice-editor-container", config);
                 } catch (e) {
                     console.error('ONLYOFFICE initialization error:', e);
                     document.getElementById('onlyoffice-fallback')?.classList.remove('hidden');
                 }
             });
+
+            /**
+             * Insert image directly into ONLYOFFICE document editor via DocsAPI Asc.scope
+             */
+            function insertImageIntoOnlyOffice(imageUrl, widthPx = 150, heightPx = 150) {
+                if (!window.docEditor) {
+                    alert('Editor belum selesai dimuat. Tunggu sebentar...');
+                    return;
+                }
+
+                try {
+                    window.docEditor.insertImage({
+                        fileType: "png",
+                        url: imageUrl,
+                        width: widthPx,
+                        height: heightPx
+                    });
+                } catch (err) {
+                    console.warn('insertImage error:', err);
+                    alert('Tidak dapat menyisipkan gambar secara otomatis. Silakan gunakan menu Insert -> Picture pada toolbar ONLYOFFICE.');
+                }
+            }
+
+            function insertQrCodeToEditor() {
+                if (!qrCodeDataUri) {
+                    alert('QR Code dokumen tidak tersedia.');
+                    return;
+                }
+                insertImageIntoOnlyOffice(qrCodeDataUri, 140, 140);
+            }
+
+            function insertMySignature() {
+                const sig = mySignatureUrl || mySignatureDataUri;
+                if (!sig) {
+                    alert('Anda belum memiliki tanda tangan tersimpan.');
+                    return;
+                }
+                insertImageIntoOnlyOffice(sig, 160, 80);
+            }
+
+            function insertSignatureImage(signatureUrl, userName) {
+                if (!signatureUrl) {
+                    alert('Pengguna ' + userName + ' belum memiliki tanda tangan tersimpan.');
+                    return;
+                }
+                insertImageIntoOnlyOffice(signatureUrl, 160, 80);
+            }
+
+            function openSignatureSelectorModal() {
+                const modal = document.getElementById('signature-users-modal');
+                const list = document.getElementById('signature-users-list');
+                modal.showModal();
+
+                fetch('{{ route("signatures.users") }}')
+                    .then(res => res.json())
+                    .then(data => {
+                        const users = data.users || [];
+                        if (users.length === 0) {
+                            list.innerHTML = '<p class="text-sm text-base-content/60 text-center py-4">{{ __("Tidak ada pengguna ditemukan.") }}</p>';
+                            return;
+                        }
+
+                        list.innerHTML = users.map(u => `
+                            <div class="flex items-center justify-between p-2 rounded-lg border border-base-200 hover:bg-base-200/50 transition-colors">
+                                <div>
+                                    <p class="text-sm font-medium leading-none mb-1">${u.name} ${u.is_me ? '<span class="badge badge-primary badge-xs">Saya</span>' : ''}</p>
+                                    <p class="text-xs text-base-content/60">${u.role} &bull; ${u.division}</p>
+                                </div>
+                                <div>
+                                    ${u.has_signature 
+                                        ? `<button type="button" onclick="fetchUserSignatureAndInsert(${u.id}, '${u.name}')" class="btn btn-xs btn-primary">{{ __('Sisipkan') }}</button>`
+                                        : `<span class="text-xs text-base-content/40 italic">{{ __('Belum ada TTD') }}</span>`
+                                    }
+                                </div>
+                            </div>
+                        `).join('');
+                    })
+                    .catch(err => {
+                        list.innerHTML = '<p class="text-sm text-error text-center py-4">{{ __("Gagal memuat pengguna.") }}</p>';
+                    });
+            }
+
+            function fetchUserSignatureAndInsert(userId, userName) {
+                document.getElementById('signature-users-modal').close();
+                fetch(`/profile/signature?user_id=${userId}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        const targetUrl = data.url || data.data_uri;
+                        if (data.success && targetUrl) {
+                            insertSignatureImage(targetUrl, userName);
+                        } else {
+                            alert('Tanda tangan untuk ' + userName + ' tidak ditemukan.');
+                        }
+                    })
+                    .catch(() => {
+                        alert('Gagal mengambil data tanda tangan.');
+                    });
+            }
+
+            /**
+             * "Selesai Edit" action: saves document changes from ONLYOFFICE and redirects to show page.
+             */
+            function finishEditingDocument() {
+                if (typeof window.allowIntentionalLeave === 'function') {
+                    window.allowIntentionalLeave();
+                }
+
+                const btn = document.getElementById('btn-selesai-edit');
+                const spinner = document.getElementById('spinner-selesai-edit');
+                const icon = document.getElementById('icon-selesai-edit');
+                const text = document.getElementById('text-selesai-edit');
+                const targetUrl = "{{ route('documents.show', ['document' => $document->id, 'saving' => 1]) }}";
+
+                if (btn) btn.disabled = true;
+                if (icon) icon.classList.add('hidden');
+                if (spinner) spinner.classList.remove('hidden');
+                if (text) text.textContent = "{{ __('Menyimpan...') }}";
+
+                if (window.docEditor) {
+                    try {
+                        window.docEditor.destroyEditor();
+                    } catch (e) {
+                        console.warn('destroyEditor error:', e);
+                    }
+                }
+
+                setTimeout(() => {
+                    window.location.href = targetUrl;
+                }, 1000);
+            }
         </script>
     @endpush
 

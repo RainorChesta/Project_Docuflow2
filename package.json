@@ -4,7 +4,8 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "dev": "vite",
+        "dev:all": "concurrently -k -p \"[{name}]\" -n \"PHP,VITE\" -c \"blue.bold,magenta.bold\" \"php artisan serve --host=0.0.0.0 --port=8000\" \"vite\""
     },
     "devDependencies": {
         "@tailwindcss/typography": "^0.5.20",

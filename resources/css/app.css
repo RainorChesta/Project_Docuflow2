@@ -64,6 +64,10 @@
     --color-error: oklch(0.65 0.18 25);
     --color-error-content: oklch(0.15 0.04 25);
   }
+
+  html, body {
+    height: 100%;
+  }
 }
 
 /* Override DaisyUI theme :root — unlayered beats layered, so custom

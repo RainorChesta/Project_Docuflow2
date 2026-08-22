@@ -11,22 +11,43 @@ class Document extends Model
 {
     protected $fillable = [
         'document_number', 'title', 'summary', 'summary_status', 'summary_error',
-        'summary_started_at', 'summary_completed_at', 'visibility', 'division_id', 'owner_id',
+        'summary_started_at', 'summary_completed_at', 'visibility', 'division_id', 'company_id', 'branch_id', 'owner_id',
         'document_type_id', 'is_public', 'current_version_id',
         'pending_rollback_version_id', 'rollback_requested_by_id', 'rollback_requested_at',
         'paper_size', 'paper_margin',
         'general_access', 'link_role', 'share_token',
+        'expiration_date', 'is_expired', 'is_expiration_notified', 'expiration_notif_status',
     ];
 
     protected function casts(): array
     {
         return [
             'is_public' => 'boolean',
+            'is_expired' => 'boolean',
             'rollback_requested_at' => 'datetime',
             'summary_started_at' => 'datetime',
             'summary_completed_at' => 'datetime',
+            'expiration_date' => 'date',
             'paper_margin' => 'array',
         ];
+    }
+
+    /**
+     * Get the effective expiration date.
+     * Uses manual expiration_date if set, otherwise calculates from created_at + default_retention_years.
+     */
+    protected function expiresAt(): \Illuminate\Database\Eloquent\Casts\Attribute
+    {
+        return \Illuminate\Database\Eloquent\Casts\Attribute::make(
+            get: function () {
+                if ($this->expiration_date) {
+                    return $this->expiration_date;
+                }
+                
+                $retentionYears = (int) Setting::get('document_retention_years', config('app.document_retention_years', 2));
+                return $this->created_at ? $this->created_at->copy()->addYears($retentionYears) : null;
+            }
+        );
     }
 
     public const SUMMARY_PENDING = 'pending';
@@ -61,6 +82,16 @@ class Document extends Model
     public function division(): BelongsTo
     {
         return $this->belongsTo(Division::class);
+    }
+
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
     }
 
     public function documentType(): BelongsTo

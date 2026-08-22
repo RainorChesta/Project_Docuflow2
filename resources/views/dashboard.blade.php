@@ -122,7 +122,29 @@
                             </div>
                             <div class="stat-desc text-xs text-base-content/40 mt-1">{{ __('Menunggu review kepala') }}</div>
                         </div>
+                        
+                        <!-- Expiring Documents Stat -->
+                        @if(isset($expiringDocuments) && $expiringDocuments->count() > 0)
+                            <div class="stat bg-base-100 border border-warning/50 rounded-box p-4 cursor-pointer hover:bg-base-200 transition-colors" onclick="document.getElementById('expiring-modal').showModal()" title="{{ __('Lihat Daftar Dokumen') }}">
+                                <div class="stat-title text-base-content/50 text-xs font-medium flex items-center gap-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    {{ __('Hampir Kedaluwarsa') }}
+                                </div>
+                                <div class="stat-value text-2xl font-bold text-warning mt-1 flex justify-between items-end">
+                                    <span>{{ $expiringDocuments->count() }}</span>
+                                </div>
+                                <div class="stat-desc text-xs text-base-content/40 mt-1 flex items-center gap-1">
+                                    <span>{{ __('Dalam 30 hari') }}</span>
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 ml-auto text-base-content/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                    </svg>
+                                </div>
+                            </div>
+                        @endif
                     </div>
+
 
                     <!-- Recent Documents -->
                     <div class="bg-base-100 border border-base-300 rounded-box">
@@ -177,5 +199,70 @@
             @endif
         </div>
     </div>
+
+    <!-- Expiring Documents Modal -->
+    @if(isset($expiringDocuments) && $expiringDocuments->count() > 0)
+        <dialog id="expiring-modal" class="modal">
+            <div class="modal-box w-11/12 max-w-3xl">
+                <form method="dialog">
+                    <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+                </form>
+                <h3 class="font-bold text-lg flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    {{ __('Dokumen Segera Kedaluwarsa') }}
+                </h3>
+                <p class="py-4 text-sm text-base-content/70">
+                    {{ __('Berikut adalah daftar dokumen yang akan kedaluwarsa dalam 30 hari ke depan.') }}
+                </p>
+                <div class="overflow-x-auto border border-base-200 rounded-lg">
+                    <table class="table table-sm w-full">
+                        <thead class="bg-base-200/50">
+                            <tr>
+                                <th>{{ __('Nomor & Judul') }}</th>
+                                <th>{{ __('Sisa Waktu') }}</th>
+                                <th>{{ __('Tanggal Kedaluwarsa') }}</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($expiringDocuments as $doc)
+                                @php
+                                    $days = now()->startOfDay()->diffInDays($doc->expires_at->startOfDay(), false);
+                                @endphp
+                                <tr class="hover">
+                                    <td>
+                                        <div class="font-medium text-base-content">{{ $doc->title }}</div>
+                                        <div class="text-xs text-base-content/50">{{ $doc->document_number }}</div>
+                                    </td>
+                                    <td>
+                                        @if($days == 0)
+                                            <span class="badge badge-error badge-sm">{{ __('Hari ini') }}</span>
+                                        @elseif($days == 1)
+                                            <span class="badge badge-error badge-sm">{{ __('Besok') }}</span>
+                                        @elseif($days <= 7)
+                                            <span class="badge badge-warning badge-sm">{{ __(':days hari', ['days' => $days]) }}</span>
+                                        @else
+                                            <span class="badge badge-ghost badge-sm">{{ __(':days hari', ['days' => $days]) }}</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-sm">
+                                        {{ $doc->expires_at->format('d M Y') }}
+                                    </td>
+                                    <td class="text-right">
+                                        <a href="{{ route('documents.show', $doc) }}" class="btn btn-ghost btn-xs">{{ __('Lihat') }}</a>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <form method="dialog" class="modal-backdrop">
+                <button>close</button>
+            </form>
+        </dialog>
+    @endif
 
 </x-app-layout>

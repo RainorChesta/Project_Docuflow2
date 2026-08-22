@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full overflow-hidden print:h-auto print:overflow-visible">
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -19,8 +19,8 @@
         @stack('styles')
         @stack('after-styles')
     </head>
-    <body class="font-sans antialiased bg-base-200 text-base-content print:bg-white">
-        <div class="flex h-screen overflow-hidden print:block print:h-auto print:overflow-visible"
+    <body class="h-full overflow-hidden font-sans antialiased bg-base-200 text-base-content print:bg-white print:h-auto print:overflow-visible">
+        <div class="flex h-full w-full overflow-hidden print:block print:h-auto print:overflow-visible"
              x-data="{
                  open: localStorage.getItem('dokuflow:sidebar') === 'closed' ? false : window.innerWidth >= 1024,
                  toggle() {
@@ -38,7 +38,7 @@
                  localStorage.setItem('dokuflow:sidebar', 'closed');
              }">
             <!-- Left Sidebar -->
-            <div class="print:hidden">
+            <div class="print:hidden h-full flex shrink-0">
                 @include('layouts.navigation')
             </div>
 
@@ -62,6 +62,9 @@
                         @endisset
                     </div>
                     <div class="flex items-center gap-1">
+                        {{-- Company & Branch Switcher --}}
+                        <x-company-branch-switcher />
+
                         {{-- Language Switcher (ID <-> EN) --}}
                         <x-language-toggle />
 
@@ -161,6 +164,8 @@
         </div>
         <x-mandatory-signature-modal />
         <x-search-modal />
+        <x-navigation-guard />
+        <x-toast-notification />
         @stack('scripts')
     </body>
 </html>

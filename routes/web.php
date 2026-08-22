@@ -61,6 +61,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/documents/{document}/preview', [DocumentController::class, 'preview'])->name('documents.preview');
     Route::post('/documents/{document}/summarize', [DocumentController::class, 'summarize'])->name('documents.summarize');
     Route::get('/documents/{document}/summary-status', [DocumentController::class, 'summaryStatus'])->name('documents.summary-status');
+    Route::get('/documents/{document}/onlyoffice-status', [DocumentController::class, 'onlyofficeStatus'])->name('documents.onlyoffice-status');
     Route::get('/documents/{document}/preview-content', [DocumentController::class, 'previewContent'])->name('documents.preview-content');
     Route::get('/documents/{document}/versions/{version}/preview', [DocumentController::class, 'previewVersion'])->name('documents.preview-version');
     Route::get('/documents/{document}/versions/{version}/file', [DocumentController::class, 'file'])->name('documents.file');
@@ -95,8 +96,17 @@ Route::middleware('auth')->group(function () {
     Route::post('/documents/{document}/export-pdf', [DocumentExportController::class, 'export'])
         ->name('documents.export-pdf');
 
+    // Context Switcher (Company & Branch)
+    Route::post('/context/switch', [\App\Http\Controllers\ContextSwitchController::class, 'switch'])->name('context.switch');
+    Route::get('/companies/{company}/branches', [\App\Http\Controllers\ContextSwitchController::class, 'branchesForCompany'])->name('companies.branches');
+
+    // Director Accordion Browsing
+    Route::get('/director/documents', [\App\Http\Controllers\DirectorDocumentController::class, 'index'])->name('director.documents.index');
+
     // Admin
     Route::prefix('admin')->name('admin.')->group(function () {
+        Route::resource('companies', \App\Http\Controllers\Admin\CompanyController::class);
+        Route::resource('branches', \App\Http\Controllers\Admin\BranchController::class);
         Route::resource('divisions', DivisionController::class);
         Route::resource('users', UserController::class);
         Route::get('/retention', [RetentionController::class, 'edit'])->name('retention.edit');

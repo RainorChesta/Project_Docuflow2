@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password', 'division_id', 'system_role', 'is_active', 'profile_picture'])]
+#[Fillable(['name', 'email', 'password', 'division_id', 'system_role', 'is_active', 'profile_picture', 'nip', 'phone_number'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -48,6 +48,22 @@ class User extends Authenticatable
     public function divisions(): BelongsToMany
     {
         return $this->belongsToMany(Division::class)->withTimestamps();
+    }
+
+    /**
+     * Companies assigned to this user.
+     */
+    public function companies(): BelongsToMany
+    {
+        return $this->belongsToMany(Company::class)->withTimestamps();
+    }
+
+    /**
+     * Branches assigned to this user.
+     */
+    public function branches(): BelongsToMany
+    {
+        return $this->belongsToMany(Branch::class)->withTimestamps();
     }
 
     /**
@@ -114,9 +130,40 @@ class User extends Authenticatable
         return $this->system_role === 'admin';
     }
 
+    public function isDirector(): bool
+    {
+        return $this->system_role === 'direktur';
+    }
+
     public function isHead(): bool
     {
         return $this->system_role === 'head';
+    }
+
+    /**
+     * Hitung total approval yang menunggu tindakan pengguna (Head).
+     */
+    public function pendingApprovalsCount(): int
+    {
+        if (!$this->isHead()) {
+            return 0;
+        }
+
+        $divisionIds = $this->allDivisionIds();
+        if (empty($divisionIds)) {
+            return 0;
+        }
+
+        $versionsCount = DocumentVersion::where('status', 'pending')
+            ->whereNull('discarded_at')
+            ->whereHas('document', fn($q) => $q->whereIn('division_id', $divisionIds))
+            ->count();
+
+        $rollbacksCount = Document::whereIn('division_id', $divisionIds)
+            ->whereNotNull('pending_rollback_version_id')
+            ->count();
+
+        return $versionsCount + $rollbacksCount;
     }
 
     protected $with = ['signature'];
