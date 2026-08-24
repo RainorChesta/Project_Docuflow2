@@ -48,3 +48,4 @@ class GroupedDocumentExpiring extends Notification implements ShouldQueue
         ];
     }
 }
+

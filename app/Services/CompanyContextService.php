@@ -21,12 +21,12 @@ class CompanyContextService
         $sessionCompanyId = session('active_company_id');
         if ($sessionCompanyId) {
             // Verify access
-            if ($user->isAdmin() || $user->isDirector() || $user->companies()->where('companies.id', $sessionCompanyId)->exists()) {
+            if ($user->isAdmin() || $user->companies()->where('companies.id', $sessionCompanyId)->exists()) {
                 return (int) $sessionCompanyId;
             }
         }
 
-        // Default: first assigned company or first company in DB if director/admin
+        // Default: first assigned company or first company in DB if admin
         $company = $this->getDefaultCompany($user);
         if ($company) {
             session(['active_company_id' => $company->id]);
@@ -52,7 +52,7 @@ class CompanyContextService
         if ($sessionBranchId) {
             $branch = Branch::find($sessionBranchId);
             if ($branch && (!$companyId || $branch->company_id === $companyId)) {
-                if ($user->isAdmin() || $user->isDirector() || $user->branches()->where('branches.id', $sessionBranchId)->exists()) {
+                if ($user->isAdmin() || $user->branches()->where('branches.id', $sessionBranchId)->exists()) {
                     return (int) $sessionBranchId;
                 }
             }
@@ -77,7 +77,7 @@ class CompanyContextService
             return collect();
         }
 
-        if ($user->isAdmin() || $user->isDirector()) {
+        if ($user->isAdmin()) {
             return Company::orderBy('name')->get();
         }
 
@@ -99,7 +99,7 @@ class CompanyContextService
             return collect();
         }
 
-        if ($user->isAdmin() || $user->isDirector()) {
+        if ($user->isAdmin()) {
             return Branch::where('company_id', $companyId)->orderBy('is_pusat', 'desc')->orderBy('name')->get();
         }
 
@@ -108,7 +108,7 @@ class CompanyContextService
 
     private function getDefaultCompany(User $user): ?Company
     {
-        if ($user->isAdmin() || $user->isDirector()) {
+        if ($user->isAdmin()) {
             return Company::orderBy('name')->first();
         }
 
@@ -121,7 +121,7 @@ class CompanyContextService
             return null;
         }
 
-        if ($user->isAdmin() || $user->isDirector()) {
+        if ($user->isAdmin()) {
             return Branch::where('company_id', $companyId)->orderBy('is_pusat', 'desc')->orderBy('name')->first();
         }
 

@@ -34,6 +34,7 @@ class SignatureRequested extends Notification
             ]),
             'url'      => route('signatures.requests.index'),
             'icon'     => 'signature',
+            'document_id' => $this->document->id
         ];
     }
 
@@ -42,3 +43,5 @@ class SignatureRequested extends Notification
         return $this->toArray($notifiable);
     }
 }
+
+

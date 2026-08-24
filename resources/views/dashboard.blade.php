@@ -105,44 +105,42 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div class="stat bg-base-100 border border-base-300 rounded-box p-4">
                             <div class="stat-title text-base-content/50 text-xs font-medium">{{ __('Total Dokumen') }}</div>
-                            <div class="stat-value text-2xl font-bold text-primary mt-1">{{ auth()->user()->documents()->count() }}</div>
+                            <div class="stat-value text-2xl font-bold text-primary mt-1">{{ $totalDocsCount ?? 0 }}</div>
                             <div class="stat-desc text-xs text-base-content/40 mt-1">{{ __('Sepanjang waktu') }}</div>
                         </div>
                         <div class="stat bg-base-100 border border-base-300 rounded-box p-4">
                             <div class="stat-title text-base-content/50 text-xs font-medium">{{ __('Dokumen Aktif') }}</div>
                             <div class="stat-value text-2xl font-bold text-primary mt-1">
-                                {{ auth()->user()->documents()->whereHas('currentVersion', fn($q) => $q->where('status', 'active'))->count() }}
+                                {{ $activeDocsCount ?? 0 }}
                             </div>
                             <div class="stat-desc text-xs text-base-content/40 mt-1">{{ __('Disetujui & diterbitkan') }}</div>
                         </div>
                         <div class="stat bg-base-100 border border-base-300 rounded-box p-4">
                             <div class="stat-title text-base-content/50 text-xs font-medium">{{ __('Menunggu Persetujuan') }}</div>
                             <div class="stat-value text-2xl font-bold text-primary mt-1">
-                                {{ auth()->user()->documents()->whereHas('versions', fn($q) => $q->where('status', 'pending'))->count() }}
+                                {{ $pendingDocsCount ?? 0 }}
                             </div>
                             <div class="stat-desc text-xs text-base-content/40 mt-1">{{ __('Menunggu review kepala') }}</div>
                         </div>
                         
                         <!-- Expiring Documents Stat -->
-                        @if(isset($expiringDocuments) && $expiringDocuments->count() > 0)
-                            <div class="stat bg-base-100 border border-warning/50 rounded-box p-4 cursor-pointer hover:bg-base-200 transition-colors" onclick="document.getElementById('expiring-modal').showModal()" title="{{ __('Lihat Daftar Dokumen') }}">
-                                <div class="stat-title text-base-content/50 text-xs font-medium flex items-center gap-1">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                    </svg>
-                                    {{ __('Hampir Kedaluwarsa') }}
-                                </div>
-                                <div class="stat-value text-2xl font-bold text-warning mt-1 flex justify-between items-end">
-                                    <span>{{ $expiringDocuments->count() }}</span>
-                                </div>
-                                <div class="stat-desc text-xs text-base-content/40 mt-1 flex items-center gap-1">
-                                    <span>{{ __('Dalam 30 hari') }}</span>
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 ml-auto text-base-content/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                                    </svg>
-                                </div>
+                        <div class="stat bg-base-100 border border-base-300 hover:border-warning/50 rounded-box p-4 cursor-pointer hover:bg-base-200 transition-colors" onclick="document.getElementById('expiring-modal').showModal()" title="{{ __('Lihat Daftar Dokumen') }}">
+                            <div class="stat-title text-base-content/50 text-xs font-medium flex items-center gap-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                                {{ __('Hampir Kedaluwarsa') }}
                             </div>
-                        @endif
+                            <div class="stat-value text-2xl font-bold text-warning mt-1 flex justify-between items-end">
+                                <span>{{ isset($expiringDocuments) ? $expiringDocuments->count() : 0 }}</span>
+                            </div>
+                            <div class="stat-desc text-xs text-base-content/40 mt-1 flex items-center gap-1">
+                                <span>{{ __('Dalam 30 hari') }}</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 ml-auto text-base-content/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                </svg>
+                            </div>
+                        </div>
                     </div>
 
 
@@ -201,21 +199,21 @@
     </div>
 
     <!-- Expiring Documents Modal -->
-    @if(isset($expiringDocuments) && $expiringDocuments->count() > 0)
-        <dialog id="expiring-modal" class="modal">
-            <div class="modal-box w-11/12 max-w-3xl">
-                <form method="dialog">
-                    <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
-                </form>
-                <h3 class="font-bold text-lg flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    {{ __('Dokumen Segera Kedaluwarsa') }}
-                </h3>
-                <p class="py-4 text-sm text-base-content/70">
-                    {{ __('Berikut adalah daftar dokumen yang akan kedaluwarsa dalam 30 hari ke depan.') }}
-                </p>
+    <dialog id="expiring-modal" class="modal">
+        <div class="modal-box w-11/12 max-w-3xl">
+            <form method="dialog">
+                <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+            </form>
+            <h3 class="font-bold text-lg flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                {{ __('Dokumen Segera Kedaluwarsa') }}
+            </h3>
+            <p class="py-4 text-sm text-base-content/70">
+                {{ __('Berikut adalah daftar dokumen yang akan kedaluwarsa dalam 30 hari ke depan.') }}
+            </p>
+            @if(isset($expiringDocuments) && $expiringDocuments->count() > 0)
                 <div class="overflow-x-auto border border-base-200 rounded-lg">
                     <table class="table table-sm w-full">
                         <thead class="bg-base-200/50">
@@ -258,11 +256,18 @@
                         </tbody>
                     </table>
                 </div>
-            </div>
-            <form method="dialog" class="modal-backdrop">
-                <button>close</button>
-            </form>
-        </dialog>
-    @endif
+            @else
+                <div class="py-8 text-center text-sm text-base-content/60">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 mx-auto text-base-content/20 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p>{{ __('Tidak ada dokumen yang hampir kedaluwarsa.') }}</p>
+                </div>
+            @endif
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
 
 </x-app-layout>

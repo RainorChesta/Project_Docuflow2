@@ -23,7 +23,15 @@ class DirectorDocumentController extends Controller
         $selectedCompanyId = $request->get('company_id');
         $selectedBranchId = $request->get('branch_id');
 
-        $companies = Company::with(['branches' => function ($query) use ($search) {
+        $companiesQuery = Company::query();
+        if (!$user->isAdmin()) {
+            $companiesQuery->whereHas('users', fn($uq) => $uq->where('users.id', $user->id));
+        }
+
+        $companies = $companiesQuery->with(['branches' => function ($query) use ($search, $user) {
+            if (!$user->isAdmin()) {
+                $query->whereHas('users', fn($uq) => $uq->where('users.id', $user->id));
+            }
             $query->withCount(['documents' => function ($docQuery) use ($search) {
                 if ($search) {
                     $docQuery->where('title', 'like', "%{$search}%")
@@ -35,6 +43,10 @@ class DirectorDocumentController extends Controller
         // If specific branch is selected, fetch its documents
         $documents = collect();
         if ($selectedBranchId) {
+            if (!$user->isAdmin() && !$user->branches()->where('branches.id', $selectedBranchId)->exists()) {
+                abort(403, 'Unauthorized branch access.');
+            }
+
             $docQuery = Document::where('branch_id', $selectedBranchId)
                 ->with(['owner', 'division', 'documentType', 'currentVersion', 'versions']);
 

@@ -48,14 +48,10 @@
                                     </td>
                                     <td>{{ $user->division?->code ?? '-' }}</td>
                                     <td>
-                                        @if($user->isDirector())
-                                            <span class="badge badge-sm badge-info">{{ __('Semua PT & Cabang') }}</span>
-                                        @else
-                                            <div class="text-xs">
-                                                <span class="font-semibold">{{ $user->companies->pluck('code')->join(', ') ?: '-' }}</span>
-                                                <div class="text-base-content/60">{{ $user->branches->pluck('name')->join(', ') ?: '-' }}</div>
-                                            </div>
-                                        @endif
+                                        <div class="text-xs">
+                                            <span class="font-semibold">{{ $user->companies->pluck('code')->join(', ') ?: '-' }}</span>
+                                            <div class="text-base-content/60">{{ $user->branches->pluck('name')->join(', ') ?: '-' }}</div>
+                                        </div>
                                     </td>
                                     <td>
                                         <span class="badge {{ $user->system_role === 'admin' ? 'badge-accent' : ($user->system_role === 'direktur' ? 'badge-info' : ($user->system_role === 'head' ? 'badge-warning' : 'badge-ghost')) }} badge-sm uppercase font-semibold">

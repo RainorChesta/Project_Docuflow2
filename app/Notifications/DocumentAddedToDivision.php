@@ -34,6 +34,7 @@ class DocumentAddedToDivision extends Notification
             ]),
             'url'     => route('documents.show', $this->document),
             'icon'    => 'document',
+            'document_id' => $this->document->id
         ];
     }
 
@@ -42,3 +43,5 @@ class DocumentAddedToDivision extends Notification
         return $this->toArray($notifiable);
     }
 }
+
+

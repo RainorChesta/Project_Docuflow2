@@ -192,6 +192,11 @@ class Document extends Model
      */
     public function scopeDivision(Builder $query, User $user): Builder
     {
+        if ($user->isAdmin()) {
+            return $query->where('visibility', self::VISIBILITY_DIVISION)
+                ->whereHas('versions', fn($q) => $q->where('status', 'active'));
+        }
+
         $divisionIds = $user->allDivisionIds();
 
         if (empty($divisionIds)) {
@@ -217,7 +222,25 @@ class Document extends Model
             return $query;
         }
 
+        $branchIds = $user->allBranchIds();
+        $companyIds = $user->allCompanyIds();
         $divisionIds = $user->allDivisionIds();
+
+        if (!empty($branchIds)) {
+            $query->where(function ($q) use ($branchIds, $companyIds) {
+                $q->whereIn('branch_id', $branchIds)
+                  ->orWhere(function ($sub) use ($companyIds) {
+                      $sub->whereNull('branch_id')
+                          ->whereIn('company_id', $companyIds);
+                  });
+            });
+        } elseif (!empty($companyIds)) {
+            $query->whereIn('company_id', $companyIds);
+        }
+
+        if ($user->isDirector()) {
+            return $query;
+        }
 
         return $query->where(function (Builder $q) use ($user, $divisionIds) {
             $q->where('visibility', self::VISIBILITY_GENERAL)

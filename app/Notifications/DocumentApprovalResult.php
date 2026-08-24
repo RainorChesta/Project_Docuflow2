@@ -50,6 +50,7 @@ class DocumentApprovalResult extends Notification
             'message' => $message,
             'url'     => route('documents.show', $this->document),
             'icon'    => $isApproved ? 'approval' : 'document',
+            'document_id' => $this->document->id
         ];
     }
 
@@ -58,3 +59,5 @@ class DocumentApprovalResult extends Notification
         return $this->toArray($notifiable);
     }
 }
+
+

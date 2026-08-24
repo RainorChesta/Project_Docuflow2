@@ -10,7 +10,62 @@ class DocumentPolicy
 {
     public function view(User $user, Document $document): bool
     {
-        if ($user->isAdmin() || $user->isDirector()) return true;
+        if ($user->isAdmin()) return true;
+
+        $contextService = app(\App\Services\CompanyContextService::class);
+        $activeBranchId = $contextService->getActiveBranchId($user);
+        $activeCompanyId = $contextService->getActiveCompanyId($user);
+
+        // Enforce active branch and company isolation:
+        // When a user selects a company or branch, only documents matching that active context can be accessed.
+        if ($activeBranchId) {
+            if ($document->branch_id) {
+                if ((int)$document->branch_id !== (int)$activeBranchId) {
+                    return false;
+                }
+            } elseif ($document->company_id) {
+                if ((int)$document->company_id !== (int)$activeCompanyId) {
+                    return false;
+                }
+            } else {
+                $userBranchIds = $user->allBranchIds();
+                $userCompanyIds = $user->allCompanyIds();
+                if (!empty($userBranchIds) || !empty($userCompanyIds)) {
+                    return false;
+                }
+            }
+        } elseif ($activeCompanyId) {
+            $docCompanyId = $document->company_id ?? $document->branch?->company_id;
+            if ($docCompanyId) {
+                if ((int)$docCompanyId !== (int)$activeCompanyId) {
+                    return false;
+                }
+            } else {
+                $userBranchIds = $user->allBranchIds();
+                $userCompanyIds = $user->allCompanyIds();
+                if (!empty($userBranchIds) || !empty($userCompanyIds)) {
+                    return false;
+                }
+            }
+        } else {
+            // Check company & branch restriction across all assigned (e.g. testing / fallback)
+            $userBranchIds = $user->allBranchIds();
+            $userCompanyIds = $user->allCompanyIds();
+
+            if ($document->branch_id && !empty($userBranchIds)) {
+                if (!in_array($document->branch_id, $userBranchIds, true)) {
+                    return false;
+                }
+            }
+
+            if ($document->company_id && !empty($userCompanyIds)) {
+                if (!in_array($document->company_id, $userCompanyIds, true)) {
+                    return false;
+                }
+            }
+        }
+
+        if ($user->isDirector()) return true;
         if ($document->isGeneral()) return true;
         if ($user->id === $document->owner_id) return true;
 
@@ -27,16 +82,15 @@ class DocumentPolicy
 
     public function create(User $user): bool
     {
-        if ($user->isDirector()) return false;
-        // Any active user may create documents; personal/general docs
+        // Any active user (including Director) may create documents; personal/general docs
         // do not require a division.
-        return $user->is_active;
+        return (bool) ($user->is_active ?? true);
     }
 
     public function update(User $user, Document $document): bool
     {
-        if ($user->isDirector()) return false;
-        if ($user->id === $document->owner_id || $user->isAdmin()) return true;
+        if (!$this->view($user, $document)) return false;
+        if ($user->id === $document->owner_id || $user->isAdmin() || $user->isDirector()) return true;
 
         $role = app(DocumentShareService::class)->resolveEffectiveRole($document, $user);
 
@@ -45,21 +99,21 @@ class DocumentPolicy
 
     public function manageAccess(User $user, Document $document): bool
     {
-        if ($user->isDirector()) return false;
-        return $user->id === $document->owner_id || $user->isAdmin();
+        if (!$this->view($user, $document)) return false;
+        return $user->id === $document->owner_id || $user->isAdmin() || $user->isDirector();
     }
 
     public function approve(User $user, Document $document): bool
     {
-        if ($user->isDirector()) return false;
-        if ($user->isAdmin()) return true;
+        if (!$this->view($user, $document)) return false;
+        if ($user->isAdmin() || $user->isDirector()) return true;
         return $user->isHead() && $user->division_id === $document->division_id;
     }
 
     public function delete(User $user, Document $document): bool
     {
-        if ($user->isDirector()) return false;
-        if ($user->isAdmin()) return true;
+        if (!$this->view($user, $document)) return false;
+        if ($user->isAdmin() || $user->isDirector()) return true;
 
         // Owner boleh hapus dokumen selama belum punya versi approved (active).
         return $user->id === $document->owner_id

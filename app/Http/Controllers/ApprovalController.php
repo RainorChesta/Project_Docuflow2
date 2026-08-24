@@ -20,6 +20,25 @@ class ApprovalController extends Controller
     public function index(): \Illuminate\View\View
     {
         $user = auth()->user();
+
+        if ($user->isAdmin() || $user->isDirector()) {
+            $companyIds = $user->companies()->pluck('companies.id')->all();
+
+            $pendingVersionsQuery = DocumentVersion::where('status', 'pending')
+                ->whereNull('discarded_at');
+            $pendingRollbacksQuery = Document::whereNotNull('pending_rollback_version_id');
+
+            if (!$user->isAdmin() && !empty($companyIds)) {
+                $pendingVersionsQuery->whereHas('document', fn($q) => $q->whereIn('company_id', $companyIds));
+                $pendingRollbacksQuery->whereIn('company_id', $companyIds);
+            }
+
+            $pendingVersions = $pendingVersionsQuery->with('document', 'author')->latest()->get();
+            $pendingRollbacks = $pendingRollbacksQuery->with('pendingRollbackVersion', 'rollbackRequestedBy')->latest()->get();
+
+            return view('approvals.index', compact('pendingVersions', 'pendingRollbacks'));
+        }
+
         $divisionIds = $user->allDivisionIds();
 
         $pendingVersions = DocumentVersion::where('status', 'pending')

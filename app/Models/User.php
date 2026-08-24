@@ -80,6 +80,22 @@ class User extends Authenticatable
         return array_values(array_unique($ids));
     }
 
+    /**
+     * IDs of all branches assigned to this user.
+     */
+    public function allBranchIds(): array
+    {
+        return $this->branches()->pluck('branches.id')->all();
+    }
+
+    /**
+     * IDs of all companies assigned to this user.
+     */
+    public function allCompanyIds(): array
+    {
+        return $this->companies()->pluck('companies.id')->all();
+    }
+
     public function documents(): HasMany
     {
         return $this->hasMany(Document::class, 'owner_id');
@@ -141,12 +157,28 @@ class User extends Authenticatable
     }
 
     /**
-     * Hitung total approval yang menunggu tindakan pengguna (Head).
+     * Hitung total approval yang menunggu tindakan pengguna (Head / Direktur / Admin).
      */
     public function pendingApprovalsCount(): int
     {
-        if (!$this->isHead()) {
+        if (!$this->isHead() && !$this->isDirector() && !$this->isAdmin()) {
             return 0;
+        }
+
+        if ($this->isAdmin() || $this->isDirector()) {
+            $companyIds = $this->companies()->pluck('companies.id')->all();
+
+            $versionsQuery = DocumentVersion::where('status', 'pending')
+                ->whereNull('discarded_at');
+
+            $rollbacksQuery = Document::whereNotNull('pending_rollback_version_id');
+
+            if (!$this->isAdmin() && !empty($companyIds)) {
+                $versionsQuery->whereHas('document', fn($q) => $q->whereIn('company_id', $companyIds));
+                $rollbacksQuery->whereIn('company_id', $companyIds);
+            }
+
+            return $versionsQuery->count() + $rollbacksQuery->count();
         }
 
         $divisionIds = $this->allDivisionIds();

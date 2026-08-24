@@ -73,8 +73,14 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                         <div class="form-control w-full">
-                            <label for="division_id" class="label"><span class="label-text font-medium">{{ __('Divisi Utama') }}</span></label>
-                            <select name="division_id" id="division_id" class="select select-bordered w-full">
+                            <label for="division_id" class="label">
+                                <span class="label-text font-medium">{{ __('Divisi Utama') }}</span>
+                                <span class="label-text-alt text-base-content/50" x-show="role === 'direktur'">{{ __('(N/A)') }}</span>
+                            </label>
+                            <select name="division_id" id="division_id"
+                                    :disabled="role === 'direktur'"
+                                    :class="role === 'direktur' ? 'bg-base-200 cursor-not-allowed opacity-60' : ''"
+                                    class="select select-bordered w-full">
                                 <option value="">{{ __('Tanpa Divisi') }}</option>
                                 @foreach($divisions as $div)
                                     <option value="{{ $div->id }}" {{ old('division_id', $user->division_id) == $div->id ? 'selected' : '' }}>{{ $div->code }} - {{ $div->name }}</option>
@@ -87,7 +93,7 @@
                                 <option value="user" {{ old('system_role', $user->system_role) === 'user' ? 'selected' : '' }}>User (Staff)</option>
                                 <option value="head" {{ old('system_role', $user->system_role) === 'head' ? 'selected' : '' }}>Division Head (Kepala Divisi)</option>
                                 @if($user->system_role === 'direktur')
-                                    <option value="direktur" {{ old('system_role', $user->system_role) === 'direktur' ? 'selected' : '' }}>Direktur (Read-Only All PT & Cabang)</option>
+                                    <option value="direktur" {{ old('system_role', $user->system_role) === 'direktur' ? 'selected' : '' }}>Direktur</option>
                                 @endif
                                 <option value="admin" {{ old('system_role', $user->system_role) === 'admin' ? 'selected' : '' }}>System Admin</option>
                             </select>
@@ -97,43 +103,43 @@
                         </div>
                     </div>
 
-                    {{-- Multi-Company & Branch Assignment (Hidden for Direktur) --}}
-                    <div x-show="role !== 'direktur'" class="border-t border-base-200 pt-4 mt-4 mb-4">
-                        <h3 class="font-semibold text-sm mb-2">{{ __('Assignment Perusahaan & Cabang') }}</h3>
-                        <p class="text-xs text-base-content/60 mb-3">{{ __('Pilih perusahaan yang dapat diakses user, lalu centang cabang-cabang yang di-assign.') }}</p>
-
-                        <div class="space-y-4">
-                            @foreach($companies as $company)
-                                <div class="border border-base-300 rounded-lg p-3 bg-base-200/30">
-                                    <label class="flex items-center gap-2 cursor-pointer font-medium text-sm">
-                                        <input type="checkbox" name="company_ids[]" value="{{ $company->id }}" 
-                                               :checked="selectedCompanies.includes({{ $company->id }})"
-                                               @change="toggleCompany({{ $company->id }})"
-                                               class="checkbox checkbox-sm checkbox-primary">
-                                        <span>{{ $company->name }} ({{ $company->code }})</span>
-                                    </label>
-
-                                    <div class="pl-6 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 border-t border-base-300/50"
-                                         x-show="selectedCompanies.includes({{ $company->id }})">
-                                        @foreach($company->branches as $branch)
-                                            <label class="flex items-center gap-2 cursor-pointer text-xs">
-                                                <input type="checkbox" name="branch_ids[]" value="{{ $branch->id }}"
-                                                       {{ in_array($branch->id, $userBranchIds) ? 'checked' : '' }}
-                                                       class="checkbox checkbox-xs checkbox-secondary">
-                                                <span>{{ $branch->name }} @if($branch->is_pusat)<span class="text-primary font-semibold">({{ __('Pusat') }})</span>@else({{ $branch->code }})@endif</span>
-                                            </label>
-                                        @endforeach
-                                    </div>
-                                </div>
-                            @endforeach
+                    {{-- Multi-Company & Branch Assignment --}}
+                    <div class="border-t border-base-200 pt-4 mt-4 mb-4">
+                        <div x-show="role === 'admin'" class="alert alert-info py-2.5 text-xs mb-3 flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            <span>{{ __('Role System Admin secara otomatis memiliki hak akses ke seluruh Perusahaan & Cabang.') }}</span>
                         </div>
-                    </div>
 
-                    <div x-show="role === 'direktur'" class="alert alert-info text-xs mb-4">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span>{{ __('Pengguna dengan peran Direktur secara otomatis memiliki hak akses baca (read-only) ke seluruh Perusahaan dan Cabang.') }}</span>
+                        <div x-show="role !== 'admin'">
+                            <h3 class="font-semibold text-sm mb-2">{{ __('Assignment Perusahaan & Cabang') }}</h3>
+                            <p class="text-xs text-base-content/60 mb-3">{{ __('Pilih perusahaan yang dapat diakses user, lalu centang cabang-cabang yang di-assign.') }}</p>
+
+                            <div class="space-y-4">
+                                @foreach($companies as $company)
+                                    <div class="border border-base-300 rounded-lg p-3 bg-base-200/30">
+                                        <label class="flex items-center gap-2 cursor-pointer font-medium text-sm">
+                                            <input type="checkbox" name="company_ids[]" value="{{ $company->id }}" 
+                                                   :checked="selectedCompanies.includes({{ $company->id }})"
+                                                   @change="toggleCompany({{ $company->id }})"
+                                                   class="checkbox checkbox-sm checkbox-primary">
+                                            <span>{{ $company->name }} ({{ $company->code }})</span>
+                                        </label>
+
+                                        <div class="pl-6 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 border-t border-base-300/50"
+                                             x-show="selectedCompanies.includes({{ $company->id }})">
+                                            @foreach($company->branches as $branch)
+                                                <label class="flex items-center gap-2 cursor-pointer text-xs">
+                                                    <input type="checkbox" name="branch_ids[]" value="{{ $branch->id }}"
+                                                           {{ in_array($branch->id, $userBranchIds) ? 'checked' : '' }}
+                                                           class="checkbox checkbox-xs checkbox-secondary">
+                                                    <span>{{ $branch->name }} @if($branch->is_pusat)<span class="text-primary font-semibold">({{ __('Pusat') }})</span>@else({{ $branch->code }})@endif</span>
+                                                </label>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
                     </div>
 
                     <div class="form-control mb-4">

@@ -118,7 +118,7 @@
         </a>
         @endif
 
-        @if(auth()->user()->isHead())
+        @if(auth()->user()->isHead() || auth()->user()->isDirector() || auth()->user()->isAdmin())
         <a href="{{ route('approvals.index') }}"
            class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
                   {{ request()->routeIs('approvals.*') ? 'nav-item-active bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"

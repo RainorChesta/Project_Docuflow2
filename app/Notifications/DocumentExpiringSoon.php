@@ -52,3 +52,4 @@ class DocumentExpiringSoon extends Notification
         ];
     }
 }
+

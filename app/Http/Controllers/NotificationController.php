@@ -7,30 +7,111 @@ use Illuminate\Http\Request;
 
 class NotificationController extends Controller
 {
+    private function filterNotifications($user, $notifications)
+    {
+        if ($user->isAdmin()) {
+            return $notifications;
+        }
+
+        $contextService = app(\App\Services\CompanyContextService::class);
+        $activeBranchId = $contextService->getActiveBranchId($user);
+        $activeCompanyId = $contextService->getActiveCompanyId($user);
+
+        $docIds = [];
+        foreach ($notifications as $n) {
+            $docId = $n->data['document_id'] ?? null;
+            if (!$docId) {
+                $url = $n->data['url'] ?? '';
+                if (preg_match('/\/documents\/([0-9a-f\-]{36}|[0-9]+)/', $url, $matches)) {
+                    $docId = $matches[1];
+                }
+            }
+            if ($docId) {
+                $docIds[$n->id] = $docId;
+            }
+        }
+
+        $documents = !empty($docIds)
+            ? \App\Models\Document::with('branch')->whereIn('id', array_unique(array_values($docIds)))->get()->keyBy('id')
+            : collect();
+
+        return $notifications->filter(function ($n) use ($user, $docIds, $documents, $activeBranchId, $activeCompanyId) {
+            if (!isset($docIds[$n->id])) {
+                $type = $n->data['type'] ?? '';
+                if (in_array($type, [
+                    'approval_request', 
+                    'approval_result', 
+                    'document_shared', 
+                    'document_added_division', 
+                    'signature_request', 
+                    'rollback_request',
+                    'document_expiring_urgent',
+                    'document_expiring_warning',
+                    'document_opened',
+                    'grouped_document_expiring',
+                ])) {
+                    return false; // Hide legacy/unresolved document notifications to prevent leaking
+                }
+                return true;
+            }
+
+            $doc = $documents->get($docIds[$n->id]);
+            if (!$doc) {
+                return false;
+            }
+            if (!$user->can('view', $doc)) {
+                return false;
+            }
+            
+            // Scope notifications to the selected branch and company:
+            // Documents are only accessible in the branch or company where they were created.
+            if ($activeBranchId) {
+                if ($doc->branch_id) {
+                    if ((int)$doc->branch_id !== (int)$activeBranchId) {
+                        return false;
+                    }
+                } elseif ($doc->company_id) {
+                    if ((int)$doc->company_id !== (int)$activeCompanyId) {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
+            } elseif ($activeCompanyId) {
+                $docCompanyId = $doc->company_id ?? $doc->branch?->company_id;
+                if ((int)$docCompanyId !== (int)$activeCompanyId) {
+                    return false;
+                }
+            }
+            
+            return true;
+        });
+    }
+
     /**
      * Get recent notifications for the authenticated user.
      */
     public function index(Request $request): JsonResponse
     {
-        $notifications = $request->user()
-            ->notifications()
-            ->latest()
-            ->limit(20)
-            ->get()
-            ->map(fn($n) => [
-                'id'       => $n->id,
-                'type'     => $n->data['type'] ?? 'general',
-                'title'    => $n->data['title'] ?? '',
-                'message'  => $n->data['message'] ?? '',
-                'url'      => $n->data['url'] ?? '#',
-                'icon'     => $n->data['icon'] ?? 'bell',
-                'read'     => !is_null($n->read_at),
-                'time'     => $n->created_at->diffForHumans(),
-            ]);
+        $rawNotifications = $request->user()->notifications()->latest()->limit(100)->get();
+        $filtered = $this->filterNotifications($request->user(), $rawNotifications);
+
+        $notifications = $filtered->take(20)->map(fn($n) => [
+            'id'       => $n->id,
+            'type'     => $n->data['type'] ?? 'general',
+            'title'    => $n->data['title'] ?? '',
+            'message'  => $n->data['message'] ?? '',
+            'url'      => $n->data['url'] ?? '#',
+            'icon'     => $n->data['icon'] ?? 'bell',
+            'read'     => !is_null($n->read_at),
+            'time'     => $n->created_at->diffForHumans(),
+        ])->values();
+
+        $unreadCount = $filtered->whereNull('read_at')->count();
 
         return response()->json([
             'notifications' => $notifications,
-            'unread_count'  => $request->user()->unreadNotifications()->count(),
+            'unread_count'  => $unreadCount,
         ]);
     }
 
@@ -47,7 +128,7 @@ class NotificationController extends Controller
 
         return response()->json([
             'success' => true,
-            'unread_count' => $request->user()->unreadNotifications()->count(),
+            'unread_count' => $this->getUnreadCount($request->user()),
         ]);
     }
 
@@ -70,7 +151,13 @@ class NotificationController extends Controller
     public function unreadCount(Request $request): JsonResponse
     {
         return response()->json([
-            'unread_count' => $request->user()->unreadNotifications()->count(),
+            'unread_count' => $this->getUnreadCount($request->user()),
         ]);
+    }
+
+    private function getUnreadCount($user): int
+    {
+        $rawUnread = $user->unreadNotifications()->latest()->limit(100)->get();
+        return $this->filterNotifications($user, $rawUnread)->count();
     }
 }

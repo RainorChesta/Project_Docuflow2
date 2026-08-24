@@ -37,6 +37,7 @@ class DocumentApprovalRequested extends Notification
             ]),
             'url'     => route('approvals.index'),
             'icon'    => 'approval',
+            'document_id' => $this->document->id
         ];
     }
 
@@ -45,3 +46,5 @@ class DocumentApprovalRequested extends Notification
         return $this->toArray($notifiable);
     }
 }
+
+

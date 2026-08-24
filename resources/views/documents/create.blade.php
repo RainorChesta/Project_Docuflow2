@@ -93,7 +93,7 @@
                             <label for="branch_id" class="label">
                                 <span class="label-text font-medium">{{ __('Cabang (Branch)') }}</span>
                             </label>
-                            @if(auth()->user()->isAdmin())
+                            @if(auth()->user()->isAdmin() || auth()->user()->isDirector())
                                 <select name="branch_id" id="branch_id" class="select select-bordered w-full" required>
                                     @foreach($availableBranches as $branch)
                                         <option value="{{ $branch->id }}" {{ (old('branch_id', $activeBranch?->id) == $branch->id) ? 'selected' : '' }}>
@@ -122,7 +122,7 @@
                             <label for="division_id" class="label">
                                 <span class="label-text font-medium">{{ __('Divisi') }}</span>
                             </label>
-                            @if(auth()->user()->isAdmin())
+                            @if(auth()->user()->isAdmin() || auth()->user()->isDirector())
                                 <select name="division_id" id="division_id" class="select select-bordered w-full" required>
                                     <option value="">{{ __('Pilih divisi...') }}</option>
                                     @foreach($divisions as $div)
@@ -131,7 +131,7 @@
                                         </option>
                                     @endforeach
                                 </select>
-                                <p class="text-xs text-base-content/50 mt-1">{{ __('Admin bisa pilih divisi mana pun.') }}</p>
+                                <p class="text-xs text-base-content/50 mt-1">{{ __('Pilih divisi dokumen.') }}</p>
                             @else
                                 @php($myDivision = auth()->user()->division)
                                 <input type="text" value="{{ $myDivision ? $myDivision->code . ' - ' . $myDivision->name : '—' }}" class="input input-bordered w-full bg-base-200" disabled>
@@ -264,9 +264,14 @@
                 }
 
                 var branchId = branchSelect ? branchSelect.value : '';
+                var divisionSelect = document.getElementById('division_id');
+                var divisionId = divisionSelect ? divisionSelect.value : '';
                 var url = '{{ route('documents.next-number') }}?document_type_id=' + encodeURIComponent(typeId);
                 if (branchId) {
                     url += '&branch_id=' + encodeURIComponent(branchId);
+                }
+                if (divisionId) {
+                    url += '&division_id=' + encodeURIComponent(divisionId);
                 }
 
                 fetch(url, {
@@ -303,6 +308,10 @@
             typeSelect.addEventListener('change', fetchPreview);
             if (branchSelect) {
                 branchSelect.addEventListener('change', fetchPreview);
+            }
+            var divisionSelect = document.getElementById('division_id');
+            if (divisionSelect) {
+                divisionSelect.addEventListener('change', fetchPreview);
             }
 
             uploadCheckbox.addEventListener('change', function () {

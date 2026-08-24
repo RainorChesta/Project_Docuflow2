@@ -29,7 +29,7 @@ class ContextSwitchController extends Controller
         $companyId = (int) $validated['company_id'];
         
         // Authorize company
-        if (!$user->isAdmin() && !$user->isDirector() && !$user->companies()->where('companies.id', $companyId)->exists()) {
+        if (!$user->isAdmin() && !$user->companies()->where('companies.id', $companyId)->exists()) {
             return back()->with('error', 'Unauthorized company access.');
         }
 
@@ -39,7 +39,7 @@ class ContextSwitchController extends Controller
         if ($branchId) {
             $branch = Branch::where('id', $branchId)->where('company_id', $companyId)->first();
             if ($branch) {
-                if ($user->isAdmin() || $user->isDirector() || $user->branches()->where('branches.id', $branch->id)->exists()) {
+                if ($user->isAdmin() || $user->branches()->where('branches.id', $branch->id)->exists()) {
                     session(['active_branch_id' => $branch->id]);
                 }
             }
@@ -62,7 +62,7 @@ class ContextSwitchController extends Controller
     public function branchesForCompany(Request $request, Company $company): JsonResponse
     {
         $user = auth()->user();
-        if (!$user->isAdmin() && !$user->isDirector() && !$user->companies()->where('companies.id', $company->id)->exists()) {
+        if (!$user->isAdmin() && !$user->companies()->where('companies.id', $company->id)->exists()) {
             return response()->json([], 403);
         }
 

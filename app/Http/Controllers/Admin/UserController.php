@@ -51,22 +51,21 @@ class UserController extends Controller
         $branchIds = $validated['branch_ids'] ?? [];
         unset($validated['company_ids'], $validated['branch_ids']);
 
-        if ($validated['system_role'] === 'direktur') {
+        if ($validated['system_role'] === 'admin') {
+            $companyIds = Company::pluck('id')->all();
+            $branchIds = Branch::pluck('id')->all();
+        } elseif ($validated['system_role'] === 'direktur') {
             $validated['nip'] = null;
+            $validated['division_id'] = null;
         }
 
         $user = User::create($validated);
 
-        if ($user->isDirector()) {
-            $user->companies()->sync(Company::pluck('id'));
-            $user->branches()->sync(Branch::pluck('id'));
-        } else {
-            if (!empty($companyIds)) {
-                $user->companies()->sync($companyIds);
-            }
-            if (!empty($branchIds)) {
-                $user->branches()->sync($branchIds);
-            }
+        if (!empty($companyIds)) {
+            $user->companies()->sync($companyIds);
+        }
+        if (!empty($branchIds)) {
+            $user->branches()->sync($branchIds);
         }
 
         return redirect()->route('admin.users.index')->with('success', 'User created.');
@@ -112,19 +111,18 @@ class UserController extends Controller
         $branchIds = $validated['branch_ids'] ?? [];
         unset($validated['company_ids'], $validated['branch_ids']);
 
-        if ($validated['system_role'] === 'direktur') {
+        if ($validated['system_role'] === 'admin') {
+            $companyIds = Company::pluck('id')->all();
+            $branchIds = Branch::pluck('id')->all();
+        } elseif ($validated['system_role'] === 'direktur') {
             $validated['nip'] = null;
+            $validated['division_id'] = null;
         }
 
         $user->update($validated);
 
-        if ($user->isDirector()) {
-            $user->companies()->sync(Company::pluck('id'));
-            $user->branches()->sync(Branch::pluck('id'));
-        } else {
-            $user->companies()->sync($companyIds);
-            $user->branches()->sync($branchIds);
-        }
+        $user->companies()->sync($companyIds);
+        $user->branches()->sync($branchIds);
 
         return redirect()->route('admin.users.index')->with('success', 'User updated.');
     }

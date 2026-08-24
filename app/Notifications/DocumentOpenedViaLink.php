@@ -34,6 +34,7 @@ class DocumentOpenedViaLink extends Notification
             ]),
             'url'     => route('documents.show', $this->document),
             'icon'    => 'document',
+            'document_id' => $this->document->id
         ];
     }
 
@@ -42,3 +43,5 @@ class DocumentOpenedViaLink extends Notification
         return $this->toArray($notifiable);
     }
 }
+
+

@@ -29,7 +29,10 @@ class UrgentDocumentExpiring extends Notification implements ShouldQueue
             'title' => 'Dokumen akan kedaluwarsa ' . $timeText,
             'message' => '"' . $this->document->title . '" akan kedaluwarsa pada ' . $this->document->expires_at?->format('d F Y') . '.',
             'url' => route('documents.show', $this->document),
-            'icon' => 'document'
+            'icon' => 'document',
+            'document_id' => $this->document->id
         ];
     }
 }
+
+

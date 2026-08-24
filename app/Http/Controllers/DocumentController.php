@@ -43,10 +43,30 @@ class DocumentController extends Controller
 
         $contextService = app(\App\Services\CompanyContextService::class);
         $activeBranchId = $contextService->getActiveBranchId($user);
+        $activeCompanyId = $contextService->getActiveCompanyId($user);
+        $userBranchIds = $user->allBranchIds();
+        $userCompanyIds = $user->allCompanyIds();
 
         // Apply active branch filtering if not admin looking at global
-        if ($activeBranchId && !$user->isAdmin() && !$user->isDirector()) {
-            $query->where('branch_id', $activeBranchId);
+        if (!$user->isAdmin()) {
+            if ($activeBranchId && !$user->isDirector()) {
+                $query->where('branch_id', $activeBranchId);
+            } elseif ($activeCompanyId && !$user->isDirector()) {
+                $query->where(function ($q) use ($activeCompanyId) {
+                    $q->where('company_id', $activeCompanyId)
+                      ->orWhereHas('branch', fn($b) => $b->where('company_id', $activeCompanyId));
+                });
+            } elseif (!empty($userBranchIds)) {
+                $query->where(function ($q) use ($userBranchIds, $userCompanyIds) {
+                    $q->whereIn('branch_id', $userBranchIds)
+                      ->orWhere(function ($sub) use ($userCompanyIds) {
+                          $sub->whereNull('branch_id')
+                              ->whereIn('company_id', $userCompanyIds);
+                      });
+                });
+            } elseif (!empty($userCompanyIds)) {
+                $query->whereIn('company_id', $userCompanyIds);
+            }
         }
 
         if ($type === 'general') {
@@ -107,7 +127,7 @@ class DocumentController extends Controller
     public function create(): View
     {
         $user = auth()->user();
-        $divisions = $user->isAdmin()
+        $divisions = ($user->isAdmin() || $user->isDirector())
             ? Division::all()
             : Division::whereIn('id', $user->allDivisionIds())->get();
         $documentTypes = DocumentType::all();
@@ -128,10 +148,14 @@ class DocumentController extends Controller
         $validated = $request->validate([
             'document_type_id' => 'required|exists:document_types,id',
             'branch_id' => 'nullable|exists:branches,id',
+            'division_id' => 'nullable|exists:divisions,id',
         ]);
 
         $user = auth()->user();
-        $division = $user->division_id ? Division::find($user->division_id) : null;
+        $divisionId = ($user->isAdmin() || $user->isDirector())
+            ? ($validated['division_id'] ?? $user->division_id)
+            : $user->division_id;
+        $division = $divisionId ? Division::find($divisionId) : null;
         $documentType = DocumentType::findOrFail($validated['document_type_id']);
 
         $contextService = app(\App\Services\CompanyContextService::class);
@@ -153,6 +177,7 @@ class DocumentController extends Controller
         $rules = [
             'title' => 'required|string|max:255',
             'document_type_id' => 'required|exists:document_types,id',
+            'division_id' => ($user->isAdmin() || $user->isDirector()) ? 'required|exists:divisions,id' : 'nullable',
             'branch_id' => 'nullable|exists:branches,id',
             'expiration_date' => 'nullable|date',
         ];
@@ -173,7 +198,9 @@ class DocumentController extends Controller
             'document_number.regex' => 'Format nomor tidak sesuai. Contoh: 029/S.ED/HRD/JBM/VIII/2026',
         ]);
 
-        $validated['division_id'] = $user->division_id;
+        $validated['division_id'] = ($user->isAdmin() || $user->isDirector())
+            ? ($validated['division_id'] ?? null)
+            : $user->division_id;
         $validated['visibility'] = Document::VISIBILITY_DIVISION;
         $validated['expiration_date'] = $validated['expiration_date'] ?? null;
 

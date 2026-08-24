@@ -13,12 +13,30 @@ class DashboardController extends Controller
     public function index(Request $request): View
     {
         $user = auth()->user();
+        $contextService = app(\App\Services\CompanyContextService::class);
+        $activeBranchId = $contextService->getActiveBranchId($user);
+        $activeCompanyId = $contextService->getActiveCompanyId($user);
+        $userBranchIds = $user->allBranchIds();
+        $userCompanyIds = $user->allCompanyIds();
 
         // Search across every document the user may see.
         $results = null;
         if ($request->filled('search') || $request->filled('document_type_id')) {
-            $results = Document::with('owner', 'division', 'currentVersion')
-                ->visibleTo($user)
+            $searchQuery = Document::with('owner', 'division', 'currentVersion')
+                ->visibleTo($user);
+
+            if (!$user->isAdmin()) {
+                if ($activeBranchId) {
+                    $searchQuery->where('branch_id', $activeBranchId);
+                } elseif ($activeCompanyId) {
+                    $searchQuery->where(function ($q) use ($activeCompanyId) {
+                        $q->where('company_id', $activeCompanyId)
+                          ->orWhereHas('branch', fn($b) => $b->where('company_id', $activeCompanyId));
+                    });
+                }
+            }
+
+            $results = $searchQuery
                 ->when($request->filled('search'), function ($q) use ($request) {
                     $q->where(function ($q) use ($request) {
                         $q->where('title', 'like', "%{$request->get('search')}%")
@@ -70,13 +88,38 @@ class DashboardController extends Controller
             return view('dashboard', compact('results', 'documents', 'divisions', 'documentTypes'));
         }
 
-        $recent = $user->documents()->with('division', 'currentVersion')
-            ->latest()
-            ->take(5)
-            ->get();
+        $baseDocQuery = $user->documents();
+        if ($activeBranchId) {
+            $baseDocQuery->where('branch_id', $activeBranchId);
+        } elseif ($activeCompanyId) {
+            $baseDocQuery->where(function ($q) use ($activeCompanyId) {
+                $q->where('company_id', $activeCompanyId)
+                  ->orWhereHas('branch', fn($b) => $b->where('company_id', $activeCompanyId));
+            });
+        } elseif (!empty($userBranchIds)) {
+            $baseDocQuery->where(function ($q) use ($userBranchIds, $userCompanyIds) {
+                $q->whereIn('branch_id', $userBranchIds)
+                  ->orWhere(function ($sub) use ($userCompanyIds) {
+                      $sub->whereNull('branch_id')
+                          ->whereIn('company_id', $userCompanyIds);
+                  });
+            });
+        } elseif (!empty($userCompanyIds)) {
+            $baseDocQuery->whereIn('company_id', $userCompanyIds);
+        }
 
-        $expiringDocuments = $user->documents()->with('division')
+        $totalDocsCount = (clone $baseDocQuery)->count();
+        $activeDocsCount = (clone $baseDocQuery)->whereHas('currentVersion', fn($q) => $q->where('status', 'active'))->count();
+        $pendingDocsCount = (clone $baseDocQuery)->whereHas('versions', fn($q) => $q->where('status', 'pending'))->count();
+
+        $recent = (clone $baseDocQuery)->with('division', 'currentVersion')->latest()->take(5)->get();
+
+        $expiringQuery = (clone $baseDocQuery)
+            ->with('division')
             ->where('is_expired', false)
+            ->whereHas('currentVersion', fn($q) => $q->where('status', 'active'));
+
+        $expiringDocuments = $expiringQuery
             ->get()
             ->filter(function ($doc) {
                 if (!$doc->expires_at) return false;
@@ -87,6 +130,14 @@ class DashboardController extends Controller
 
         $documentTypes = DocumentType::orderBy('name')->get();
 
-        return view('dashboard', compact('results', 'recent', 'documentTypes', 'expiringDocuments'));
+        return view('dashboard', compact(
+            'results',
+            'recent',
+            'documentTypes',
+            'expiringDocuments',
+            'totalDocsCount',
+            'activeDocsCount',
+            'pendingDocsCount'
+        ));
     }
 }
