@@ -231,22 +231,22 @@
                             {{ __('Download DOCX') }}
                         </a>
                         @can('manageAccess', $document)
-                            <button type="button" onclick="openShareModal()" class="btn btn-outline btn-primary btn-sm">
+                            <button type="button" onclick="openShareModal()" class="btn btn-outline btn-primary btn-sm gap-1.5">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 0a3 3 0 11-5.367 2.684 3 3 0 015.367-2.684z" /></svg>
-                                {{ __('Share') }}
+                                <span>{{ __('Bagikan') }}</span>
                             </button>
                         @endcan
 
                         <button
                             type="button"
                             class="btn btn-ghost btn-sm border border-base-300"
-                            onclick="document.getElementById('version-modal').showModal()"
+                            onclick="openModal('version-modal')"
                         >
                             {{ __('Lihat Versi') }} ({{ $document->versions->count() }})
                         </button>
 
                         @can('update', $document)
-                            <button type="button" class="btn btn-ghost btn-sm border border-base-300" onclick="document.getElementById('scope-modal').showModal()">
+                            <button type="button" class="btn btn-ghost btn-sm border border-base-300" onclick="openModal('scope-modal')">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                 {{ __('Ubah Cakupan') }}
                             </button>
@@ -258,7 +258,7 @@
                              di dokumen (lihat #export-pdf-modal). --}}
                         @if(!$isFileBased)
                             <button type="button" class="btn btn-ghost btn-sm border border-base-300"
-                                    onclick="document.getElementById('export-pdf-modal').showModal()">
+                                    onclick="openModal('export-pdf-modal')">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                                 {{ __('Export PDF') }}
                             </button>
@@ -433,11 +433,11 @@
                 </div>
             @endif
 
-            {{-- Bagikan Modal (Google Docs model) --}}
+            {{-- Unified Share & Access Modal --}}
             <dialog id="share-modal" class="modal">
                 <div class="modal-box max-w-xl max-h-[85vh] overflow-y-auto">
                     <div class="flex flex-wrap items-center justify-between mb-4">
-                        <h3 class="font-semibold">{{ __('Share ":title"', ['title' => $document->title]) }}</h3>
+                        <h3 class="font-semibold text-base">{{ __('Bagikan ":title"', ['title' => $document->title]) }}</h3>
                         <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('share-modal').close()">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -447,47 +447,65 @@
 
                     {{-- Invite search --}}
                     <div class="form-control mb-2 relative">
-                        <input id="share-search-input" type="text" placeholder="{{ __('Search user name or division…') }}"
+                        <input id="share-search-input" type="text" placeholder="{{ __('Tambahkan orang atau divisi…') }}"
                                class="input input-bordered w-full" autocomplete="off">
                         <div id="share-search-results" class="hidden absolute top-full left-0 right-0 z-10 mt-1 bg-base-100 border border-base-300 rounded-box shadow-lg max-h-64 overflow-y-auto"></div>
                     </div>
-                    <p id="share-search-hint" class="text-xs text-base-content/50 mb-4">{{ __('Add people or divisions to access this document.') }}</p>
+                    <p id="share-search-hint" class="text-xs text-base-content/50 mb-4">{{ __('Ketik nama pengguna atau divisi untuk memberikan akses khusus.') }}</p>
 
                     {{-- People with access --}}
                     <div class="mb-5">
-                        <h4 class="text-sm font-medium text-base-content/70 mb-2">{{ __('People with access') }}</h4>
-                        <div id="share-list" class="space-y-2 text-sm">
+                        <h4 class="text-sm font-medium text-base-content/70 mb-2">{{ __('Orang & Divisi yang memiliki akses') }}</h4>
+                        <div id="share-list" class="space-y-2 text-sm max-h-52 overflow-y-auto pr-1">
                             <div class="text-base-content/50 italic">Memuat&hellip;</div>
                         </div>
                     </div>
 
-                    {{-- General access --}}
-                    <div class="border-t border-base-200 pt-4">
-                        <h4 class="text-sm font-medium text-base-content/70 mb-3">{{ __('General access') }}</h4>
-                        <div class="flex flex-col gap-2">
-                            <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="radio" name="general_access" value="restricted" class="radio radio-sm" onchange="updateGeneralAccess()">
-                                <span class="text-sm">{{ __('Restricted — invited people only') }}</span>
-                            </label>
-                            <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="radio" name="general_access" value="anyone_with_link" class="radio radio-sm" onchange="updateGeneralAccess()">
-                                <span class="text-sm">{{ __('Anyone with the link') }}</span>
-                            </label>
-                            <div class="flex flex-wrap items-center gap-2 mt-2">
-                                <button type="button" class="btn btn-outline btn-primary btn-sm" onclick="copyShareUrl(this)">
+                    {{-- General access / Share Link --}}
+                    <div class="border-t border-base-300 pt-4">
+                        <h4 class="text-sm font-medium text-base-content/70 mb-3">{{ __('Akses umum (Share Link)') }}</h4>
+                        <div class="space-y-3">
+                            <div class="flex flex-col gap-2.5">
+                                <label class="flex items-center gap-2.5 cursor-pointer">
+                                    <input type="radio" name="general_access" value="restricted" class="radio radio-sm" onchange="updateGeneralAccess()">
+                                    <div>
+                                        <span class="text-sm font-medium">{{ __('Dibatasi (Restricted)') }}</span>
+                                        <p class="text-xs text-base-content/60">{{ __('Hanya orang dan divisi dengan akses khusus yang dapat membuka dokumen ini.') }}</p>
+                                    </div>
+                                </label>
+                                <label class="flex items-start gap-2.5 cursor-pointer">
+                                    <input type="radio" name="general_access" value="anyone_with_link" class="radio radio-sm mt-0.5" onchange="updateGeneralAccess()">
+                                    <div class="flex-1">
+                                        <div class="flex flex-wrap items-center justify-between gap-2">
+                                            <span class="text-sm font-medium">{{ __('Siapa saja yang memiliki link') }}</span>
+                                            <div id="link-role-container" class="inline-flex items-center gap-1.5">
+                                                <select id="link-role-select" class="select select-bordered select-xs" onchange="updateGeneralAccess()">
+                                                    <option value="viewer">{{ __('Viewer') }}</option>
+                                                    <option value="editor">{{ __('Editor') }}</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <p class="text-xs text-base-content/60">{{ __('Siapa saja di internet yang memiliki link ini dapat melihat atau mengedit sesuai peran yang dipilih.') }}</p>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <div class="flex flex-wrap items-center gap-2 pt-2">
+                                <button type="button" class="btn btn-outline btn-primary btn-sm gap-1.5" onclick="copyShareUrl(this)">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                                    Salin Link
+                                    <span>{{ __('Salin Link') }}</span>
                                 </button>
-                                <button type="button" id="regenerate-token-btn" class="btn btn-ghost btn-sm" onclick="regenerateToken(this)">
+                                <button type="button" id="regenerate-token-btn" class="btn btn-ghost btn-sm gap-1.5" onclick="regenerateToken(this)">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                    {{ __('Create new link') }}
+                                    <span>{{ __('Buat link baru') }}</span>
                                 </button>
                             </div>
+
                             {{-- Feedback: link disalin --}}
                             <div id="share-copied-feedback" class="hidden mt-3 p-3 bg-success/10 border border-success/20 rounded-lg transition-all">
                                 <p class="text-xs font-semibold text-success flex items-center gap-1.5 mb-1.5">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                                    Link berhasil disalin
+                                    {{ __('Link berhasil disalin') }}
                                 </p>
                                 <input id="share-copied-url" type="text" class="input input-bordered input-sm w-full text-xs bg-base-100" readonly onclick="this.select()" />
                             </div>
@@ -632,8 +650,6 @@
             loading.classList.remove('hidden');
             if (copyBtn) copyBtn.classList.add('hidden');
 
-            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-
             const percentage = parseInt(document.getElementById('summary-percentage')?.value || 30);
             const model = document.getElementById('summary-model')?.value || 'auto';
 
@@ -715,6 +731,16 @@
             document.getElementById('upload-version-modal').showModal();
         @endif
 
+        function openModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (!modal) return;
+            const scrollPos = window.scrollY;
+            modal.showModal();
+            requestAnimationFrame(() => {
+                window.scrollTo({ top: scrollPos, behavior: 'instant' });
+            });
+        }
+
         // ---- Bagikan modal (Google Docs model) ----
         const shareDataUrl = @json(route('shares.data', $document));
         const shareStoreUrl = @json(route('shares.store', $document));
@@ -724,9 +750,13 @@
         let shareState = null;
 
         async function openShareModal() {
-            document.getElementById('share-modal').showModal();
+            openModal('share-modal');
             await loadShareData();
         }
+
+        // Backward compatibility
+        function openAccessModal() { openShareModal(); }
+        function openShareLinkModal() { openShareModal(); }
 
         async function loadShareData() {
             const list = document.getElementById('share-list');
@@ -791,10 +821,16 @@
         function renderGeneralAccess() {
             const restricted = document.querySelector('input[name="general_access"][value="restricted"]');
             const anyone = document.querySelector('input[name="general_access"][value="anyone_with_link"]');
+            const roleSelect = document.getElementById('link-role-select');
+
             if (shareState.general_access === 'anyone_with_link') {
-                anyone.checked = true;
+                if (anyone) anyone.checked = true;
             } else {
-                restricted.checked = true;
+                if (restricted) restricted.checked = true;
+            }
+
+            if (roleSelect && shareState.link_role) {
+                roleSelect.value = shareState.link_role;
             }
         }
 
@@ -840,8 +876,16 @@
         }
 
         async function updateGeneralAccess() {
-            const access = document.querySelector('input[name="general_access"]:checked').value;
-            await postForm(shareGeneralUrl, { _method: 'PATCH', general_access: access });
+            const checkedInput = document.querySelector('input[name="general_access"]:checked');
+            const access = checkedInput ? checkedInput.value : 'restricted';
+            const roleSelect = document.getElementById('link-role-select');
+            const linkRole = roleSelect ? roleSelect.value : 'viewer';
+
+            await postForm(shareGeneralUrl, {
+                _method: 'PATCH',
+                general_access: access,
+                link_role: linkRole
+            });
             await loadShareData();
         }
 

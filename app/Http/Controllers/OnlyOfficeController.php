@@ -47,6 +47,44 @@ class OnlyOfficeController extends Controller
     }
 
     /**
+     * Serve user's signature image to ONLYOFFICE Docs Document Server.
+     */
+    public function signature(User $user): \Illuminate\Http\Response
+    {
+        if (!$user->hasSignature() || !$user->signature?->file_path) {
+            abort(404, 'Signature not found.');
+        }
+
+        $disk = Storage::disk('public');
+        if (!$disk->exists($user->signature->file_path)) {
+            abort(404, 'Signature file not found in storage.');
+        }
+
+        $rawBytes = $disk->get($user->signature->file_path);
+        $squaredBytes = $this->onlyOfficeService->formatSquareSignature($rawBytes, 400, 24);
+
+        return response($squaredBytes, 200, [
+            'Content-Type' => 'image/png',
+            'Content-Disposition' => 'inline; filename="signature_' . $user->id . '.png"',
+            'Cache-Control' => 'no-cache, private',
+        ]);
+    }
+
+    /**
+     * Serve document QR Code PNG to ONLYOFFICE Docs Document Server.
+     */
+    public function qrcode(Document $document, \App\Services\QrCodeService $qrCodeService): \Illuminate\Http\Response
+    {
+        $qrPng = $qrCodeService->pngBytes($qrCodeService->qrcodeUrl($document));
+
+        return response($qrPng, 200, [
+            'Content-Type' => 'image/png',
+            'Content-Disposition' => 'inline; filename="qrcode_' . $document->id . '.png"',
+            'Cache-Control' => 'no-cache, private',
+        ]);
+    }
+
+    /**
      * Handle the save / status callback from ONLYOFFICE Document Server.
      */
     public function callback(Request $request, Document $document): JsonResponse

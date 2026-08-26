@@ -46,15 +46,11 @@ class DocumentShareController extends Controller
                 'user_id' => $validated['user_id'],
                 'role' => $validated['role'],
             ]);
-
-            // Notify the user about the shared document
-            if ($targetUser->id !== $invitedBy->id) {
-                $targetUser->notify(new \App\Notifications\DocumentSharedWithUser($document, $validated['role'], $invitedBy->name));
-            }
         } else {
+            $division = Division::findOrFail($validated['division_id']);
             $share = $this->shareService->addDivisionShare(
                 $document,
-                Division::findOrFail($validated['division_id']),
+                $division,
                 $validated['role'],
                 $invitedBy,
             );
@@ -80,6 +76,10 @@ class DocumentShareController extends Controller
             'role' => $validated['role'],
         ]);
 
+        if ($share->user_id && $share->user_id !== auth()->id()) {
+            $share->user?->notify(new \App\Notifications\DocumentSharedWithUser($document, $validated['role'], auth()->user()->name));
+        }
+
         return back()->with('notice', 'Peran pengguna diperbarui.');
     }
 
@@ -87,7 +87,7 @@ class DocumentShareController extends Controller
     {
         $this->authorize('manageAccess', $document);
 
-        $this->shareService->removeUserShare($share);
+        $this->shareService->removeUserShare($share, auth()->user());
         $this->auditService->log(auth()->user(), 'share.user.removed', 'document_share', $share->id, [
             'document_id' => $document->id,
         ]);
@@ -107,6 +107,23 @@ class DocumentShareController extends Controller
             'role' => $validated['role'],
         ]);
 
+        $division = $divisionShare->division;
+        if ($division) {
+            $divisionUsers = User::where('division_id', $division->id)
+                ->where('is_active', true)
+                ->where('id', '!=', auth()->id())
+                ->get();
+
+            foreach ($divisionUsers as $member) {
+                $member->notify(new \App\Notifications\DocumentSharedWithDivision(
+                    $document,
+                    $division->name,
+                    $validated['role'],
+                    auth()->user()->name
+                ));
+            }
+        }
+
         return back()->with('notice', 'Peran divisi diperbarui.');
     }
 
@@ -114,7 +131,7 @@ class DocumentShareController extends Controller
     {
         $this->authorize('manageAccess', $document);
 
-        $this->shareService->removeDivisionShare($divisionShare);
+        $this->shareService->removeDivisionShare($divisionShare, auth()->user());
         $this->auditService->log(auth()->user(), 'share.division.removed', 'document_division_share', $divisionShare->id, [
             'document_id' => $document->id,
         ]);
@@ -128,11 +145,13 @@ class DocumentShareController extends Controller
 
         $validated = $request->validate([
             'general_access' => 'required|in:restricted,anyone_with_link',
+            'link_role' => 'nullable|in:viewer,editor',
         ]);
 
-        $this->shareService->updateGeneralAccess($document, $validated['general_access']);
+        $this->shareService->updateGeneralAccess($document, $validated['general_access'], $validated['link_role'] ?? null);
         $this->auditService->log(auth()->user(), 'share.general_access.updated', 'document', $document->id, [
             'general_access' => $validated['general_access'],
+            'link_role' => $document->fresh()->link_role,
         ]);
 
         return back()->with('notice', 'Pengaturan akses umum diperbarui.');

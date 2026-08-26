@@ -157,4 +157,83 @@ class OnlyOfficeIntegrationTest extends TestCase
         $this->assertEquals('pdf', $config['document']['fileType']);
         $this->assertTrue($config['document']['permissions']['edit']);
     }
+
+    public function test_onlyoffice_signature_endpoint_serves_png_binary()
+    {
+        Storage::fake('public');
+        $sigPath = 'signatures/sig_test.png';
+        Storage::disk('public')->put($sigPath, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='));
+
+        \App\Models\Signature::create([
+            'user_id' => $this->user->id,
+            'file_path' => $sigPath,
+            'signature_type' => 'canvas',
+        ]);
+
+        $response = $this->get(route('onlyoffice.signature', ['user' => $this->user->id]));
+
+        $response->assertStatus(200);
+        $response->assertHeader('Content-Type', 'image/png');
+    }
+
+    public function test_onlyoffice_qrcode_endpoint_serves_png_binary()
+    {
+        $response = $this->get(route('onlyoffice.qrcode', ['document' => $this->document->id]));
+
+        $response->assertStatus(200);
+        $response->assertHeader('Content-Type', 'image/png');
+    }
+
+    public function test_onlyoffice_service_generates_valid_insert_image_token()
+    {
+        config([
+            'onlyoffice.jwt_enabled' => true,
+            'onlyoffice.jwt_secret' => 'test-secret-key-12345-dokuflow-2026',
+        ]);
+
+        $service = app(OnlyOfficeService::class);
+        $imageUrl = 'http://localhost:8000/onlyoffice/users/1/signature';
+        $token = $service->generateInsertImageToken($imageUrl);
+
+        $this->assertNotNull($token);
+
+        $decoded = (array) \Firebase\JWT\JWT::decode($token, new \Firebase\JWT\Key('test-secret-key-12345-dokuflow-2026', 'HS256'));
+        $this->assertEquals('add', $decoded['c']);
+        $this->assertEquals($imageUrl, $decoded['url']);
+    }
+
+    public function test_signature_show_endpoint_returns_onlyoffice_url_and_token()
+    {
+        Storage::fake('public');
+        $sigPath = 'signatures/sig_test.png';
+        Storage::disk('public')->put($sigPath, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='));
+
+        \App\Models\Signature::create([
+            'user_id' => $this->user->id,
+            'file_path' => $sigPath,
+            'signature_type' => 'canvas',
+        ]);
+
+        config([
+            'onlyoffice.jwt_enabled' => true,
+            'onlyoffice.jwt_secret' => 'test-secret-key-12345-dokuflow-2026',
+            'onlyoffice.internal_url' => 'http://host.docker.internal:8000',
+        ]);
+
+        $response = $this->actingAs($this->user)->getJson(route('profile.signature.show'));
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure([
+            'success',
+            'url',
+            'token',
+            'client_url',
+            'data_uri',
+            'updated_at',
+        ]);
+        $response->assertJson([
+            'success' => true,
+            'url' => 'http://host.docker.internal:8000/onlyoffice/users/' . $this->user->id . '/signature',
+        ]);
+    }
 }

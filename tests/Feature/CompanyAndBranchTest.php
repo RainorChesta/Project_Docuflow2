@@ -322,4 +322,34 @@ class CompanyAndBranchTest extends TestCase
         $docListResponse->assertSee('Dokumen Khusus Alfa');
         $docListResponse->assertDontSee('Dokumen Rahasia Beta');
     }
+
+    public function test_director_documents_page_hides_branch_switcher_dropdown_for_director(): void
+    {
+        $company = Company::create(['name' => 'PT Jaya Harmoni', 'code' => 'JHM']);
+        $branch = Branch::create(['company_id' => $company->id, 'name' => 'Pusat', 'is_pusat' => true]);
+        
+        $director = User::factory()->create([
+            'system_role' => 'direktur',
+            'nip' => null,
+            'division_id' => null,
+        ]);
+        $director->companies()->sync([$company->id]);
+        $director->branches()->sync([$branch->id]);
+
+        $admin = User::factory()->create(['system_role' => 'admin']);
+        $admin->companies()->sync([$company->id]);
+        $admin->branches()->sync([$branch->id]);
+
+        // Director on director.documents.index: company & branch switcher is hidden
+        $directorResp = $this->actingAs($director)->get(route('director.documents.index'));
+        $directorResp->assertOk();
+        $directorResp->assertDontSee('name="company_id"', false);
+        $directorResp->assertDontSee('name="branch_id"', false);
+
+        // Admin on director.documents.index: switcher is visible
+        $adminResp = $this->actingAs($admin)->get(route('director.documents.index'));
+        $adminResp->assertOk();
+        $adminResp->assertSee('name="company_id"', false);
+        $adminResp->assertSee('name="branch_id"', false);
+    }
 }

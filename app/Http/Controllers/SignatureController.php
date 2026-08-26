@@ -23,12 +23,14 @@ class SignatureController extends Controller
 
         if ($user && $user->hasSignature()) {
             $sig = $user->signature;
-            $internalBase = rtrim(config('onlyoffice.internal_url'), '/');
-            $relativeUrl = Storage::disk('public')->url($sig->file_path);
+            $onlyOfficeService = app(\App\Services\OnlyOfficeService::class);
+            $onlyOfficeUrl = $onlyOfficeService->getSignatureFileUrl($user);
+            $token = $onlyOfficeUrl ? $onlyOfficeService->generateInsertImageToken($onlyOfficeUrl) : null;
 
             return response()->json([
-                'success' => true,
-                'url'        => $internalBase . $relativeUrl,
+                'success'    => true,
+                'url'        => $onlyOfficeUrl,
+                'token'      => $token,
                 'client_url' => asset('storage/' . $sig->file_path),
                 'data_uri'   => 'data:image/png;base64,' . base64_encode(Storage::disk('public')->get($sig->file_path)),
                 'updated_at' => $sig->updated_at->toISOString(),
@@ -67,6 +69,9 @@ class SignatureController extends Controller
             return back()->with('error', 'Gagal memproses gambar tanda tangan.');
         }
 
+        $onlyOfficeService = app(\App\Services\OnlyOfficeService::class);
+        $imageData = $onlyOfficeService->formatSquareSignature($imageData, 400, 24);
+
         $filename = 'signatures/sig_' . $user->id . '_' . time() . '.png';
 
         // Delete existing signature file if exists
@@ -89,11 +94,17 @@ class SignatureController extends Controller
         $signature->refresh();
 
         if ($request->wantsJson()) {
+            $onlyOfficeService = app(\App\Services\OnlyOfficeService::class);
+            $onlyOfficeUrl = $onlyOfficeService->getSignatureFileUrl($user);
+            $token = $onlyOfficeUrl ? $onlyOfficeService->generateInsertImageToken($onlyOfficeUrl) : null;
+
             return response()->json([
-                'success'    => true,
-                'message'    => 'Tanda tangan digital berhasil disimpan.',
-                'url'        => asset('storage/' . $signature->file_path),
-                'updated_at' => $signature->updated_at->toISOString(),
+                'success'        => true,
+                'message'        => 'Tanda tangan digital berhasil disimpan.',
+                'url'            => asset('storage/' . $signature->file_path),
+                'onlyoffice_url' => $onlyOfficeUrl,
+                'token'          => $token,
+                'updated_at'     => $signature->updated_at->toISOString(),
             ]);
         }
 

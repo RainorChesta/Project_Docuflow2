@@ -2,15 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Branch;
 use App\Models\Company;
+use App\Models\Division;
 use App\Models\Document;
+use App\Models\DocumentType;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class DirectorDocumentController extends Controller
 {
     /**
-     * Display the Accordion view of all Companies, Branches, and Documents for Director.
+     * Display Google Drive-style folder navigation of Companies, Branches, Divisions, and Documents for Director.
      */
     public function index(Request $request): View
     {
@@ -22,44 +26,269 @@ class DirectorDocumentController extends Controller
         $search = $request->get('search');
         $selectedCompanyId = $request->get('company_id');
         $selectedBranchId = $request->get('branch_id');
+        $selectedDivisionId = $request->get('division_id');
+        $selectedDocTypeId = $request->get('document_type_id');
+        $selectedOwnerId = $request->get('owner_id');
+        $viewMode = $request->get('view_mode', 'grid');
 
-        $companiesQuery = Company::query();
-        if (!$user->isAdmin()) {
-            $companiesQuery->whereHas('users', fn($uq) => $uq->where('users.id', $user->id));
+        // Verify company access if specified
+        $currentCompany = null;
+        if ($selectedCompanyId) {
+            $compQuery = Company::where('id', $selectedCompanyId);
+            if (!$user->isAdmin()) {
+                $compQuery->whereHas('users', fn($q) => $q->where('users.id', $user->id));
+            }
+            $currentCompany = $compQuery->first();
+            if (!$currentCompany) {
+                $selectedCompanyId = null;
+                $selectedBranchId = null;
+                $selectedDivisionId = null;
+            }
         }
 
-        $companies = $companiesQuery->with(['branches' => function ($query) use ($search, $user) {
+        // Verify branch access if specified
+        $currentBranch = null;
+        if ($selectedBranchId && $selectedCompanyId) {
+            $branchQuery = Branch::where('id', $selectedBranchId)->where('company_id', $selectedCompanyId);
             if (!$user->isAdmin()) {
-                $query->whereHas('users', fn($uq) => $uq->where('users.id', $user->id));
+                $branchQuery->whereHas('users', fn($q) => $q->where('users.id', $user->id));
             }
-            $query->withCount(['documents' => function ($docQuery) use ($search) {
-                if ($search) {
-                    $docQuery->where('title', 'like', "%{$search}%")
-                        ->orWhere('document_number', 'like', "%{$search}%");
+            $currentBranch = $branchQuery->first();
+            if (!$currentBranch) {
+                $selectedBranchId = null;
+                $selectedDivisionId = null;
+            }
+        }
+
+        // Verify division if specified
+        $currentDivision = null;
+        if ($selectedDivisionId) {
+            $currentDivision = Division::find($selectedDivisionId);
+        }
+
+        // Build Breadcrumbs trail
+        $breadcrumbs = [
+            [
+                'name' => __('Semua Perusahaan'),
+                'url' => route('director.documents.index', array_filter(['view_mode' => $viewMode])),
+                'icon' => 'home',
+                'active' => !$selectedCompanyId,
+            ]
+        ];
+
+        if ($currentCompany) {
+            $breadcrumbs[] = [
+                'name' => $currentCompany->name,
+                'url' => route('director.documents.index', array_filter([
+                    'company_id' => $currentCompany->id,
+                    'view_mode' => $viewMode,
+                ])),
+                'icon' => 'company',
+                'active' => $selectedCompanyId && !$selectedBranchId,
+            ];
+        }
+
+        if ($currentBranch) {
+            $breadcrumbs[] = [
+                'name' => $currentBranch->name . ($currentBranch->is_pusat ? ' (Pusat)' : ''),
+                'url' => route('director.documents.index', array_filter([
+                    'company_id' => $currentCompany->id,
+                    'branch_id' => $currentBranch->id,
+                    'view_mode' => $viewMode,
+                ])),
+                'icon' => 'branch',
+                'active' => $selectedBranchId && !$selectedDivisionId,
+            ];
+        }
+
+        if ($currentDivision) {
+            $breadcrumbs[] = [
+                'name' => $currentDivision->name,
+                'url' => route('director.documents.index', array_filter([
+                    'company_id' => $currentCompany?->id,
+                    'branch_id' => $currentBranch?->id,
+                    'division_id' => $currentDivision->id,
+                    'view_mode' => $viewMode,
+                ])),
+                'icon' => 'division',
+                'active' => true,
+            ];
+        }
+
+        // Parent URL for "Up one level"
+        $parentUrl = null;
+        if ($selectedDivisionId) {
+            $parentUrl = route('director.documents.index', array_filter([
+                'company_id' => $selectedCompanyId,
+                'branch_id' => $selectedBranchId,
+                'view_mode' => $viewMode,
+            ]));
+        } elseif ($selectedBranchId) {
+            $parentUrl = route('director.documents.index', array_filter([
+                'company_id' => $selectedCompanyId,
+                'view_mode' => $viewMode,
+            ]));
+        } elseif ($selectedCompanyId) {
+            $parentUrl = route('director.documents.index', array_filter([
+                'view_mode' => $viewMode,
+            ]));
+        }
+
+        // Sub-Folders collection for current level
+        $folders = collect();
+
+        // Level 0: Root -> Show Company folders
+        if (!$selectedCompanyId) {
+            $companiesQuery = Company::query();
+            if (!$user->isAdmin()) {
+                $companiesQuery->whereHas('users', fn($uq) => $uq->where('users.id', $user->id));
+            }
+            $companies = $companiesQuery->withCount(['branches' => function ($bq) use ($user) {
+                if (!$user->isAdmin()) {
+                    $bq->whereHas('users', fn($uq) => $uq->where('users.id', $user->id));
                 }
-            }]);
-        }])->orderBy('name')->get();
+            }])->withCount(['documents'])->orderBy('name')->get();
 
-        // If specific branch is selected, fetch its documents
-        $documents = collect();
-        if ($selectedBranchId) {
-            if (!$user->isAdmin() && !$user->branches()->where('branches.id', $selectedBranchId)->exists()) {
-                abort(403, 'Unauthorized branch access.');
+            $folders = $companies->map(function ($comp) use ($viewMode) {
+                return [
+                    'id' => $comp->id,
+                    'type' => 'company',
+                    'name' => $comp->name,
+                    'code' => $comp->code,
+                    'sub_count' => $comp->branches_count,
+                    'sub_label' => 'Cabang',
+                    'doc_count' => $comp->documents_count,
+                    'url' => route('director.documents.index', array_filter([
+                        'company_id' => $comp->id,
+                        'view_mode' => $viewMode,
+                    ])),
+                ];
+            });
+        }
+        // Level 1: Inside Company -> Show Branch folders
+        elseif ($selectedCompanyId && !$selectedBranchId) {
+            $branchesQuery = Branch::where('company_id', $selectedCompanyId);
+            if (!$user->isAdmin()) {
+                $branchesQuery->whereHas('users', fn($uq) => $uq->where('users.id', $user->id));
             }
+            
+            if (!empty($search)) {
+                $branchesQuery->where('name', 'like', "%{$search}%");
+            }
+            
+            $branches = $branchesQuery->withCount(['documents'])->orderByDesc('is_pusat')->orderBy('name')->get();
 
-            $docQuery = Document::where('branch_id', $selectedBranchId)
-                ->with(['owner', 'division', 'documentType', 'currentVersion', 'versions']);
+            $folders = $branches->map(function ($br) use ($selectedCompanyId, $viewMode) {
+                return [
+                    'id' => $br->id,
+                    'type' => 'branch',
+                    'name' => $br->name,
+                    'code' => $br->effective_code,
+                    'is_pusat' => (bool) $br->is_pusat,
+                    'doc_count' => $br->documents_count,
+                    'url' => route('director.documents.index', array_filter([
+                        'company_id' => $selectedCompanyId,
+                        'branch_id' => $br->id,
+                        'view_mode' => $viewMode,
+                    ])),
+                ];
+            });
+        }
+        // Level 2: Inside Branch -> Show Division folders
+        elseif ($selectedBranchId && !$selectedDivisionId) {
+            $branchDocDivisions = Document::where('branch_id', $selectedBranchId)
+                ->whereNotNull('division_id')
+                ->select('division_id')
+                ->selectRaw('count(*) as count')
+                ->groupBy('division_id')
+                ->pluck('count', 'division_id');
 
-            if ($search) {
+            $allDivisions = Division::orderBy('name');
+            if (!empty($search)) {
+                $allDivisions->where('name', 'like', "%{$search}%");
+            }
+            $allDivisions = $allDivisions->get();
+            
+            $folders = $allDivisions->map(function ($div) use ($branchDocDivisions, $selectedCompanyId, $selectedBranchId, $viewMode) {
+                $count = $branchDocDivisions[$div->id] ?? 0;
+                return [
+                    'id' => $div->id,
+                    'type' => 'division',
+                    'name' => $div->name,
+                    'code' => $div->code,
+                    'doc_count' => $count,
+                    'url' => route('director.documents.index', array_filter([
+                        'company_id' => $selectedCompanyId,
+                        'branch_id' => $selectedBranchId,
+                        'division_id' => $div->id,
+                        'view_mode' => $viewMode,
+                    ])),
+                ];
+            });
+        }
+
+        // Fetch Documents for current branch & filters
+        $documents = collect();
+        $availableDivisions = collect();
+        $availableDocumentTypes = collect();
+        $availableCreators = collect();
+
+        $hasSearchOrFilter = $selectedDivisionId 
+            || ($search !== null && trim($search) !== '') 
+            || $selectedDocTypeId 
+            || $selectedOwnerId;
+
+        // Documents are only queried inside a selected division
+        if ($selectedDivisionId) {
+            // Populate filter options dynamically from documents in this selected division
+            $branchDocTypes = DocumentType::whereHas('documents', fn($q) => $q->where('division_id', $selectedDivisionId))->orderBy('name')->get();
+            $availableDocumentTypes = $branchDocTypes->isNotEmpty() ? $branchDocTypes : DocumentType::orderBy('name')->get();
+
+            $availableCreators = User::whereHas('documents', fn($q) => $q->where('division_id', $selectedDivisionId))->orderBy('name')->get(['id', 'name']);
+
+            $docQuery = Document::where('division_id', $selectedDivisionId)
+                ->with(['owner', 'division', 'documentType', 'currentVersion', 'versions', 'branch.company']);
+
+            // Apply search filter for documents inside division
+            if (!empty($search)) {
                 $docQuery->where(function ($q) use ($search) {
                     $q->where('title', 'like', "%{$search}%")
-                        ->orWhere('document_number', 'like', "%{$search}%");
+                      ->orWhere('document_number', 'like', "%{$search}%");
                 });
             }
 
-            $documents = $docQuery->latest()->paginate(15);
+            // Apply document type filter
+            if ($selectedDocTypeId) {
+                $docQuery->where('document_type_id', $selectedDocTypeId);
+            }
+
+            // Apply creator filter
+            if ($selectedOwnerId) {
+                $docQuery->where('owner_id', $selectedOwnerId);
+            }
+
+            $documents = $docQuery->latest()->paginate(16)->withQueryString();
         }
 
-        return view('director.documents.index', compact('companies', 'documents', 'selectedCompanyId', 'selectedBranchId', 'search'));
+        return view('director.documents.index', compact(
+            'breadcrumbs',
+            'parentUrl',
+            'folders',
+            'documents',
+            'hasSearchOrFilter',
+            'currentCompany',
+            'currentBranch',
+            'currentDivision',
+            'selectedCompanyId',
+            'selectedBranchId',
+            'selectedDivisionId',
+            'selectedDocTypeId',
+            'selectedOwnerId',
+            'search',
+            'viewMode',
+            'availableDivisions',
+            'availableDocumentTypes',
+            'availableCreators'
+        ));
     }
 }

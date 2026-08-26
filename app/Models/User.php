@@ -198,5 +198,29 @@ class User extends Authenticatable
         return $versionsCount + $rollbacksCount;
     }
 
+    /**
+     * Hitung total dokumen baru yang dibagikan kepada pengguna yang belum dibuka / dibaca.
+     * Hanya muncul pada pengguna yang diberi/menerima akses, bukan pemilik.
+     * Dihitung per dokumen (meskipun pengguna diberi akses bertahap/berganda seperti viewer lalu editor).
+     */
+    public function sharedDocumentsCount(): int
+    {
+        return $this->unreadNotifications()
+            ->where('data->type', 'document_shared')
+            ->get()
+            ->map(function ($notification) {
+                $data = $notification->data;
+                if (!empty($data['document_id'])) {
+                    return (string) $data['document_id'];
+                }
+                if (!empty($data['url']) && preg_match('/\/documents\/([0-9a-f\-]{36}|[0-9]+)/', $data['url'], $matches)) {
+                    return (string) $matches[1];
+                }
+                return $notification->id;
+            })
+            ->unique()
+            ->count();
+    }
+
     protected $with = ['signature'];
 }

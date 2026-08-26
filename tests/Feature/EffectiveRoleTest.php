@@ -136,6 +136,9 @@ class EffectiveRoleTest extends TestCase
         $doc->update(['general_access' => 'anyone_with_link', 'link_role' => 'viewer']);
 
         $this->assertSame('viewer', $this->service->resolveEffectiveRole($doc, $user));
+
+        $doc->update(['link_role' => 'editor']);
+        $this->assertSame('editor', $this->service->resolveEffectiveRole($doc, $user));
     }
 
     public function test_personal_share_beats_link_role(): void
@@ -147,6 +150,20 @@ class EffectiveRoleTest extends TestCase
 
         DocumentShare::create(['document_id' => $doc->id, 'user_id' => $user->id, 'role' => 'editor', 'invited_by' => $owner->id]);
 
+        $this->assertSame('editor', $this->service->resolveEffectiveRole($doc, $user));
+    }
+
+    public function test_update_general_access_with_editor_role(): void
+    {
+        $owner = User::factory()->create();
+        $user = User::factory()->create();
+        $doc = $this->makeDocument($owner);
+
+        $this->service->updateGeneralAccess($doc, 'anyone_with_link', 'editor');
+        $doc->refresh();
+
+        $this->assertSame('anyone_with_link', $doc->general_access);
+        $this->assertSame('editor', $doc->link_role);
         $this->assertSame('editor', $this->service->resolveEffectiveRole($doc, $user));
     }
 

@@ -76,10 +76,24 @@ class DocumentController extends Controller
             // My Documents — semua dokumen milik user, apapun scopenya.
             $query->ownedBy($user);
         } elseif ($type === 'shared') {
-            // Shared Documents — shared directly with user, excluding owned docs.
-            $query->whereHas('shares', fn($q) => $q->where('user_id', $user->id))
-                  ->where('owner_id', '!=', $user->id)
-                  ->with(['shares' => fn($q) => $q->where('user_id', $user->id)]);
+            // Shared Documents — shared directly with user or user's division, excluding owned docs.
+            $divisionIds = $user->allDivisionIds();
+            $query->where('owner_id', '!=', $user->id)
+                  ->where(function ($q) use ($user, $divisionIds) {
+                      $q->whereHas('shares', fn($sq) => $sq->where('user_id', $user->id));
+                      if (!empty($divisionIds)) {
+                          $q->orWhereHas('divisionShares', fn($dq) => $dq->whereIn('division_id', $divisionIds));
+                      }
+                  })
+                  ->with([
+                      'shares' => fn($q) => $q->where('user_id', $user->id),
+                      'divisionShares' => fn($q) => !empty($divisionIds) ? $q->whereIn('division_id', $divisionIds) : $q,
+                  ]);
+
+            // Clear unread shared document notifications when viewing the shared list
+            $user->unreadNotifications()
+                ->where('data->type', 'document_shared')
+                ->update(['read_at' => now()]);
         } else {
             // Division-scoped documents of divisions the user belongs to.
             $query->division($user);
@@ -234,7 +248,36 @@ class DocumentController extends Controller
     {
         $this->authorize('view', $document);
 
-        $document->load('owner', 'division', 'documentType', 'currentVersion', 'versions.author');
+        $currentUser = auth()->user();
+
+        // If the viewer is not the document owner, and has granted access to this document, notify the owner
+        if ($document->owner_id && $currentUser && $currentUser->id !== $document->owner_id) {
+            $hasGrantedAccess = \App\Models\DocumentShare::where('document_id', $document->id)
+                ->where('user_id', $currentUser->id)
+                ->exists();
+
+            if (!$hasGrantedAccess && !empty($currentUser->allDivisionIds())) {
+                $hasGrantedAccess = \App\Models\DocumentDivisionShare::where('document_id', $document->id)
+                    ->whereIn('division_id', $currentUser->allDivisionIds())
+                    ->exists();
+            }
+
+            if ($hasGrantedAccess) {
+                // Mark unread share notification for this document as read
+                $currentUser->unreadNotifications()
+                    ->where('data->type', 'document_shared')
+                    ->where('data->document_id', $document->id)
+                    ->update(['read_at' => now()]);
+
+                // Throttle notification per viewer & document (15 minutes) to prevent notification spam on page reload
+                $throttleKey = 'notif_doc_opened_' . $document->id . '_' . $currentUser->id;
+                if (\Illuminate\Support\Facades\Cache::add($throttleKey, true, now()->addMinutes(15))) {
+                    $document->owner?->notify(new \App\Notifications\DocumentOpenedByGrantedUser($document, $currentUser->name));
+                }
+            }
+        }
+
+        $document->load('owner', 'division', 'documentType', 'currentVersion', 'versions.author', 'shares.user', 'divisionShares.division');
 
         $divisions = auth()->user()->isAdmin()
             ? Division::all()
@@ -343,22 +386,26 @@ class DocumentController extends Controller
             'edit'
         );
 
-        $qrCodeDataUri = $this->qrCodeService->dataUri($this->qrCodeService->qrcodeUrl($document));
         $currentUser = auth()->user();
-        $internalBase = rtrim(config('onlyoffice.internal_url'), '/');
-        $userSignatureUrl = ($currentUser->hasSignature() && $currentUser->signature?->file_path)
-            ? $internalBase . Storage::disk('public')->url($currentUser->signature->file_path)
-            : null;
+        $userSignatureUrl = $this->onlyOfficeService->getSignatureFileUrl($currentUser);
+        $userSignatureToken = $userSignatureUrl ? $this->onlyOfficeService->generateInsertImageToken($userSignatureUrl) : null;
         $userSignatureDataUri = ($currentUser->hasSignature() && $currentUser->signature?->file_path && Storage::disk('public')->exists($currentUser->signature->file_path))
             ? 'data:image/png;base64,' . base64_encode(Storage::disk('public')->get($currentUser->signature->file_path))
             : null;
+
+        $qrCodeUrl = $this->onlyOfficeService->getQrCodeFileUrl($document);
+        $qrCodeToken = $this->onlyOfficeService->generateInsertImageToken($qrCodeUrl);
+        $qrCodeDataUri = $this->qrCodeService->dataUri($this->qrCodeService->qrcodeUrl($document));
 
         return view('documents.edit', compact(
             'document',
             'version',
             'onlyOfficeConfig',
+            'qrCodeUrl',
+            'qrCodeToken',
             'qrCodeDataUri',
             'userSignatureUrl',
+            'userSignatureToken',
             'userSignatureDataUri'
         ));
     }
@@ -369,7 +416,18 @@ class DocumentController extends Controller
 
         $document->load('owner', 'division', 'documentType', 'currentVersion');
 
-        return view('documents.preview', compact('document'));
+        $version = $document->displayVersion();
+        $onlyOfficeConfig = null;
+        if ($version) {
+            $onlyOfficeConfig = $this->onlyOfficeService->generateEditorConfig(
+                $document,
+                $version,
+                auth()->user(),
+                'view'
+            );
+        }
+
+        return view('documents.preview', compact('document', 'onlyOfficeConfig'));
     }
 
     public function previewContent(Document $document): View
@@ -387,7 +445,14 @@ class DocumentController extends Controller
 
         abort_unless($version->document_id === $document->id, 404);
 
-        return view('documents.preview-version', compact('document', 'version'));
+        $onlyOfficeConfig = $this->onlyOfficeService->generateEditorConfig(
+            $document,
+            $version,
+            auth()->user(),
+            'view'
+        );
+
+        return view('documents.preview-version', compact('document', 'version', 'onlyOfficeConfig'));
     }
 
     public function save(Request $request, Document $document): RedirectResponse

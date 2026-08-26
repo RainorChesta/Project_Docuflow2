@@ -58,8 +58,13 @@ class DocumentShareService
             }
         }
 
-        if ($best === null && $document->general_access === self::GENERAL_ACCESS_ANYONE_WITH_LINK) {
-            return $document->link_role;
+        if ($document->general_access === self::GENERAL_ACCESS_ANYONE_WITH_LINK && $document->link_role !== null) {
+            $linkRole = $document->link_role;
+            $linkWeight = self::ROLE_WEIGHTS[$linkRole] ?? 1;
+            if ($linkWeight > $bestWeight) {
+                $best = $linkRole;
+                $bestWeight = $linkWeight;
+            }
         }
 
         return $best;
@@ -67,10 +72,16 @@ class DocumentShareService
 
     public function addUserShare(Document $document, User $user, string $role, User $invitedBy): DocumentShare
     {
-        return DocumentShare::updateOrCreate(
+        $share = DocumentShare::updateOrCreate(
             ['document_id' => $document->id, 'user_id' => $user->id],
             ['role' => $role, 'invited_by' => $invitedBy->id],
         );
+
+        if ($user->id !== $invitedBy->id) {
+            $user->notify(new \App\Notifications\DocumentSharedWithUser($document, $role, $invitedBy->name));
+        }
+
+        return $share;
     }
 
     public function updateUserShareRole(DocumentShare $share, string $newRole): void
@@ -78,17 +89,49 @@ class DocumentShareService
         $share->update(['role' => $newRole]);
     }
 
-    public function removeUserShare(DocumentShare $share): void
+    public function removeUserShare(DocumentShare $share, ?User $revokedBy = null): void
     {
+        $documentId = $share->document_id;
+        $userId = $share->user_id;
+        $document = $share->document;
+
         $share->delete();
+
+        if ($userId && $documentId) {
+            $user = User::find($userId);
+            $user?->unreadNotifications()
+                ->where('data->type', 'document_shared')
+                ->where('data->document_id', $documentId)
+                ->delete();
+
+            if ($revokedBy && $user && $user->id !== $revokedBy->id && $document) {
+                $user->notify(new \App\Notifications\DocumentAccessRevoked($document, $revokedBy->name));
+            }
+        }
     }
 
     public function addDivisionShare(Document $document, Division $division, string $role, User $invitedBy): DocumentDivisionShare
     {
-        return DocumentDivisionShare::updateOrCreate(
+        $share = DocumentDivisionShare::updateOrCreate(
             ['document_id' => $document->id, 'division_id' => $division->id],
             ['role' => $role, 'invited_by' => $invitedBy->id],
         );
+
+        $divisionUsers = User::where('division_id', $division->id)
+            ->where('is_active', true)
+            ->where('id', '!=', $invitedBy->id)
+            ->get();
+
+        foreach ($divisionUsers as $member) {
+            $member->notify(new \App\Notifications\DocumentSharedWithDivision(
+                $document,
+                $division->name,
+                $role,
+                $invitedBy->name
+            ));
+        }
+
+        return $share;
     }
 
     public function updateDivisionShareRole(DocumentDivisionShare $share, string $newRole): void
@@ -96,18 +139,39 @@ class DocumentShareService
         $share->update(['role' => $newRole]);
     }
 
-    public function removeDivisionShare(DocumentDivisionShare $share): void
+    public function removeDivisionShare(DocumentDivisionShare $share, ?User $revokedBy = null): void
     {
+        $documentId = $share->document_id;
+        $divisionId = $share->division_id;
+        $document = $share->document;
+        $divisionName = $share->division?->name;
+
         $share->delete();
+
+        if ($divisionId && $documentId) {
+            $divisionUsers = User::where('division_id', $divisionId)
+                ->where('is_active', true)
+                ->get();
+
+            foreach ($divisionUsers as $member) {
+                $member->unreadNotifications()
+                    ->where('data->type', 'document_shared')
+                    ->where('data->document_id', $documentId)
+                    ->delete();
+
+                if ($revokedBy && $member->id !== $revokedBy->id && $document) {
+                    $member->notify(new \App\Notifications\DocumentAccessRevoked($document, $revokedBy->name, $divisionName));
+                }
+            }
+        }
     }
 
-    public function updateGeneralAccess(Document $document, string $access): void
+    public function updateGeneralAccess(Document $document, string $access, ?string $linkRole = null): void
     {
-        // Link-based access always defaults to Viewer; per-user roles are set
-        // individually in the "Orang dengan akses" list, never via the link.
+        $role = $access === self::GENERAL_ACCESS_ANYONE_WITH_LINK ? ($linkRole ?? $document->link_role ?? 'viewer') : null;
         $document->update([
             'general_access' => $access,
-            'link_role' => $access === self::GENERAL_ACCESS_ANYONE_WITH_LINK ? 'viewer' : null,
+            'link_role' => $role,
         ]);
     }
 

@@ -216,9 +216,10 @@
         <script src="{{ rtrim(config('onlyoffice.url'), '/') }}/web-apps/apps/api/documents/api.js"
                 onerror="document.getElementById('onlyoffice-fallback').classList.remove('hidden');"></script>
         <script>
-            const qrCodeDataUri = @json($qrCodeDataUri);
-            const mySignatureDataUri = @json($userSignatureDataUri ?? null);
+            const qrCodeUrl = @json($qrCodeUrl ?? null);
+            const qrCodeToken = @json($qrCodeToken ?? null);
             const mySignatureUrl = @json($userSignatureUrl ?? null);
+            const mySignatureToken = @json($userSignatureToken ?? null);
 
             document.addEventListener('DOMContentLoaded', function() {
                 if (typeof DocsAPI === 'undefined') {
@@ -269,50 +270,69 @@
             });
 
             /**
-             * Insert image directly into ONLYOFFICE document editor via DocsAPI Asc.scope
+             * Insert image directly into ONLYOFFICE document editor via DocsAPI insertImage
              */
-            function insertImageIntoOnlyOffice(imageUrl, widthPx = 150, heightPx = 150) {
+            function insertImageIntoOnlyOffice(imageUrl, widthPx = 140, heightPx = 140, token = null) {
                 if (!window.docEditor) {
-                    alert('Editor belum selesai dimuat. Tunggu sebentar...');
+                    alert('{{ __("Editor belum selesai dimuat. Tunggu sebentar...") }}');
+                    return;
+                }
+
+                if (!imageUrl) {
+                    alert('{{ __("URL gambar tidak valid.") }}');
                     return;
                 }
 
                 try {
-                    window.docEditor.insertImage({
+                    const payload = {
+                        c: "add",
+                        images: [
+                            {
+                                fileType: "png",
+                                url: imageUrl,
+                                width: widthPx,
+                                height: heightPx
+                            }
+                        ],
                         fileType: "png",
                         url: imageUrl,
                         width: widthPx,
                         height: heightPx
-                    });
+                    };
+
+                    if (token) {
+                        payload.token = token;
+                    }
+
+                    window.docEditor.insertImage(payload);
                 } catch (err) {
                     console.warn('insertImage error:', err);
-                    alert('Tidak dapat menyisipkan gambar secara otomatis. Silakan gunakan menu Insert -> Picture pada toolbar ONLYOFFICE.');
+                    alert('{{ __("Tidak dapat menyisipkan gambar secara otomatis. Silakan gunakan menu Insert -> Picture pada toolbar ONLYOFFICE.") }}');
                 }
             }
 
             function insertQrCodeToEditor() {
-                if (!qrCodeDataUri) {
-                    alert('QR Code dokumen tidak tersedia.');
+                if (!qrCodeUrl) {
+                    alert('{{ __("QR Code dokumen tidak tersedia.") }}');
                     return;
                 }
-                insertImageIntoOnlyOffice(qrCodeDataUri, 140, 140);
+                insertImageIntoOnlyOffice(qrCodeUrl, 140, 140, qrCodeToken);
             }
 
             function insertMySignature() {
-                const sig = mySignatureUrl || mySignatureDataUri;
-                if (!sig) {
-                    alert('Anda belum memiliki tanda tangan tersimpan.');
+                if (!mySignatureUrl) {
+                    alert('{{ __("Anda belum memiliki tanda tangan tersimpan.") }}');
                     return;
                 }
-                insertImageIntoOnlyOffice(sig, 160, 80);
+                insertImageIntoOnlyOffice(mySignatureUrl, 140, 140, mySignatureToken);
             }
 
-            function insertSignatureImage(signatureUrl, userName) {
+            function insertSignatureImage(signatureUrl, userName, token = null) {
                 if (!signatureUrl) {
                     alert('Pengguna ' + userName + ' belum memiliki tanda tangan tersimpan.');
                     return;
                 }
-                insertImageIntoOnlyOffice(signatureUrl, 160, 80);
+                insertImageIntoOnlyOffice(signatureUrl, 140, 140, token);
             }
 
             function openSignatureSelectorModal() {
@@ -354,9 +374,8 @@
                 fetch(`/profile/signature?user_id=${userId}`)
                     .then(res => res.json())
                     .then(data => {
-                        const targetUrl = data.url || data.data_uri;
-                        if (data.success && targetUrl) {
-                            insertSignatureImage(targetUrl, userName);
+                        if (data.success && data.url) {
+                            insertSignatureImage(data.url, userName, data.token || null);
                         } else {
                             alert('Tanda tangan untuk ' + userName + ' tidak ditemukan.');
                         }

@@ -7,7 +7,7 @@
     $activeBranchId = $contextService->getActiveBranchId($user);
 @endphp
 
-@if($companies->isNotEmpty())
+@if(!$user?->isDirector() && $companies->isNotEmpty())
     <div class="flex items-center gap-1.5 sm:gap-2 mr-2" x-data="{
         companyId: '{{ $activeCompanyId }}',
         branchId: '{{ $activeBranchId }}',

@@ -48,6 +48,146 @@ class OnlyOfficeService
     }
 
     /**
+     * Get the URL ONLYOFFICE uses to fetch a user's signature image.
+     */
+    public function getSignatureFileUrl(User $user): ?string
+    {
+        if (!$user->hasSignature()) {
+            return null;
+        }
+
+        $internalBase = rtrim(config('onlyoffice.internal_url'), '/');
+
+        return $internalBase . route('onlyoffice.signature', [
+            'user' => $user->id,
+        ], false);
+    }
+
+    /**
+     * Get the URL ONLYOFFICE uses to fetch the document's QR code PNG image.
+     */
+    public function getQrCodeFileUrl(Document $document): string
+    {
+        $internalBase = rtrim(config('onlyoffice.internal_url'), '/');
+
+        return $internalBase . route('onlyoffice.qrcode', [
+            'document' => $document->id,
+        ], false);
+    }
+
+    /**
+     * Generate a signed JWT token for the ONLYOFFICE insertImage Docs API command.
+     */
+    public function generateInsertImageToken(string $imageUrl): ?string
+    {
+        if (!config('onlyoffice.jwt_enabled') || empty(config('onlyoffice.jwt_secret'))) {
+            return null;
+        }
+
+        $payload = [
+            'c' => 'add',
+            'images' => [
+                [
+                    'fileType' => 'png',
+                    'url' => $imageUrl,
+                ],
+            ],
+            'fileType' => 'png',
+            'url' => $imageUrl,
+        ];
+
+        return JWT::encode($payload, config('onlyoffice.jwt_secret'), 'HS256');
+    }
+
+    /**
+     * Convert/trim any signature PNG into a crisp, centered 1:1 square PNG
+     * with transparent background, matching the square QR code dimensions.
+     */
+    public function formatSquareSignature(string $rawPngBytes, int $targetSize = 400, int $padding = 24): string
+    {
+        if (!extension_loaded('gd')) {
+            return $rawPngBytes;
+        }
+
+        $src = @imagecreatefromstring($rawPngBytes);
+        if (!$src) {
+            return $rawPngBytes;
+        }
+
+        $srcW = imagesx($src);
+        $srcH = imagesy($src);
+
+        // Find bounding box of signature ink strokes
+        $minX = $srcW;
+        $minY = $srcH;
+        $maxX = 0;
+        $maxY = 0;
+        $hasStroke = false;
+
+        for ($y = 0; $y < $srcH; $y++) {
+            for ($x = 0; $x < $srcW; $x++) {
+                $rgba = imagecolorat($src, $x, $y);
+                $alpha = ($rgba >> 24) & 0x7F; // 0 = opaque, 127 = fully transparent
+                $r = ($rgba >> 16) & 0xFF;
+                $g = ($rgba >> 8) & 0xFF;
+                $b = $rgba & 0xFF;
+
+                // Pixel is considered part of ink stroke if not transparent and not white background
+                $isNotTransparent = ($alpha < 110);
+                $isNotWhite = ($r < 240 || $g < 240 || $b < 240);
+
+                if ($isNotTransparent && $isNotWhite) {
+                    $hasStroke = true;
+                    if ($x < $minX) $minX = $x;
+                    if ($x > $maxX) $maxX = $x;
+                    if ($y < $minY) $minY = $y;
+                    if ($y > $maxY) $maxY = $y;
+                }
+            }
+        }
+
+        if (!$hasStroke) {
+            $minX = 0;
+            $minY = 0;
+            $maxX = $srcW - 1;
+            $maxY = $srcH - 1;
+        }
+
+        $cropW = max(1, $maxX - $minX + 1);
+        $cropH = max(1, $maxY - $minY + 1);
+
+        // Create square destination image with transparent background
+        $dest = imagecreatetruecolor($targetSize, $targetSize);
+        imagealphablending($dest, false);
+        imagesavealpha($dest, true);
+        $transparent = imagecolorallocatealpha($dest, 255, 255, 255, 127);
+        imagefilledrectangle($dest, 0, 0, $targetSize, $targetSize, $transparent);
+        imagealphablending($dest, true);
+
+        // Scale cropped signature to fill available square area proportionally
+        $availSize = max(1, $targetSize - (2 * $padding));
+        $scale = min($availSize / $cropW, $availSize / $cropH);
+
+        $newW = (int) round($cropW * $scale);
+        $newH = (int) round($cropH * $scale);
+
+        // Center within square canvas
+        $destX = (int) round(($targetSize - $newW) / 2);
+        $destY = (int) round(($targetSize - $newH) / 2);
+
+        imagecopyresampled($dest, $src, $destX, $destY, $minX, $minY, $newW, $newH, $cropW, $cropH);
+
+        ob_start();
+        imagepng($dest);
+        $output = ob_get_clean();
+
+        imagedestroy($src);
+        imagedestroy($dest);
+
+        return $output ?: $rawPngBytes;
+    }
+
+    /**
      * Get the callback URL ONLYOFFICE calls to save the document.
      */
     public function getCallbackUrl(Document $document): string
@@ -129,6 +269,7 @@ class OnlyOfficeService
                     'name' => $user->name,
                 ],
                 'customization' => [
+                    'autoFocus' => false,
                     'autosave' => (bool) config('onlyoffice.autosave', true),
                     'forcesave' => (bool) config('onlyoffice.forcesave', true),
                     'chat' => false,

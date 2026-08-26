@@ -59,7 +59,9 @@ class NotificationController extends Controller
             if (!$doc) {
                 return false;
             }
-            if (!$user->can('view', $doc)) {
+
+            $type = $n->data['type'] ?? '';
+            if ($type !== 'document_access_revoked' && !$user->can('view', $doc)) {
                 return false;
             }
             

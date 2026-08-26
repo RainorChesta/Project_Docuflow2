@@ -36,6 +36,15 @@
                     }
                     try {
                         const config = @json($onlyOfficeConfig);
+                        const savedY = window.scrollY;
+                        config.events = config.events || {};
+                        const origOnAppReady = config.events.onAppReady;
+                        config.events.onAppReady = function() {
+                            if (window.scrollY !== savedY && savedY < 200) {
+                                window.scrollTo({ top: savedY, behavior: 'instant' });
+                            }
+                            if (typeof origOnAppReady === 'function') origOnAppReady();
+                        };
                         new DocsAPI.DocEditor("docx-preview-{{ $version->id }}", config);
                     } catch (e) {
                         console.error('ONLYOFFICE initialization error:', e);

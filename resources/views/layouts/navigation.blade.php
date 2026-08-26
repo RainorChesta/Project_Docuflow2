@@ -81,8 +81,22 @@
                   {{ request()->routeIs('documents.*') && request('type', '') === 'shared' ? 'nav-item-active bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0'"
            :title="open ? '' : 'Shared Documents'">
-            <svg xmlns="http://www.w3.org/2000/svg" class="nav-item-icon h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">Shared Documents</span>
+            <div class="relative shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="nav-item-icon h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                @php($sharedDocsCount = auth()->user()->sharedDocumentsCount())
+                @if($sharedDocsCount > 0)
+                    <span class="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-error"></span>
+                    </span>
+                @endif
+            </div>
+            <span class="whitespace-nowrap flex-1 flex items-center justify-between" :class="open ? '' : 'lg:hidden'">
+                <span>Shared Documents</span>
+                @if($sharedDocsCount > 0)
+                    <span class="badge badge-error badge-xs font-bold text-white px-1.5">{{ $sharedDocsCount }}</span>
+                @endif
+            </span>
         </a>
 
         <a href="{{ route('documents.index', ['type' => 'division']) }}"
@@ -162,6 +176,29 @@
            :title="open ? '' : '{{ __('Dokumen Saya') }}'">
             <svg xmlns="http://www.w3.org/2000/svg" class="nav-item-icon h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
             <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Saya') }}</span>
+        </a>
+
+        <a href="{{ route('documents.index', ['type' => 'shared']) }}"
+           class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                  {{ request()->routeIs('documents.*') && request('type', '') === 'shared' ? 'nav-item-active bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"
+           :class="open ? '' : 'lg:justify-center lg:px-0'"
+           :title="open ? '' : 'Shared Documents'">
+            <div class="relative shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="nav-item-icon h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                @php($adminSharedDocsCount = auth()->user()->sharedDocumentsCount())
+                @if($adminSharedDocsCount > 0)
+                    <span class="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-error"></span>
+                    </span>
+                @endif
+            </div>
+            <span class="whitespace-nowrap flex-1 flex items-center justify-between" :class="open ? '' : 'lg:hidden'">
+                <span>Shared Documents</span>
+                @if($adminSharedDocsCount > 0)
+                    <span class="badge badge-error badge-xs font-bold text-white px-1.5">{{ $adminSharedDocsCount }}</span>
+                @endif
+            </span>
         </a>
         @endif
 
