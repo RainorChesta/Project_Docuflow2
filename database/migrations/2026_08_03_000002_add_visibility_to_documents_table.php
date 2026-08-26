@@ -12,6 +12,13 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // 1. Add standalone index on division_id first in a separate query so that
+        // the foreign key constraint remains satisfied when dropping the composite index.
+        Schema::table('documents', function (Blueprint $table) {
+            $table->index('division_id');
+        });
+
+        // 2. Add visibility column, drop legacy composite index, and add new composite index.
         Schema::table('documents', function (Blueprint $table) {
             // visibility: general (public) | division (division-specific) | personal (private to owner)
             $table->string('visibility')->default('division')->after('title');
@@ -38,6 +45,7 @@ return new class extends Migration
             $table->foreignId('division_id')->nullable(false)->change();
             $table->dropIndex(['visibility', 'division_id']);
             $table->index(['division_id', 'is_public']);
+            $table->dropIndex(['division_id']);
         });
     }
 };
