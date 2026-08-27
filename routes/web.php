@@ -127,7 +127,7 @@ Route::middleware('auth')->group(function () {
 Route::get('/onlyoffice/documents/{document}/versions/{version}/file', [\App\Http\Controllers\OnlyOfficeController::class, 'file'])->name('onlyoffice.file');
 Route::get('/onlyoffice/users/{user}/signature', [\App\Http\Controllers\OnlyOfficeController::class, 'signature'])->name('onlyoffice.signature');
 Route::get('/onlyoffice/documents/{document}/qrcode', [\App\Http\Controllers\OnlyOfficeController::class, 'qrcode'])->name('onlyoffice.qrcode');
-Route::post('/onlyoffice/documents/{document}/callback', [\App\Http\Controllers\OnlyOfficeController::class, 'callback'])->name('onlyoffice.callback')->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class]);
+Route::match(['get', 'post'], '/onlyoffice/documents/{document}/callback', [\App\Http\Controllers\OnlyOfficeController::class, 'callback'])->name('onlyoffice.callback')->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class]);
 
 // Share-token link access (Google Docs model)
 Route::get('/shared/{token}', [DocumentShareController::class, 'accessByToken'])->name('documents.shared');

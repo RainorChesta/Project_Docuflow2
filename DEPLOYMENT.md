@@ -35,6 +35,7 @@ rsync -avz -e "ssh -p 2022 -i ~/.ssh/hyu_deploy_key" --progress \
   --exclude='.git' \
   --exclude='.env' \
   --exclude='node_modules' \
+  --exclude='public/storage' \
   --exclude='storage/*.key' \
   --exclude='storage/logs/*' \
   --exclude='storage/framework/cache/*' \
@@ -431,6 +432,7 @@ rsync -avz -e "${SSH_CMD}" --progress \
   --exclude='.git' \
   --exclude='.env' \
   --exclude='node_modules' \
+  --exclude='public/storage' \
   --exclude='storage/*.key' \
   --exclude='storage/logs/*' \
   --exclude='storage/framework/cache/*' \
@@ -442,13 +444,15 @@ echo "⚡ Running post-deployment commands on server..."
 ${SSH_CMD} ${REMOTE} << EOF
   cd ${REMOTE_DIR}
   composer install --no-dev --optimize-autoloader
+  rm -f public/storage
+  php artisan storage:link
   php artisan migrate --force
   php artisan config:cache
   php artisan route:cache
   php artisan view:cache
   php artisan queue:restart
   chown -R www-data:www-data ${REMOTE_DIR}
-  chmod -R 775 ${REMOTE_DIR}/storage ${REMOTE_DIR}/bootstrap/cache
+  chmod -R 775 ${REMOTE_DIR}/storage ${REMOTE_DIR}/bootstrap/cache ${REMOTE_DIR}/storage/app/public
   supervisorctl restart dokuflow-reverb
 EOF
 
@@ -484,14 +488,10 @@ chmod +x deploy.sh
 
 ### Gotcha 2: Broken `/storage` Symlink & 403 Forbidden Images
 * **Symptom:** Assets in `/storage/` (e.g., `https://dokuflow.cmhgroup.id/storage/logo.png`) return `403 Forbidden` or `404 Not Found`.
-* **Root Cause:** Running `rsync` from local machine uploads the local machine symlink (`/home/austin/Web Dev/.../storage/app/public`) to the server.
-* **Fix:** Re-link storage directly on the production server:
+* **Root Cause:** Running `rsync` from local machine uploads the local machine symlink (`/home/austin/Web Dev/.../storage/app/public`) to the server, pointing to a non-existent local directory path on the server.
+* **Fix:** Re-link storage directly on the production server and reset directory permissions:
   ```bash
-  rm -f /var/www/dokuflow.cmhgroup.id/public/storage
-  cd /var/www/dokuflow.cmhgroup.id
-  php artisan storage:link
-  chown -R www-data:www-data /var/www/dokuflow.cmhgroup.id/storage /var/www/dokuflow.cmhgroup.id/public/storage
-  chmod -R 775 /var/www/dokuflow.cmhgroup.id/storage
+  ssh -p 2022 -i ~/.ssh/hyu_deploy_key root@hyu.cmhgroup.id "rm -f /var/www/dokuflow.cmhgroup.id/public/storage && cd /var/www/dokuflow.cmhgroup.id && php artisan storage:link && chown -R www-data:www-data /var/www/dokuflow.cmhgroup.id/storage /var/www/dokuflow.cmhgroup.id/public/storage && chmod -R 775 /var/www/dokuflow.cmhgroup.id/storage /var/www/dokuflow.cmhgroup.id/storage/app/public"
   ```
 
 ### Gotcha 3: HTTPS & Let's Encrypt SSL Setup
