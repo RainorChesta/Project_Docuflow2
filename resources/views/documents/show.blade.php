@@ -1,16 +1,14 @@
 <x-app-layout>
     <x-slot name="header">Document Detail</x-slot>
 
-    @if(!auth()->user()->isAdmin() && !auth()->user()->isHead())
-        <x-confirm-modal
-            name="confirm-discard-{{ $document->id }}"
-            :title="__('Delete Document?')"
-            :message="__('Are you sure you want to delete this document and all its changes?')"
-            :action="route('documents.destroy', $document)"
-            method="DELETE"
-            :confirmLabel="__('Delete Document')"
-        />
-    @endif
+    <x-confirm-modal
+        name="confirm-discard-{{ $document->id }}"
+        :title="__('Delete Document?')"
+        :message="__('Are you sure you want to delete this document and all its changes?')"
+        :action="route('documents.destroy', $document)"
+        method="DELETE"
+        :confirmLabel="__('Delete Document')"
+    />
 
     {{-- Konfirmasi approve rollback (banner pending rollback) --}}
     @if($document->hasPendingRollback() && auth()->user()->can('approve', $document))

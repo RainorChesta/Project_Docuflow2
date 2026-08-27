@@ -20,4 +20,15 @@
             {{ __('Bersihkan') }}
         </a>
     @endif
+    
+    <div class="divider divider-horizontal hidden sm:flex m-0"></div>
+    
+    <div class="join">
+        <button type="button" @click="viewMode = 'list'" class="btn btn-sm join-item" :class="viewMode === 'list' ? 'btn-active' : 'btn-ghost'">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+        </button>
+        <button type="button" @click="viewMode = 'grid'" class="btn btn-sm join-item" :class="viewMode === 'grid' ? 'btn-active' : 'btn-ghost'">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+        </button>
+    </div>
 </form>

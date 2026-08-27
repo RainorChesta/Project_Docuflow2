@@ -1,24 +1,22 @@
 <x-app-layout>
 
-    @if(!auth()->user()->isAdmin() && !auth()->user()->isHead())
-        <x-confirm-modal
-            name="confirm-discard-{{ $document->id }}"
-            title="Discard Document?"
-            message="Are you sure you want to discard this document and all its changes?"
-            :action="route('documents.destroy', $document)"
-            method="DELETE"
-            confirmLabel="Discard"
-        />
+    <x-confirm-modal
+        name="confirm-discard-{{ $document->id }}"
+        title="Discard Document?"
+        message="Are you sure you want to discard this document and all its changes?"
+        :action="route('documents.destroy', $document)"
+        method="DELETE"
+        confirmLabel="Discard"
+    />
 
-        <x-confirm-modal
-            name="confirm-discard-version-{{ $document->id }}"
-            title="Discard Changes?"
-            message="Are you sure you want to discard the pending changes? The approved version will remain intact."
-            :action="route('documents.discard', $document)"
-            method="POST"
-            confirmLabel="Discard Changes"
-        />
-    @endif
+    <x-confirm-modal
+        name="confirm-discard-version-{{ $document->id }}"
+        title="Discard Changes?"
+        message="Are you sure you want to discard the pending changes? The approved version will remain intact."
+        :action="route('documents.discard', $document)"
+        method="POST"
+        confirmLabel="Discard Changes"
+    />
 
     @php
         $pending = $document->versions->first(fn($v) => $v->status === 'pending' && !$v->discarded_at);
@@ -119,34 +117,15 @@
 
                 @if($document->currentVersion)
                     @can('update', $document)
-                        @if(!auth()->user()->isAdmin() && !auth()->user()->isHead())
-                            <button type="button" class="btn btn-outline btn-error btn-sm" x-on:click="$dispatch('open-modal', 'confirm-discard-version-{{ $document->id }}')">
-                                {{ __('Discard Changes') }}
-                            </button>
-                        @else
-                            <form method="POST" action="{{ route('documents.discard', $document) }}" class="inline">
-                                @csrf
-                                <button type="submit" class="btn btn-outline btn-error btn-sm">
-                                    {{ __('Discard Changes') }}
-                                </button>
-                            </form>
-                        @endif
+                        <button type="button" class="btn btn-outline btn-error btn-sm" x-on:click="$dispatch('open-modal', 'confirm-discard-version-{{ $document->id }}')">
+                            {{ __('Discard Changes') }}
+                        </button>
                     @endcan
                 @else
                     @can('delete', $document)
-                        @if(!auth()->user()->isAdmin() && !auth()->user()->isHead())
-                            <button type="button" class="btn btn-outline btn-error btn-sm" x-on:click="$dispatch('open-modal', 'confirm-discard-{{ $document->id }}')">
-                                {{ __('Discard') }}
-                            </button>
-                        @else
-                            <form method="POST" action="{{ route('documents.destroy', $document) }}" class="inline">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn btn-outline btn-error btn-sm">
-                                    {{ __('Discard') }}
-                                </button>
-                            </form>
-                        @endif
+                        <button type="button" class="btn btn-outline btn-error btn-sm" x-on:click="$dispatch('open-modal', 'confirm-discard-{{ $document->id }}')">
+                            {{ __('Discard') }}
+                        </button>
                     @endcan
                 @endif
 

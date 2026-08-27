@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ __('Document Not Found') }} - {{ config('app.name', 'DokuFlow') }}</title>
+    <title>{{ __('Page Not Found') }} - {{ config('app.name', 'DokuFlow') }}</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen bg-base-200 flex items-center justify-center p-4">
@@ -25,16 +25,16 @@
             <h1 class="text-5xl font-extrabold text-error opacity-20">
                 404
             </h1>
-            <h2 class="text-xl font-bold text-base-content">{{ __('Document Not Found') }}</h2>
+            <h2 class="text-xl font-bold text-base-content">{{ __('Page Not Found') }}</h2>
             
             <div class="bg-base-200/50 p-3 rounded-lg border border-base-300 text-left mx-auto">
                 <p class="text-base-content/80 text-sm font-medium">
-                    {{ __('The document you are looking for could not be found.') }}
+                    {{ __('The page you are looking for could not be found.') }}
                 </p>
                 <ul class="list-disc list-inside text-base-content/60 text-xs mt-2 space-y-1">
-                    <li>{{ __('The URL might be invalid.') }}</li>
-                    <li>{{ __('The document may have been deleted.') }}</li>
-                    <li>{{ __('If scanning a QR code, try again.') }}</li>
+                    <li>{{ __('The URL might be misspelled or invalid.') }}</li>
+                    <li>{{ __('The page may have been deleted or moved.') }}</li>
+                    <li>{{ __('If you clicked a link, it may be outdated.') }}</li>
                 </ul>
             </div>
         </div>

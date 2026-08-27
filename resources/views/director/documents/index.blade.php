@@ -10,7 +10,7 @@
                 <div class="p-4 sm:p-5 flex flex-col md:flex-row md:items-center gap-4">
 
                     {{-- Breadcrumbs Navigation Trail --}}
-                <nav class="flex items-center flex-wrap gap-2 text-sm sm:text-base font-medium bg-base-200/50 px-4 py-3 rounded-xl border border-base-300">
+                <nav class="flex items-center flex-wrap gap-2 text-xs font-medium bg-base-200/50 px-3 py-2 rounded-lg border border-base-300">
                         @if($parentUrl)
                             <a href="{{ $parentUrl }}" 
                                class="btn btn-ghost btn-xs btn-circle mr-1" 
@@ -108,21 +108,7 @@
                 </div>
             @elseif($selectedBranchId)
                 <div class="px-4 sm:px-5 pb-4 sm:pb-5 space-y-4 border-t border-base-200 pt-4 sm:pt-5">
-                    <div class="flex items-center gap-2">
-                        <div class="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
-                        <h3 class="font-bold text-base text-base-content flex items-center flex-wrap gap-2">
-                            @if(!$selectedDivisionId)
-                                <span>{{ __('Cari Folder Divisi di Cabang:') }}</span>
-                            @else
-                                <span>{{ __('Cari & Filter Dokumen di:') }}</span>
-                            @endif
-                            <span class="badge badge-primary">{{ $currentBranch?->name }}</span>
-                            @if($selectedDivisionId && $currentDivision)
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
-                                <span class="badge badge-secondary">{{ $currentDivision->name }}</span>
-                            @endif
-                        </h3>
-                    </div>
+
 
                     {{-- Search & Filter Form --}}
                     <form method="GET" action="{{ route('director.documents.index') }}" class="space-y-3">

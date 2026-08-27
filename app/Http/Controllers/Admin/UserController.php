@@ -59,6 +59,8 @@ class UserController extends Controller
             $validated['division_id'] = null;
         }
 
+        $validated['is_active'] = $request->boolean('is_active');
+
         $user = User::create($validated);
 
         if (!empty($companyIds)) {
@@ -118,6 +120,8 @@ class UserController extends Controller
             $validated['nip'] = null;
             $validated['division_id'] = null;
         }
+
+        $validated['is_active'] = $request->boolean('is_active');
 
         $user->update($validated);
 

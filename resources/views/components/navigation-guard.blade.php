@@ -1,4 +1,4 @@
-﻿@props(['isDirty' => 'false'])
+@props(['isDirty' => 'false'])
 
 <div x-data="navigationGuardComponent({ isDirty: {{ $isDirty }} })" x-init="initGuard()">
     <x-modal name="confirm-navigation-modal" :show="false" maxWidth="sm">
@@ -27,16 +27,16 @@
             isDirty: config.isDirty,
             pendingUrl: null,
             isIntentionalLeave: false,
-            
             initGuard() {
-                // 1 & 5: Intercept BeforeUnload (Native reload/close tab)
+                // Aggressive capture-phase beforeunload to silence third-party scripts (like ONLYOFFICE)
+                // from showing the native browser prompt when we already confirmed via custom modal.
                 window.addEventListener('beforeunload', (e) => {
-                    if (this.isDirty && !this.isIntentionalLeave) {
-                        e.preventDefault();
-                        e.returnValue = '';
-                        return '';
+                    if (this.isIntentionalLeave) {
+                        e.stopImmediatePropagation();
                     }
-                });
+                }, true);
+
+                // Removed native beforeunload as requested
 
                 // 3 & 4: Intercept popstate (Back/Forward buttons)
                 history.pushState({ navigationGuard: true }, "");
@@ -100,7 +100,15 @@
                 this.isIntentionalLeave = true;
                 this.$dispatch('close-modal', 'confirm-navigation-modal');
                 
-                // Cleanup ONLYOFFICE if it exists on the page
+                // Forcefully NUKE all iframes from the DOM.
+                // Since ONLYOFFICE runs in an iframe on a different port (cross-origin), 
+                // its internal beforeunload listener triggers the browser warning.
+                // Removing the iframe instantly destroys its window and bypasses the warning!
+                document.querySelectorAll('iframe').forEach(iframe => iframe.remove());
+                
+                const container = document.getElementById('onlyoffice-editor-container');
+                if (container) container.remove();
+
                 if (window.docEditor) {
                     try { window.docEditor.destroyEditor(); } catch (e) {}
                 }
