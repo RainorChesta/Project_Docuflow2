@@ -6,9 +6,11 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Document extends Model
 {
+    use SoftDeletes;
     protected $fillable = [
         'document_number', 'title', 'summary', 'summary_status', 'summary_error',
         'summary_started_at', 'summary_completed_at', 'visibility', 'division_id', 'company_id', 'branch_id', 'owner_id',

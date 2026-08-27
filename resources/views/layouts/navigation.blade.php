@@ -57,6 +57,17 @@
             <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">Dashboard</span>
         </a>
 
+        @if(auth()->user()->isDirector())
+        <a href="{{ route('director.documents.index') }}"
+           class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                  {{ request()->routeIs('director.documents.*') ? 'nav-item-active bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"
+           :class="open ? '' : 'lg:justify-center lg:px-0'"
+           :title="open ? '' : '{{ __('All Document') }}'">
+            <svg xmlns="http://www.w3.org/2000/svg" class="nav-item-icon h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('All Document') }}</span>
+        </a>
+        @endif
+
         @if(!auth()->user()->isAdmin())
         <a href="{{ route('documents.index', ['type' => 'general']) }}"
            class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
@@ -154,17 +165,6 @@
                     <span class="badge badge-error badge-xs font-bold text-white px-1.5">{{ $pendingApprovalCount }}</span>
                 @endif
             </span>
-        </a>
-        @endif
-
-        @if(auth()->user()->isDirector())
-        <a href="{{ route('director.documents.index') }}"
-           class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
-                  {{ request()->routeIs('director.documents.*') ? 'nav-item-active bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"
-           :class="open ? '' : 'lg:justify-center lg:px-0'"
-           :title="open ? '' : '{{ __('Semua Dokumen PT & Cabang') }}'">
-            <svg xmlns="http://www.w3.org/2000/svg" class="nav-item-icon h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
-            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Semua Dokumen (Direktur)') }}</span>
         </a>
         @endif
 

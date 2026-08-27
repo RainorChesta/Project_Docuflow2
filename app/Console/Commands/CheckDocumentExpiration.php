@@ -31,6 +31,7 @@ class CheckDocumentExpiration extends Command
                     
                     if ($days < 0) {
                         $document->update(['is_expired' => true]);
+                        $document->delete();
                         $expiredCount++;
                     } elseif ($days <= 1) {
                         if ($document->expiration_notif_status !== 'urgent') {

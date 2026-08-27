@@ -127,7 +127,7 @@
                                     'documents.preview-version' => __('Pratinjau'),
                                     default => $docTypeLabel,
                                 }, 'url' => null];
-                            } elseif ($name !== 'dashboard') {
+                            } elseif ($name !== 'dashboard' && !str_starts_with($name, 'director.documents.')) {
                                 $crumbs[] = ['label' => __('Dashboard'), 'url' => route('dashboard')];
                                 if (str_starts_with($name, 'admin.')) {
                                     $section = match (true) {

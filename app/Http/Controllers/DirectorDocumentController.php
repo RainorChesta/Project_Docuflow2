@@ -240,13 +240,14 @@ class DirectorDocumentController extends Controller
 
         // Documents are only queried inside a selected division
         if ($selectedDivisionId) {
-            // Populate filter options dynamically from documents in this selected division
-            $branchDocTypes = DocumentType::whereHas('documents', fn($q) => $q->where('division_id', $selectedDivisionId))->orderBy('name')->get();
+            // Populate filter options dynamically from documents in this selected division and branch
+            $branchDocTypes = DocumentType::whereHas('documents', fn($q) => $q->where('division_id', $selectedDivisionId)->where('branch_id', $selectedBranchId))->orderBy('name')->get();
             $availableDocumentTypes = $branchDocTypes->isNotEmpty() ? $branchDocTypes : DocumentType::orderBy('name')->get();
 
-            $availableCreators = User::whereHas('documents', fn($q) => $q->where('division_id', $selectedDivisionId))->orderBy('name')->get(['id', 'name']);
+            $availableCreators = User::whereHas('documents', fn($q) => $q->where('division_id', $selectedDivisionId)->where('branch_id', $selectedBranchId))->orderBy('name')->get(['id', 'name']);
 
             $docQuery = Document::where('division_id', $selectedDivisionId)
+                ->where('branch_id', $selectedBranchId)
                 ->with(['owner', 'division', 'documentType', 'currentVersion', 'versions', 'branch.company']);
 
             // Apply search filter for documents inside division

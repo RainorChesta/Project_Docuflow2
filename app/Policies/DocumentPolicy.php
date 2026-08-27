@@ -10,7 +10,7 @@ class DocumentPolicy
 {
     public function view(User $user, Document $document): bool
     {
-        if ($user->isAdmin()) return true;
+        if ($user->isAdmin() || $user->isDirector()) return true;
 
         $contextService = app(\App\Services\CompanyContextService::class);
         $activeBranchId = $contextService->getActiveBranchId($user);
@@ -65,7 +65,6 @@ class DocumentPolicy
             }
         }
 
-        if ($user->isDirector()) return true;
         if ($document->isGeneral()) return true;
         if ($user->id === $document->owner_id) return true;
 

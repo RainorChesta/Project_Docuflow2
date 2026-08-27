@@ -4,90 +4,79 @@
     <div class="py-6 space-y-6">
         <div class="max-w-7xl mx-auto w-full px-4 sm:px-6 space-y-6">
 
-            {{-- 1. Breadcrumbs Bar --}}
-            <div class="bg-base-100 border border-base-300 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                        </svg>
-                    </div>
-                    <div>
-                        <h2 class="text-lg font-bold text-base-content tracking-tight">{{ __('Direktori Dokumen') }}</h2>
-                        <p class="text-xs text-base-content/60">
-                            {{ __('Jelajahi seluruh arsip dokumen berdasarkan struktur Perusahaan dan Cabang.') }}
-                        </p>
-                    </div>
-                </div>
+            {{-- 1 & 2. Direktori and Search/Filter Card --}}
+            <div class="bg-base-100 border border-base-300 rounded-2xl shadow-sm flex flex-col">
+                {{-- Breadcrumbs Bar --}}
+                <div class="p-4 sm:p-5 flex flex-col md:flex-row md:items-center gap-4">
 
-                {{-- Breadcrumbs Navigation Trail --}}
-                <nav class="flex items-center flex-wrap gap-1.5 text-xs sm:text-sm bg-base-200/50 px-3 py-2 rounded-xl border border-base-300">
-                    @if($parentUrl)
-                        <a href="{{ $parentUrl }}" 
-                           class="btn btn-ghost btn-xs btn-circle mr-1" 
-                           title="{{ __('Kembali ke folder sebelumnya') }}">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                            </svg>
-                        </a>
-                    @endif
-
-                    @foreach($breadcrumbs as $index => $crumb)
-                        @if($index > 0)
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-base-content/40 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                            </svg>
-                        @endif
-
-                        @if($crumb['active'] ?? false)
-                            <span class="font-bold text-base-content flex items-center gap-1.5 px-2 py-0.5 bg-primary/10 rounded-md text-primary">
-                                @if(($crumb['icon'] ?? '') === 'home')
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
-                                @elseif(($crumb['icon'] ?? '') === 'company')
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                                @elseif(($crumb['icon'] ?? '') === 'branch')
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" /></svg>
-                                @elseif(($crumb['icon'] ?? '') === 'division')
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
-                                @endif
-                                {{ $crumb['name'] }}
-                            </span>
-                        @else
-                            <a href="{{ $crumb['url'] }}" 
-                               class="font-medium text-base-content/70 hover:text-primary transition-colors flex items-center gap-1.5 px-1.5 py-0.5 rounded-md hover:bg-base-200">
-                                @if(($crumb['icon'] ?? '') === 'home')
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
-                                @elseif(($crumb['icon'] ?? '') === 'company')
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                                @elseif(($crumb['icon'] ?? '') === 'branch')
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" /></svg>
-                                @endif
-                                {{ $crumb['name'] }}
+                    {{-- Breadcrumbs Navigation Trail --}}
+                <nav class="flex items-center flex-wrap gap-2 text-sm sm:text-base font-medium bg-base-200/50 px-4 py-3 rounded-xl border border-base-300">
+                        @if($parentUrl)
+                            <a href="{{ $parentUrl }}" 
+                               class="btn btn-ghost btn-xs btn-circle mr-1" 
+                               title="{{ __('Kembali ke folder sebelumnya') }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                </svg>
                             </a>
                         @endif
-                    @endforeach
-                </nav>
-            </div>
 
-            {{-- 2. Search & Filter Section --}}
-            @if($selectedCompanyId && !$selectedBranchId)
-                <div class="bg-base-100 border border-base-300 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
-                    <div class="flex items-center gap-2">
-                        <div class="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
-                        <h3 class="font-bold text-sm text-base-content">
-                            {{ __('Cari Folder Cabang') }}
-                        </h3>
-                    </div>
+                        @foreach($breadcrumbs as $index => $crumb)
+                            @if($index > 0)
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-base-content/40 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                </svg>
+                            @endif
+
+                            @if($crumb['active'] ?? false)
+                                <span class="font-bold text-base-content flex items-center gap-1.5 px-2 py-0.5 bg-primary/10 rounded-md text-primary">
+                                    @if(($crumb['icon'] ?? '') === 'home')
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                                    @elseif(($crumb['icon'] ?? '') === 'company')
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                                    @elseif(($crumb['icon'] ?? '') === 'branch')
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" /></svg>
+                                    @elseif(($crumb['icon'] ?? '') === 'division')
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+                                    @endif
+                                    {{ $crumb['name'] }}
+                                </span>
+                            @else
+                                <a href="{{ $crumb['url'] }}" 
+                                   class="font-medium text-base-content/70 hover:text-primary transition-colors flex items-center gap-1.5 px-1.5 py-0.5 rounded-md hover:bg-base-200">
+                                    @if(($crumb['icon'] ?? '') === 'home')
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                                    @elseif(($crumb['icon'] ?? '') === 'company')
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                                    @elseif(($crumb['icon'] ?? '') === 'branch')
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" /></svg>
+                                    @endif
+                                    {{ $crumb['name'] }}
+                                </a>
+                            @endif
+                        @endforeach
+                    </nav>
+                </div>
+
+                {{-- Search & Filter Section --}}
+                @if($selectedCompanyId && !$selectedBranchId)
+                    <div class="px-4 sm:px-5 pb-4 sm:pb-5 space-y-4 border-t border-base-200 pt-4 sm:pt-5">
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+                            <h3 class="font-bold text-sm text-base-content">
+                                {{ __('Cari Folder Cabang') }}
+                            </h3>
+                        </div>
 
                     <form method="GET" action="{{ route('director.documents.index') }}" class="space-y-3">
                         <input type="hidden" name="company_id" value="{{ $selectedCompanyId }}">
                         <input type="hidden" name="view_mode" value="{{ $viewMode }}">
 
-                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-3">
-                            <div class="sm:col-span-1 lg:col-span-11 relative">
+                        <div class="flex flex-col sm:flex-row gap-3 w-full">
+                            <div class="flex-grow relative">
                                 <input type="text" name="search" value="{{ $search }}" 
                                        placeholder="{{ __('Search branch...') }}" 
-                                       class="input input-bordered input-sm w-full pl-9 pr-8 bg-base-200/40 focus:bg-base-100">
+                                       class="input input-bordered input-sm w-full pl-9 pr-8 bg-base-100 shadow-sm focus:shadow-md focus:border-primary transition-all">
                                 <svg class="w-4 h-4 absolute left-3 top-2.5 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
@@ -99,8 +88,8 @@
                                     </a>
                                 @endif
                             </div>
-                            <div class="sm:col-span-1 lg:col-span-1 flex items-center gap-2">
-                                <button type="submit" class="btn btn-primary btn-sm w-full">
+                            <div class="shrink-0 flex items-center gap-2">
+                                <button type="submit" class="btn btn-primary btn-sm w-full sm:w-auto px-6">
                                     {{ __('Search') }}
                                 </button>
                             </div>
@@ -118,13 +107,19 @@
                     @endif
                 </div>
             @elseif($selectedBranchId)
-                <div class="bg-base-100 border border-base-300 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
+                <div class="px-4 sm:px-5 pb-4 sm:pb-5 space-y-4 border-t border-base-200 pt-4 sm:pt-5">
                     <div class="flex items-center gap-2">
                         <div class="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
-                        <h3 class="font-bold text-sm text-base-content">
-                            {{ __('Cari & Filter Dokumen di Cabang') }}: <span class="text-primary">{{ $currentBranch?->name }}</span>
+                        <h3 class="font-bold text-base text-base-content flex items-center flex-wrap gap-2">
+                            @if(!$selectedDivisionId)
+                                <span>{{ __('Cari Folder Divisi di Cabang:') }}</span>
+                            @else
+                                <span>{{ __('Cari & Filter Dokumen di:') }}</span>
+                            @endif
+                            <span class="badge badge-primary">{{ $currentBranch?->name }}</span>
                             @if($selectedDivisionId && $currentDivision)
-                                <span class="text-base-content/50">/</span> <span class="text-secondary">{{ $currentDivision->name }}</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                                <span class="badge badge-secondary">{{ $currentDivision->name }}</span>
                             @endif
                         </h3>
                     </div>
@@ -136,13 +131,13 @@
                         @if($selectedDivisionId)<input type="hidden" name="division_id" value="{{ $selectedDivisionId }}">@endif
                         <input type="hidden" name="view_mode" value="{{ $viewMode }}">
 
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
+                        <div class="flex flex-col lg:flex-row gap-3 w-full">
                             @if(!$selectedDivisionId)
                                 {{-- Division Search (When in Branch) --}}
-                                <div class="sm:col-span-2 lg:col-span-11 relative">
+                                <div class="flex-grow relative">
                                     <input type="text" name="search" value="{{ $search }}" 
                                            placeholder="{{ __('Search division...') }}" 
-                                           class="input input-bordered input-sm w-full pl-9 pr-8 bg-base-200/40 focus:bg-base-100">
+                                           class="input input-bordered input-sm w-full pl-9 pr-8 bg-base-100 shadow-sm focus:shadow-md focus:border-primary transition-all">
                                     <svg class="w-4 h-4 absolute left-3 top-2.5 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                     </svg>
@@ -154,17 +149,17 @@
                                         </a>
                                     @endif
                                 </div>
-                                <div class="sm:col-span-2 lg:col-span-1 flex items-center gap-2">
-                                    <button type="submit" class="btn btn-primary btn-sm w-full">
+                                <div class="shrink-0 flex items-center gap-2">
+                                    <button type="submit" class="btn btn-primary btn-sm w-full lg:w-auto px-6">
                                         {{ __('Search') }}
                                     </button>
                                 </div>
                             @else
                                 {{-- Document Search & Filters (When inside a Division) --}}
-                                <div class="sm:col-span-2 lg:col-span-5 relative">
+                                <div class="flex-grow relative">
                                     <input type="text" name="search" value="{{ $search }}" 
                                            placeholder="{{ __('Search documents...') }}" 
-                                           class="input input-bordered input-sm w-full pl-9 pr-8 bg-base-200/40 focus:bg-base-100">
+                                           class="input input-bordered input-sm w-full pl-9 pr-8 bg-base-100 shadow-sm focus:shadow-md focus:border-primary transition-all">
                                     <svg class="w-4 h-4 absolute left-3 top-2.5 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                     </svg>
@@ -178,9 +173,9 @@
                                 </div>
 
                                 {{-- Document Type Filter --}}
-                                <div class="lg:col-span-3">
+                                <div class="w-full lg:w-48 shrink-0">
                                     <select name="document_type_id" 
-                                            class="select select-bordered select-sm w-full text-xs bg-base-200/40 focus:bg-base-100">
+                                            class="select select-bordered select-sm w-full text-xs bg-base-100 shadow-sm focus:shadow-md focus:border-primary transition-all">
                                         <option value="">{{ __('Document Type') }} (Semua)</option>
                                         @foreach($availableDocumentTypes as $dt)
                                             <option value="{{ $dt->id }}" {{ $selectedDocTypeId == $dt->id ? 'selected' : '' }}>
@@ -191,9 +186,9 @@
                                 </div>
 
                                 {{-- Created By Filter --}}
-                                <div class="lg:col-span-3">
+                                <div class="w-full lg:w-48 shrink-0">
                                     <select name="owner_id" 
-                                            class="select select-bordered select-sm w-full text-xs bg-base-200/40 focus:bg-base-100">
+                                            class="select select-bordered select-sm w-full text-xs bg-base-100 shadow-sm focus:shadow-md focus:border-primary transition-all">
                                         <option value="">{{ __('Created By') }} (Semua)</option>
                                         @foreach($availableCreators as $creator)
                                             <option value="{{ $creator->id }}" {{ $selectedOwnerId == $creator->id ? 'selected' : '' }}>
@@ -204,8 +199,8 @@
                                 </div>
 
                                 {{-- Action Buttons: Search --}}
-                                <div class="sm:col-span-2 lg:col-span-1 flex items-center gap-2">
-                                    <button type="submit" class="btn btn-primary btn-sm w-full">
+                                <div class="shrink-0 flex items-center gap-2">
+                                    <button type="submit" class="btn btn-primary btn-sm w-full lg:w-auto px-6">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                         </svg>
@@ -261,6 +256,7 @@
                     @endif
                 </div>
             @endif
+            </div>
 
             {{-- 3. FOLDERS SECTION (Company / Branch / Division Folders) --}}
             @if($folders->isNotEmpty())
