@@ -59,7 +59,8 @@ class DocumentService
     public function generateId(?Division $division, ?DocumentType $documentType, ?\App\Models\Branch $branch = null): string
     {
         return DB::transaction(function () use ($division, $documentType, $branch) {
-            $query = Document::where('document_type_id', $documentType?->id)
+            $query = Document::withTrashed()
+                ->where('document_type_id', $documentType?->id)
                 ->whereYear('created_at', now()->year);
 
             if ($branch) {
@@ -86,7 +87,8 @@ class DocumentService
      */
     public function previewNumber(?Division $division, ?DocumentType $documentType, ?\App\Models\Branch $branch = null): string
     {
-        $query = Document::where('document_type_id', $documentType?->id)
+        $query = Document::withTrashed()
+            ->where('document_type_id', $documentType?->id)
             ->whereYear('created_at', now()->year);
 
         if ($branch) {

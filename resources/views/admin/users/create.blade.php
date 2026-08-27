@@ -6,14 +6,8 @@
             <div class="card bg-base-100 border border-base-300 shadow-sm p-4 sm:p-6"
                  x-data="{
                      role: '{{ old('system_role', 'user') }}',
-                     selectedCompanies: {{ json_encode(old('company_ids', [])) }},
-                     toggleCompany(id) {
-                         if (this.selectedCompanies.includes(id)) {
-                             this.selectedCompanies = this.selectedCompanies.filter(c => c !== id);
-                         } else {
-                             this.selectedCompanies.push(id);
-                         }
-                     }
+                     selectedCompanies: {{ json_encode(old('company_ids', [])) }}.map(Number),
+                     selectedBranches: {{ json_encode(old('branch_ids', [])) }}.map(Number)
                  }">
                 <form method="POST" action="{{ route('admin.users.store') }}">
                     @csrf
@@ -107,21 +101,45 @@
 
                             <div class="space-y-4">
                                 @foreach($companies as $company)
-                                    <div class="border border-base-300 rounded-lg p-3 bg-base-200/30">
+                                    <div class="border border-base-300 rounded-lg p-3 bg-base-200/30"
+                                         x-data="{ 
+                                            companyId: {{ $company->id }},
+                                            branchIds: {{ $company->branches->pluck('id')->toJson() }}
+                                         }">
+                                        <template x-if="selectedCompanies.map(String).includes(String(companyId))">
+                                            <input type="hidden" name="company_ids[]" :value="companyId">
+                                        </template>
+
                                         <label class="flex items-center gap-2 cursor-pointer font-medium text-sm">
-                                            <input type="checkbox" name="company_ids[]" value="{{ $company->id }}" 
-                                                   :checked="selectedCompanies.includes({{ $company->id }})"
-                                                   @change="toggleCompany({{ $company->id }})"
+                                            <input type="checkbox" 
+                                                   :checked="branchIds.length === 0 ? selectedCompanies.map(String).includes(String(companyId)) : branchIds.every(b => selectedBranches.map(String).includes(String(b)))"
+                                                   x-effect="$el.indeterminate = (branchIds.length > 0 && branchIds.some(b => selectedBranches.map(String).includes(String(b))) && !branchIds.every(b => selectedBranches.map(String).includes(String(b))))"
+                                                   @change="
+                                                        if ($el.checked) {
+                                                            branchIds.forEach(b => { if (!selectedBranches.map(String).includes(String(b))) selectedBranches.push(String(b)); });
+                                                            if (!selectedCompanies.map(String).includes(String(companyId))) selectedCompanies.push(String(companyId));
+                                                        } else {
+                                                            selectedBranches = selectedBranches.filter(b => !branchIds.map(String).includes(String(b)));
+                                                            selectedCompanies = selectedCompanies.filter(c => String(c) !== String(companyId));
+                                                        }
+                                                   "
                                                    class="checkbox checkbox-sm checkbox-primary">
                                             <span>{{ $company->name }} ({{ $company->code }})</span>
                                         </label>
 
                                         <div class="pl-6 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 border-t border-base-300/50"
-                                             x-show="selectedCompanies.includes({{ $company->id }})">
+                                             x-show="selectedCompanies.map(String).includes(String(companyId)) || branchIds.some(b => selectedBranches.map(String).includes(String(b)))">
                                             @foreach($company->branches as $branch)
                                                 <label class="flex items-center gap-2 cursor-pointer text-xs">
                                                     <input type="checkbox" name="branch_ids[]" value="{{ $branch->id }}"
-                                                           {{ in_array($branch->id, old('branch_ids', [])) ? 'checked' : '' }}
+                                                           x-model="selectedBranches"
+                                                           @change="
+                                                                if (branchIds.some(b => selectedBranches.map(String).includes(String(b)))) {
+                                                                    if (!selectedCompanies.map(String).includes(String(companyId))) selectedCompanies.push(String(companyId));
+                                                                } else {
+                                                                    selectedCompanies = selectedCompanies.filter(c => String(c) !== String(companyId));
+                                                                }
+                                                           "
                                                            class="checkbox checkbox-xs checkbox-secondary">
                                                     <span>{{ $branch->name }} @if($branch->is_pusat)<span class="text-primary font-semibold">({{ __('Pusat') }})</span>@else({{ $branch->code }})@endif</span>
                                                 </label>

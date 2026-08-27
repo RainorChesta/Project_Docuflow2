@@ -11,6 +11,10 @@ class DocumentPolicy
     public function view(User $user, Document $document): bool
     {
         if ($user->isAdmin() || $user->isDirector()) return true;
+        
+        // Owner can always view their own documents, bypassing active branch isolation.
+        // This is necessary so they don't get locked out right after creating a document in another branch.
+        if ($user->id === $document->owner_id) return true;
 
         $contextService = app(\App\Services\CompanyContextService::class);
         $activeBranchId = $contextService->getActiveBranchId($user);
@@ -66,7 +70,6 @@ class DocumentPolicy
         }
 
         if ($document->isGeneral()) return true;
-        if ($user->id === $document->owner_id) return true;
 
         // Division-scoped docs: visible to members of that division.
         if ($document->isDivision()

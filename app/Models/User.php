@@ -188,10 +188,11 @@ class User extends Authenticatable
 
         $versionsCount = DocumentVersion::where('status', 'pending')
             ->whereNull('discarded_at')
-            ->whereHas('document', fn($q) => $q->whereIn('division_id', $divisionIds))
+            ->whereHas('document', fn($q) => $q->whereIn('division_id', $divisionIds)->visibleTo($this))
             ->count();
 
         $rollbacksCount = Document::whereIn('division_id', $divisionIds)
+            ->visibleTo($this)
             ->whereNotNull('pending_rollback_version_id')
             ->count();
 

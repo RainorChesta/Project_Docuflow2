@@ -38,17 +38,17 @@ class ApprovalController extends Controller
 
             return view('approvals.index', compact('pendingVersions', 'pendingRollbacks'));
         }
-
         $divisionIds = $user->allDivisionIds();
 
         $pendingVersions = DocumentVersion::where('status', 'pending')
             ->whereNull('discarded_at')
-            ->whereHas('document', fn($q) => $q->whereIn('division_id', $divisionIds))
+            ->whereHas('document', fn($q) => $q->whereIn('division_id', $divisionIds)->visibleTo($user))
             ->with('document', 'author')
             ->latest()
             ->get();
 
         $pendingRollbacks = Document::whereIn('division_id', $divisionIds)
+            ->visibleTo($user)
             ->whereNotNull('pending_rollback_version_id')
             ->with('pendingRollbackVersion', 'rollbackRequestedBy')
             ->latest()
@@ -136,6 +136,13 @@ class ApprovalController extends Controller
             $heads = \App\Models\User::where('division_id', $document->division_id)
                 ->where('system_role', 'head')
                 ->where('id', '!=', $user->id)
+                ->where(function ($q) use ($document) {
+                    if ($document->branch_id) {
+                        $q->whereHas('branches', fn($bq) => $bq->where('branches.id', $document->branch_id));
+                    } elseif ($document->company_id) {
+                        $q->whereHas('companies', fn($cq) => $cq->where('companies.id', $document->company_id));
+                    }
+                })
                 ->get();
 
             foreach ($heads as $head) {

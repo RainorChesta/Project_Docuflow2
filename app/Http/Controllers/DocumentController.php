@@ -204,7 +204,7 @@ class DocumentController extends Controller
                 'max:100',
                 'unique:documents,document_number',
                 // Format resmi: seq/tipe/divisi/pusat/bulan-romawi/tahun
-                'regex:/^\d{3}\/[A-Z0-9.\-]+\/[A-Z0-9]+\/[A-Z0-9]+\/(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII)\/\d{4}$/',
+                'regex:/^\d{3}\/[A-Z0-9.\-]+\/[A-Z0-9.\-]+\/[A-Z0-9.\-]+\/(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII)\/\d{4}$/',
             ];
         }
 
@@ -489,6 +489,13 @@ class DocumentController extends Controller
             $heads = \App\Models\User::where('division_id', $document->division_id)
                 ->where('system_role', 'head')
                 ->where('id', '!=', $user->id)
+                ->where(function ($q) use ($document) {
+                    if ($document->branch_id) {
+                        $q->whereHas('branches', fn($bq) => $bq->where('branches.id', $document->branch_id));
+                    } elseif ($document->company_id) {
+                        $q->whereHas('companies', fn($cq) => $cq->where('companies.id', $document->company_id));
+                    }
+                })
                 ->get();
 
             foreach ($heads as $head) {
@@ -577,6 +584,13 @@ class DocumentController extends Controller
             $heads = \App\Models\User::where('division_id', $document->division_id)
                 ->where('system_role', 'head')
                 ->where('id', '!=', $user->id)
+                ->where(function ($q) use ($document) {
+                    if ($document->branch_id) {
+                        $q->whereHas('branches', fn($bq) => $bq->where('branches.id', $document->branch_id));
+                    } elseif ($document->company_id) {
+                        $q->whereHas('companies', fn($cq) => $cq->where('companies.id', $document->company_id));
+                    }
+                })
                 ->get();
 
             foreach ($heads as $head) {
