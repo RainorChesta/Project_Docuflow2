@@ -76,8 +76,8 @@ server {
         try_files $uri $uri/ /index.php?$query_string;
     }
 
-    # Laravel Reverb WebSocket Reverse Proxy
-    location /app {
+    # Laravel Reverb WebSocket Reverse Proxy (Use ^~ /app/ to avoid matching /approvals)
+    location ^~ /app/ {
         proxy_pass http://127.0.0.1:8081;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
@@ -145,10 +145,10 @@ VITE_REVERB_PORT=80
 VITE_REVERB_SCHEME=http
 
 # ONLYOFFICE Configuration
-ONLYOFFICE_URL=http://dokuflow.cmhgroup.id:8080
-ONLYOFFICE_INTERNAL_URL=http://127.0.0.1:8080
+ONLYOFFICE_URL=http://dokuflow.cmhgroup.id:8884
+ONLYOFFICE_INTERNAL_URL=http://127.0.0.1:8884
 ONLYOFFICE_JWT_ENABLED=true
-ONLYOFFICE_JWT_SECRET=dokuflow_onlyoffice_secret_key_2026
+ONLYOFFICE_JWT_SECRET=de1e91347d7abd4c831649a098693b4c21fcc932f21b9b97fc7bec2dbb957f6d
 ```
 
 ```bash
@@ -170,115 +170,202 @@ chmod -R 775 /var/www/dokuflow.cmhgroup.id/storage /var/www/dokuflow.cmhgroup.id
 
 ---
 
-## 📄 Step 4: ONLYOFFICE Document Server Setup
+## 📄 Step 4: ONLYOFFICE Document Server Setup Guide
 
-Choose **Option A** (Docker Container) or **Option B** (Native Bare-Metal without Docker):
+ONLYOFFICE Document Server provides online collaborative document editing (DOCX, XLSX, PPTX) for DokuFlow.
+
+### 4.1 System Requirements & Server Sizing
+
+Before deploying ONLYOFFICE, ensure your dedicated/remote server meets these requirements:
+
+| Component | Minimum Requirement | Recommended |
+| :--- | :--- | :--- |
+| **RAM** | **4 GB** (strict minimum) | **8 GB+** |
+| **CPU** | **2 Cores** (2.0 GHz+) | **4 Cores+** |
+| **Disk Space** | **20 GB Free** | **40 GB+ Free** |
+| **Docker Engine** | Version 20.10+ | Latest |
+| **Docker Compose** | Version 2.0+ | Latest |
+
+> [!WARNING]
+> Do NOT attempt to run ONLYOFFICE on a server with less than 4 GB of RAM. The container initializes PostgreSQL, RabbitMQ, Node.js, and C++ conversion workers, which will trigger Linux Out-Of-Memory (OOM) crashes on low-memory servers.
 
 ---
 
-### Option A: Docker Setup (Recommended & Quickest)
+### 4.2 Generating & Configuring JWT Security Secret
 
-Start the ONLYOFFICE DocumentServer container using Docker Compose:
+`JWT_SECRET` is a self-generated shared secret key used to secure communication between DokuFlow and ONLYOFFICE Document Server. You generate this key yourself.
+
+#### Generating a Random 32-Byte Key
+
+Run any of the following commands on your server terminal to generate a secure key:
 
 ```bash
-cd /var/www/dokuflow.cmhgroup.id
+# Option 1: Using OpenSSL
+openssl rand -hex 32
+
+# Option 2: Using PHP
+php -r "echo bin2hex(random_bytes(32));"
+```
+
+> [!IMPORTANT]
+> Save your generated key! The exact same string must be used in both DokuFlow's `.env` (`ONLYOFFICE_JWT_SECRET`) and ONLYOFFICE Docker container (`JWT_SECRET`).
+
+---
+
+### 4.3 Deploying via Docker (Recommended Production Approach)
+
+Docker is the safest and recommended method because it encapsulates PostgreSQL, RabbitMQ, and C++ dependencies in an isolated container without conflicting with host web servers (cPanel, Nginx, or Apache).
+
+#### Method 1: Single `docker run` Command (Fastest)
+
+Run this command on your ONLYOFFICE server (replace `<YOUR_GENERATED_JWT_SECRET>` with the key generated above):
+
+```bash
+docker run -d -p 8884:80 \
+  --name dokuflow-onlyoffice \
+  --restart=always \
+  -e JWT_ENABLED=true \
+  -e JWT_SECRET=<YOUR_GENERATED_JWT_SECRET> \
+  -e JWT_HEADER=Authorization \
+  -v /app/onlyoffice/DocumentServer/logs:/var/log/onlyoffice \
+  -v /app/onlyoffice/DocumentServer/data:/var/www/onlyoffice/Data \
+  -v /app/onlyoffice/DocumentServer/lib:/var/lib/onlyoffice \
+  -v /app/onlyoffice/DocumentServer/db:/var/lib/postgresql \
+  onlyoffice/documentserver:latest
+```
+
+#### Method 2: Docker Compose (`docker-compose.yml`)
+
+Create `/opt/onlyoffice/docker-compose.yml` on the ONLYOFFICE server:
+
+```yaml
+version: '3.8'
+
+services:
+  onlyoffice:
+    image: onlyoffice/documentserver:latest
+    container_name: dokuflow-onlyoffice
+    restart: always
+    ports:
+      - "8884:80"
+    environment:
+      - JWT_ENABLED=true
+      - JWT_SECRET=<YOUR_GENERATED_JWT_SECRET>
+      - JWT_HEADER=Authorization
+      - JWT_IN_BODY=true
+    volumes:
+      - /app/onlyoffice/logs:/var/log/onlyoffice
+      - /app/onlyoffice/data:/var/www/onlyoffice/Data
+      - /app/onlyoffice/lib:/var/lib/onlyoffice
+      - /app/onlyoffice/db:/var/lib/postgresql
+```
+
+Launch the service:
+```bash
 docker compose up -d
 ```
 
-Verify that ONLYOFFICE is running on port 8080:
+---
+
+### 4.3 Setting up Nginx Reverse Proxy with SSL (Optional / Production Domain)
+
+If hosting ONLYOFFICE on a subdomain (e.g. `office.cmhgroup.id`) with HTTPS:
+
+Create Nginx site config `/etc/nginx/sites-available/onlyoffice.conf`:
+
+```nginx
+server {
+    listen 80;
+    server_name office.cmhgroup.id;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name office.cmhgroup.id;
+
+    ssl_certificate /etc/letsencrypt/live/office.cmhgroup.id/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/office.cmhgroup.id/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8884;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "Upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+Enable site & reload Nginx:
 ```bash
-docker ps
-curl -I http://localhost:8080
+ln -s /etc/nginx/sites-available/onlyoffice.conf /etc/nginx/sites-enabled/
+nginx -t && systemctl reload nginx
 ```
 
 ---
 
-### Option B: Native Setup without Docker (Bare-Metal on Ubuntu/Debian)
+### 4.4 Configuring DokuFlow `.env` Integration
 
-If Docker is not installed or preferred, install `onlyoffice-documentserver` directly via APT:
+On your DokuFlow application server (`/var/www/dokuflow.cmhgroup.id/.env`):
 
-#### B.1 Install Prerequisites (PostgreSQL & RabbitMQ)
+```env
+# ONLYOFFICE Configuration
+# ONLYOFFICE_URL: Public URL of ONLYOFFICE Docker server (accessed by user browser)
+ONLYOFFICE_URL=http://<ONLYOFFICE_VPS_IP>:8884
 
+# ONLYOFFICE_INTERNAL_URL: Public URL/IP of DokuFlow (accessed by ONLYOFFICE to download DOCX & post callbacks)
+ONLYOFFICE_INTERNAL_URL=http://dokuflow.cmhgroup.id
+
+ONLYOFFICE_JWT_ENABLED=true
+ONLYOFFICE_JWT_SECRET=<YOUR_GENERATED_JWT_SECRET>
+DOCUMENT_STORAGE_DISK=local
+ONLYOFFICE_AUTOSAVE=false
+ONLYOFFICE_FORCESAVE=false
+```
+
+After updating `.env`, clear Laravel configuration cache:
 ```bash
-sudo apt-get update
-sudo apt-get install -y postgresql rabbitmq-server
-
-# Create PostgreSQL Database and User for ONLYOFFICE
-sudo -i -u postgres psql -c "CREATE DATABASE onlyoffice;"
-sudo -i -u postgres psql -c "CREATE USER onlyoffice WITH password 'onlyoffice';"
-sudo -i -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE onlyoffice TO onlyoffice;"
+php artisan config:cache
 ```
 
-#### B.2 Add ONLYOFFICE Official APT Repository
+---
 
-```bash
-mkdir -p ~/.gnupg
-chmod 700 ~/.gnupg
-gpg --no-default-keyring --keyring gnupg-ring:/tmp/onlyoffice.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys CB2DE8E5
-chmod 644 /tmp/onlyoffice.gpg
-sudo chown root:root /tmp/onlyoffice.gpg
-sudo mv /tmp/onlyoffice.gpg /usr/share/keyrings/onlyoffice.gpg
-echo "deb [signed-by=/usr/share/keyrings/onlyoffice.gpg] https://download.onlyoffice.com/repo/debian squeeze main" | sudo tee /etc/apt/sources.list.d/onlyoffice.list
-```
+### 4.5 Health Verification & Troubleshooting
 
-#### B.3 Set Port 8080 for ONLYOFFICE (to avoid conflict with main Nginx)
+1. **Fix "The file cannot be accessed right now" Error (`allowPrivateIPAddress`):**
+   By default, ONLYOFFICE blocks requests to private/internal IP addresses. Enable `allowPrivateIPAddress` inside the container by running this on your ONLYOFFICE VPS:
+   ```bash
+   docker exec -it dokuflow-onlyoffice sed -i 's/"allowPrivateIPAddress": false/"allowPrivateIPAddress": true/g' /etc/onlyoffice/documentserver/default.json
+   docker exec -it dokuflow-onlyoffice supervisorctl restart all
+   ```
 
-```bash
-echo onlyoffice-documentserver onlyoffice/ds-port select 8080 | sudo debconf-set-selections
-```
+2. **Verify Health Check Endpoint:**
+   Run from your DokuFlow application server:
+   ```bash
+   curl -i http://<ONLYOFFICE_SERVER_IP>:8884/healthcheck
+   ```
+   *Expected Response:* `true` (Status `200 OK`)
 
-#### B.4 Install ONLYOFFICE DocumentServer
+3. **Verify Welcome Page:**
+   ```bash
+   curl -I http://<ONLYOFFICE_SERVER_IP>:8884/welcome/
+   ```
 
-```bash
-sudo apt-get update
-sudo apt-get install -y onlyoffice-documentserver
-```
-*(When prompted for the PostgreSQL password during installation, enter `onlyoffice`).*
+4. **Check Container Logs (if editor fails to load):**
+   ```bash
+   docker logs -f dokuflow-onlyoffice
+   ```
 
-#### B.5 Configure JWT Security Secret
-
-Edit `/etc/onlyoffice/documentserver/local.json`:
-
-```bash
-sudo nano /etc/onlyoffice/documentserver/local.json
-```
-
-Update the `secret` and `token` sections to match your `.env` secret (`dokuflow_onlyoffice_secret_key_2026`):
-
-```json
-{
-  "services": {
-    "CoAuthoring": {
-      "secret": {
-        "inbox": { "string": "dokuflow_onlyoffice_secret_key_2026" },
-        "outbox": { "string": "dokuflow_onlyoffice_secret_key_2026" },
-        "session": { "string": "dokuflow_onlyoffice_secret_key_2026" }
-      },
-      "token": {
-        "enable": {
-          "request": {
-            "inbox": true,
-            "outbox": true
-          },
-          "browser": true
-        }
-      }
-    }
-  }
-}
-```
-
-Restart ONLYOFFICE DocumentServer services:
-
-```bash
-sudo supervisorctl restart all
-```
-
-Verify service availability:
-
-```bash
-curl -I http://localhost:8080
-```
+5. **Common Issues & Solutions:**
+   - **Download Failed / Cannot Load Document ("The file cannot be accessed right now"):**
+     1. Ensure `ONLYOFFICE_INTERNAL_URL` in `.env` points to DokuFlow's URL (`http://dokuflow.cmhgroup.id`), NOT to ONLYOFFICE.
+     2. Ensure `allowPrivateIPAddress` is set to `true` inside the ONLYOFFICE container (Step 1 above).
+   - **JWT Token Invalid:** Ensure `ONLYOFFICE_JWT_SECRET` in DokuFlow `.env` matches `JWT_SECRET` in ONLYOFFICE Docker container environment.
+   - **Mixed Content Error (HTTPS vs HTTP):** If DokuFlow runs on `https://`, ONLYOFFICE **must** also be served via HTTPS (`https://office.cmhgroup.id`).
 
 ---
 
@@ -373,3 +460,57 @@ To run:
 chmod +x deploy.sh
 ./deploy.sh
 ```
+
+---
+
+## 🛠️ Troubleshooting & Production Gotchas
+
+### Gotcha 1: Nginx WebSocket Route Conflict (`/app` vs `/approvals`)
+* **Symptom:** Opening `https://dokuflow.cmhgroup.id/approvals` returns a plain text `404 Not found.`.
+* **Root Cause:** Using `location /app` in Nginx matches **ANY** URL starting with `/app` (including `/approvals`), which forwards web requests to Laravel Reverb (Port 8081).
+* **Fix:** Ensure the Nginx location directive uses `location ^~ /app/` with trailing slash and `^~` modifier:
+  ```nginx
+  location ^~ /app/ {
+      proxy_pass http://127.0.0.1:8081;
+      proxy_http_version 1.1;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "Upgrade";
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+  }
+  ```
+
+### Gotcha 2: Broken `/storage` Symlink & 403 Forbidden Images
+* **Symptom:** Assets in `/storage/` (e.g., `https://dokuflow.cmhgroup.id/storage/logo.png`) return `403 Forbidden` or `404 Not Found`.
+* **Root Cause:** Running `rsync` from local machine uploads the local machine symlink (`/home/austin/Web Dev/.../storage/app/public`) to the server.
+* **Fix:** Re-link storage directly on the production server:
+  ```bash
+  rm -f /var/www/dokuflow.cmhgroup.id/public/storage
+  cd /var/www/dokuflow.cmhgroup.id
+  php artisan storage:link
+  chown -R www-data:www-data /var/www/dokuflow.cmhgroup.id/storage /var/www/dokuflow.cmhgroup.id/public/storage
+  chmod -R 775 /var/www/dokuflow.cmhgroup.id/storage
+  ```
+
+### Gotcha 3: HTTPS & Let's Encrypt SSL Setup
+* **Symptom:** Browser shows "Not Secure" or defaults to another domain's SSL certificate (`advert.cmhgroup.id`).
+* **Fix:** Issue a dedicated SSL certificate for `dokuflow.cmhgroup.id`:
+  ```bash
+  certbot --nginx -d dokuflow.cmhgroup.id --non-interactive --agree-tos --email admin@cmhgroup.id --redirect
+  ```
+  Ensure `.env` has:
+  ```env
+  APP_URL=https://dokuflow.cmhgroup.id
+  ```
+  Then clear/re-cache config:
+  ```bash
+  php artisan config:cache && php artisan route:cache
+  ```
+
+### Gotcha 4: Mandatory Digital Signature Requirement (`EnsureUserHasSignature`)
+* **Symptom:** Logging in as Admin or a new user immediately redirects to `/profile?must_sign=1`.
+* **Root Cause:** DokuFlow's security policy requires every user to have a digital signature (`hasSignature() == true`) before accessing documents or approvals.
+* **Fix:** Ensure users draw their signature on `/profile` or seed default Admin signature via `php artisan db:seed`.
+

@@ -17,9 +17,12 @@ class ApprovalController extends Controller
         protected AuditService $auditService,
     ) {}
 
-    public function index(): \Illuminate\View\View
+    public function index(): \Illuminate\View\View|\Illuminate\Http\RedirectResponse
     {
         $user = auth()->user();
+        if (!$user) {
+            return redirect()->route('login');
+        }
 
         if ($user->isAdmin() || $user->isDirector()) {
             $companyIds = $user->companies()->pluck('companies.id')->all();
