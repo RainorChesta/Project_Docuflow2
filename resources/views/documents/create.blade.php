@@ -3,15 +3,42 @@
 
     <div class="py-6">
         <div class="max-w-3xl mx-auto w-full px-0">
+
+            {{-- Template banner when creating from template --}}
+            @if($selectedTemplate)
+            <div class="alert alert-info mb-4 shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>
+                <div>
+                    <div class="font-semibold">{{ __('Menggunakan template:') }} {{ $selectedTemplate->title }}</div>
+                    <div class="text-xs opacity-80">{{ __('Tipe dokumen dan nomor akan diisi otomatis. File template akan disalin ke dokumen baru.') }}</div>
+                </div>
+                <a href="{{ route('documents.choose') }}" class="btn btn-ghost btn-sm">{{ __('Ganti') }}</a>
+            </div>
+            @endif
+
             <div class="card bg-base-100 border border-base-300 shadow-sm">
                 <div class="card-body">
                     <form method="POST" action="{{ route('documents.store') }}" enctype="multipart/form-data">
                         @csrf
 
+                        {{-- Hidden template_id --}}
+                        @if($selectedTemplate)
+                            <input type="hidden" name="template_id" value="{{ $selectedTemplate->id }}">
+                        @endif
+
+                        {{-- Document Type --}}
                         <div class="form-control w-full mb-4">
                             <label for="document_type_id" class="label">
                                 <span class="label-text font-medium">{{ __('Tipe Dokumen') }}</span>
                             </label>
+                            @if($selectedTemplate)
+                                {{-- Auto-filled from template — disabled display + hidden input --}}
+                                <input type="text"
+                                       value="{{ $selectedTemplate->documentType->code }} - {{ $selectedTemplate->documentType->name }}"
+                                       class="input input-bordered w-full bg-base-200 cursor-not-allowed" disabled>
+                                <input type="hidden" name="document_type_id" id="document_type_id" value="{{ $selectedTemplate->document_type_id }}">
+                                <p class="text-xs text-info mt-1">{{ __('Tipe dokumen ditentukan oleh template.') }}</p>
+                            @else
                             <div x-data="{
                                     search: '',
                                     open: false,
@@ -44,7 +71,7 @@
                             >
                                 <!-- Hidden input for form submission and JS events -->
                                 <input type="hidden" name="document_type_id" id="document_type_id" :value="selectedId">
-                            
+
                                 <!-- Trigger button -->
                                 <button type="button" @click="open = !open; if(open) $nextTick(() => $refs.searchInput.focus())" class="select select-bordered w-full flex items-center justify-between font-normal" :class="{'!outline-none !ring-2 !ring-primary/20 !border-primary': open}">
                                     <span x-text="selectedLabel" :class="{'text-base-content/50': !selectedId}"></span>
@@ -52,7 +79,7 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                                     </svg>
                                 </button>
-                            
+
                                 <!-- Dropdown menu -->
                                 <div x-show="open" style="display: none;" class="absolute z-10 w-full mt-1 bg-base-100 border border-base-300 rounded-box shadow-lg">
                                     <div class="p-2 border-b border-base-300">
@@ -72,9 +99,11 @@
                                     </ul>
                                 </div>
                             </div>
+                            @endif
                             @error('document_type_id') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                         </div>
 
+                        {{-- Document Number --}}
                         <div class="form-control w-full mb-4">
                             <label for="document_number_field" class="label">
                                 <span class="label-text font-medium">{{ __('Nomor Dokumen') }}</span>
@@ -89,6 +118,7 @@
                             </p>
                         </div>
 
+                        {{-- Branch --}}
                         <div class="form-control w-full mb-4">
                             <label for="branch_id" class="label">
                                 <span class="label-text font-medium">{{ __('Cabang (Branch)') }}</span>
@@ -110,14 +140,16 @@
                             @error('branch_id') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                         </div>
 
+                        {{-- Title --}}
                         <div class="form-control w-full mb-4">
                             <label for="title" class="label">
                                 <span class="label-text font-medium">{{ __('Judul') }}</span>
                             </label>
-                            <input type="text" name="title" id="title" value="{{ old('title') }}" class="input input-bordered w-full" required>
+                            <input type="text" name="title" id="title" value="{{ old('title', $selectedTemplate?->title) }}" class="input input-bordered w-full" required>
                             @error('title') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                         </div>
 
+                        {{-- Division --}}
                         <div class="form-control w-full mb-4">
                             <label for="division_id" class="label">
                                 <span class="label-text font-medium">{{ __('Divisi') }}</span>
@@ -143,6 +175,7 @@
 
                         <div class="divider"></div>
 
+                        {{-- Expiration --}}
                         <div class="bg-base-200/50 p-4 rounded-xl border border-base-300 mb-4">
                             <div class="flex items-center justify-between mb-3">
                                 <label class="font-medium text-sm text-base-content flex items-center gap-2">
@@ -208,6 +241,8 @@
                             @error('expiration_date') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                         </div>
 
+                        {{-- Upload section — hidden when using template --}}
+                        @if(!$selectedTemplate)
                         <div class="form-control mb-2">
                             <label class="label cursor-pointer justify-start gap-3">
                                 <input type="checkbox" name="is_upload" id="is_upload" value="1"
@@ -229,6 +264,7 @@
                                 {{ __('Setelah berkas dipilih, isi nomor dokumen di atas sesuai nomor resmi pada berkas fisik.') }}
                             </p>
                         </div>
+                        @endif
 
                         <div class="flex flex-wrap justify-end">
                             <button type="submit" class="btn btn-primary">
@@ -314,25 +350,29 @@
                 divisionSelect.addEventListener('change', fetchPreview);
             }
 
-            uploadCheckbox.addEventListener('change', function () {
-                if (uploadCheckbox.checked) {
-                    uploadField.classList.remove('hidden');
-                } else {
-                    uploadField.classList.add('hidden');
-                    fileInput.value = '';
-                    setUploadMode(false);
-                }
-            });
+            if (uploadCheckbox) {
+                uploadCheckbox.addEventListener('change', function () {
+                    if (uploadCheckbox.checked) {
+                        uploadField.classList.remove('hidden');
+                    } else {
+                        uploadField.classList.add('hidden');
+                        fileInput.value = '';
+                        setUploadMode(false);
+                    }
+                });
+            }
 
-            fileInput.addEventListener('change', function () {
-                setUploadMode(fileInput.files.length > 0);
-            });
+            if (fileInput) {
+                fileInput.addEventListener('change', function () {
+                    setUploadMode(fileInput.files.length > 0);
+                });
+            }
 
-            // Restore state kalau form reload akibat error validasi.
+            // Restore state kalau form reload akibat error validasi, or auto-trigger for template
             if (typeSelect.value) {
                 fetchPreview();
             }
-            if (uploadCheckbox.checked) {
+            if (uploadCheckbox && uploadCheckbox.checked) {
                 uploadField.classList.remove('hidden');
             }
 

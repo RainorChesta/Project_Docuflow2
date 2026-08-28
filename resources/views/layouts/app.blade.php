@@ -116,10 +116,11 @@
 
                         if ($route) {
                             if (str_starts_with($name, 'documents.')) {
-                                if (in_array($name, ['documents.create', 'documents.edit', 'documents.show', 'documents.preview', 'documents.preview-version'])) {
+                                if (in_array($name, ['documents.choose', 'documents.create', 'documents.edit', 'documents.show', 'documents.preview', 'documents.preview-version'])) {
                                     $crumbs[] = ['label' => $docTypeLabel, 'url' => $docTypeRoute];
                                 }
                                 $crumbs[] = ['label' => match ($name) {
+                                    'documents.choose' => __('Pilih Template'),
                                     'documents.create' => __('Buat'),
                                     'documents.edit' => __('Edit'),
                                     'documents.show' => __('Detail Dokumen'),

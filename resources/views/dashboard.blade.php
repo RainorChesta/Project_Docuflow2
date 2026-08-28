@@ -185,7 +185,7 @@
                                     <svg class="w-10 h-10 mx-auto text-base-content/20 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                                     <p class="text-sm text-base-content/50 mb-1">{{ __('Belum ada dokumen') }}</p>
                                     <p class="text-xs text-base-content/30">{{ __('Buat dokumen pertama Anda untuk memulai.') }}</p>
-                                    <a href="{{ route('documents.create') }}" class="btn btn-primary btn-sm mt-4">
+                                    <a href="{{ route('documents.choose') }}" class="btn btn-primary btn-sm mt-4">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                                         {{ __('Buat Dokumen') }}
                                     </a>

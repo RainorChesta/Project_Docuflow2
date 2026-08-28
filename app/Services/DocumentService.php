@@ -218,6 +218,51 @@ class DocumentService
     }
 
     /**
+     * Buat dokumen baru dari template. File .docx template di-copy ke
+     * storage dokumen baru, sehingga template asli tidak pernah berubah.
+     * Versi pertama berstatus "draft" — user bisa langsung edit di OnlyOffice.
+     */
+    public function createFromTemplate(array $data, int $ownerId, \App\Models\DocumentTemplate $template): Document
+    {
+        $division = !empty($data['division_id']) ? Division::find($data['division_id']) : null;
+        $documentType = DocumentType::findOrFail($data['document_type_id']);
+        $branch = !empty($data['branch_id']) ? \App\Models\Branch::with('company')->find($data['branch_id']) : null;
+
+        if ($branch && empty($data['company_id'])) {
+            $data['company_id'] = $branch->company_id;
+        }
+
+        $data['document_number'] = $this->generateId($division, $documentType, $branch);
+        $data['visibility'] ??= Document::VISIBILITY_DIVISION;
+        $data['owner_id'] = $ownerId;
+        $data['template_id'] = $template->id;
+
+        return DB::transaction(function () use ($data, $template) {
+            $doc = Document::create($data);
+
+            $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
+            $destDir = 'documents/' . $doc->id;
+            $destPath = $destDir . '/v1.docx';
+
+            // Copy template file to new document storage
+            $disk->copy($template->file_path, $destPath);
+
+            $doc->versions()->create([
+                'version_number' => 1,
+                'content' => '',
+                'file_path' => $destPath,
+                'file_original_name' => $doc->title . '.docx',
+                'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'author_id' => $data['owner_id'],
+                'author_name' => User::find($data['owner_id'])->name,
+                'status' => 'draft',
+            ]);
+
+            return $doc;
+        });
+    }
+
+    /**
      * Kirim job ringkasan AI ke antrian. Job hanya membawa document id —
      * payload kecil, dan request web tidak menunggu Groq selesai.
      */
