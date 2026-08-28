@@ -181,4 +181,109 @@ class OnlyOfficeController extends Controller
         // For other statuses (1 = editing, 3 = saving error, 7 = corrupt):
         return response()->json(['error' => 0]);
     }
+
+    /**
+     * Serve the template file to ONLYOFFICE Docs Document Server.
+     */
+    public function templateFile(\App\Models\DocumentTemplate $template): BinaryFileResponse|StreamedResponse
+    {
+        $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
+
+        if (!$template->file_path || !$disk->exists($template->file_path)) {
+            abort(404, 'File not found in storage.');
+        }
+
+        $mime = $template->file_mime ?? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        $fileName = $template->file_original_name ?? ($template->title . '.docx');
+
+        return $disk->response($template->file_path, $fileName, [
+            'Content-Type' => $mime,
+            'Content-Disposition' => 'inline; filename="' . addslashes($fileName) . '"',
+        ]);
+    }
+
+    /**
+     * Handle the save / status callback from ONLYOFFICE Document Server for Templates.
+     */
+    public function templateCallback(Request $request, \App\Models\DocumentTemplate $template): JsonResponse
+    {
+        $rawPayload = $request->all();
+        Log::info("ONLYOFFICE callback received for template {$template->id}", [
+            'status' => $rawPayload['status'] ?? null,
+            'users' => $rawPayload['users'] ?? null,
+        ]);
+
+        $payload = $this->onlyOfficeService->validateCallbackToken($rawPayload, $request->bearerToken());
+
+        if ($payload === null) {
+            return response()->json(['error' => 1, 'message' => 'Invalid JWT token'], 403);
+        }
+
+        $status = (int) ($payload['status'] ?? 0);
+        $cacheKey = 'onlyoffice_template_active_' . $template->id;
+
+        if ($status === 1) {
+            \Illuminate\Support\Facades\Cache::put($cacheKey, true, now()->addMinutes(10));
+        }
+
+        // Status 2 = Ready for saving, 6 = ForceSave
+        if (in_array($status, [2, 6], true)) {
+            $downloadUrl = $payload['url'] ?? null;
+
+            if (!$downloadUrl) {
+                Log::warning("ONLYOFFICE callback status {$status} missing download URL.", $payload);
+                return response()->json(['error' => 1, 'message' => 'Missing download URL'], 400);
+            }
+
+            try {
+                // Download the updated DOCX file from ONLYOFFICE
+                $response = Http::timeout(60)->get($downloadUrl);
+
+                if (!$response->successful()) {
+                    Log::error("Failed to download updated DOCX from ONLYOFFICE URL: {$downloadUrl}", [
+                        'http_status' => $response->status(),
+                    ]);
+                    return response()->json(['error' => 1, 'message' => 'Failed to download file'], 500);
+                }
+
+                $fileContent = $response->body();
+
+                // Save new template content
+                $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
+                $disk->put($template->file_path, $fileContent);
+                
+                $template->touch(); // Update updated_at timestamp
+
+                // Determine author
+                $userId = null;
+                if (!empty($payload['users']) && is_array($payload['users'])) {
+                    $userId = (int) $payload['users'][0];
+                } elseif (!empty($payload['actions']) && is_array($payload['actions'])) {
+                    $userId = (int) ($payload['actions'][0]['userid'] ?? null);
+                }
+                $author = ($userId ? User::find($userId) : null) ?? $template->creator;
+
+                $this->auditService->log($author, 'template.saved_onlyoffice', 'document_template', $template->id, [
+                    'status' => $status,
+                ]);
+
+                Log::info("Template {$template->id} saved successfully from ONLYOFFICE.");
+            } catch (\Throwable $e) {
+                Log::error("Exception processing ONLYOFFICE template callback: " . $e->getMessage(), [
+                    'exception' => $e,
+                ]);
+                return response()->json(['error' => 1, 'message' => $e->getMessage()], 500);
+            }
+        } elseif ($status === 4) {
+            $template->touch(); // Rotate key
+            Log::info("ONLYOFFICE closed without changes for template {$template->id}. Touched to rotate key.");
+        }
+
+        if (in_array($status, [2, 3, 4, 7], true)) {
+            \Illuminate\Support\Facades\Cache::forget($cacheKey);
+            \Illuminate\Support\Facades\Cache::forget('onlyoffice_template_key_' . $template->id);
+        }
+
+        return response()->json(['error' => 0]);
+    }
 }

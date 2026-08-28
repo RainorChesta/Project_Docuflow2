@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         $middleware->validateCsrfTokens(except: [
             'onlyoffice/documents/*/callback',
+            'onlyoffice/templates/*/callback',
         ]);
         $middleware->alias([
             'share.link' => \App\Http\Middleware\ShareLinkAuth::class,

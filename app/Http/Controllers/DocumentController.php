@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Document;
+use App\Models\DocumentTemplate;
 use App\Models\DocumentType;
 use App\Models\Division;
 use App\Models\DocumentVersion;
@@ -232,7 +233,18 @@ class DocumentController extends Controller
         return view($view, compact('documents', 'documentTypes', 'type', 'showDocuments', 'virtualFolders', 'breadcrumbs', 'folder'));
     }
 
-    public function create(): View
+    /**
+     * MS Word-style chooser page: blank document or pick a template.
+     */
+    public function choose(): View
+    {
+        $templates = DocumentTemplate::active()->with('documentType')->orderBy('title')->get();
+        $documentTypes = DocumentType::all();
+
+        return view('documents.choose', compact('templates', 'documentTypes'));
+    }
+
+    public function create(Request $request): View
     {
         $user = auth()->user();
         $divisions = ($user->isAdmin() || $user->isDirector())
@@ -245,7 +257,15 @@ class DocumentController extends Controller
         $activeBranch = $activeBranchId ? \App\Models\Branch::with('company')->find($activeBranchId) : null;
         $availableBranches = $contextService->getAvailableBranches($user);
 
-        return view('documents.create', compact('divisions', 'documentTypes', 'activeBranch', 'availableBranches'));
+        // If a template_id is passed via URL, load the template for auto-fill
+        $selectedTemplate = null;
+        if ($templateId = $request->query('template_id')) {
+            $selectedTemplate = DocumentTemplate::active()->with('documentType')->find($templateId);
+        }
+
+        return view('documents.create', compact(
+            'divisions', 'documentTypes', 'activeBranch', 'availableBranches', 'selectedTemplate'
+        ));
     }
 
     /**
@@ -281,6 +301,7 @@ class DocumentController extends Controller
 
         $user = auth()->user();
         $isUpload = $request->boolean('is_upload');
+        $templateId = $request->input('template_id');
 
         $rules = [
             'title' => 'required|string|max:255',
@@ -288,6 +309,7 @@ class DocumentController extends Controller
             'division_id' => ($user->isAdmin() || $user->isDirector()) ? 'required|exists:divisions,id' : 'nullable',
             'branch_id' => 'nullable|exists:branches,id',
             'expiration_date' => 'nullable|date',
+            'template_id' => 'nullable|exists:document_templates,id',
         ];
 
         if ($isUpload) {
@@ -323,6 +345,10 @@ class DocumentController extends Controller
         if ($isUpload) {
             $doc = $this->documentService->createFromUpload($validated, $user->id, $request->file('file'));
             $message = 'Dokumen berhasil diunggah. Silakan edit dokumen di editor.';
+        } elseif ($templateId) {
+            $template = DocumentTemplate::findOrFail($templateId);
+            $doc = $this->documentService->createFromTemplate($validated, $user->id, $template);
+            $message = 'Dokumen berhasil dibuat dari template. Silakan edit di editor.';
         } else {
             $doc = $this->documentService->create($validated, $user->id);
             $message = 'Document created. Fill in the content.';
@@ -333,6 +359,7 @@ class DocumentController extends Controller
             'document_number' => $doc->document_number,
             'visibility' => $doc->visibility,
             'via_upload' => $isUpload,
+            'from_template' => $templateId ? true : false,
         ]);
 
         return redirect()->route('documents.edit', $doc)->with('success', $message);

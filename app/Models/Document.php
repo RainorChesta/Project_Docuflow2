@@ -14,7 +14,7 @@ class Document extends Model
     protected $fillable = [
         'document_number', 'title', 'summary', 'summary_status', 'summary_error',
         'summary_started_at', 'summary_completed_at', 'visibility', 'division_id', 'company_id', 'branch_id', 'owner_id',
-        'document_type_id', 'is_public', 'current_version_id',
+        'document_type_id', 'template_id', 'is_public', 'current_version_id',
         'pending_rollback_version_id', 'rollback_requested_by_id', 'rollback_requested_at',
         'paper_size', 'paper_margin',
         'general_access', 'link_role', 'share_token',
@@ -99,6 +99,11 @@ class Document extends Model
     public function documentType(): BelongsTo
     {
         return $this->belongsTo(DocumentType::class);
+    }
+
+    public function template(): BelongsTo
+    {
+        return $this->belongsTo(DocumentTemplate::class, 'template_id');
     }
 
     public function owner(): BelongsTo
