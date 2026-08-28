@@ -60,4 +60,12 @@
     @if($doc->documentType)
         <span class="badge badge-outline badge-xs opacity-60">{{ $doc->documentType->code }}</span>
     @endif
+    @php
+        $contextService = app(\App\Services\CompanyContextService::class);
+        $activeBranchId = $contextService->getActiveBranchId(auth()->user());
+        $isCrossBranch = $doc->branch_id && $activeBranchId && (int)$doc->branch_id !== (int)$activeBranchId;
+    @endphp
+    @if($isCrossBranch)
+        <span class="badge badge-xs badge-secondary mt-1" title="Dokumen Lintas Cabang">↗ Lintas Cabang</span>
+    @endif
 </a>

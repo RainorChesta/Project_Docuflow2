@@ -16,9 +16,17 @@ class DocumentPolicy
         // This is necessary so they don't get locked out right after creating a document in another branch.
         if ($user->id === $document->owner_id) return true;
 
+        // General documents are accessible to everyone across all branches/companies
+        if ($document->isGeneral()) return true;
+
         $contextService = app(\App\Services\CompanyContextService::class);
         $activeBranchId = $contextService->getActiveBranchId($user);
         $activeCompanyId = $contextService->getActiveCompanyId($user);
+
+        // Any share (personal, division, branch, or link) grants view, bypassing strict branch isolation.
+        if (app(DocumentShareService::class)->resolveEffectiveRole($document, $user) !== null) {
+            return true;
+        }
 
         // Enforce active branch and company isolation:
         // When a user selects a company or branch, only documents matching that active context can be accessed.
@@ -69,8 +77,6 @@ class DocumentPolicy
             }
         }
 
-        if ($document->isGeneral()) return true;
-
         // Division-scoped docs: visible to members of that division.
         if ($document->isDivision()
             && $document->division_id
@@ -78,8 +84,7 @@ class DocumentPolicy
             return true;
         }
 
-        // Any share (personal, division, or link) grants view.
-        return app(DocumentShareService::class)->resolveEffectiveRole($document, $user) !== null;
+        return false;
     }
 
     public function create(User $user): bool

@@ -92,6 +92,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/documents/{document}/share-data', [DocumentShareController::class, 'shareData'])->name('shares.data');
     Route::get('/documents/{document}/search-sharees', [DocumentShareController::class, 'searchSharees'])->name('shares.search');
 
+    // Cross-Branch Distribution
+    Route::post('/documents/{document}/distributions', [\App\Http\Controllers\DocumentDistributionController::class, 'store'])->name('distributions.store');
     // PDF Export
     Route::post('/documents/{document}/export-pdf', [DocumentExportController::class, 'export'])
         ->name('documents.export-pdf');

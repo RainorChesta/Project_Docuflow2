@@ -47,31 +47,111 @@ class DocumentController extends Controller
         $userBranchIds = $user->allBranchIds();
         $userCompanyIds = $user->allCompanyIds();
 
-        // Apply active branch filtering if not admin looking at global
+        $folder = $request->get('folder');
+        $virtualFolders = [];
+        $breadcrumbs = [];
+
+        // Base query - only apply strict active branch filtering if NOT in 'general' type,
+        // or if in 'general' type, we will apply specific branch filters based on the active folder.
         if (!$user->isAdmin()) {
-            if ($activeBranchId && !$user->isDirector()) {
-                $query->where('branch_id', $activeBranchId);
-            } elseif ($activeCompanyId && !$user->isDirector()) {
-                $query->where(function ($q) use ($activeCompanyId) {
-                    $q->where('company_id', $activeCompanyId)
-                      ->orWhereHas('branch', fn($b) => $b->where('company_id', $activeCompanyId));
-                });
-            } elseif (!empty($userBranchIds)) {
-                $query->where(function ($q) use ($userBranchIds, $userCompanyIds) {
-                    $q->whereIn('branch_id', $userBranchIds)
-                      ->orWhere(function ($sub) use ($userCompanyIds) {
-                          $sub->whereNull('branch_id')
-                              ->whereIn('company_id', $userCompanyIds);
-                      });
-                });
-            } elseif (!empty($userCompanyIds)) {
-                $query->whereIn('company_id', $userCompanyIds);
+            if ($type !== 'general' && $type !== 'shared') {
+                if ($activeBranchId && !$user->isDirector()) {
+                    $query->where('branch_id', $activeBranchId);
+                } elseif ($activeCompanyId && !$user->isDirector()) {
+                    $query->where(function ($q) use ($activeCompanyId) {
+                        $q->where('company_id', $activeCompanyId)
+                          ->orWhereHas('branch', fn($b) => $b->where('company_id', $activeCompanyId));
+                    });
+                } elseif (!empty($userBranchIds)) {
+                    $query->where(function ($q) use ($userBranchIds, $userCompanyIds) {
+                        $q->whereIn('branch_id', $userBranchIds)
+                          ->orWhere(function ($sub) use ($userCompanyIds) {
+                              $sub->whereNull('branch_id')
+                                  ->whereIn('company_id', $userCompanyIds);
+                          });
+                    });
+                } elseif (!empty($userCompanyIds)) {
+                    $query->whereIn('company_id', $userCompanyIds);
+                }
             }
         }
 
         if ($type === 'general') {
-            // General (public) — visible to everyone.
-            $query->general();
+            $pusatBranch = \App\Models\Company::find($activeCompanyId)?->pusatBranch;
+            $pusatBranchId = $pusatBranch?->id;
+
+            if (!$folder) {
+                // Root General Folders
+                if ($pusatBranch) {
+                    $virtualFolders[] = ['id' => 'pusat', 'name' => $pusatBranch->name . ' (Pusat)'];
+                }
+                
+                // Show "My Branch" if active branch is not pusat
+                if ($activeBranchId && $activeBranchId !== $pusatBranchId) {
+                    $myBranch = \App\Models\Branch::find($activeBranchId);
+                    if ($myBranch) {
+                        $virtualFolders[] = ['id' => 'my-branch', 'name' => 'Cabang ' . $myBranch->name];
+                    }
+                }
+                
+                $virtualFolders[] = ['id' => 'other-branches', 'name' => 'Cabang Lainnya'];
+                $virtualFolders[] = ['id' => 'cross-branch', 'name' => 'Dokumen Lintas Cabang'];
+
+                // At root, show nothing or only active branch docs? Let's just show no documents at root, forcing them to click a folder.
+                $query->whereRaw('1 = 0'); // Empty query
+            } elseif ($folder === 'pusat') {
+                $breadcrumbs[] = ['name' => $pusatBranch?->name . ' (Pusat)', 'url' => '?type=general&folder=pusat'];
+                $query->general()->where('branch_id', $pusatBranchId);
+            } elseif ($folder === 'my-branch') {
+                $myBranch = \App\Models\Branch::find($activeBranchId);
+                $breadcrumbs[] = ['name' => 'Cabang ' . ($myBranch?->name ?? 'Saya'), 'url' => '?type=general&folder=my-branch'];
+                $query->general()->where('branch_id', $activeBranchId);
+            } elseif ($folder === 'other-branches') {
+                $breadcrumbs[] = ['name' => 'Cabang Lainnya', 'url' => '?type=general&folder=other-branches'];
+                
+                $otherBranches = \App\Models\Branch::where('company_id', $activeCompanyId)
+                                    ->where('id', '!=', $pusatBranchId)
+                                    ->when($activeBranchId, function($q) use ($activeBranchId) {
+                                        return $q->where('id', '!=', $activeBranchId);
+                                    })
+                                    ->get();
+
+                foreach ($otherBranches as $branch) {
+                    $virtualFolders[] = ['id' => 'branch-' . $branch->id, 'name' => 'Cabang ' . $branch->name];
+                }
+
+                $query->whereRaw('1 = 0'); // Don't show documents directly here
+            } elseif (str_starts_with($folder, 'branch-')) {
+                $branchId = str_replace('branch-', '', $folder);
+                $branch = \App\Models\Branch::find($branchId);
+                
+                $breadcrumbs[] = ['name' => 'Cabang Lainnya', 'url' => '?type=general&folder=other-branches'];
+                $breadcrumbs[] = ['name' => 'Cabang ' . ($branch?->name ?? $branchId), 'url' => '?type=general&folder=' . $folder];
+                
+                $query->general()->where('branch_id', $branchId);
+            } elseif ($folder === 'cross-branch') {
+                $breadcrumbs[] = ['name' => 'Lintas Cabang', 'url' => '?type=general&folder=cross-branch'];
+                $virtualFolders = [
+                    ['id' => 'cross-branch-received', 'name' => 'Diterima dari Cabang Lain'],
+                    ['id' => 'cross-branch-sent', 'name' => 'Dikirim ke Cabang Lain'],
+                ];
+                $query->whereRaw('1 = 0');
+            } elseif ($folder === 'cross-branch-received') {
+                $breadcrumbs[] = ['name' => 'Lintas Cabang', 'url' => '?type=general&folder=cross-branch'];
+                $breadcrumbs[] = ['name' => 'Diterima', 'url' => '?type=general&folder=cross-branch-received'];
+                // Documents distributed TO the active branch
+                $query->general()->whereHas('distributions', fn($q) => $q->whereIn('target_branch_id', $user->allBranchIds()));
+                
+                // Clear notifications
+                $user->unreadNotifications()
+                    ->where('data->type', 'document_cross_branch_received')
+                    ->update(['read_at' => now()]);
+            } elseif ($folder === 'cross-branch-sent') {
+                $breadcrumbs[] = ['name' => 'Lintas Cabang', 'url' => '?type=general&folder=cross-branch'];
+                $breadcrumbs[] = ['name' => 'Dikirim', 'url' => '?type=general&folder=cross-branch-sent'];
+                // Documents distributed FROM the active branch
+                $query->general()->whereHas('distributions', fn($q) => $q->whereIn('source_branch_id', $user->allBranchIds()));
+            }
         } elseif ($type === 'mine') {
             // My Documents — semua dokumen milik user, apapun scopenya.
             $query->ownedBy($user);
@@ -114,15 +194,25 @@ class DocumentController extends Controller
             $query->where('document_type_id', $documentTypeId);
         }
 
+        if ($year = $request->get('year')) {
+            $query->whereYear('created_at', (int) $year);
+        }
+
         if ($status = $request->get('status')) {
             if ($status === 'active') {
-                $query->whereHas('currentVersion', fn($q) => $q->where('status', 'active'));
+                $query->whereHas('currentVersion', fn($q) => $q->where('status', 'active'))
+                      ->where('is_expired', false);
             } elseif ($status === 'pending') {
                 $query->whereDoesntHave('currentVersion')
                     ->orWhereHas('versions', fn($q) => $q->where('status', 'pending'));
             } elseif ($status === 'draft') {
                 $query->whereDoesntHave('versions');
+            } elseif ($status === 'expired') {
+                $query->where('is_expired', true);
             }
+        } else {
+            // Sembunyikan dokumen kedaluwarsa secara default kecuali diminta
+            $query->where('is_expired', false);
         }
 
         $documents = $query->latest()->paginate(15)->withQueryString();
@@ -135,7 +225,11 @@ class DocumentController extends Controller
             default => 'documents.general',
         };
 
-        return view($view, compact('documents', 'documentTypes', 'type'));
+        // General documents always shows the filter toolbar.
+        // Other types already include _search unconditionally in their views.
+        $showDocuments = ($type === 'general' && $folder !== null) || $type !== 'general';
+
+        return view($view, compact('documents', 'documentTypes', 'type', 'showDocuments', 'virtualFolders', 'breadcrumbs', 'folder'));
     }
 
     public function create(): View
@@ -670,6 +764,10 @@ class DocumentController extends Controller
 
         $document = Document::findOrFail($id);
 
+        if (!auth()->user()->can('view', $document)) {
+            abort(403, 'Anda tidak punya akses ke dalam dokumen ini.');
+        }
+
         return view('documents.verified', compact('document'));
     }
 
@@ -692,7 +790,7 @@ class DocumentController extends Controller
 
         $document->update([
             'visibility' => $validated['visibility'],
-            'division_id' => $validated['visibility'] === Document::VISIBILITY_DIVISION ? $divisionId : null,
+            'division_id' => $divisionId,
             // Legacy derived flag stays in sync with the scope.
             'is_public' => $validated['visibility'] === Document::VISIBILITY_GENERAL,
         ]);

@@ -137,7 +137,17 @@
             <div class="card bg-base-100 border border-base-300 shadow-sm mb-6 print:hidden">
                 <div class="card-body">
                     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-base-200 pb-4">
-                        <h1 class="text-xl font-bold text-base-content truncate min-w-0">{{ $document->title }}</h1>
+                        <div class="flex items-center gap-2 min-w-0">
+                            <h1 class="text-xl font-bold text-base-content truncate min-w-0">{{ $document->title }}</h1>
+                            @php
+                                $contextService = app(\App\Services\CompanyContextService::class);
+                                $activeBranchId = $contextService->getActiveBranchId(auth()->user());
+                                $isCrossBranch = $document->branch_id && $activeBranchId && (int)$document->branch_id !== (int)$activeBranchId;
+                            @endphp
+                            @if($isCrossBranch)
+                                <span class="badge badge-secondary badge-sm shrink-0" title="Dokumen Lintas Cabang">↗ Lintas Cabang</span>
+                            @endif
+                        </div>
                         <span class="badge badge-outline badge-sm shrink-0">{{ $document->document_number }}</span>
                     </div>
 
