@@ -71,6 +71,57 @@ class OnlyOfficeController extends Controller
     }
 
     /**
+     * Serve a placeholder image for pending signatures.
+     */
+    public function signaturePlaceholder(Request $request): \Illuminate\Http\Response
+    {
+        $width = 400;
+        $height = 400;
+
+        if (!extension_loaded('gd')) {
+            return response('GD extension required', 500);
+        }
+
+        $image = imagecreatetruecolor($width, $height);
+        
+        imagealphablending($image, false);
+        imagesavealpha($image, true);
+        $transparent = imagecolorallocatealpha($image, 255, 255, 255, 127);
+        imagefilledrectangle($image, 0, 0, $width, $height, $transparent);
+        imagealphablending($image, true);
+        
+        $textColor = imagecolorallocate($image, 150, 150, 150);
+        $font = 5;
+        
+        $lines = ["PENDING", "SIGNATURE", "APPROVAL"];
+        $fh = imagefontheight($font);
+        
+        $totalHeight = count($lines) * $fh + (count($lines) - 1) * 10;
+        $startY = ($height - $totalHeight) / 2;
+
+        foreach ($lines as $i => $line) {
+            $fw = imagefontwidth($font);
+            $textWidth = $fw * strlen($line);
+            $x = ($width - $textWidth) / 2;
+            $y = $startY + ($i * ($fh + 10));
+            imagestring($image, $font, (int) $x, (int) $y, $line, $textColor);
+        }
+        
+        $borderColor = imagecolorallocate($image, 200, 200, 200);
+        imagerectangle($image, 0, 0, $width - 1, $height - 1, $borderColor);
+        
+        ob_start();
+        imagepng($image);
+        $imageData = ob_get_clean();
+        imagedestroy($image);
+        
+        return response($imageData, 200, [
+            'Content-Type' => 'image/png',
+            'Cache-Control' => 'no-cache, private',
+        ]);
+    }
+
+    /**
      * Serve document QR Code PNG to ONLYOFFICE Docs Document Server.
      */
     public function qrcode(Document $document, \App\Services\QrCodeService $qrCodeService): \Illuminate\Http\Response

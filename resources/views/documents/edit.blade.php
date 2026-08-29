@@ -350,13 +350,19 @@
 
             function fetchUserSignatureAndInsert(userId, userName) {
                 document.getElementById('signature-users-modal').close();
-                fetch(`/profile/signature?user_id=${userId}`)
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.success && data.url) {
+                fetch(`/profile/signature?user_id=${userId}&document_id={{ $document->id }}`)
+                    .then(res => res.json().then(data => ({ status: res.status, data: data })))
+                    .then(response => {
+                        const data = response.data;
+                        if (response.status === 200 && data.success && data.url) {
                             insertSignatureImage(data.url, userName, data.token || null);
+                            if (data.message) {
+                                setTimeout(() => alert(data.message), 500);
+                            }
+                        } else if (response.status === 403) {
+                            alert(data.message || 'Anda tidak memiliki izin untuk menggunakan tanda tangan pengguna ini.');
                         } else {
-                            alert('Tanda tangan untuk ' + userName + ' tidak ditemukan.');
+                            alert(data.message || 'Tanda tangan untuk ' + userName + ' tidak ditemukan.');
                         }
                     })
                     .catch(() => {

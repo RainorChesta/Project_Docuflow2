@@ -39,29 +39,56 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
-        {{-- ─── Left panel: Canvas ─── --}}
+        {{-- ─── Left panel: Input Options (Canvas / Upload) ─── --}}
         <div class="space-y-3">
-            <label class="block text-sm font-medium text-base-content">Canvas Tanda Tangan</label>
-
-            <div class="relative border-2 border-dashed border-base-300 rounded-xl bg-base-100 p-2 shadow-inner hover:border-primary/50 transition-colors">
-                <canvas id="signature-canvas" class="w-full h-52 touch-none cursor-crosshair rounded-lg bg-white"></canvas>
-                <div id="canvas-hint" class="absolute inset-0 pointer-events-none flex flex-col items-center justify-center text-base-content/30 transition-opacity duration-200">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                    </svg>
-                    <span class="text-xs font-medium">Goreskan tanda tangan Anda di sini</span>
+            <div class="flex items-center justify-between">
+                <label class="block text-sm font-medium text-base-content">Pilih Metode</label>
+                <div class="tabs tabs-boxed p-1" id="signature-tabs">
+                    <a class="tab tab-active tab-sm font-medium" data-target="draw">Gambar</a>
+                    <a class="tab tab-sm font-medium" data-target="upload">Unggah</a>
                 </div>
             </div>
 
-            <div class="flex items-center justify-between gap-2 pt-1">
-                <button type="button" id="btn-clear-canvas" class="btn btn-ghost btn-sm text-base-content/70">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                    Hapus Canvas
-                </button>
-                <button type="button" id="btn-save-signature" class="btn btn-primary btn-sm" disabled>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
-                    Simpan TTD
-                </button>
+            {{-- Draw Mode --}}
+            <div id="signature-mode-draw" class="space-y-3">
+                <div class="relative border-2 border-dashed border-base-300 rounded-xl bg-base-100 p-2 shadow-inner hover:border-primary/50 transition-colors">
+                    <canvas id="signature-canvas" class="w-full h-52 touch-none cursor-crosshair rounded-lg bg-white"></canvas>
+                    <div id="canvas-hint" class="absolute inset-0 pointer-events-none flex flex-col items-center justify-center text-base-content/30 transition-opacity duration-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                        <span class="text-xs font-medium">Goreskan tanda tangan Anda di sini</span>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between gap-2 pt-1">
+                    <button type="button" id="btn-clear-canvas" class="btn btn-ghost btn-sm text-base-content/70">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        Hapus Canvas
+                    </button>
+                    <button type="button" id="btn-save-signature" class="btn btn-primary btn-sm" disabled>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                        Simpan TTD
+                    </button>
+                </div>
+            </div>
+
+            {{-- Upload Mode --}}
+            <div id="signature-mode-upload" class="space-y-3 hidden">
+                <div class="relative border-2 border-dashed border-base-300 rounded-xl bg-base-100 p-6 flex flex-col items-center justify-center hover:border-primary/50 transition-colors h-[230px]">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-base-content/30 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    <p class="text-sm text-base-content/70 mb-4 text-center">Pilih file gambar (PNG, JPG) dengan latar transparan jika memungkinkan.</p>
+                    <input type="file" id="signature-file-input" accept="image/png, image/jpeg, image/jpg" class="file-input file-input-bordered file-input-sm w-full max-w-xs" />
+                </div>
+
+                <div class="flex justify-end gap-2 pt-1">
+                    <button type="button" id="btn-save-upload-signature" class="btn btn-primary btn-sm" disabled>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                        Simpan TTD
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -244,6 +271,36 @@
         const SHOW_URL   = panel.dataset.showUrl;
         const CSRF       = panel.dataset.csrf;
 
+        const fileInput      = document.getElementById('signature-file-input');
+        const saveUploadBtn  = document.getElementById('btn-save-upload-signature');
+        let currentMode      = 'draw'; // 'draw' or 'upload'
+
+        /* ── Tabs logic ── */
+        const tabs = document.querySelectorAll('#signature-tabs .tab');
+        const modeDraw = document.getElementById('signature-mode-draw');
+        const modeUpload = document.getElementById('signature-mode-upload');
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                tabs.forEach(t => t.classList.remove('tab-active'));
+                e.target.classList.add('tab-active');
+                currentMode = e.target.dataset.target;
+                
+                if (currentMode === 'draw') {
+                    modeDraw.classList.remove('hidden');
+                    modeUpload.classList.add('hidden');
+                } else {
+                    modeDraw.classList.add('hidden');
+                    modeUpload.classList.remove('hidden');
+                }
+            });
+        });
+
+        /* ── Upload Input Logic ── */
+        fileInput.addEventListener('change', () => {
+            saveUploadBtn.disabled = !fileInput.files.length;
+        });
+
         /* ── Canvas / SignaturePad setup ── */
         function resizeCanvas() {
             const ratio = Math.max(window.devicePixelRatio || 1, 1);
@@ -278,20 +335,29 @@
         });
 
         /* ── Save signature via AJAX ── */
-        saveBtn.addEventListener('click', async () => {
-            if (signaturePad.isEmpty()) {
-                showFlash('Canvas tanda tangan masih kosong.', 'warning');
-                return;
+        async function saveSignature(isUpload) {
+            const body = new FormData();
+            body.append('_token', CSRF);
+
+            if (isUpload) {
+                if (!fileInput.files.length) {
+                    showFlash('Silakan pilih file gambar terlebih dahulu.', 'warning');
+                    return;
+                }
+                body.append('signature_image', fileInput.files[0]);
+            } else {
+                if (signaturePad.isEmpty()) {
+                    showFlash('Canvas tanda tangan masih kosong.', 'warning');
+                    return;
+                }
+                const dataUrl = signaturePad.toDataURL('image/png');
+                body.append('signature_data', dataUrl);
             }
 
-            const dataUrl = signaturePad.toDataURL('image/png');
-            const body    = new FormData();
-            body.append('_token',         CSRF);
-            body.append('signature_data', dataUrl);
-
-            const origHtml = saveBtn.innerHTML;
-            saveBtn.disabled = true;
-            saveBtn.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Menyimpan...';
+            const activeBtn = isUpload ? saveUploadBtn : saveBtn;
+            const origHtml = activeBtn.innerHTML;
+            activeBtn.disabled = true;
+            activeBtn.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Menyimpan...';
 
             try {
                 const res  = await fetch(STORE_URL, {
@@ -304,23 +370,29 @@
                 if (data.success) {
                     renderSavedSignature(panel, data.url, data.updated_at);
                     setBadge(true);
-                    signaturePad.clear();
-                    if (hint) hint.style.opacity = '1';
-                    saveBtn.disabled = true;
+                    if (!isUpload) {
+                        signaturePad.clear();
+                        if (hint) hint.style.opacity = '1';
+                    } else {
+                        fileInput.value = ''; // clear input
+                    }
+                    activeBtn.disabled = true;
                     showFlash('Tanda tangan berhasil disimpan!');
-                    // No page reload needed; UI updates dynamically via renderSavedSignature
                 } else {
                     showFlash(data.message || 'Gagal menyimpan tanda tangan.', 'error');
-                    saveBtn.disabled = false;
+                    activeBtn.disabled = false;
                 }
             } catch (err) {
                 console.error('Save signature error:', err);
                 showFlash('Terjadi kesalahan jaringan saat menyimpan.', 'error');
-                saveBtn.disabled = false;
+                activeBtn.disabled = false;
             } finally {
-                saveBtn.innerHTML = origHtml;
+                activeBtn.innerHTML = origHtml;
             }
-        });
+        }
+
+        saveBtn.addEventListener('click', () => saveSignature(false));
+        saveUploadBtn.addEventListener('click', () => saveSignature(true));
 
         /* ── Delete signature via AJAX (with Custom Modal) ── */
         let formToSubmit = null;
