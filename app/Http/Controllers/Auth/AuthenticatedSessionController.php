@@ -29,8 +29,35 @@ class AuthenticatedSessionController extends Controller
         $request->session()->regenerate();
 
         $user = $request->user();
-        $expiringCount = \App\Models\Document::visibleTo($user)
+        $contextService = app(\App\Services\CompanyContextService::class);
+        $activeBranchId = $contextService->getActiveBranchId($user);
+        $activeCompanyId = $contextService->getActiveCompanyId($user);
+        $userBranchIds = $user->allBranchIds();
+        $userCompanyIds = $user->allCompanyIds();
+
+        $baseDocQuery = $user->documents();
+        if ($activeBranchId) {
+            $baseDocQuery->where('branch_id', $activeBranchId);
+        } elseif ($activeCompanyId) {
+            $baseDocQuery->where(function ($q) use ($activeCompanyId) {
+                $q->where('company_id', $activeCompanyId)
+                  ->orWhereHas('branch', fn($b) => $b->where('company_id', $activeCompanyId));
+            });
+        } elseif (!empty($userBranchIds)) {
+            $baseDocQuery->where(function ($q) use ($userBranchIds, $userCompanyIds) {
+                $q->whereIn('branch_id', $userBranchIds)
+                  ->orWhere(function ($sub) use ($userCompanyIds) {
+                      $sub->whereNull('branch_id')
+                          ->whereIn('company_id', $userCompanyIds);
+                  });
+            });
+        } elseif (!empty($userCompanyIds)) {
+            $baseDocQuery->whereIn('company_id', $userCompanyIds);
+        }
+
+        $expiringCount = $baseDocQuery
             ->where('is_expired', false)
+            ->whereHas('currentVersion', fn($q) => $q->where('status', 'active'))
             ->get()
             ->filter(function ($doc) {
                 if (!$doc->expires_at) return false;

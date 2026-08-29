@@ -274,6 +274,15 @@
             <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Jenis Dokumen') }}</span>
         </a>
 
+        <a href="{{ route('admin.templates.index') }}"
+           class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                  {{ request()->routeIs('admin.templates.*') || request()->routeIs('admin.template-categories.*') ? 'nav-item-active bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"
+           :class="open ? '' : 'lg:justify-center lg:px-0'"
+           :title="open ? '' : '{{ __('Template Dokumen') }}'">
+            <svg xmlns="http://www.w3.org/2000/svg" class="nav-item-icon h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>
+            <span class="whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Template Dokumen') }}</span>
+        </a>
+
         <a href="{{ route('admin.users.index') }}"
            class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
                   {{ request()->routeIs('admin.users.*') ? 'nav-item-active bg-primary/10 text-primary' : 'text-base-content/60 hover:bg-base-200 hover:text-base-content' }}"

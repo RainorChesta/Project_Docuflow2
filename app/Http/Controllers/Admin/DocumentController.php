@@ -67,9 +67,10 @@ class DocumentController extends Controller
                 Storage::disk('local')->delete($version->file_path);
             }
         }
+        
+        $document->versions()->delete();
+        $document->forceDelete();
 
-        $document->delete();
-
-        return redirect()->route('admin.documents.index')->with('success', 'Dokumen dihapus.');
+        return redirect()->route('admin.documents.index')->with('success', 'Dokumen dihapus permanen.');
     }
 }

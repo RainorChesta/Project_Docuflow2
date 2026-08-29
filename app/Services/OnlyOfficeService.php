@@ -200,6 +200,50 @@ class OnlyOfficeService
     }
 
     /**
+     * Generate a unique template key for ONLYOFFICE caching/versioning.
+     */
+    public function generateTemplateKey(\App\Models\DocumentTemplate $template): string
+    {
+        $cacheKey = 'onlyoffice_template_key_' . $template->id;
+        
+        return \Illuminate\Support\Facades\Cache::remember($cacheKey, now()->addDays(1), function () use ($template) {
+            $timeKey = uniqid() . '_' . microtime(true);
+            
+            $raw = sprintf(
+                'tpl_%d_%s',
+                $template->id,
+                $timeKey
+            );
+
+            return substr(preg_replace('/[^0-9a-zA-Z_\-]/', '_', $raw), 0, 128);
+        });
+    }
+
+    /**
+     * Get the URL ONLYOFFICE uses to fetch the DOCX template file from Laravel.
+     */
+    public function getTemplateFileUrl(\App\Models\DocumentTemplate $template): string
+    {
+        $internalBase = rtrim(config('onlyoffice.internal_url'), '/');
+        
+        return $internalBase . route('onlyoffice.templates.file', [
+            'template' => $template->id,
+        ], false);
+    }
+
+    /**
+     * Get the callback URL ONLYOFFICE calls to save the template.
+     */
+    public function getTemplateCallbackUrl(\App\Models\DocumentTemplate $template): string
+    {
+        $internalBase = rtrim(config('onlyoffice.internal_url'), '/');
+
+        return $internalBase . route('onlyoffice.templates.callback', [
+            'template' => $template->id,
+        ], false);
+    }
+
+    /**
      * Generate the complete config payload for the ONLYOFFICE Docs API editor.
      */
     public function generateEditorConfig(
@@ -280,6 +324,86 @@ class OnlyOfficeService
                     'goback' => [
                         'url' => route('documents.show', $document),
                         'text' => __('Kembali ke Detail Dokumen'),
+                    ],
+                ],
+            ],
+            'height' => '100%',
+            'width' => '100%',
+            'type' => 'desktop',
+        ];
+
+        if (config('onlyoffice.jwt_enabled') && config('onlyoffice.jwt_secret')) {
+            $config['token'] = JWT::encode($config, config('onlyoffice.jwt_secret'), 'HS256');
+        }
+
+        return $config;
+    }
+
+    /**
+     * Generate the complete config payload for the ONLYOFFICE Docs API editor for Templates.
+     */
+    public function generateTemplateEditorConfig(
+        \App\Models\DocumentTemplate $template,
+        User $user,
+        string $mode = 'edit'
+    ): array {
+        $fileUrl = $this->getTemplateFileUrl($template);
+        $callbackUrl = $this->getTemplateCallbackUrl($template);
+        $documentKey = $this->generateTemplateKey($template);
+
+        $extension = 'docx';
+        if ($template->file_path) {
+            $ext = strtolower(pathinfo($template->file_path, PATHINFO_EXTENSION));
+            if (in_array($ext, ['docx'], true)) {
+                $extension = $ext;
+            }
+        }
+
+        $canEdit = ($mode === 'edit');
+        $fileName = $template->file_original_name ?? $template->title;
+        if (!str_ends_with(strtolower($fileName), '.' . $extension)) {
+            $fileName .= '.' . $extension;
+        }
+
+        $config = [
+            'documentType' => 'word',
+            'document' => [
+                'title' => $fileName,
+                'url' => $fileUrl,
+                'fileType' => $extension,
+                'key' => $documentKey,
+                'permissions' => [
+                    'edit' => $canEdit,
+                    'download' => true,
+                    'print' => true,
+                    'review' => true,
+                    'comment' => true,
+                    'copy' => true,
+                    'modifyFilter' => true,
+                    'modifyContentControl' => true,
+                    'fillForms' => true,
+                ],
+            ],
+            'editorConfig' => [
+                'mode' => $canEdit ? 'edit' : 'view',
+                'lang' => app()->getLocale() === 'id' ? 'id-ID' : 'en-US',
+                'callbackUrl' => $callbackUrl,
+                'user' => [
+                    'id' => (string) $user->id,
+                    'name' => $user->name,
+                ],
+                'customization' => [
+                    'autoFocus' => false,
+                    'autosave' => (bool) config('onlyoffice.autosave', true),
+                    'forcesave' => (bool) config('onlyoffice.forcesave', true),
+                    'chat' => false,
+                    'comments' => false,
+                    'compactHeader' => false,
+                    'toolbarNoTabs' => false,
+                    'feedback' => false,
+                    'goback' => [
+                        'url' => route('admin.templates.index'),
+                        'text' => __('Kembali ke Daftar Template'),
                     ],
                 ],
             ],

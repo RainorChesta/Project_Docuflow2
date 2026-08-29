@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\DivisionController;
 use App\Http\Controllers\Admin\DocumentController as AdminDocumentController;
+use App\Http\Controllers\Admin\DocumentTemplateController;
 use App\Http\Controllers\Admin\RetentionController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\DocumentTypeController;
@@ -54,6 +55,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/signature-requests/{signatureRequest}/reject', [SignatureController::class, 'reject'])->name('signatures.requests.reject');
 
     // Documents
+    Route::get('/documents/choose', [DocumentController::class, 'choose'])->name('documents.choose');
     Route::resource('documents', DocumentController::class)->except(['edit', 'update']);
     Route::get('/document-numbers/preview', [DocumentController::class, 'nextNumber'])->name('documents.next-number');
     Route::get('/documents/{document}/edit', [DocumentController::class, 'edit'])->name('documents.edit');
@@ -114,6 +116,12 @@ Route::middleware('auth')->group(function () {
         Route::get('/retention', [RetentionController::class, 'edit'])->name('retention.edit');
         Route::put('/retention', [RetentionController::class, 'update'])->name('retention.update');
         Route::resource('document-types', DocumentTypeController::class);
+        Route::get('/templates/create-manual', [DocumentTemplateController::class, 'createManual'])->name('templates.create-manual');
+        Route::post('/templates/manual', [DocumentTemplateController::class, 'storeManual'])->name('templates.store-manual');
+        Route::get('/templates/{template}/editor', [DocumentTemplateController::class, 'editor'])->name('templates.editor');
+        Route::resource('templates', DocumentTemplateController::class)->except(['show']);
+        Route::patch('/templates/{template}/toggle-status', [DocumentTemplateController::class, 'toggleStatus'])->name('templates.toggle-status');
+        Route::get('/templates/{template}/download', [DocumentTemplateController::class, 'download'])->name('templates.download');
         Route::get('/documents', [AdminDocumentController::class, 'index'])->name('documents.index');
         Route::delete('/documents/{document}', [AdminDocumentController::class, 'destroy'])->name('documents.destroy');
     });
@@ -130,6 +138,9 @@ Route::get('/onlyoffice/documents/{document}/versions/{version}/file', [\App\Htt
 Route::get('/onlyoffice/users/{user}/signature', [\App\Http\Controllers\OnlyOfficeController::class, 'signature'])->name('onlyoffice.signature');
 Route::get('/onlyoffice/documents/{document}/qrcode', [\App\Http\Controllers\OnlyOfficeController::class, 'qrcode'])->name('onlyoffice.qrcode');
 Route::match(['get', 'post'], '/onlyoffice/documents/{document}/callback', [\App\Http\Controllers\OnlyOfficeController::class, 'callback'])->name('onlyoffice.callback')->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class]);
+
+Route::get('/onlyoffice/templates/{template}/file', [\App\Http\Controllers\OnlyOfficeController::class, 'templateFile'])->name('onlyoffice.templates.file');
+Route::match(['get', 'post'], '/onlyoffice/templates/{template}/callback', [\App\Http\Controllers\OnlyOfficeController::class, 'templateCallback'])->name('onlyoffice.templates.callback')->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class]);
 
 // Share-token link access (Google Docs model)
 Route::get('/shared/{token}', [DocumentShareController::class, 'accessByToken'])->name('documents.shared');

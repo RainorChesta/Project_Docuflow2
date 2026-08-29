@@ -17,19 +17,11 @@
                     <span class="badge badge-sm {{ $shareRole === 'editor' ? 'badge-info' : 'badge-ghost' }} shrink-0 capitalize">{{ $shareRole }}</span>
                 @endif
             @endif
-            @php
-                $contextService = app(\App\Services\CompanyContextService::class);
-                $activeBranchId = $contextService->getActiveBranchId(auth()->user());
-                $isCrossBranch = $doc->branch_id && $activeBranchId && (int)$doc->branch_id !== (int)$activeBranchId;
-            @endphp
-            @if($isCrossBranch)
-                <span class="badge badge-sm badge-secondary shrink-0" title="Dokumen Lintas Cabang">↗ Lintas Cabang</span>
-            @endif
         </div>
         <p class="text-sm text-base-content/60 truncate">
             {{ $doc->document_number }}
             @if($doc->branch)
-                <span class="font-medium text-base-content/80">· {{ $doc->branch->name }} @if($doc->branch->is_pusat)<span class="text-primary font-semibold">(Pusat)</span>@endif</span>
+                <span class="font-medium text-base-content/80">· {{ $doc->branch->name }}</span>
             @endif
             @if($doc->isGeneral()) <span class="text-success">· {{ __('Umum') }}</span>
             @elseif($doc->isPersonal()) <span class="text-info">· {{ __('Personal') }}</span>
