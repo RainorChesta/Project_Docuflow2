@@ -9,12 +9,7 @@
 
 @layer base {
   :root {
-    --color-primary: oklch(0.303 0.067 -94.8);
-    --color-primary-content: oklch(1 0 0);
-    --color-secondary: oklch(0.55 0.04 260);
-    --color-secondary-content: oklch(1 0 0);
-    --color-accent: oklch(0.58 0.16 245);
-    --color-accent-content: oklch(1 0 0);
+    /* Base Colors from previous DaisyUI theme */
     --color-neutral: oklch(0.28 0.04 250);
     --color-neutral-content: oklch(0.98 0.005 250);
     --color-base-100: oklch(1 0 0);
@@ -39,20 +34,11 @@
     --color-base-200: oklch(0.2 0.04 260);
     --color-base-300: oklch(0.35 0.04 250);
     --color-base-content: oklch(0.98 0.005 250);
-    /* Primary lebih terang di dark mode — navy gelap tak kebaca
-       di atas bg gelap (outline button, teks primary, active menu). */
-    --color-primary: oklch(0.62 0.12 265);
-    --color-primary-content: oklch(0.15 0.03 265);
-    /* Secondary — sedikit lebih terang biar terbaca */
-    --color-secondary: oklch(0.68 0.04 260);
-    --color-secondary-content: oklch(0.15 0.03 260);
-    /* Accent — lebih cerah, desaturasi sedikit */
-    --color-accent: oklch(0.68 0.13 245);
-    --color-accent-content: oklch(0.15 0.03 245);
+    
     /* Neutral — lebih terang dari base */
     --color-neutral: oklch(0.4 0.03 250);
     --color-neutral-content: oklch(0.95 0.005 250);
-    /* Info — sama dengan accent di dark */
+    /* Info */
     --color-info: oklch(0.68 0.13 245);
     /* Success — hijau lebih lembut */
     --color-success: oklch(0.72 0.17 150);
@@ -70,16 +56,27 @@
   }
 }
 
-/* Override DaisyUI theme :root — unlayered beats layered, so custom
-   brand colors win over daisyui's default theme. Base colors left to
-   the layered :root/.dark so dark mode still works. */
+/* DokuFlow Brand System Specification */
 :root {
-  --color-primary: oklch(0.303 0.067 -94.8);
-  --color-primary-content: oklch(1 0 0);
-  --color-secondary: oklch(0.55 0.04 260);
-  --color-secondary-content: oklch(1 0 0);
-  --color-accent: oklch(0.58 0.16 245);
-  --color-accent-content: oklch(1 0 0);
+  --brand-primary: #0F6DB7;
+  --brand-primary-hover: #0B5F9F;
+  --brand-primary-soft: #EAF5FC;
+
+  --brand-accent: #147D6A;
+  --brand-accent-hover: #0F6E5D;
+  --brand-accent-soft: #E8F6F2;
+
+  --brand-on-primary: #FFFFFF;
+  --brand-on-accent: #FFFFFF;
+
+  /* Map brand colors to DaisyUI unlayered variables */
+  --color-primary: var(--brand-primary);
+  --color-primary-content: var(--brand-on-primary);
+  --color-secondary: var(--brand-accent);
+  --color-secondary-content: var(--brand-on-accent);
+  --color-accent: var(--brand-accent);
+  --color-accent-content: var(--brand-on-accent);
+  
   --color-neutral: oklch(0.28 0.04 250);
   --color-neutral-content: oklch(0.98 0.005 250);
   --color-info: oklch(0.58 0.16 245);
@@ -95,16 +92,26 @@
   --border: 1px;
 }
 
-/* Dark mode: semua semantic colors disesuaikan biar terbaca di atas
-   bg gelap. Unlayered supaya menang atas :root unlayered di atas
-   (specificity sama, urutan menang). */
 .dark {
-  --color-primary: oklch(0.62 0.12 265);
-  --color-primary-content: oklch(0.15 0.03 265);
-  --color-secondary: oklch(0.68 0.04 260);
-  --color-secondary-content: oklch(0.15 0.03 260);
-  --color-accent: oklch(0.68 0.13 245);
-  --color-accent-content: oklch(0.15 0.03 245);
+  --brand-primary: #4AA9F0;
+  --brand-primary-hover: #67BEF8;
+  --brand-primary-soft: #12324A;
+
+  --brand-accent: #35C8A8;
+  --brand-accent-hover: #52D7BB;
+  --brand-accent-soft: #123B34;
+
+  --brand-on-primary: #07111A;
+  --brand-on-accent: #06130F;
+
+  /* Map brand colors to DaisyUI unlayered variables for dark mode */
+  --color-primary: var(--brand-primary);
+  --color-primary-content: var(--brand-on-primary);
+  --color-secondary: var(--brand-accent);
+  --color-secondary-content: var(--brand-on-accent);
+  --color-accent: var(--brand-accent);
+  --color-accent-content: var(--brand-on-accent);
+
   --color-neutral: oklch(0.4 0.03 250);
   --color-neutral-content: oklch(0.95 0.005 250);
   --color-info: oklch(0.68 0.13 245);
