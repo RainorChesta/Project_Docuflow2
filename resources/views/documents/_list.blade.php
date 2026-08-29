@@ -21,7 +21,7 @@
         <p class="text-sm text-base-content/60 truncate">
             {{ $doc->document_number }}
             @if($doc->branch)
-                <span class="font-medium text-base-content/80">· {{ $doc->branch->name }} @if($doc->branch->is_pusat)<span class="text-primary font-semibold">(Pusat)</span>@endif</span>
+                <span class="font-medium text-base-content/80">· {{ $doc->branch->name }}</span>
             @endif
             @if($doc->isGeneral()) <span class="text-success">· {{ __('Umum') }}</span>
             @elseif($doc->isPersonal()) <span class="text-info">· {{ __('Personal') }}</span>

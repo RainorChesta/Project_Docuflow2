@@ -249,7 +249,7 @@ class Document extends Model
             return $query;
         }
 
-        return $query->where(function (Builder $q) use ($user, $divisionIds) {
+        return $query->where(function (Builder $q) use ($user, $divisionIds, $branchIds) {
             $q->where('visibility', self::VISIBILITY_GENERAL)
                 ->orWhere('owner_id', $user->id)
                 ->orWhere(function (Builder $sub) use ($divisionIds) {
@@ -257,8 +257,14 @@ class Document extends Model
                         ->whereIn('division_id', $divisionIds);
                 })
                 ->orWhereHas('shares', fn(Builder $s) => $s->where('user_id', $user->id))
-                ->orWhereHas('divisionShares', fn(Builder $ds) => $ds->whereIn('division_id', $divisionIds));
+                ->orWhereHas('divisionShares', fn(Builder $ds) => $ds->whereIn('division_id', $divisionIds))
+                ->orWhereHas('distributions', fn(Builder $dist) => $dist->whereIn('target_branch_id', $branchIds));
         });
+    }
+
+    public function distributions(): HasMany
+    {
+        return $this->hasMany(DocumentDistribution::class);
     }
 
     /**

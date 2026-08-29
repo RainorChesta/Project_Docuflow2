@@ -27,7 +27,8 @@ class QrCodeService
     {
         $token = rtrim(strtr(base64_encode(Crypt::encryptString((string) $document->id)), '+/', '-_'), '=');
 
-        return route('documents.hash', ['token' => $token]);
+        $path = route('documents.hash', ['token' => $token], false);
+        return rtrim(config('app.url'), '/') . $path;
     }
 
     /**
@@ -131,4 +132,4 @@ return (new Builder(
 
         return $out;
     }
-} 
+}

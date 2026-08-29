@@ -31,6 +31,7 @@ class DocumentTypeSeeder extends Seeder
             ['code' => 'S.PRT', 'name' => 'Surat Perintah'],
             ['code' => 'S.PWN', 'name' => 'Surat Penawaran'],
             ['code' => 'SK', 'name' => 'Surat Keterangan'],
+            ['code' => 'SOP', 'name' => 'Standard Operating Procedure'],
         ];
 
         foreach ($types as $type) {

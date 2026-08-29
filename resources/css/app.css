@@ -244,6 +244,42 @@
     height: auto;
 }
 
+/* Template card thumbnail — docx content rendered by mammoth scaled down to a mini page */
+.template-thumb-preview {
+    font-size: 7px;
+    line-height: 1.5;
+    color: var(--color-base-content);
+    pointer-events: none;
+    background: #fff;
+    border-radius: 3px;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+.template-thumb-preview * {
+    font-size: inherit !important;
+    line-height: inherit !important;
+    color: inherit !important;
+}
+.template-thumb-preview p,
+.template-thumb-preview h1,
+.template-thumb-preview h2,
+.template-thumb-preview h3,
+.template-thumb-preview h4,
+.template-thumb-preview h5,
+.template-thumb-preview h6,
+.template-thumb-preview ul,
+.template-thumb-preview ol,
+.template-thumb-preview blockquote {
+    margin: 0 0 3px;
+}
+.template-thumb-preview ul,
+.template-thumb-preview ol {
+    padding-left: 12px;
+}
+.template-thumb-preview img {
+    max-width: 100%;
+    height: auto;
+}
+
 /* Jodit editor — override DaisyUI base-content color leak */
 .jodit-wysiwyg,
 .jodit-wysiwyg * {

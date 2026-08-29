@@ -1,6 +1,14 @@
 <x-guest-layout title="Verifikasi Dokumen" heading="Status Dokumen" description="Hasil pemindaian QR Code Dokumen" size="sm">
     <div class="text-center">
-        @if($document->currentVersion)
+        @if($document->is_expired)
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-error/20 text-error mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+            <h2 class="text-base font-semibold text-error mb-0.5">Dokumen Kedaluwarsa</h2>
+            <p class="text-xs text-base-content/70 mb-5">Masa berlaku dokumen ini telah habis pada {{ $document->expiration_date?->format('d M Y') ?? 'waktu yang ditentukan' }}.</p>
+        @elseif($document->currentVersion)
             <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-success/20 text-success mb-3">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />

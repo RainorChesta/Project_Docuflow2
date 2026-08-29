@@ -15,7 +15,14 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call(DocumentTypeSeeder::class);
+        $this->call([
+            CompanySeeder::class,
+            BranchSeeder::class,
+            DivisionSeeder::class,
+            DocumentTypeSeeder::class,
+            UserSeeder::class,
+            DocumentTemplateSeeder::class,
+        ]);
 
         // User::factory(10)->create();
 

@@ -11,75 +11,62 @@ class DocumentPolicy
     public function view(User $user, Document $document): bool
     {
         if ($user->isAdmin() || $user->isDirector()) return true;
-        
-        // Owner can always view their own documents, bypassing active branch isolation.
-        // This is necessary so they don't get locked out right after creating a document in another branch.
-        if ($user->id === $document->owner_id) return true;
-
         $contextService = app(\App\Services\CompanyContextService::class);
         $activeBranchId = $contextService->getActiveBranchId($user);
         $activeCompanyId = $contextService->getActiveCompanyId($user);
 
-        // Enforce active branch and company isolation:
-        // When a user selects a company or branch, only documents matching that active context can be accessed.
+        // 1. Strict Active Context Isolation
+        // A document MUST belong to the active context (or be distributed to it) to be viewed.
+        $inScope = false;
+
         if ($activeBranchId) {
-            if ($document->branch_id) {
-                if ((int)$document->branch_id !== (int)$activeBranchId) {
-                    return false;
-                }
-            } elseif ($document->company_id) {
-                if ((int)$document->company_id !== (int)$activeCompanyId) {
-                    return false;
-                }
-            } else {
-                $userBranchIds = $user->allBranchIds();
-                $userCompanyIds = $user->allCompanyIds();
-                if (!empty($userBranchIds) || !empty($userCompanyIds)) {
-                    return false;
-                }
+            if ($document->branch_id && (int)$document->branch_id === (int)$activeBranchId) {
+                $inScope = true;
+            } elseif (!$document->branch_id && $document->company_id && (int)$document->company_id === (int)$activeCompanyId) {
+                $inScope = true;
+            } elseif ($document->distributions()->where('target_branch_id', $activeBranchId)->exists()) {
+                $inScope = true;
             }
         } elseif ($activeCompanyId) {
             $docCompanyId = $document->company_id ?? $document->branch?->company_id;
-            if ($docCompanyId) {
-                if ((int)$docCompanyId !== (int)$activeCompanyId) {
-                    return false;
-                }
-            } else {
-                $userBranchIds = $user->allBranchIds();
-                $userCompanyIds = $user->allCompanyIds();
-                if (!empty($userBranchIds) || !empty($userCompanyIds)) {
-                    return false;
-                }
+            if ($docCompanyId && (int)$docCompanyId === (int)$activeCompanyId) {
+                $inScope = true;
+            } elseif ($document->distributions()->whereHas('targetBranch', fn($b) => $b->where('company_id', $activeCompanyId))->exists()) {
+                $inScope = true;
             }
         } else {
-            // Check company & branch restriction across all assigned (e.g. testing / fallback)
+            // "All Branches" context
             $userBranchIds = $user->allBranchIds();
             $userCompanyIds = $user->allCompanyIds();
 
-            if ($document->branch_id && !empty($userBranchIds)) {
-                if (!in_array($document->branch_id, $userBranchIds, true)) {
-                    return false;
-                }
-            }
-
-            if ($document->company_id && !empty($userCompanyIds)) {
-                if (!in_array($document->company_id, $userCompanyIds, true)) {
-                    return false;
-                }
+            if ($document->branch_id && in_array($document->branch_id, $userBranchIds, true)) {
+                $inScope = true;
+            } elseif ($document->company_id && in_array($document->company_id, $userCompanyIds, true)) {
+                $inScope = true;
+            } elseif ($document->distributions()->whereIn('target_branch_id', $userBranchIds)->exists()) {
+                $inScope = true;
             }
         }
 
+        if (!$inScope) {
+            return false;
+        }
+
+        // 2. Role / Access check (only reached if in scope)
+        if ($user->id === $document->owner_id) return true;
         if ($document->isGeneral()) return true;
 
-        // Division-scoped docs: visible to members of that division.
+        if (app(DocumentShareService::class)->resolveEffectiveRole($document, $user) !== null) {
+            return true;
+        }
+
         if ($document->isDivision()
             && $document->division_id
             && in_array($document->division_id, $user->allDivisionIds(), true)) {
             return true;
         }
 
-        // Any share (personal, division, or link) grants view.
-        return app(DocumentShareService::class)->resolveEffectiveRole($document, $user) !== null;
+        return false;
     }
 
     public function create(User $user): bool
