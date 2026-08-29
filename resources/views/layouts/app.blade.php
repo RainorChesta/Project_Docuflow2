@@ -58,7 +58,7 @@
                             <svg x-show="open" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
                         @isset($header)
-                            <h1 class="text-base sm:text-lg font-semibold text-base-content min-w-0 truncate">{{ $header }}</h1>
+                            {{-- Header title removed per user request, relying on breadcrumbs instead --}}
                         @endisset
                     </div>
                     <div class="flex items-center gap-1">
@@ -99,14 +99,15 @@
                         $isAdmin = $user->isAdmin();
                         $isHead = $user->isHead();
 
-                        $docType = request('type', 'general');
-                        if ($route && in_array($name, ['documents.edit', 'documents.show', 'documents.preview', 'documents.preview-version'])) {
+                        $docType = request('type');
+                        if (!$docType && $route && in_array($name, ['documents.edit', 'documents.show', 'documents.preview', 'documents.preview-version'])) {
                             $docType = match (request()->route('document')?->visibility) {
                                 'personal' => 'mine',
                                 'division' => 'division',
                                 default => 'general',
                             };
                         }
+                        $docType = $docType ?: 'general';
                         $docTypeLabel = match ($docType) {
                             'mine' => __('Dokumen Saya'),
                             'division' => __('Dokumen Divisi'),
@@ -114,41 +115,66 @@
                         };
                         $docTypeRoute = route('documents.index', ['type' => $docType]);
 
-                        if ($route) {
+                        if ($route && $name !== 'dashboard') {
+                            $crumbs[] = ['label' => __('Dashboard'), 'url' => route('dashboard')];
+
                             if (str_starts_with($name, 'documents.')) {
                                 if (in_array($name, ['documents.choose', 'documents.create', 'documents.edit', 'documents.show', 'documents.preview', 'documents.preview-version'])) {
                                     $crumbs[] = ['label' => $docTypeLabel, 'url' => $docTypeRoute];
                                 }
-                                $crumbs[] = ['label' => match ($name) {
-                                    'documents.choose' => __('Pilih Template'),
-                                    'documents.create' => __('Buat'),
-                                    'documents.edit' => __('Edit'),
-                                    'documents.show' => __('Detail Dokumen'),
-                                    'documents.preview' => __('Pratinjau'),
-                                    'documents.preview-version' => __('Pratinjau'),
-                                    default => $docTypeLabel,
-                                }, 'url' => null];
-                            } elseif ($name !== 'dashboard' && !str_starts_with($name, 'director.documents.')) {
-                                $crumbs[] = ['label' => __('Dashboard'), 'url' => route('dashboard')];
-                                if (str_starts_with($name, 'admin.')) {
-                                    $section = match (true) {
-                                        str_contains($name, 'divisions') => __('Divisi'),
-                                        str_contains($name, 'document-types') => __('Tipe Dokumen'),
-                                        str_contains($name, 'users') => __('Pengguna'),
-                                        str_contains($name, 'retention') => __('Retensi'),
-                                        default => __('Administrasi'),
-                                    };
-                                    $crumbs[] = ['label' => $section, 'url' => null];
-                                    if (str_contains($name, '.create')) {
-                                        $crumbs[] = ['label' => __('Buat'), 'url' => null];
-                                    } elseif (str_contains($name, '.edit')) {
-                                        $crumbs[] = ['label' => __('Edit'), 'url' => null];
+                                
+                                if ($name === 'documents.choose') {
+                                    $crumbs[] = ['label' => __('Pilih Template'), 'url' => null];
+                                } elseif ($name === 'documents.create') {
+                                    $crumbs[] = ['label' => __('Pilih Template'), 'url' => route('documents.choose', ['type' => $docType])];
+                                    $crumbs[] = ['label' => __('Buat Dokumen'), 'url' => null];
+                                } elseif ($name === 'documents.edit') {
+                                    if ($doc = request()->route('document')) {
+                                        $crumbs[] = ['label' => __('Detail Dokumen'), 'url' => route('documents.show', $doc)];
                                     }
-                                } elseif ($name === 'approvals.index') {
-                                    $crumbs[] = ['label' => __('Persetujuan'), 'url' => null];
-                                } elseif ($name === 'profile.edit') {
-                                    $crumbs[] = ['label' => __('Profil'), 'url' => null];
+                                    $crumbs[] = ['label' => __('Edit Dokumen'), 'url' => null];
+                                } elseif ($name === 'documents.show') {
+                                    $crumbs[] = ['label' => __('Detail Dokumen'), 'url' => null];
+                                } elseif ($name === 'documents.preview' || $name === 'documents.preview-version') {
+                                    if ($doc = request()->route('document')) {
+                                        $crumbs[] = ['label' => __('Detail Dokumen'), 'url' => route('documents.show', $doc)];
+                                    }
+                                    $crumbs[] = ['label' => __('Pratinjau Dokumen'), 'url' => null];
+                                } elseif ($name === 'documents.index') {
+                                    $crumbs[] = ['label' => $docTypeLabel, 'url' => null];
                                 }
+                            } elseif (str_starts_with($name, 'director.documents.')) {
+                                $crumbs[] = ['label' => __('Semua Dokumen'), 'url' => null];
+                            } elseif (str_starts_with($name, 'admin.')) {
+                                $section = match (true) {
+                                    str_contains($name, 'divisions') => __('Divisi'),
+                                    str_contains($name, 'document-types') => __('Tipe Dokumen'),
+                                    str_contains($name, 'users') => __('Pengguna'),
+                                    str_contains($name, 'retention') => __('Retensi'),
+                                    str_contains($name, 'templates') || str_contains($name, 'template-categories') => __('Template Dokumen'),
+                                    str_contains($name, 'companies') => __('Perusahaan'),
+                                    str_contains($name, 'branches') => __('Cabang'),
+                                    default => __('Administrasi'),
+                                };
+                                // Try to determine the index route for the section
+                                $indexRouteName = preg_replace('/\.(create|edit|show)$/', '.index', $name);
+                                $indexUrl = (Route::has($indexRouteName) && $indexRouteName !== $name) ? route($indexRouteName) : null;
+                                
+                                $crumbs[] = ['label' => $section, 'url' => $indexUrl];
+                                
+                                if (str_contains($name, '.create')) {
+                                    $crumbs[] = ['label' => __('Buat'), 'url' => null];
+                                } elseif (str_contains($name, '.edit')) {
+                                    $crumbs[] = ['label' => __('Edit'), 'url' => null];
+                                } elseif (str_contains($name, '.show')) {
+                                    $crumbs[] = ['label' => __('Detail'), 'url' => null];
+                                }
+                            } elseif (str_starts_with($name, 'approvals.')) {
+                                $crumbs[] = ['label' => __('Persetujuan'), 'url' => null];
+                            } elseif (str_starts_with($name, 'profile.')) {
+                                $crumbs[] = ['label' => __('Profil'), 'url' => null];
+                            } elseif (str_starts_with($name, 'signatures.requests.')) {
+                                $crumbs[] = ['label' => __('Persetujuan Tanda Tangan'), 'url' => null];
                             }
                         }
                     @endphp

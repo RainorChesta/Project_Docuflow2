@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">Shared Documents</x-slot>
 
-    <div class="py-6">
+    <div class="pt-0 pb-6">
         <div class="max-w-7xl mx-auto w-full" x-data="{ viewMode: localStorage.getItem('docViewMode') || 'list' }" x-init="$watch('viewMode', val => localStorage.setItem('docViewMode', val))">
             @include('documents._header', ['title' => 'Shared Documents', 'showCreate' => false])
 

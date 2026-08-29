@@ -3,18 +3,18 @@
     $hasPending = $doc->versions->contains('status', 'pending');
     $isEditorShare = isset($type) && $type === 'shared' && $doc->shares->first()?->role === 'editor';
 @endphp
-<a href="{{ route('documents.show', $doc) }}" class="group flex flex-col items-center gap-1 p-3 rounded-lg hover:bg-primary/5 transition-colors cursor-pointer relative" title="{{ $doc->title }}">
+<a href="{{ route('documents.show', ['document' => $doc, 'type' => request('type')]) }}" class="group flex flex-col items-center gap-1 p-3 rounded-lg hover:bg-primary/5 transition-colors cursor-pointer relative" title="{{ $doc->title }}">
 
     {{-- Hover actions (top-right corner) --}}
     <div class="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-        <span onclick="event.preventDefault(); event.stopPropagation(); window.location='{{ route('documents.preview', $doc) }}'" class="btn btn-ghost btn-xs btn-square" title="{{ __('Pratinjau') }}">
+        <span onclick="event.preventDefault(); event.stopPropagation(); window.location='{{ route('documents.preview', ['document' => $doc, 'type' => request('type')]) }}'" class="btn btn-ghost btn-xs btn-square" title="{{ __('Pratinjau') }}">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
             </svg>
         </span>
         @if($doc->owner_id === auth()->id() || $isEditorShare)
-            <span onclick="event.preventDefault(); event.stopPropagation(); window.location='{{ route('documents.edit', $doc) }}'" class="btn btn-ghost btn-xs btn-square" title="{{ __('Edit') }}">
+            <span onclick="event.preventDefault(); event.stopPropagation(); window.location='{{ route('documents.edit', ['document' => $doc, 'type' => request('type')]) }}'" class="btn btn-ghost btn-xs btn-square" title="{{ __('Edit') }}">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
             </span>
         @endif

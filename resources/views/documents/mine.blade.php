@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">{{ __('Dokumen Saya') }}</x-slot>
 
-    <div class="py-6">
+    <div class="pt-0 pb-6">
         <div class="max-w-7xl mx-auto w-full" x-data="{ viewMode: localStorage.getItem('docViewMode') || 'list' }" x-init="$watch('viewMode', val => localStorage.setItem('docViewMode', val))">
             @include('documents._header', ['title' => __('Dokumen Saya')])
 

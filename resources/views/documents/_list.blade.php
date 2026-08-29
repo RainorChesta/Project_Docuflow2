@@ -5,7 +5,7 @@
 <div class="px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3">
     <div class="min-w-0">
         <div class="flex flex-wrap items-center gap-2">
-            <a href="{{ route('documents.show', $doc) }}" class="link link-primary font-medium truncate min-w-0">
+            <a href="{{ route('documents.show', ['document' => $doc, 'type' => request('type')]) }}" class="link link-primary font-medium truncate min-w-0">
                 {{ $doc->title }}
             </a>
             @if($doc->documentType)
@@ -35,13 +35,13 @@
             $isEditorShare = isset($type) && $type === 'shared' && $doc->shares->first()?->role === 'editor';
         @endphp
         @if($doc->owner_id === auth()->id() || $isEditorShare)
-            <a href="{{ route('documents.edit', $doc) }}" class="btn btn-ghost btn-xs">
+            <a href="{{ route('documents.edit', ['document' => $doc, 'type' => request('type')]) }}" class="btn btn-ghost btn-xs">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                 {{ __('Edit') }}
             </a>
         @endif
         <a
-            href="{{ route('documents.preview', $doc) }}"
+            href="{{ route('documents.preview', ['document' => $doc, 'type' => request('type')]) }}"
             class="inline-flex items-center justify-center w-6 h-6 rounded-full shrink-0 text-base-content/60 hover:text-base-content hover:bg-base-200"
             title="{{ __('Pratinjau') }}"
         >
