@@ -6,8 +6,8 @@
             <div class="card bg-base-100 border border-base-300 shadow-sm p-4 sm:p-6"
                  x-data="{
                      role: '{{ old('system_role', 'user') }}',
-                     selectedCompanies: {{ json_encode(old('company_ids', [])) }}.map(Number),
-                     selectedBranches: {{ json_encode(old('branch_ids', [])) }}.map(Number)
+                     selectedCompanies: {{ json_encode(old('company_ids', [])) }}.map(String),
+                     selectedBranches: {{ json_encode(old('branch_ids', [])) }}.map(String)
                  }">
                 <form method="POST" action="{{ route('admin.users.store') }}">
                     @csrf
@@ -23,11 +23,11 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                         <div class="form-control w-full">
-                            <label for="name" class="label"><span class="label-text font-medium">{{ __('Nama Lengkap') }}</span></label>
+                            <label for="name" class="label"><span class="label-text font-medium">{{ __('Nama Lengkap') }} <span class="text-error">*</span></span></label>
                             <input type="text" name="name" id="name" value="{{ old('name') }}" class="input input-bordered w-full" required>
                         </div>
                         <div class="form-control w-full">
-                            <label for="email" class="label"><span class="label-text font-medium">{{ __('Email') }}</span></label>
+                            <label for="email" class="label"><span class="label-text font-medium">{{ __('Email') }} <span class="text-error">*</span></span></label>
                             <input type="email" name="email" id="email" value="{{ old('email') }}" class="input input-bordered w-full" required>
                         </div>
                     </div>
@@ -52,11 +52,11 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                         <div class="form-control w-full">
-                            <label for="password" class="label"><span class="label-text font-medium">{{ __('Password') }}</span></label>
+                            <label for="password" class="label"><span class="label-text font-medium">{{ __('Password') }} <span class="text-error">*</span></span></label>
                             <input type="password" name="password" id="password" class="input input-bordered w-full" required>
                         </div>
                         <div class="form-control w-full">
-                            <label for="password_confirmation" class="label"><span class="label-text font-medium">{{ __('Konfirmasi Password') }}</span></label>
+                            <label for="password_confirmation" class="label"><span class="label-text font-medium">{{ __('Konfirmasi Password') }} <span class="text-error">*</span></span></label>
                             <input type="password" name="password_confirmation" id="password_confirmation" class="input input-bordered w-full" required>
                         </div>
                     </div>
@@ -78,7 +78,7 @@
                             </select>
                         </div>
                         <div class="form-control w-full">
-                            <label for="system_role" class="label"><span class="label-text font-medium">{{ __('Peran Sistem (Role)') }}</span></label>
+                            <label for="system_role" class="label"><span class="label-text font-medium">{{ __('Peran Sistem (Role)') }} <span class="text-error">*</span></span></label>
                             <select name="system_role" id="system_role" x-model="role" class="select select-bordered w-full" required>
                                 <option value="user" {{ old('system_role', 'user') === 'user' ? 'selected' : '' }}>User (Staff)</option>
                                 <option value="head" {{ old('system_role') === 'head' ? 'selected' : '' }}>Division Head (Kepala Divisi)</option>
@@ -99,47 +99,102 @@
                             <h3 class="font-semibold text-sm mb-2">{{ __('Assignment Perusahaan & Cabang') }}</h3>
                             <p class="text-xs text-base-content/60 mb-3">{{ __('Pilih perusahaan yang dapat diakses user, lalu centang cabang-cabang yang di-assign.') }}</p>
 
+                            <div x-data="{
+                                search: '',
+                                open: false,
+                                companies: [
+                                    @foreach($companies as $company)
+                                        { id: {{ $company->id }}, name: '{{ addslashes($company->name) }} ({{ addslashes($company->code) }})', branchIds: {{ $company->branches->pluck('id')->toJson() }} },
+                                    @endforeach
+                                ],
+                                get filteredCompanies() {
+                                    if (this.search === '') {
+                                        return this.companies.filter(c => !selectedCompanies.includes(String(c.id)));
+                                    }
+                                    return this.companies.filter(c => 
+                                        !selectedCompanies.includes(String(c.id)) && 
+                                        c.name.toLowerCase().includes(this.search.toLowerCase())
+                                    );
+                                },
+                                toggleCompany(id) {
+                                    id = String(id);
+                                    if (selectedCompanies.includes(id)) {
+                                        selectedCompanies = selectedCompanies.filter(c => c !== id);
+                                        // Also remove its branches
+                                        let company = this.companies.find(c => String(c.id) === id);
+                                        if(company) {
+                                            selectedBranches = selectedBranches.filter(b => !company.branchIds.map(String).includes(String(b)));
+                                        }
+                                    } else {
+                                        selectedCompanies.push(id);
+                                    }
+                                    this.search = '';
+                                    this.$refs.searchInput.focus();
+                                }
+                            }" class="relative mb-6">
+                                
+                                <div class="border border-base-300 rounded-lg p-2 min-h-[3rem] flex flex-wrap gap-2 items-center bg-base-100 cursor-text"
+                                     @click="open = true; $refs.searchInput.focus()"
+                                     @click.away="open = false">
+                                    
+                                    <template x-for="id in selectedCompanies" :key="id">
+                                        <div class="badge badge-primary gap-1 p-3">
+                                            <span x-text="companies.find(c => String(c.id) === String(id))?.name"></span>
+                                            <button type="button" @click.stop="toggleCompany(id)" class="hover:bg-primary-focus rounded-full p-0.5">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                            </button>
+                                            <input type="hidden" name="company_ids[]" :value="id">
+                                        </div>
+                                    </template>
+                                    
+                                    <input type="text" x-ref="searchInput" x-model="search" @focus="open = true" @keydown.backspace="if(search === '' && selectedCompanies.length > 0) toggleCompany(selectedCompanies[selectedCompanies.length - 1])" class="flex-1 outline-none bg-transparent min-w-[150px] text-sm" placeholder="{{ __('Cari perusahaan...') }}">
+                                </div>
+                                
+                                <div x-show="open" 
+                                     x-transition
+                                     class="absolute z-10 mt-1 w-full bg-base-100 border border-base-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                    <template x-if="filteredCompanies.length === 0">
+                                        <div class="p-3 text-sm text-base-content/60 text-center">{{ __('Tidak ada perusahaan ditemukan') }}</div>
+                                    </template>
+                                    <template x-for="company in filteredCompanies" :key="company.id">
+                                        <div @click="toggleCompany(company.id)" class="p-3 hover:bg-base-200 cursor-pointer text-sm">
+                                            <span x-text="company.name"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+
                             <div class="space-y-4">
                                 @foreach($companies as $company)
-                                    <div class="border border-base-300 rounded-lg p-3 bg-base-200/30"
+                                    <div class="border border-base-300 rounded-lg p-4 bg-base-200/30"
+                                         x-show="selectedCompanies.includes(String({{ $company->id }}))"
                                          x-data="{ 
                                             companyId: {{ $company->id }},
                                             branchIds: {{ $company->branches->pluck('id')->toJson() }}
                                          }">
-                                        <template x-if="selectedCompanies.map(String).includes(String(companyId))">
-                                            <input type="hidden" name="company_ids[]" :value="companyId">
-                                        </template>
+                                        
+                                        <div class="flex items-center justify-between border-b border-base-300 pb-2 mb-3">
+                                            <span class="font-medium text-sm">{{ $company->name }} ({{ $company->code }}) - Cabang</span>
+                                            <label class="flex items-center gap-2 cursor-pointer text-xs">
+                                                <input type="checkbox" 
+                                                       :checked="branchIds.length > 0 && branchIds.every(b => selectedBranches.includes(String(b)))"
+                                                       @change="
+                                                            if ($el.checked) {
+                                                                branchIds.forEach(b => { if (!selectedBranches.includes(String(b))) selectedBranches.push(String(b)); });
+                                                            } else {
+                                                                selectedBranches = selectedBranches.filter(b => !branchIds.map(String).includes(String(b)));
+                                                            }
+                                                       "
+                                                       class="checkbox checkbox-xs checkbox-primary">
+                                                <span>{{ __('Pilih Semua') }}</span>
+                                            </label>
+                                        </div>
 
-                                        <label class="flex items-center gap-2 cursor-pointer font-medium text-sm">
-                                            <input type="checkbox" 
-                                                   :checked="branchIds.length === 0 ? selectedCompanies.map(String).includes(String(companyId)) : branchIds.every(b => selectedBranches.map(String).includes(String(b)))"
-                                                   x-effect="$el.indeterminate = (branchIds.length > 0 && branchIds.some(b => selectedBranches.map(String).includes(String(b))) && !branchIds.every(b => selectedBranches.map(String).includes(String(b))))"
-                                                   @change="
-                                                        if ($el.checked) {
-                                                            branchIds.forEach(b => { if (!selectedBranches.map(String).includes(String(b))) selectedBranches.push(String(b)); });
-                                                            if (!selectedCompanies.map(String).includes(String(companyId))) selectedCompanies.push(String(companyId));
-                                                        } else {
-                                                            selectedBranches = selectedBranches.filter(b => !branchIds.map(String).includes(String(b)));
-                                                            selectedCompanies = selectedCompanies.filter(c => String(c) !== String(companyId));
-                                                        }
-                                                   "
-                                                   class="checkbox checkbox-sm checkbox-primary">
-                                            <span>{{ $company->name }} ({{ $company->code }})</span>
-                                        </label>
-
-                                        <div class="pl-6 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 border-t border-base-300/50"
-                                             x-show="selectedCompanies.map(String).includes(String(companyId)) || branchIds.some(b => selectedBranches.map(String).includes(String(b)))">
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                             @foreach($company->branches as $branch)
                                                 <label class="flex items-center gap-2 cursor-pointer text-xs">
                                                     <input type="checkbox" name="branch_ids[]" value="{{ $branch->id }}"
                                                            x-model="selectedBranches"
-                                                           @change="
-                                                                if (branchIds.some(b => selectedBranches.map(String).includes(String(b)))) {
-                                                                    if (!selectedCompanies.map(String).includes(String(companyId))) selectedCompanies.push(String(companyId));
-                                                                } else {
-                                                                    selectedCompanies = selectedCompanies.filter(c => String(c) !== String(companyId));
-                                                                }
-                                                           "
                                                            class="checkbox checkbox-xs checkbox-secondary">
                                                     <span>{{ $branch->name }} @if($branch->is_pusat)<span class="text-primary font-semibold">({{ __('Pusat') }})</span>@else({{ $branch->code }})@endif</span>
                                                 </label>

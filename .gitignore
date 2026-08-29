@@ -25,3 +25,9 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+database/seeders/TemplateCategorySeeder.php
+database/seeders/DocumentTemplateSeeder.php
+database/seeders/DivisionSeeder.php
+database/seeders/UserSeeder.php
+database/seeders/CompanySeeder.php
+database/seeders/BranchSeeder.php

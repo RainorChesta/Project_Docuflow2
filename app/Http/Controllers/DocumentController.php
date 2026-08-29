@@ -48,31 +48,61 @@ class DocumentController extends Controller
         $userBranchIds = $user->allBranchIds();
         $userCompanyIds = $user->allCompanyIds();
 
-        // Apply active branch filtering if not admin looking at global
+        $folder = $request->get('folder');
+        $virtualFolders = [];
+        $breadcrumbs = [];
+
+        // Base query - only apply strict active branch filtering if NOT in 'general' type,
+        // or if in 'general' type, we will apply specific branch filters based on the active folder.
         if (!$user->isAdmin()) {
-            if ($activeBranchId && !$user->isDirector()) {
-                $query->where('branch_id', $activeBranchId);
-            } elseif ($activeCompanyId && !$user->isDirector()) {
-                $query->where(function ($q) use ($activeCompanyId) {
-                    $q->where('company_id', $activeCompanyId)
-                      ->orWhereHas('branch', fn($b) => $b->where('company_id', $activeCompanyId));
-                });
-            } elseif (!empty($userBranchIds)) {
-                $query->where(function ($q) use ($userBranchIds, $userCompanyIds) {
-                    $q->whereIn('branch_id', $userBranchIds)
-                      ->orWhere(function ($sub) use ($userCompanyIds) {
-                          $sub->whereNull('branch_id')
-                              ->whereIn('company_id', $userCompanyIds);
-                      });
-                });
-            } elseif (!empty($userCompanyIds)) {
-                $query->whereIn('company_id', $userCompanyIds);
+            if ($type !== 'general' && $type !== 'shared') {
+                if ($activeBranchId && !$user->isDirector()) {
+                    $query->where('branch_id', $activeBranchId);
+                } elseif ($activeCompanyId && !$user->isDirector()) {
+                    $query->where(function ($q) use ($activeCompanyId) {
+                        $q->where('company_id', $activeCompanyId)
+                          ->orWhereHas('branch', fn($b) => $b->where('company_id', $activeCompanyId));
+                    });
+                } elseif (!empty($userBranchIds)) {
+                    $query->where(function ($q) use ($userBranchIds, $userCompanyIds) {
+                        $q->whereIn('branch_id', $userBranchIds)
+                          ->orWhere(function ($sub) use ($userCompanyIds) {
+                              $sub->whereNull('branch_id')
+                                  ->whereIn('company_id', $userCompanyIds);
+                          });
+                    });
+                } elseif (!empty($userCompanyIds)) {
+                    $query->whereIn('company_id', $userCompanyIds);
+                }
             }
         }
 
         if ($type === 'general') {
-            // General (public) — visible to everyone.
-            $query->general();
+            $query->general()->where(function ($q) use ($activeBranchId, $activeCompanyId, $user) {
+                if ($activeBranchId) {
+                    $q->where('branch_id', $activeBranchId)
+                       ->orWhere(function ($sub) use ($activeCompanyId) {
+                           $sub->whereNull('branch_id')
+                               ->where('company_id', $activeCompanyId);
+                       })
+                       ->orWhereHas('distributions', fn($dq) => $dq->where('target_branch_id', $activeBranchId));
+                } elseif ($activeCompanyId) {
+                    $q->where(function ($sub) use ($activeCompanyId) {
+                        $sub->where('company_id', $activeCompanyId)
+                            ->orWhereHas('branch', fn($b) => $b->where('company_id', $activeCompanyId));
+                    })
+                    ->orWhereHas('distributions', fn($dq) => $dq->whereHas('targetBranch', fn($b) => $b->where('company_id', $activeCompanyId)));
+                } else {
+                    $q->whereIn('branch_id', $user->allBranchIds())
+                       ->orWhereIn('company_id', $user->allCompanyIds())
+                       ->orWhereHas('distributions', fn($dq) => $dq->whereIn('target_branch_id', $user->allBranchIds()));
+                }
+            });
+            
+            // Clear notifications
+            $user->unreadNotifications()
+                ->where('data->type', 'document_cross_branch_received')
+                ->update(['read_at' => now()]);
         } elseif ($type === 'mine') {
             // My Documents — semua dokumen milik user, apapun scopenya.
             $query->ownedBy($user);
@@ -115,15 +145,25 @@ class DocumentController extends Controller
             $query->where('document_type_id', $documentTypeId);
         }
 
+        if ($year = $request->get('year')) {
+            $query->whereYear('created_at', (int) $year);
+        }
+
         if ($status = $request->get('status')) {
             if ($status === 'active') {
-                $query->whereHas('currentVersion', fn($q) => $q->where('status', 'active'));
+                $query->whereHas('currentVersion', fn($q) => $q->where('status', 'active'))
+                      ->where('is_expired', false);
             } elseif ($status === 'pending') {
                 $query->whereDoesntHave('currentVersion')
                     ->orWhereHas('versions', fn($q) => $q->where('status', 'pending'));
             } elseif ($status === 'draft') {
                 $query->whereDoesntHave('versions');
+            } elseif ($status === 'expired') {
+                $query->where('is_expired', true);
             }
+        } else {
+            // Sembunyikan dokumen kedaluwarsa secara default kecuali diminta
+            $query->where('is_expired', false);
         }
 
         $documents = $query->latest()->paginate(15)->withQueryString();
@@ -136,7 +176,11 @@ class DocumentController extends Controller
             default => 'documents.general',
         };
 
-        return view($view, compact('documents', 'documentTypes', 'type'));
+        // General documents always shows the filter toolbar.
+        // Other types already include _search unconditionally in their views.
+        $showDocuments = true;
+
+        return view($view, compact('documents', 'documentTypes', 'type', 'showDocuments', 'virtualFolders', 'breadcrumbs', 'folder'));
     }
 
     /**
@@ -327,8 +371,9 @@ class DocumentController extends Controller
                 'view'
             );
         }
+        $companies = \App\Models\Company::with('branches')->get();
 
-        return view('documents.show', compact('document', 'divisions', 'onlyOfficeConfig', 'version'));
+        return view('documents.show', compact('document', 'divisions', 'onlyOfficeConfig', 'version', 'companies'));
     }
 
     /**
@@ -704,6 +749,10 @@ class DocumentController extends Controller
 
         $document = Document::findOrFail($id);
 
+        if (!auth()->user()->can('view', $document)) {
+            abort(403, 'Anda tidak punya akses ke dalam dokumen ini.');
+        }
+
         return view('documents.verified', compact('document'));
     }
 
@@ -718,6 +767,8 @@ class DocumentController extends Controller
 
         $validated = $request->validate([
             'visibility' => 'required|in:general,division,personal',
+            'target_branch_ids' => 'nullable|array',
+            'target_branch_ids.*' => 'exists:branches,id'
         ]);
 
         // Division scope keeps the document's original division; fall back to
@@ -726,10 +777,52 @@ class DocumentController extends Controller
 
         $document->update([
             'visibility' => $validated['visibility'],
-            'division_id' => $validated['visibility'] === Document::VISIBILITY_DIVISION ? $divisionId : null,
+            'division_id' => $divisionId,
             // Legacy derived flag stays in sync with the scope.
             'is_public' => $validated['visibility'] === Document::VISIBILITY_GENERAL,
         ]);
+        
+        // Sync document distributions for general visibility
+        if ($validated['visibility'] === Document::VISIBILITY_GENERAL) {
+            $targetBranchIds = $request->input('target_branch_ids', []);
+            \App\Models\DocumentDistribution::where('document_id', $document->id)->delete();
+            
+            if (is_array($targetBranchIds) && count($targetBranchIds) > 0) {
+                $distributions = [];
+                $targetBranches = \App\Models\Branch::whereIn('id', $targetBranchIds)->get()->keyBy('id');
+                
+                foreach ($targetBranchIds as $targetBranchId) {
+                    $distributions[] = [
+                        'document_id' => $document->id,
+                        'source_branch_id' => $document->branch_id,
+                        'target_branch_id' => $targetBranchId,
+                        'sent_at' => now(),
+                        'status' => 'unread',
+                        'created_by' => auth()->id(),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                    
+                    // Notify users in the target branch
+                    if (isset($targetBranches[$targetBranchId])) {
+                        $branchUsers = \App\Models\User::whereHas('branches', fn($q) => $q->where('branches.id', $targetBranchId))
+                            ->where('is_active', true)
+                            ->get();
+                            
+                        $targetBranchName = $targetBranches[$targetBranchId]->name;
+                        $senderName = auth()->user()->name;
+                        
+                        foreach ($branchUsers as $branchUser) {
+                            $branchUser->notify(new \App\Notifications\CrossBranchDocumentReceived($document, $targetBranchName, $senderName));
+                        }
+                    }
+                }
+                \App\Models\DocumentDistribution::insert($distributions);
+            }
+        } else {
+            // Remove all distributions if not general
+            \App\Models\DocumentDistribution::where('document_id', $document->id)->delete();
+        }
 
         $this->auditService->log(auth()->user(), 'document.visibility_changed', 'document', $document->id, [
             'visibility' => $validated['visibility'],
