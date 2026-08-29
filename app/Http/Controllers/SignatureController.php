@@ -19,9 +19,53 @@ class SignatureController extends Controller
     public function show(Request $request): JsonResponse
     {
         $userId = $request->query('user_id');
+        $documentId = $request->query('document_id');
         $user = $userId ? User::find($userId) : Auth::user();
 
-        if ($user && $user->hasSignature()) {
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Pengguna tidak ditemukan.'], 404);
+        }
+
+        // If requesting someone else's signature, check approval
+        if ($user->id !== Auth::id()) {
+            if (!$documentId) {
+                return response()->json(['success' => false, 'message' => 'ID dokumen diperlukan untuk memeriksa izin.'], 403);
+            }
+
+            $requestRecord = SignatureRequest::firstOrCreate([
+                'requester_id' => Auth::id(),
+                'target_user_id' => $user->id,
+                'document_id' => $documentId,
+            ], [
+                'status' => 'pending',
+                'requested_at' => now(),
+            ]);
+
+            if ($requestRecord->status !== 'approved') {
+                if ($requestRecord->status === 'rejected') {
+                    return response()->json([
+                        'success' => false, 
+                        'message' => 'Permintaan penggunaan tanda tangan telah ditolak oleh pengguna.' 
+                    ], 403);
+                }
+
+                $onlyOfficeService = app(\App\Services\OnlyOfficeService::class);
+                $internalBase = rtrim(config('onlyoffice.internal_url'), '/');
+                $placeholderUrl = $internalBase . route('onlyoffice.signature.placeholder', [], false);
+                $token = $placeholderUrl ? $onlyOfficeService->generateInsertImageToken($placeholderUrl) : null;
+
+                return response()->json([
+                    'success' => true,
+                    'is_pending' => true,
+                    'request_id' => $requestRecord->id,
+                    'url' => $placeholderUrl,
+                    'token' => $token,
+                    'message' => 'Permintaan penggunaan tanda tangan telah dikirim ke pengguna terkait. Tanda tangan disisipkan sebagai placeholder sementara.',
+                ]);
+            }
+        }
+
+        if ($user->hasSignature()) {
             $sig = $user->signature;
             $onlyOfficeService = app(\App\Services\OnlyOfficeService::class);
             $onlyOfficeUrl = $onlyOfficeService->getSignatureFileUrl($user);
@@ -29,6 +73,7 @@ class SignatureController extends Controller
 
             return response()->json([
                 'success'    => true,
+                'is_pending' => false,
                 'url'        => $onlyOfficeUrl,
                 'token'      => $token,
                 'client_url' => asset('storage/' . $sig->file_path),
@@ -37,7 +82,7 @@ class SignatureController extends Controller
             ]);
         }
 
-        return response()->json(['success' => false], 404);
+        return response()->json(['success' => false, 'message' => 'Tanda tangan belum dibuat.'], 404);
     }
 
     /**
@@ -46,30 +91,55 @@ class SignatureController extends Controller
     public function store(Request $request): JsonResponse|RedirectResponse
     {
         $request->validate([
-            'signature_data' => ['required', 'string'], // base64 data url
+            'signature_data' => ['nullable', 'string'], // base64 data url
+            'signature_image' => ['nullable', 'image', 'mimes:png,jpg,jpeg', 'max:2048'], // image file
         ]);
 
         $user = Auth::user();
-        $dataUrl = $request->input('signature_data');
 
-        if (!preg_match('/^data:image\/(\w+);base64,/', $dataUrl, $type)) {
+        if (!$request->filled('signature_data') && !$request->hasFile('signature_image')) {
             if ($request->wantsJson()) {
-                return response()->json(['success' => false, 'message' => 'Format gambar tanda tangan tidak valid.'], 422);
+                return response()->json(['success' => false, 'message' => 'Silakan gambar atau unggah tanda tangan.'], 422);
             }
-            return back()->with('error', 'Format gambar tanda tangan tidak valid.');
-        }
-
-        $imageData = substr($dataUrl, strpos($dataUrl, ',') + 1);
-        $imageData = base64_decode($imageData);
-
-        if ($imageData === false) {
-            if ($request->wantsJson()) {
-                return response()->json(['success' => false, 'message' => 'Gagal memproses gambar tanda tangan.'], 422);
-            }
-            return back()->with('error', 'Gagal memproses gambar tanda tangan.');
+            return back()->with('error', 'Silakan gambar atau unggah tanda tangan.');
         }
 
         $onlyOfficeService = app(\App\Services\OnlyOfficeService::class);
+        $imageData = null;
+        $signatureType = 'canvas';
+
+        if ($request->hasFile('signature_image')) {
+            $file = $request->file('signature_image');
+            $imageData = file_get_contents($file->getRealPath());
+            if ($imageData === false) {
+                if ($request->wantsJson()) {
+                    return response()->json(['success' => false, 'message' => 'Gagal membaca file gambar.'], 422);
+                }
+                return back()->with('error', 'Gagal membaca file gambar.');
+            }
+            $signatureType = 'upload';
+        } else {
+            $dataUrl = $request->input('signature_data');
+
+            if (!preg_match('/^data:image\/(\w+);base64,/', $dataUrl, $type)) {
+                if ($request->wantsJson()) {
+                    return response()->json(['success' => false, 'message' => 'Format gambar tanda tangan tidak valid.'], 422);
+                }
+                return back()->with('error', 'Format gambar tanda tangan tidak valid.');
+            }
+
+            $imageData = substr($dataUrl, strpos($dataUrl, ',') + 1);
+            $imageData = base64_decode($imageData);
+
+            if ($imageData === false) {
+                if ($request->wantsJson()) {
+                    return response()->json(['success' => false, 'message' => 'Gagal memproses gambar tanda tangan.'], 422);
+                }
+                return back()->with('error', 'Gagal memproses gambar tanda tangan.');
+            }
+        }
+
+        // Format to square and add transparency handling if needed (OnlyOfficeService handles it)
         $imageData = $onlyOfficeService->formatSquareSignature($imageData, 400, 24);
 
         $filename = 'signatures/sig_' . $user->id . '_' . time() . '.png';
@@ -85,7 +155,7 @@ class SignatureController extends Controller
             ['user_id' => $user->id],
             [
                 'file_path' => $filename,
-                'signature_type' => 'canvas',
+                'signature_type' => $signatureType,
             ]
         );
 
@@ -94,7 +164,6 @@ class SignatureController extends Controller
         $signature->refresh();
 
         if ($request->wantsJson()) {
-            $onlyOfficeService = app(\App\Services\OnlyOfficeService::class);
             $onlyOfficeUrl = $onlyOfficeService->getSignatureFileUrl($user);
             $token = $onlyOfficeUrl ? $onlyOfficeService->generateInsertImageToken($onlyOfficeUrl) : null;
 
