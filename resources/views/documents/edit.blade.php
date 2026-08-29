@@ -212,6 +212,7 @@
                     config.events = config.events || {};
                     config.events.onAppReady = function() {
                         console.log('ONLYOFFICE editor ready');
+                        replacePendingSignatures();
                     };
                     config.events.onDocumentStateChange = function(event) {
                         const isModified = event.data;
@@ -247,6 +248,43 @@
                     document.getElementById('onlyoffice-fallback')?.classList.remove('hidden');
                 }
             });
+
+            function replacePendingSignatures() {
+                const approvedSignatures = @json($approvedSignatures ?? []);
+                if (!approvedSignatures || approvedSignatures.length === 0 || !window.docEditor || !window.docEditor.createConnector) return;
+
+                const connector = window.docEditor.createConnector();
+                const script = `
+                    var oDocument = Api.GetDocument();
+                    var aContentControls = oDocument.GetAllContentControls();
+                    var approved = ${JSON.stringify(approvedSignatures)};
+                    
+                    for (var i = 0; i < aContentControls.length; i++) {
+                        var label = aContentControls[i].GetLabel();
+                        if (label && label.indexOf("pending_sig_") === 0) {
+                            var reqId = parseInt(label.split("_")[2]);
+                            var match = null;
+                            for (var j = 0; j < approved.length; j++) {
+                                if (approved[j].request_id === reqId) {
+                                    match = approved[j];
+                                    break;
+                                }
+                            }
+                            if (match && match.url) {
+                                aContentControls[i].RemoveAllElements();
+                                var oParagraph = Api.CreateParagraph();
+                                var oImage = Api.CreateImage(match.url, 140 * 36000, 140 * 36000);
+                                oParagraph.AddElement(oImage, 0);
+                                aContentControls[i].AddElement(oParagraph, 0);
+                                aContentControls[i].SetLabel("resolved_sig_" + reqId);
+                            }
+                        }
+                    }
+                `;
+                connector.callCommand(new Function(script), function() {
+                    console.log("Pending signatures replaced automatically.");
+                });
+            }
 
             /**
              * Insert image directly into ONLYOFFICE document editor via DocsAPI insertImage
@@ -306,12 +344,36 @@
                 insertImageIntoOnlyOffice(mySignatureUrl, 140, 140, mySignatureToken);
             }
 
-            function insertSignatureImage(signatureUrl, userName, token = null) {
+            function insertSignatureImage(signatureUrl, userName, token = null, isPending = false, requestId = null) {
                 if (!signatureUrl) {
                     alert('Pengguna ' + userName + ' belum memiliki tanda tangan tersimpan.');
                     return;
                 }
-                insertImageIntoOnlyOffice(signatureUrl, 140, 140, token);
+
+                if (isPending && requestId && window.docEditor && window.docEditor.createConnector) {
+                    try {
+                        var connector = window.docEditor.createConnector();
+                        var script = `
+                            var oDocument = Api.GetDocument();
+                            var oParagraph = Api.CreateParagraph();
+                            var oImage = Api.CreateImage("${signatureUrl}", 140 * 36000, 140 * 36000);
+                            oParagraph.AddElement(oImage, 0);
+                            
+                            var oBlockLvlSdt = Api.CreateBlockLvlSdt();
+                            oBlockLvlSdt.SetLabel("pending_sig_${requestId}");
+                            oBlockLvlSdt.AddElement(oParagraph, 0);
+                            oDocument.InsertContent([oBlockLvlSdt]);
+                        `;
+                        connector.callCommand(new Function(script), function() {
+                            console.log("Pending signature content control inserted");
+                        });
+                    } catch (e) {
+                        console.warn("Failed to insert content control, falling back to basic image insertion.", e);
+                        insertImageIntoOnlyOffice(signatureUrl, 140, 140, token);
+                    }
+                } else {
+                    insertImageIntoOnlyOffice(signatureUrl, 140, 140, token);
+                }
             }
 
             function openSignatureSelectorModal() {
@@ -355,7 +417,7 @@
                     .then(response => {
                         const data = response.data;
                         if (response.status === 200 && data.success && data.url) {
-                            insertSignatureImage(data.url, userName, data.token || null);
+                            insertSignatureImage(data.url, userName, data.token || null, data.is_pending || false, data.request_id || null);
                             if (data.message) {
                                 setTimeout(() => alert(data.message), 500);
                             }

@@ -28,6 +28,26 @@ class DocumentController extends Controller
         protected \App\Services\OnlyOfficeService $onlyOfficeService,
     ) {}
 
+    private function getApprovedSignatures(Document $document): array
+    {
+        return \App\Models\SignatureRequest::where('document_id', $document->id)
+            ->where('status', 'approved')
+            ->with('targetUser.signature')
+            ->get()
+            ->map(function ($req) {
+                if (!$req->targetUser || !$req->targetUser->hasSignature()) {
+                    return null;
+                }
+                return [
+                    'request_id' => $req->id,
+                    'url' => $this->onlyOfficeService->getSignatureFileUrl($req->targetUser),
+                ];
+            })
+            ->filter()
+            ->values()
+            ->toArray();
+    }
+
     public function index(Request $request): View
     {
         $user = auth()->user();
@@ -373,7 +393,9 @@ class DocumentController extends Controller
         }
         $companies = \App\Models\Company::with('branches')->get();
 
-        return view('documents.show', compact('document', 'divisions', 'onlyOfficeConfig', 'version', 'companies'));
+        $approvedSignatures = $this->getApprovedSignatures($document);
+
+        return view('documents.show', compact('document', 'divisions', 'onlyOfficeConfig', 'version', 'approvedSignatures', 'companies'));
     }
 
     /**
@@ -476,6 +498,8 @@ class DocumentController extends Controller
         $qrCodeToken = $this->onlyOfficeService->generateInsertImageToken($qrCodeUrl);
         $qrCodeDataUri = $this->qrCodeService->dataUri($this->qrCodeService->qrcodeUrl($document));
 
+        $approvedSignatures = $this->getApprovedSignatures($document);
+
         return view('documents.edit', compact(
             'document',
             'version',
@@ -485,7 +509,8 @@ class DocumentController extends Controller
             'qrCodeDataUri',
             'userSignatureUrl',
             'userSignatureToken',
-            'userSignatureDataUri'
+            'userSignatureDataUri',
+            'approvedSignatures'
         ));
     }
 
@@ -506,7 +531,9 @@ class DocumentController extends Controller
             );
         }
 
-        return view('documents.preview', compact('document', 'onlyOfficeConfig'));
+        $approvedSignatures = $this->getApprovedSignatures($document);
+
+        return view('documents.preview', compact('document', 'onlyOfficeConfig', 'approvedSignatures'));
     }
 
     public function previewContent(Document $document): View
@@ -531,7 +558,9 @@ class DocumentController extends Controller
             'view'
         );
 
-        return view('documents.preview-version', compact('document', 'version', 'onlyOfficeConfig'));
+        $approvedSignatures = $this->getApprovedSignatures($document);
+
+        return view('documents.preview-version', compact('document', 'version', 'onlyOfficeConfig', 'approvedSignatures'));
     }
 
     public function save(Request $request, Document $document): RedirectResponse

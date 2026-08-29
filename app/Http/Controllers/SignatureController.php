@@ -56,6 +56,8 @@ class SignatureController extends Controller
 
                 return response()->json([
                     'success' => true,
+                    'is_pending' => true,
+                    'request_id' => $requestRecord->id,
                     'url' => $placeholderUrl,
                     'token' => $token,
                     'message' => 'Permintaan penggunaan tanda tangan telah dikirim ke pengguna terkait. Tanda tangan disisipkan sebagai placeholder sementara.',
@@ -71,6 +73,7 @@ class SignatureController extends Controller
 
             return response()->json([
                 'success'    => true,
+                'is_pending' => false,
                 'url'        => $onlyOfficeUrl,
                 'token'      => $token,
                 'client_url' => asset('storage/' . $sig->file_path),
