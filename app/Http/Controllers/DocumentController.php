@@ -78,81 +78,31 @@ class DocumentController extends Controller
         }
 
         if ($type === 'general') {
-            $pusatBranch = \App\Models\Company::find($activeCompanyId)?->pusatBranch;
-            $pusatBranchId = $pusatBranch?->id;
-
-            if (!$folder) {
-                // Root General Folders
-                if ($pusatBranch) {
-                    $virtualFolders[] = ['id' => 'pusat', 'name' => $pusatBranch->name . ' (Pusat)'];
+            $query->general()->where(function ($q) use ($activeBranchId, $activeCompanyId, $user) {
+                if ($activeBranchId) {
+                    $q->where('branch_id', $activeBranchId)
+                       ->orWhere(function ($sub) use ($activeCompanyId) {
+                           $sub->whereNull('branch_id')
+                               ->where('company_id', $activeCompanyId);
+                       })
+                       ->orWhereHas('distributions', fn($dq) => $dq->where('target_branch_id', $activeBranchId));
+                } elseif ($activeCompanyId) {
+                    $q->where(function ($sub) use ($activeCompanyId) {
+                        $sub->where('company_id', $activeCompanyId)
+                            ->orWhereHas('branch', fn($b) => $b->where('company_id', $activeCompanyId));
+                    })
+                    ->orWhereHas('distributions', fn($dq) => $dq->whereHas('targetBranch', fn($b) => $b->where('company_id', $activeCompanyId)));
+                } else {
+                    $q->whereIn('branch_id', $user->allBranchIds())
+                       ->orWhereIn('company_id', $user->allCompanyIds())
+                       ->orWhereHas('distributions', fn($dq) => $dq->whereIn('target_branch_id', $user->allBranchIds()));
                 }
-                
-                // Show "My Branch" if active branch is not pusat
-                if ($activeBranchId && $activeBranchId !== $pusatBranchId) {
-                    $myBranch = \App\Models\Branch::find($activeBranchId);
-                    if ($myBranch) {
-                        $virtualFolders[] = ['id' => 'my-branch', 'name' => 'Cabang ' . $myBranch->name];
-                    }
-                }
-                
-                $virtualFolders[] = ['id' => 'other-branches', 'name' => 'Cabang Lainnya'];
-                $virtualFolders[] = ['id' => 'cross-branch', 'name' => 'Dokumen Lintas Cabang'];
-
-                // At root, show nothing or only active branch docs? Let's just show no documents at root, forcing them to click a folder.
-                $query->whereRaw('1 = 0'); // Empty query
-            } elseif ($folder === 'pusat') {
-                $breadcrumbs[] = ['name' => $pusatBranch?->name . ' (Pusat)', 'url' => '?type=general&folder=pusat'];
-                $query->general()->where('branch_id', $pusatBranchId);
-            } elseif ($folder === 'my-branch') {
-                $myBranch = \App\Models\Branch::find($activeBranchId);
-                $breadcrumbs[] = ['name' => 'Cabang ' . ($myBranch?->name ?? 'Saya'), 'url' => '?type=general&folder=my-branch'];
-                $query->general()->where('branch_id', $activeBranchId);
-            } elseif ($folder === 'other-branches') {
-                $breadcrumbs[] = ['name' => 'Cabang Lainnya', 'url' => '?type=general&folder=other-branches'];
-                
-                $otherBranches = \App\Models\Branch::where('company_id', $activeCompanyId)
-                                    ->where('id', '!=', $pusatBranchId)
-                                    ->when($activeBranchId, function($q) use ($activeBranchId) {
-                                        return $q->where('id', '!=', $activeBranchId);
-                                    })
-                                    ->get();
-
-                foreach ($otherBranches as $branch) {
-                    $virtualFolders[] = ['id' => 'branch-' . $branch->id, 'name' => 'Cabang ' . $branch->name];
-                }
-
-                $query->whereRaw('1 = 0'); // Don't show documents directly here
-            } elseif (str_starts_with($folder, 'branch-')) {
-                $branchId = str_replace('branch-', '', $folder);
-                $branch = \App\Models\Branch::find($branchId);
-                
-                $breadcrumbs[] = ['name' => 'Cabang Lainnya', 'url' => '?type=general&folder=other-branches'];
-                $breadcrumbs[] = ['name' => 'Cabang ' . ($branch?->name ?? $branchId), 'url' => '?type=general&folder=' . $folder];
-                
-                $query->general()->where('branch_id', $branchId);
-            } elseif ($folder === 'cross-branch') {
-                $breadcrumbs[] = ['name' => 'Lintas Cabang', 'url' => '?type=general&folder=cross-branch'];
-                $virtualFolders = [
-                    ['id' => 'cross-branch-received', 'name' => 'Diterima dari Cabang Lain'],
-                    ['id' => 'cross-branch-sent', 'name' => 'Dikirim ke Cabang Lain'],
-                ];
-                $query->whereRaw('1 = 0');
-            } elseif ($folder === 'cross-branch-received') {
-                $breadcrumbs[] = ['name' => 'Lintas Cabang', 'url' => '?type=general&folder=cross-branch'];
-                $breadcrumbs[] = ['name' => 'Diterima', 'url' => '?type=general&folder=cross-branch-received'];
-                // Documents distributed TO the active branch
-                $query->general()->whereHas('distributions', fn($q) => $q->whereIn('target_branch_id', $user->allBranchIds()));
-                
-                // Clear notifications
-                $user->unreadNotifications()
-                    ->where('data->type', 'document_cross_branch_received')
-                    ->update(['read_at' => now()]);
-            } elseif ($folder === 'cross-branch-sent') {
-                $breadcrumbs[] = ['name' => 'Lintas Cabang', 'url' => '?type=general&folder=cross-branch'];
-                $breadcrumbs[] = ['name' => 'Dikirim', 'url' => '?type=general&folder=cross-branch-sent'];
-                // Documents distributed FROM the active branch
-                $query->general()->whereHas('distributions', fn($q) => $q->whereIn('source_branch_id', $user->allBranchIds()));
-            }
+            });
+            
+            // Clear notifications
+            $user->unreadNotifications()
+                ->where('data->type', 'document_cross_branch_received')
+                ->update(['read_at' => now()]);
         } elseif ($type === 'mine') {
             // My Documents — semua dokumen milik user, apapun scopenya.
             $query->ownedBy($user);
@@ -228,7 +178,7 @@ class DocumentController extends Controller
 
         // General documents always shows the filter toolbar.
         // Other types already include _search unconditionally in their views.
-        $showDocuments = ($type === 'general' && $folder !== null) || $type !== 'general';
+        $showDocuments = true;
 
         return view($view, compact('documents', 'documentTypes', 'type', 'showDocuments', 'virtualFolders', 'breadcrumbs', 'folder'));
     }
@@ -414,8 +364,9 @@ class DocumentController extends Controller
                 'view'
             );
         }
+        $companies = \App\Models\Company::with('branches')->get();
 
-        return view('documents.show', compact('document', 'divisions', 'onlyOfficeConfig', 'version'));
+        return view('documents.show', compact('document', 'divisions', 'onlyOfficeConfig', 'version', 'companies'));
     }
 
     /**
@@ -809,6 +760,8 @@ class DocumentController extends Controller
 
         $validated = $request->validate([
             'visibility' => 'required|in:general,division,personal',
+            'target_branch_ids' => 'nullable|array',
+            'target_branch_ids.*' => 'exists:branches,id'
         ]);
 
         // Division scope keeps the document's original division; fall back to
@@ -821,6 +774,48 @@ class DocumentController extends Controller
             // Legacy derived flag stays in sync with the scope.
             'is_public' => $validated['visibility'] === Document::VISIBILITY_GENERAL,
         ]);
+        
+        // Sync document distributions for general visibility
+        if ($validated['visibility'] === Document::VISIBILITY_GENERAL) {
+            $targetBranchIds = $request->input('target_branch_ids', []);
+            \App\Models\DocumentDistribution::where('document_id', $document->id)->delete();
+            
+            if (is_array($targetBranchIds) && count($targetBranchIds) > 0) {
+                $distributions = [];
+                $targetBranches = \App\Models\Branch::whereIn('id', $targetBranchIds)->get()->keyBy('id');
+                
+                foreach ($targetBranchIds as $targetBranchId) {
+                    $distributions[] = [
+                        'document_id' => $document->id,
+                        'source_branch_id' => $document->branch_id,
+                        'target_branch_id' => $targetBranchId,
+                        'sent_at' => now(),
+                        'status' => 'unread',
+                        'created_by' => auth()->id(),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                    
+                    // Notify users in the target branch
+                    if (isset($targetBranches[$targetBranchId])) {
+                        $branchUsers = \App\Models\User::whereHas('branches', fn($q) => $q->where('branches.id', $targetBranchId))
+                            ->where('is_active', true)
+                            ->get();
+                            
+                        $targetBranchName = $targetBranches[$targetBranchId]->name;
+                        $senderName = auth()->user()->name;
+                        
+                        foreach ($branchUsers as $branchUser) {
+                            $branchUser->notify(new \App\Notifications\CrossBranchDocumentReceived($document, $targetBranchName, $senderName));
+                        }
+                    }
+                }
+                \App\Models\DocumentDistribution::insert($distributions);
+            }
+        } else {
+            // Remove all distributions if not general
+            \App\Models\DocumentDistribution::where('document_id', $document->id)->delete();
+        }
 
         $this->auditService->log(auth()->user(), 'document.visibility_changed', 'document', $document->id, [
             'visibility' => $validated['visibility'],

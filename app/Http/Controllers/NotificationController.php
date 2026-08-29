@@ -32,7 +32,7 @@ class NotificationController extends Controller
         }
 
         $documents = !empty($docIds)
-            ? \App\Models\Document::with('branch')->whereIn('id', array_unique(array_values($docIds)))->get()->keyBy('id')
+            ? \App\Models\Document::with('branch', 'distributions.targetBranch')->whereIn('id', array_unique(array_values($docIds)))->get()->keyBy('id')
             : collect();
 
         return $notifications->filter(function ($n) use ($user, $docIds, $documents, $activeBranchId, $activeCompanyId) {
@@ -66,22 +66,23 @@ class NotificationController extends Controller
             }
             
             // Scope notifications to the selected branch and company:
-            // Documents are only accessible in the branch or company where they were created.
             if ($activeBranchId) {
-                if ($doc->branch_id) {
-                    if ((int)$doc->branch_id !== (int)$activeBranchId) {
-                        return false;
-                    }
-                } elseif ($doc->company_id) {
-                    if ((int)$doc->company_id !== (int)$activeCompanyId) {
-                        return false;
-                    }
+                if ($doc->branch_id && (int)$doc->branch_id === (int)$activeBranchId) {
+                    // ok
+                } elseif (!$doc->branch_id && $doc->company_id && (int)$doc->company_id === (int)$activeCompanyId) {
+                    // ok
+                } elseif ($doc->distributions->contains('target_branch_id', $activeBranchId)) {
+                    // ok
                 } else {
                     return false;
                 }
             } elseif ($activeCompanyId) {
                 $docCompanyId = $doc->company_id ?? $doc->branch?->company_id;
-                if ((int)$docCompanyId !== (int)$activeCompanyId) {
+                if ($docCompanyId && (int)$docCompanyId === (int)$activeCompanyId) {
+                    // ok
+                } elseif ($doc->distributions->contains(fn($dist) => $dist->targetBranch?->company_id == $activeCompanyId)) {
+                    // ok
+                } else {
                     return false;
                 }
             }

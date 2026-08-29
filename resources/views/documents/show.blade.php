@@ -1130,7 +1130,7 @@
 
     {{-- Change scope modal --}}
     <dialog id="scope-modal" class="modal">
-        <div class="modal-box max-w-sm max-h-[85vh] overflow-y-auto">
+        <div class="modal-box max-w-xl max-h-[85vh] overflow-y-auto">
             <div class="flex flex-wrap items-center justify-between mb-4">
                 <h3 class="font-semibold">Change Scope</h3>
                 <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('scope-modal').close()">
@@ -1139,33 +1139,160 @@
                     </svg>
                 </button>
             </div>
-            <form method="POST" action="{{ route('documents.update-visibility', $document) }}" class="space-y-3">
+            @php
+                $currentDistributions = $document->distributions()->pluck('target_branch_id')->toArray();
+                $initialVisibility = $document->visibility;
+            @endphp
+            <form method="POST" action="{{ route('documents.update-visibility', $document) }}" class="space-y-4" x-data="{ visibility: '{{ $initialVisibility }}' }">
                 @csrf
                 @method('PATCH')
-                <label class="label cursor-pointer justify-start gap-3 rounded-lg border border-base-300 p-3 hover:bg-base-200/50">
-                    <input type="radio" name="visibility" value="general" class="radio radio-sm radio-primary"
-                           {{ $document->isGeneral() ? 'checked' : '' }}>
-                    <span class="block min-w-0">
-                        <span class="block font-medium text-sm">General (public)</span>
-                        <span class="block text-xs text-base-content/60">Terlihat oleh semua pengguna.</span>
-                    </span>
-                </label>
-                <label class="label cursor-pointer justify-start gap-3 rounded-lg border border-base-300 p-3 hover:bg-base-200/50">
-                    <input type="radio" name="visibility" value="division" class="radio radio-sm radio-primary"
-                           {{ $document->isDivision() ? 'checked' : '' }}>
-                    <span class="block min-w-0">
-                        <span class="block font-medium text-sm">Division only</span>
-                        <span class="block text-xs text-base-content/60">Hanya divisi {{ $document->division?->code ?? '' }} yang bisa melihat.</span>
-                    </span>
-                </label>
-                <label class="label cursor-pointer justify-start gap-3 rounded-lg border border-base-300 p-3 hover:bg-base-200/50">
-                    <input type="radio" name="visibility" value="personal" class="radio radio-sm radio-primary"
-                           {{ $document->isPersonal() ? 'checked' : '' }}>
-                    <span class="block min-w-0">
-                        <span class="block font-medium text-sm">Personal</span>
-                        <span class="block text-xs text-base-content/60">Hanya kamu yang bisa melihat.</span>
-                    </span>
-                </label>
+                
+                <div class="space-y-3">
+                    <label class="label cursor-pointer justify-start gap-3 rounded-lg border border-base-300 p-3 hover:bg-base-200/50">
+                        <input type="radio" name="visibility" value="general" class="radio radio-sm radio-primary"
+                               x-model="visibility" {{ $document->isGeneral() ? 'checked' : '' }}>
+                        <span class="block min-w-0">
+                            <span class="block font-medium text-sm">General (public)</span>
+                            <span class="block text-xs text-base-content/60">Terlihat oleh semua pengguna.</span>
+                        </span>
+                    </label>
+                    <label class="label cursor-pointer justify-start gap-3 rounded-lg border border-base-300 p-3 hover:bg-base-200/50">
+                        <input type="radio" name="visibility" value="division" class="radio radio-sm radio-primary"
+                               x-model="visibility" {{ $document->isDivision() ? 'checked' : '' }}>
+                        <span class="block min-w-0">
+                            <span class="block font-medium text-sm">Division only</span>
+                            <span class="block text-xs text-base-content/60">Hanya divisi {{ $document->division?->code ?? '' }} yang bisa melihat.</span>
+                        </span>
+                    </label>
+                    <label class="label cursor-pointer justify-start gap-3 rounded-lg border border-base-300 p-3 hover:bg-base-200/50">
+                        <input type="radio" name="visibility" value="personal" class="radio radio-sm radio-primary"
+                               x-model="visibility" {{ $document->isPersonal() ? 'checked' : '' }}>
+                        <span class="block min-w-0">
+                            <span class="block font-medium text-sm">Personal</span>
+                            <span class="block text-xs text-base-content/60">Hanya kamu yang bisa melihat.</span>
+                        </span>
+                    </label>
+                </div>
+
+                {{-- Multi-Company & Branch Assignment (Sharing) - Only visible if general --}}
+                <div x-show="visibility === 'general'" x-transition class="mt-6 border-t border-base-300 pt-4">
+                    <h4 class="font-semibold text-sm mb-2">{{ __('Bagikan ke Cabang Lain (Opsional)') }}</h4>
+                    <p class="text-xs text-base-content/60 mb-4">{{ __('Pilih perusahaan dan cabang yang diizinkan untuk melihat dokumen ini. Dokumen akan muncul di Dokumen Umum mereka.') }}</p>
+
+                    <div x-data="{
+                        search: '',
+                        open: false,
+                        selectedCompanies: [],
+                        selectedBranches: {{ json_encode($currentDistributions) }}.map(String),
+                        companies: [
+                            @foreach($companies as $company)
+                                { id: {{ $company->id }}, name: '{{ addslashes($company->name) }} ({{ addslashes($company->code) }})', branchIds: {{ $company->branches->pluck('id')->toJson() }} },
+                            @endforeach
+                        ],
+                        get filteredCompanies() {
+                            if (this.search === '') {
+                                return this.companies.filter(c => !this.selectedCompanies.includes(String(c.id)));
+                            }
+                            return this.companies.filter(c => 
+                                !this.selectedCompanies.includes(String(c.id)) && 
+                                c.name.toLowerCase().includes(this.search.toLowerCase())
+                            );
+                        },
+                        toggleCompany(id) {
+                            id = String(id);
+                            if (this.selectedCompanies.includes(id)) {
+                                this.selectedCompanies = this.selectedCompanies.filter(c => c !== id);
+                                let company = this.companies.find(c => String(c.id) === id);
+                                if(company) {
+                                    this.selectedBranches = this.selectedBranches.filter(b => !company.branchIds.map(String).includes(String(b)));
+                                }
+                            } else {
+                                this.selectedCompanies.push(id);
+                            }
+                            this.search = '';
+                            this.$refs.searchInput.focus();
+                        },
+                        init() {
+                            // Pre-select companies if any of their branches are selected
+                            this.companies.forEach(company => {
+                                let hasBranch = company.branchIds.some(b => this.selectedBranches.includes(String(b)));
+                                if (hasBranch) {
+                                    this.selectedCompanies.push(String(company.id));
+                                }
+                            });
+                        }
+                    }" class="relative mb-6">
+                        
+                        <div class="border border-base-300 rounded-lg p-2 min-h-[3rem] flex flex-wrap gap-2 items-center bg-base-100 cursor-text"
+                             @click="open = true; $refs.searchInput.focus()"
+                             @click.away="open = false">
+                            
+                            <template x-for="id in selectedCompanies" :key="id">
+                                <div class="badge badge-primary gap-1 p-3">
+                                    <span x-text="companies.find(c => String(c.id) === String(id))?.name"></span>
+                                    <button type="button" @click.stop="toggleCompany(id)" class="hover:bg-primary-focus rounded-full p-0.5">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
+                                </div>
+                            </template>
+                            
+                            <input type="text" x-ref="searchInput" x-model="search" @focus="open = true" @keydown.backspace="if(search === '' && selectedCompanies.length > 0) toggleCompany(selectedCompanies[selectedCompanies.length - 1])" class="flex-1 outline-none bg-transparent min-w-[150px] text-sm" placeholder="{{ __('Tambah perusahaan...') }}">
+                        </div>
+                        
+                        <div x-show="open" 
+                             x-transition
+                             class="absolute z-10 mt-1 w-full bg-base-100 border border-base-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                            <template x-if="filteredCompanies.length === 0">
+                                <div class="p-3 text-sm text-base-content/60 text-center">{{ __('Tidak ada perusahaan ditemukan') }}</div>
+                            </template>
+                            <template x-for="company in filteredCompanies" :key="company.id">
+                                <div @click="toggleCompany(company.id)" class="p-3 hover:bg-base-200 cursor-pointer text-sm">
+                                    <span x-text="company.name"></span>
+                                </div>
+                            </template>
+                        </div>
+
+                        <div class="space-y-4 mt-4">
+                            @foreach($companies as $company)
+                                <div class="border border-base-300 rounded-lg p-4 bg-base-200/30"
+                                     x-show="selectedCompanies.includes(String({{ $company->id }}))"
+                                     x-data="{ 
+                                        branchIds: {{ $company->branches->pluck('id')->toJson() }}
+                                     }">
+                                    
+                                    <div class="flex items-center justify-between border-b border-base-300 pb-2 mb-3">
+                                        <span class="font-medium text-sm">{{ $company->name }} ({{ $company->code }}) - Cabang Tujuan</span>
+                                        <label class="flex items-center gap-2 cursor-pointer text-xs">
+                                            <input type="checkbox" 
+                                                   :checked="branchIds.length > 0 && branchIds.every(b => selectedBranches.includes(String(b)))"
+                                                   @change="
+                                                        if ($el.checked) {
+                                                            branchIds.forEach(b => { if (!selectedBranches.includes(String(b))) selectedBranches.push(String(b)); });
+                                                        } else {
+                                                            selectedBranches = selectedBranches.filter(b => !branchIds.map(String).includes(String(b)));
+                                                        }
+                                                   "
+                                                   class="checkbox checkbox-xs checkbox-primary">
+                                            <span>{{ __('Pilih Semua') }}</span>
+                                        </label>
+                                    </div>
+
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        @foreach($company->branches as $branch)
+                                            <label class="flex items-center gap-2 cursor-pointer text-xs">
+                                                <input type="checkbox" name="target_branch_ids[]" value="{{ $branch->id }}"
+                                                       x-model="selectedBranches"
+                                                       class="checkbox checkbox-xs checkbox-secondary">
+                                                <span>{{ $branch->name }} @if($branch->is_pusat)<span class="text-primary font-semibold">({{ __('Pusat') }})</span>@else({{ $branch->code }})@endif</span>
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+
                 <div class="flex flex-wrap justify-end gap-2 pt-2">
                     <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('scope-modal').close()">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
