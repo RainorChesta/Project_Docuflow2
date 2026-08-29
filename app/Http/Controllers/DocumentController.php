@@ -146,8 +146,15 @@ class DocumentController extends Controller
     {
         $templates = DocumentTemplate::active()->with('documentType')->orderBy('title')->get();
         $documentTypes = DocumentType::all();
+        
+        $frequentTemplates = DocumentTemplate::active()
+            ->withCount('documents')
+            ->orderByDesc('documents_count')
+            ->limit(5)
+            ->get()
+            ->filter(fn($t) => $t->documents_count > 0);
 
-        return view('documents.choose', compact('templates', 'documentTypes'));
+        return view('documents.choose', compact('templates', 'documentTypes', 'frequentTemplates'));
     }
 
     public function create(Request $request): View
