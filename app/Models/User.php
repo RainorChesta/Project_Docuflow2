@@ -174,8 +174,12 @@ class User extends Authenticatable
             $rollbacksQuery = Document::whereNotNull('pending_rollback_version_id');
 
             if (!$this->isAdmin() && !empty($companyIds)) {
-                $versionsQuery->whereHas('document', fn($q) => $q->whereIn('company_id', $companyIds));
-                $rollbacksQuery->whereIn('company_id', $companyIds);
+                $companyFilter = function ($q) use ($companyIds) {
+                    $q->whereIn('company_id', $companyIds)
+                      ->orWhereHas('branch', fn($bq) => $bq->whereIn('company_id', $companyIds));
+                };
+                $versionsQuery->whereHas('document', $companyFilter);
+                $rollbacksQuery->where($companyFilter);
             }
 
             return $versionsQuery->count() + $rollbacksQuery->count();

@@ -32,8 +32,12 @@ class ApprovalController extends Controller
             $pendingRollbacksQuery = Document::whereNotNull('pending_rollback_version_id');
 
             if (!$user->isAdmin() && !empty($companyIds)) {
-                $pendingVersionsQuery->whereHas('document', fn($q) => $q->whereIn('company_id', $companyIds));
-                $pendingRollbacksQuery->whereIn('company_id', $companyIds);
+                $companyFilter = function ($q) use ($companyIds) {
+                    $q->whereIn('company_id', $companyIds)
+                      ->orWhereHas('branch', fn($bq) => $bq->whereIn('company_id', $companyIds));
+                };
+                $pendingVersionsQuery->whereHas('document', $companyFilter);
+                $pendingRollbacksQuery->where($companyFilter);
             }
 
             $pendingVersions = $pendingVersionsQuery->with('document', 'author')->latest()->get();
