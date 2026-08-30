@@ -129,4 +129,68 @@ class DigitalSignatureTest extends TestCase
 
         $response->assertRedirect(route('profile.edit', ['must_sign' => 1]));
     }
+
+    public function test_target_user_approval_notifies_requester_and_allows_one_time_consumption(): void
+    {
+        \Illuminate\Support\Facades\Notification::fake();
+
+        $requester = User::factory()->create(['name' => 'RequesterUser']);
+        $targetUser = User::factory()->create(['name' => 'TargetSigner']);
+
+        $filePath = 'signatures/sig_target.png';
+        Storage::disk('public')->put($filePath, 'fake signature content');
+        Signature::create([
+            'user_id' => $targetUser->id,
+            'file_path' => $filePath,
+        ]);
+
+        $docType = DocumentType::create(['name' => 'Surat Keputusan', 'code' => 'SK']);
+        $document = Document::create([
+            'document_number' => '002/SK/DIV/2026',
+            'title' => 'Important Decision Doc',
+            'document_type_id' => $docType->id,
+            'owner_id' => $requester->id,
+            'visibility' => 'general',
+        ]);
+
+        $sigRequest = SignatureRequest::create([
+            'requester_id' => $requester->id,
+            'target_user_id' => $targetUser->id,
+            'document_id' => $document->id,
+            'status' => 'pending',
+            'requested_at' => now(),
+        ]);
+
+        // 1. Target user approves request
+        $this->actingAs($targetUser)->post(route('signatures.requests.approve', $sigRequest));
+
+        $this->assertTrue($sigRequest->fresh()->isApproved());
+        $this->assertTrue($sigRequest->fresh()->isAvailable());
+
+        // Assert requester received notification
+        \Illuminate\Support\Facades\Notification::assertSentTo(
+            $requester,
+            \App\Notifications\SignatureRequestApprovedNotification::class
+        );
+
+        // 2. Requester checks available users API
+        $resp = $this->actingAs($requester)->getJson(route('signatures.users', ['document_id' => $document->id]));
+        $resp->assertStatus(200)
+            ->assertJson([
+                'available_to_replace_count' => 1,
+            ]);
+
+        // 3. First consumption (should succeed)
+        $consumeResp = $this->actingAs($requester)->postJson(route('signatures.requests.consume', $sigRequest));
+        $consumeResp->assertStatus(200)
+            ->assertJson(['success' => true]);
+
+        $this->assertTrue($sigRequest->fresh()->isUsed());
+        $this->assertFalse($sigRequest->fresh()->isAvailable());
+
+        // 4. Second consumption attempt (must fail due to 1-to-1 rule)
+        $secondConsumeResp = $this->actingAs($requester)->postJson(route('signatures.requests.consume', $sigRequest));
+        $secondConsumeResp->assertStatus(422)
+            ->assertJson(['success' => false]);
+    }
 }

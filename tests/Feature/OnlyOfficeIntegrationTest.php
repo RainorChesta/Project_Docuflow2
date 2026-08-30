@@ -29,6 +29,9 @@ class OnlyOfficeIntegrationTest extends TestCase
 
         Storage::fake('local');
 
+        $company = \App\Models\Company::create(['name' => 'CMH Group', 'code' => 'CMH']);
+        $branch = \App\Models\Branch::create(['company_id' => $company->id, 'name' => 'Jakarta HQ', 'code' => 'JBM']);
+
         $this->division = Division::create(['name' => 'IT Division', 'code' => 'IT']);
         $this->docType = DocumentType::create(['name' => 'Surat Edaran', 'code' => 'S.ED']);
 
@@ -37,18 +40,24 @@ class OnlyOfficeIntegrationTest extends TestCase
             'system_role' => 'staff',
             'is_active' => true,
         ]);
+        $this->user->branches()->attach($branch->id);
+        $this->user->companies()->attach($company->id);
 
         $this->otherUser = User::factory()->create([
             'division_id' => $this->division->id,
             'system_role' => 'staff',
             'is_active' => true,
         ]);
+        $this->otherUser->branches()->attach($branch->id);
+        $this->otherUser->companies()->attach($company->id);
 
         // Create document with version
         $this->document = Document::create([
             'title' => 'Test ONLYOFFICE Doc',
             'document_number' => '001/S.ED/IT/JBM/VIII/2026',
             'division_id' => $this->division->id,
+            'company_id' => $company->id,
+            'branch_id' => $branch->id,
             'owner_id' => $this->user->id,
             'document_type_id' => $this->docType->id,
             'visibility' => Document::VISIBILITY_DIVISION,
@@ -233,7 +242,7 @@ class OnlyOfficeIntegrationTest extends TestCase
         ]);
         $response->assertJson([
             'success' => true,
-            'url' => 'http://host.docker.internal:8000/onlyoffice/users/' . $this->user->id . '/signature',
+            'url' => 'http://host.docker.internal:8000/onlyoffice/users/' . $this->user->id . '/signature.png',
         ]);
     }
 }

@@ -32,6 +32,7 @@ class DocumentController extends Controller
     {
         return \App\Models\SignatureRequest::where('document_id', $document->id)
             ->where('status', 'approved')
+            ->where('is_used', false)
             ->with('targetUser.signature')
             ->get()
             ->map(function ($req) {
@@ -41,6 +42,7 @@ class DocumentController extends Controller
                 return [
                     'request_id' => $req->id,
                     'url' => $this->onlyOfficeService->getSignatureFileUrl($req->targetUser),
+                    'target_user_name' => $req->targetUser->name,
                 ];
             })
             ->filter()
@@ -500,6 +502,18 @@ class DocumentController extends Controller
 
         $approvedSignatures = $this->getApprovedSignatures($document);
 
+        // Build server-side banner data for approved signature requests
+        $pendingApprovalBanner = \App\Models\SignatureRequest::where('document_id', $document->id)
+            ->where('requester_id', $currentUser->id)
+            ->where('status', 'approved')
+            ->where('is_used', false)
+            ->with('targetUser')
+            ->get()
+            ->map(fn($r) => $r->targetUser?->name)
+            ->filter()
+            ->values()
+            ->toArray();
+
         return view('documents.edit', compact(
             'document',
             'version',
@@ -510,7 +524,8 @@ class DocumentController extends Controller
             'userSignatureUrl',
             'userSignatureToken',
             'userSignatureDataUri',
-            'approvedSignatures'
+            'approvedSignatures',
+            'pendingApprovalBanner'
         ));
     }
 

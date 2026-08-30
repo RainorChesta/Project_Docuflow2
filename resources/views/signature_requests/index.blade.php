@@ -194,8 +194,10 @@
                                             {{ $req->requested_at ? $req->requested_at->format('d M Y, H:i') : '-' }}
                                         </td>
                                         <td>
-                                            @if($req->isApproved())
-                                                <span class="badge badge-success gap-1 text-xs">{{ __('Approved') }}</span>
+                                            @if($req->isUsed())
+                                                <span class="badge badge-neutral gap-1 text-xs">✓ {{ __('Digunakan') }}</span>
+                                            @elseif($req->isApproved())
+                                                <span class="badge badge-success gap-1 text-xs">{{ __('Disetujui (Siap Diganti)') }}</span>
                                             @elseif($req->isRejected())
                                                 <span class="badge badge-error gap-1 text-xs">{{ __('Rejected') }}</span>
                                             @else

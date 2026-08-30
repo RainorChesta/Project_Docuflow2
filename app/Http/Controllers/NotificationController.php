@@ -44,6 +44,7 @@ class NotificationController extends Controller
                     'document_shared', 
                     'document_added_division', 
                     'signature_request', 
+                    'signature_request_approved',
                     'rollback_request',
                     'document_expiring_urgent',
                     'document_expiring_warning',
