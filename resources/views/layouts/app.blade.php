@@ -12,15 +12,38 @@
         <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700&display=swap" rel="stylesheet" />
 
         {{-- Flash-prevention: set data-theme before CSS renders. No stored choice = follow OS live --}}
-        <script>(function(){var t=localStorage.getItem('theme:v2'),m=window.matchMedia('(prefers-color-scheme: dark)'),d=(t==='dark')||(t!=='light'&&m.matches);document.documentElement.setAttribute('data-theme',d?'dark':'light');m.addEventListener('change',function(){var s=localStorage.getItem('theme:v2');if(s!=='dark'&&s!=='light')document.documentElement.setAttribute('data-theme',m.matches?'dark':'light')})})()</script>
+        <script>(function(){var t=sessionStorage.getItem('theme:v2'),m=window.matchMedia('(prefers-color-scheme: dark)'),d=(t==='dark')||(t!=='light'&&m.matches);document.documentElement.setAttribute('data-theme',d?'dark':'light');m.addEventListener('change',function(){var s=sessionStorage.getItem('theme:v2');if(s!=='dark'&&s!=='light')document.documentElement.setAttribute('data-theme',m.matches?'dark':'light')})})()</script>
 
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         @stack('styles')
         @stack('after-styles')
     </head>
-    <body class="h-full overflow-hidden font-sans antialiased bg-base-200 text-base-content print:bg-white print:h-auto print:overflow-visible">
-        <div class="flex h-full w-full overflow-hidden print:block print:h-auto print:overflow-visible"
+    <body class="h-full overflow-hidden font-sans antialiased bg-base-200 text-base-content print:bg-white print:h-auto print:overflow-visible relative">
+        
+        <style>
+            @keyframes blob {
+                0% { transform: translate(0px, 0px) scale(1); }
+                33% { transform: translate(30px, -50px) scale(1.1); }
+                66% { transform: translate(-20px, 20px) scale(0.9); }
+                100% { transform: translate(0px, 0px) scale(1); }
+            }
+            .animate-blob {
+                animation: blob 15s infinite alternate ease-in-out;
+            }
+            .animation-delay-2000 { animation-delay: 2s; }
+            .animation-delay-4000 { animation-delay: 4s; }
+        </style>
+
+        <!-- Ambient Background Blobs for Glassmorphism Refraction -->
+        <!-- Heavily dimmed and using a safe, harmonious cool palette (blue/purple) so it doesn't distract from main content -->
+        <div class="absolute inset-0 overflow-hidden pointer-events-none z-0 opacity-50 dark:opacity-30">
+            <div class="absolute top-[-10%] left-[-5%] w-[40vw] h-[40vw] max-w-[600px] max-h-[600px] bg-blue-500/20 rounded-full blur-[120px] animate-blob"></div>
+            <div class="absolute top-[20%] right-[-10%] w-[35vw] h-[35vw] max-w-[500px] max-h-[500px] bg-indigo-500/20 rounded-full blur-[120px] animate-blob animation-delay-2000"></div>
+            <div class="absolute bottom-[-10%] left-[20%] w-[45vw] h-[45vw] max-w-[700px] max-h-[700px] bg-purple-500/20 rounded-full blur-[140px] animate-blob animation-delay-4000"></div>
+        </div>
+
+        <div class="flex h-full w-full overflow-hidden relative z-10 print:block print:h-auto print:overflow-visible"
              x-data="{
                  open: localStorage.getItem('dokuflow:sidebar') === 'closed' ? false : window.innerWidth >= 1024,
                  toggle() {
@@ -48,10 +71,10 @@
             <!-- Right Area -->
             <div class="flex flex-col flex-1 min-h-0 min-w-0 print:block print:h-auto print:overflow-visible">
                 <!-- Topbar -->
-                <header class="h-16 bg-base-100 border-b border-base-300 flex items-center justify-between px-3 sm:px-6 shrink-0 sticky top-0 z-30 print:hidden">
+                <header class="glass-panel h-[60px] flex items-center justify-between px-3 sm:px-6 shrink-0 z-30 lg:mt-4 lg:mr-4 lg:ml-2 mx-4 mt-4 rounded-[20px] transition-all duration-300 print:hidden">
                     <div class="flex items-center gap-2 sm:gap-3 min-w-0">
                         <button type="button"
-                                class="btn btn-ghost btn-sm px-2 shrink-0 lg:hidden"
+                                class="btn btn-ghost btn-circle btn-sm shrink-0 lg:hidden hover:bg-base-200"
                                 aria-label="Toggle sidebar"
                                 x-on:click="toggle()">
                             <svg x-show="!open" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
@@ -61,19 +84,25 @@
                             {{-- Header title removed per user request, relying on breadcrumbs instead --}}
                         @endisset
                     </div>
-                    <div class="flex items-center gap-1">
+                    <div class="flex items-center gap-1.5">
                         {{-- Company & Branch Switcher --}}
-                        <x-company-branch-switcher />
+                        <div class="hidden sm:block">
+                            <x-company-branch-switcher />
+                        </div>
 
                         {{-- Language Switcher (ID <-> EN) --}}
-                        <x-language-toggle />
+                        <div class="hover:bg-base-200 rounded-full transition-colors">
+                            <x-language-toggle />
+                        </div>
 
                         {{-- Theme Toggle: follows OS until user picks Light/Dark --}}
-                        <x-theme-toggle />
+                        <div class="hover:bg-base-200 rounded-full transition-colors">
+                            <x-theme-toggle />
+                        </div>
 
                         {{-- Global Search --}}
                         <button type="button"
-                                class="btn btn-ghost btn-sm btn-square"
+                                class="btn btn-ghost btn-circle btn-sm hover:bg-base-200 transition-colors"
                                 title="{{ __('Cari Dokumen') }}"
                                 aria-label="{{ __('Cari Dokumen') }}"
                                 @click="$dispatch('open-search')">
@@ -83,7 +112,9 @@
                         </button>
 
                         {{-- Notification Bell --}}
-                        <x-notification-bell />
+                        <div class="hover:bg-base-200 rounded-full transition-colors ml-1">
+                            <x-notification-bell />
+                        </div>
                     </div>
                 </header>
 

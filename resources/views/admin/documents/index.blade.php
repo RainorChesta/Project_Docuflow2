@@ -10,7 +10,7 @@
                 <div class="alert alert-error mb-4">{{ $errors->first() }}</div>
             @endif
 
-            <form method="GET" action="{{ route('admin.documents.index') }}" class="mb-4 flex flex-wrap gap-2">
+            <form method="GET" action="{{ route('admin.documents.index') }}" class="mb-4 flex flex-wrap gap-2 items-center w-full">
                 <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari judul, nomor, atau pemilik..."
                        class="input input-bordered input-sm flex-1 min-w-[200px]">
                 <select name="division_id" class="select select-bordered select-sm" onchange="this.form.submit()">
@@ -35,10 +35,13 @@
                     <option value="pending" {{ request('status') === 'pending' ? 'selected' : '' }}>Pending</option>
                     <option value="draft" {{ request('status') === 'draft' ? 'selected' : '' }}>Draft</option>
                 </select>
-                <button type="submit" class="btn btn-neutral btn-sm">Filter</button>
-                @if(request('search') || request('status') || request('division_id') || request('document_type_id'))
-                    <a href="{{ route('admin.documents.index') }}" class="btn btn-ghost btn-sm">Clear</a>
-                @endif
+                
+                <div class="flex gap-2 ml-auto shrink-0">
+                    <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+                    @if(request('search') || request('status') || request('division_id') || request('document_type_id'))
+                        <a href="{{ route('admin.documents.index') }}" class="btn btn-ghost btn-sm">Clear</a>
+                    @endif
+                </div>
             </form>
 
             <div class="card bg-base-100 border border-base-300 shadow-sm">
@@ -61,7 +64,7 @@
                                 @endphp
                                 <tr>
                                     <td>
-                                        <a href="{{ route('documents.show', $doc) }}" class="link link-primary font-medium">
+                                        <a href="{{ route('documents.show', $doc) }}" class="font-medium text-base-content no-underline hover:text-primary transition-colors">
                                             {{ $doc->title }}
                                         </a>
                                         <div class="text-xs text-base-content/60 font-mono">{{ $doc->document_number }}</div>
@@ -83,9 +86,8 @@
                                         <form method="POST" action="{{ route('admin.documents.destroy', $doc) }}" class="inline"
                                               onsubmit="return confirm('Hapus dokumen \'{{ $doc->title }}\' beserta semua versinya? Tindakan ini tidak bisa dibatalkan.')">
                                             @csrf @method('DELETE')
-                                            <button class="btn btn-outline btn-primary btn-xs" title="Hapus">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                Hapus
+                                            <button class="btn btn-ghost btn-xs btn-square text-error" title="Hapus">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                             </button>
                                         </form>
                                     </td>

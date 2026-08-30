@@ -196,6 +196,22 @@ class OnlyOfficeController extends Controller
                 // Save new or updated pending DOCX version
                 $version = $this->versionService->savePendingDocx($document, $fileContent, $author);
 
+                // Automatically process any approved signatures that were just saved into the document
+                $approvedRequests = \App\Models\SignatureRequest::where('document_id', $document->id)
+                    ->where('status', 'approved')
+                    ->with('targetUser.signature')
+                    ->get();
+
+                if ($approvedRequests->isNotEmpty()) {
+                    $processor = app(\App\Services\DocumentProcessorService::class);
+                    foreach ($approvedRequests as $req) {
+                        if ($req->targetUser && $req->targetUser->signature) {
+                            $signaturePath = Storage::disk('public')->path($req->targetUser->signature->file_path);
+                            $processor->processSignature($document, $version, $req->id, $signaturePath);
+                        }
+                    }
+                }
+
                 $this->auditService->log($author, 'document.saved_onlyoffice', 'document', $document->id, [
                     'version_number' => $version->version_number,
                     'status' => $status,

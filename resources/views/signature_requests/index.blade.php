@@ -58,7 +58,7 @@
                                         </td>
                                         <td>
                                             @if($req->document)
-                                                <a href="{{ route('documents.show', $req->document) }}" class="link link-primary font-medium text-sm">
+                                                <a href="{{ route('documents.show', $req->document) }}" class="font-medium text-sm text-base-content no-underline hover:text-primary transition-colors">
                                                     {{ $req->document->title }}
                                                 </a>
                                                 <div class="text-xs font-mono text-base-content/50">{{ $req->document->document_number }}</div>
@@ -89,7 +89,7 @@
                                         <td class="text-right">
                                             @if($req->isPending())
                                                 <div class="flex items-center justify-end gap-2">
-                                                    <form method="POST" action="{{ route('signatures.requests.approve', $req) }}">
+                                                    <form method="POST" action="{{ route('signatures.requests.approve', $req) }}" onsubmit="document.getElementById('loading-modal').showModal()">
                                                         @csrf
                                                         <button type="submit" class="btn btn-success btn-xs gap-1">
                                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
@@ -182,7 +182,7 @@
                                         </td>
                                         <td>
                                             @if($req->document)
-                                                <a href="{{ route('documents.show', $req->document) }}" class="link link-primary font-medium text-sm">
+                                                <a href="{{ route('documents.show', $req->document) }}" class="font-medium text-sm text-base-content no-underline hover:text-primary transition-colors">
                                                     {{ $req->document->title }}
                                                 </a>
                                                 <div class="text-xs font-mono text-base-content/50">{{ $req->document->document_number }}</div>
@@ -217,4 +217,13 @@
             </div>
         </div>
     </div>
+
+    {{-- Loading Modal --}}
+    <dialog id="loading-modal" class="modal">
+        <div class="modal-box flex flex-col items-center justify-center py-10">
+            <span class="loading loading-spinner loading-lg text-primary"></span>
+            <h3 class="font-bold text-lg mt-4">{{ __('Memproses Dokumen...') }}</h3>
+            <p class="text-sm text-base-content/70 mt-2 text-center">{{ __('Harap tunggu sebentar, sistem sedang membubuhkan tanda tangan Anda ke dalam dokumen secara otomatis.') }}</p>
+        </div>
+    </dialog>
 </x-app-layout>

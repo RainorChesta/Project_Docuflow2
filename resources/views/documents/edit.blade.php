@@ -355,14 +355,12 @@
                         var connector = window.docEditor.createConnector();
                         var script = `
                             var oDocument = Api.GetDocument();
+                            var oBlock = Api.CreateBlockLvlSdt();
                             var oParagraph = Api.CreateParagraph();
-                            var oImage = Api.CreateImage("${signatureUrl}", 140 * 36000, 140 * 36000);
-                            oParagraph.AddElement(oImage, 0);
-                            
-                            var oBlockLvlSdt = Api.CreateBlockLvlSdt();
-                            oBlockLvlSdt.SetLabel("pending_sig_${requestId}");
-                            oBlockLvlSdt.AddElement(oParagraph, 0);
-                            oDocument.InsertContent([oBlockLvlSdt]);
+                            oParagraph.AddText("\${PENDING_SIG_${requestId}}");
+                            oBlock.AddElement(oParagraph, 0);
+                            oBlock.SetLabel("pending_sig_${requestId}");
+                            oDocument.InsertContent([oBlock]);
                         `;
                         connector.callCommand(new Function(script), function() {
                             console.log("Pending signature content control inserted");

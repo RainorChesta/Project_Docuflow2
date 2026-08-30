@@ -269,8 +269,24 @@ class SignatureController extends Controller
             'status' => 'approved',
             'responded_at' => now(),
         ]);
+        
+        $document = $signatureRequest->document;
+        $version = $document?->displayVersion();
+        $targetUser = $signatureRequest->targetUser;
+        
+        if ($document && $version && $targetUser) {
+            $requestId = $signatureRequest->id;
+            
+            if ($targetUser->signature) {
+                $signaturePath = Storage::disk('public')->path($targetUser->signature->file_path);
+                
+                // Process the signature synchronously using PHPWord
+                $processor = app(\App\Services\DocumentProcessorService::class);
+                $processor->processSignature($document, $version, $requestId, $signaturePath);
+            }
+        }
 
-        return back()->with('success', 'Permintaan tanda tangan telah disetujui.');
+        return back()->with('success', 'Permintaan tanda tangan telah disetujui. Dokumen sedang diperbarui di latar belakang.');
     }
 
     /**

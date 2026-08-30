@@ -5,7 +5,7 @@
 <div class="px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3">
     <div class="min-w-0">
         <div class="flex flex-wrap items-center gap-2">
-            <a href="{{ route('documents.show', ['document' => $doc, 'type' => request('type')]) }}" class="link link-primary font-medium truncate min-w-0">
+            <a href="{{ route('documents.show', ['document' => $doc, 'type' => request('type')]) }}" class="font-medium truncate min-w-0 text-base-content no-underline hover:text-primary transition-colors">
                 {{ $doc->title }}
             </a>
             @if($doc->documentType)
