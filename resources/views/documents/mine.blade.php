@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">{{ __('Dokumen Saya') }}</x-slot>
 
-    <div class="py-6">
+    <div class="pt-0 pb-6">
         <div class="max-w-7xl mx-auto w-full" x-data="{ viewMode: localStorage.getItem('docViewMode') || 'list' }" x-init="$watch('viewMode', val => localStorage.setItem('docViewMode', val))">
             @include('documents._header', ['title' => __('Dokumen Saya')])
 
@@ -27,7 +27,7 @@
             </div>
 
             <!-- Grid Layout -->
-            <div x-show="viewMode === 'grid'" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-1 mb-4 bg-base-100 border border-base-300 rounded-xl shadow-sm p-3" style="display: none;">
+            <div x-show="viewMode === 'grid'" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3 mb-4 bg-base-100 border border-base-300 rounded-xl shadow-sm p-3" style="display: none;">
                 @forelse($documents as $doc)
                     @include('documents._grid', ['doc' => $doc])
                 @empty

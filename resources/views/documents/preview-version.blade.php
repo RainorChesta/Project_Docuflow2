@@ -1,8 +1,10 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex flex-wrap items-center gap-2 justify-between">
-            <span class="min-w-0 truncate">{{ $document->title }} — v{{ $version->version_number }}</span>
-            <span class="text-sm font-normal text-base-content/60 shrink-0">{{ $document->document_number }}</span>
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2">
+            <span class="min-w-0 font-bold break-words">{{ $document->title }} — v{{ $version->version_number }}</span>
+            @if($document->document_number)
+                <span class="text-xs sm:text-sm font-normal text-base-content/60 shrink-0 font-mono">{{ $document->document_number }}</span>
+            @endif
         </div>
     </x-slot>
 

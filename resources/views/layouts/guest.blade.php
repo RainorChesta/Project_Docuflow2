@@ -14,13 +14,13 @@
         <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700&display=swap" rel="stylesheet" />
 
         {{-- Flash-prevention: set data-theme before CSS renders. No stored choice = follow OS live --}}
-        <script>(function(){var t=localStorage.getItem('theme:v2'),m=window.matchMedia('(prefers-color-scheme: dark)'),d=(t==='dark')||(t!=='light'&&m.matches);document.documentElement.setAttribute('data-theme',d?'dark':'light');m.addEventListener('change',function(){var s=localStorage.getItem('theme:v2');if(s!=='dark'&&s!=='light')document.documentElement.setAttribute('data-theme',m.matches?'dark':'light')})})()</script>
+        <script>(function(){var t=sessionStorage.getItem('theme:v2'),m=window.matchMedia('(prefers-color-scheme: dark)'),d=(t==='dark')||(t!=='light'&&m.matches);document.documentElement.setAttribute('data-theme',d?'dark':'light');m.addEventListener('change',function(){var s=sessionStorage.getItem('theme:v2');if(s!=='dark'&&s!=='light')document.documentElement.setAttribute('data-theme',m.matches?'dark':'light')})})()</script>
 
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
-    <body class="h-screen h-[100dvh] bg-gradient-to-br from-primary/10 via-base-200 to-secondary/10 font-sans antialiased flex items-center justify-center p-4 overflow-hidden">
-        <div class="card bg-base-100 w-full {{ $size === 'sm' ? 'max-w-sm' : 'max-w-md' }} shadow-2xl border border-base-200 overflow-hidden">
+    <body class="min-h-screen min-h-[100dvh] bg-gradient-to-br from-primary/10 via-base-200 to-secondary/10 font-sans antialiased flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+        <div class="card bg-base-100 w-full {{ $size === 'sm' ? 'max-w-sm' : 'max-w-md' }} shadow-2xl border border-base-200 overflow-hidden my-auto">
             <div class="card-body {{ $size === 'sm' ? 'p-4 sm:p-5' : 'p-4 sm:p-8' }}">
                 <div class="text-center {{ $size === 'sm' ? 'mb-4' : 'mb-6' }} flex flex-col items-center {{ $size === 'sm' ? 'gap-2' : 'gap-3' }}">
                     <div class="self-end -mb-2">

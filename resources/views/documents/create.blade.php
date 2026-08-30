@@ -110,7 +110,7 @@
                                 <span id="document-number-hint" class="label-text-alt text-base-content/50">{{ __('Preview otomatis') }}</span>
                             </label>
                             <input type="text" id="document_number_field"
-                                   value="{{ old('document_number', __('Pilih tipe dokumen dahulu...')) }}"
+                                   value="{{ old('document_number', $initialDocumentNumber ?? __('Pilih tipe dokumen dahulu...')) }}"
                                    class="input input-bordered w-full font-mono bg-base-200" disabled>
                             @error('document_number') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                             <p class="text-xs text-base-content/50 mt-1">
@@ -266,7 +266,8 @@
                         </div>
                         @endif
 
-                        <div class="flex flex-wrap justify-end">
+                        <div class="flex flex-wrap items-center justify-end gap-2 pt-2">
+                            <a href="{{ route('documents.choose') }}" class="btn btn-ghost">{{ __('Batal') }}</a>
                             <button type="submit" class="btn btn-primary">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                                 {{ __('Buat Dokumen') }}
@@ -369,7 +370,8 @@
             }
 
             // Restore state kalau form reload akibat error validasi, or auto-trigger for template
-            if (typeSelect.value) {
+            var defaultPlaceholder = @json(__('Pilih tipe dokumen dahulu...'));
+            if (typeSelect.value && (!numberField.value || numberField.value === defaultPlaceholder)) {
                 fetchPreview();
             }
             if (uploadCheckbox && uploadCheckbox.checked) {

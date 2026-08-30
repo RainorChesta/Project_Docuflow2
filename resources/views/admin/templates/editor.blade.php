@@ -6,35 +6,37 @@
         </div>
     </x-slot>
 
-    <div class="w-full h-[calc(100vh-4rem)] flex flex-col bg-base-200">
+    <div class="w-full flex-1 flex flex-col min-h-0 bg-base-200">
         {{-- Top Navigation & Action Bar --}}
-        <div class="bg-base-100 border-b border-base-300 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-sm">
-            <div class="flex items-center gap-3 min-w-0">
-                <a href="{{ route('admin.templates.index') }}" class="btn btn-ghost btn-sm btn-square" title="{{ __('Kembali') }}">
+        <div class="bg-base-100 border-b border-base-300 px-3 sm:px-4 py-2.5 flex flex-col md:flex-row md:items-center md:justify-between gap-2.5 sm:gap-3 shrink-0 shadow-xs">
+            <div class="flex items-start sm:items-center gap-2.5 min-w-0 flex-1">
+                <a href="{{ route('admin.templates.index') }}" class="btn btn-ghost btn-sm btn-square shrink-0 text-base-content/70 hover:text-base-content mt-0.5 sm:mt-0" title="{{ __('Kembali') }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
                 </a>
-                <div class="min-w-0">
+                <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-2">
-                        <h1 class="text-base sm:text-lg font-bold truncate">{{ $template->title }}</h1>
+                        <h1 class="text-sm sm:text-base font-bold text-base-content break-words" title="{{ $template->title }}">{{ $template->title }}</h1>
                     </div>
-                    <p class="text-xs text-base-content/60">
-                        {{ __('ONLYOFFICE Template Editor') }}
+                    <p class="text-[10px] sm:text-xs text-base-content/60 mt-0.5">
+                        <span>{{ __('ONLYOFFICE Template Editor') }}</span>
                     </p>
                 </div>
             </div>
 
-            <div class="flex flex-wrap items-center gap-2">
+            <div class="flex items-center gap-1 sm:gap-1.5 self-end md:self-center ml-auto shrink-0 w-full md:w-auto justify-end pt-1 md:pt-0 border-t border-base-200/60 md:border-t-0">
                 <button type="button"
                         id="btn-selesai-edit"
                         onclick="finishEditingTemplate()"
-                        class="btn btn-primary btn-sm px-5 gap-2">
-                    <svg id="icon-selesai-edit" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        class="btn btn-primary btn-sm px-3 sm:px-4 gap-1.5 font-medium shadow-xs"
+                        title="{{ __('Selesai Edit') }}"
+                        aria-label="{{ __('Selesai Edit') }}">
+                    <svg id="icon-selesai-edit" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                     </svg>
                     <span id="spinner-selesai-edit" class="loading loading-spinner loading-xs hidden"></span>
-                    <span id="text-selesai-edit">{{ __('Selesai Edit') }}</span>
+                    <span id="text-selesai-edit" class="hidden sm:inline">{{ __('Selesai Edit') }}</span>
                 </button>
             </div>
         </div>
@@ -74,6 +76,13 @@
 
                 try {
                     const config = @json($onlyOfficeConfig);
+                    // Always use desktop type to bypass ONLYOFFICE Community Edition mobile license restriction
+                    config.type = 'desktop';
+                    config.editorConfig = config.editorConfig || {};
+                    config.editorConfig.mode = 'edit';
+                    config.editorConfig.customization = config.editorConfig.customization || {};
+                    config.editorConfig.customization.compactHeader = true;
+                    config.editorConfig.customization.mobile = { force: false };
                     
                     config.events = config.events || {};
                     config.events.onAppReady = function() {

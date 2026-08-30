@@ -2,7 +2,7 @@
     <x-slot name="header">{{ __('Direktori Dokumen Perusahaan') }}</x-slot>
 
     <div class="py-6 space-y-6">
-        <div class="max-w-7xl mx-auto w-full px-4 sm:px-6 space-y-6">
+        <div class="max-w-7xl mx-auto w-full space-y-6">
 
             {{-- 1 & 2. Direktori and Search/Filter Card --}}
             <div class="bg-base-100 border border-base-300 rounded-2xl shadow-sm flex flex-col">
@@ -10,7 +10,7 @@
                 <div class="p-4 sm:p-5 flex flex-col md:flex-row md:items-center gap-4">
 
                     {{-- Breadcrumbs Navigation Trail --}}
-                <nav class="flex items-center flex-wrap gap-2 text-xs font-medium bg-base-200/50 px-3 py-2 rounded-lg border border-base-300">
+                <nav class="flex items-center flex-wrap gap-1.5 text-xs font-medium bg-base-200/50 px-2.5 py-1.5 rounded-lg border border-base-300">
                         @if($parentUrl)
                             <a href="{{ $parentUrl }}" 
                                class="btn btn-ghost btn-xs btn-circle mr-1" 
@@ -375,81 +375,9 @@
                     @if($documents->isNotEmpty())
                         {{-- GRID VIEW --}}
                         @if($viewMode === 'grid')
-                            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3 bg-base-100 border border-base-300 rounded-xl shadow-sm p-3">
                                 @foreach($documents as $doc)
-                                    @php
-                                        $hasDraft = $doc->versions->contains('status', 'draft');
-                                        $hasPending = $doc->versions->contains('status', 'pending');
-                                    @endphp
-                                    <div class="group bg-base-100 border border-base-300 hover:border-primary/50 rounded-2xl p-4 transition-all duration-200 shadow-xs hover:shadow-md flex flex-col justify-between gap-3">
-                                        
-                                        {{-- Top Header: Icon & Status --}}
-                                        <div class="flex items-start justify-between gap-2">
-                                            <div class="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                </svg>
-                                            </div>
-
-                                            <div class="flex flex-col items-end gap-1">
-                                                @if($doc->currentVersion)
-                                                    <span class="badge badge-success badge-xs font-semibold">v{{ $doc->currentVersion->version_number }}</span>
-                                                @elseif($hasPending)
-                                                    <span class="badge badge-warning badge-xs font-semibold">{{ __('Tertunda') }}</span>
-                                                @elseif($hasDraft)
-                                                    <span class="badge badge-info badge-xs font-semibold">{{ __('Draf') }}</span>
-                                                @endif
-
-                                                @if($doc->documentType)
-                                                    <span class="badge badge-outline badge-xs">{{ $doc->documentType->code }}</span>
-                                                @endif
-                                            </div>
-                                        </div>
-
-                                        {{-- Title & Info --}}
-                                        <div class="space-y-1">
-                                            <a href="{{ route('documents.show', $doc) }}" 
-                                               class="font-bold text-sm text-base-content hover:text-primary transition-colors line-clamp-2"
-                                               title="{{ $doc->title }}">
-                                                {{ $doc->title }}
-                                            </a>
-                                            <p class="text-xs font-mono text-base-content/50 truncate" title="{{ $doc->document_number }}">
-                                                {{ $doc->document_number }}
-                                            </p>
-                                        </div>
-
-                                        {{-- Metadata Chips --}}
-                                        <div class="flex flex-wrap items-center gap-1.5 text-xs text-base-content/60 pt-2 border-t border-base-200">
-                                            @if($doc->branch)
-                                                <span class="badge badge-ghost badge-xs">{{ $doc->branch->name }}</span>
-                                            @endif
-                                            @if($doc->division)
-                                                <span class="badge badge-ghost badge-xs">{{ $doc->division->code }}</span>
-                                            @endif
-                                        </div>
-
-                                        {{-- Footer & Quick Actions --}}
-                                        <div class="flex items-center justify-between pt-2 border-t border-base-200 text-xs">
-                                            <span class="text-base-content/40 truncate" title="{{ $doc->owner->name }}">
-                                                {{ $doc->owner->name }}
-                                            </span>
-
-                                            <div class="flex items-center gap-1 shrink-0">
-                                                <a href="{{ route('documents.preview', $doc) }}" 
-                                                   class="btn btn-ghost btn-xs btn-circle"
-                                                   title="{{ __('Pratinjau') }}">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                    </svg>
-                                                </a>
-                                                <a href="{{ route('documents.show', $doc) }}" 
-                                                   class="btn btn-ghost btn-xs text-primary font-semibold">
-                                                    {{ __('Buka') }}
-                                                </a>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    @include('documents._grid', ['doc' => $doc])
                                 @endforeach
                             </div>
                         {{-- LIST VIEW --}}

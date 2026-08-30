@@ -1,160 +1,252 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ config('app.name', 'DokuFlow') }} — Document Management System</title>
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800&display=swap" rel="stylesheet" />
+    
+    <!-- New Font: Plus Jakarta Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-    {{-- Flash-prevention: set data-theme before CSS renders. No stored choice = follow OS live --}}
     <script>(function(){var t=sessionStorage.getItem('theme:v2'),m=window.matchMedia('(prefers-color-scheme: dark)'),d=(t==='dark')||(t!=='light'&&m.matches);document.documentElement.setAttribute('data-theme',d?'dark':'light')})()</script>
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+        }
+        
+        /* Minimalist Grid Pattern */
+        .bg-grid-pattern {
+            background-image: linear-gradient(to right, rgba(0,0,0,0.12) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.12) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+        [data-theme='dark'] .bg-grid-pattern {
+            background-image: linear-gradient(to right, rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.08) 1px, transparent 1px);
+        }
+        
+        /* Fade effect for the mockup */
+        .mask-fade-bottom {
+            mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+            -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+        }
+        
+        /* Typing Animation */
+        .typing-wrapper {
+            display: inline-grid;
+            text-align: left;
+        }
+        .typing-wrapper::after {
+            content: "From draft to distribution.";
+            visibility: hidden;
+            grid-area: 1 / 1;
+            white-space: nowrap;
+        }
+        .typing-text {
+            grid-area: 1 / 1;
+            justify-self: start;
+            width: fit-content;
+            white-space: nowrap;
+            border-right: 2px solid currentColor;
+            padding-right: 4px;
+            animation: blink-caret 0.75s step-end infinite;
+        }
+        @keyframes blink-caret {
+            from, to { border-color: transparent; }
+            50% { border-color: currentColor; }
+        }
+    </style>
 </head>
-<body class="min-h-screen bg-base-200 font-sans antialiased">
-    <div class="flex flex-col min-h-screen">
-        <!-- Nav -->
-        @if (Route::has('login'))
-        <div class="navbar bg-base-100/80 backdrop-blur-sm border-b border-base-300 sticky top-0 z-50 min-h-16 px-2 sm:px-4">
-            <div class="flex-1 min-w-0">
-                <a href="/" class="flex items-center gap-2 px-1 sm:px-2">
-                    <x-application-logo class="h-8 w-8 text-primary shrink-0" />
-                    <span class="text-lg font-bold text-base-content hidden sm:inline">{{ config('app.name', 'DokuFlow') }}</span>
-                </a>
-            </div>
-            <div class="flex-none gap-1 sm:gap-2">
-                {{-- Theme Toggle: follows OS until user picks Light/Dark --}}
-                <x-theme-toggle />
-                @auth
-                    <a href="{{ url('/dashboard') }}" class="btn btn-primary btn-sm">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
-                        <span class="hidden xs:inline sm:inline">Dashboard</span>
-                    </a>
-                @else
-                    <a href="{{ route('login') }}" class="btn btn-ghost btn-sm">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" /></svg>
-                        <span class="hidden sm:inline">Log in</span>
-                    </a>
-                    @if (Route::has('register'))
-                        <a href="{{ route('register') }}" class="btn btn-primary btn-sm">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-                            <span class="hidden sm:inline">Register</span>
-                        </a>
-                    @endif
-                @endauth
-            </div>
-        </div>
-        @endif
+<body class="min-h-screen bg-base-100 text-base-content antialiased flex flex-col selection:bg-primary selection:text-primary-content">
 
-        <!-- Hero -->
-        <section class="flex-1 bg-gradient-to-br from-primary/[0.08] via-base-200 to-secondary/[0.08]">
-            <div class="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20 lg:py-28 flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
-                <!-- Left -->
-                <div class="flex-1 text-center lg:text-left">
-                    <div class="badge badge-primary badge-outline mb-5">Document Workflow Platform</div>
-                    <h1 class="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-extrabold text-base-content leading-[1.1] tracking-tight break-words">
-                        Kelola dokumen<br />
-                        <span class="text-primary">dalam satu alur</span>
-                    </h1>
-                    <p class="text-base-content/60 mt-5 max-w-lg mx-auto lg:mx-0 leading-relaxed text-base lg:text-lg">
-                        DokuFlow mengelola siklus hidup dokumen — dari pembuatan, revisi, 
-                        persetujuan, hingga distribusi — dengan pelacakan <span class="text-base-content font-semibold">real-time</span> 
-                        di setiap divisi.
-                    </p>                    <div class="flex flex-wrap gap-4 mt-10 justify-center lg:justify-start">
+    <!-- Nav -->
+    @if (Route::has('login'))
+    <nav class="sticky top-0 z-50 w-full border-b border-base-200 bg-base-100/80 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-2">
+                    <x-application-logo class="h-8 w-8 text-primary" />
+                    <span class="text-xl font-bold tracking-tight">{{ config('app.name', 'DokuFlow') }}</span>
+                </div>
+                <div class="flex items-center gap-3 sm:gap-6">
+                    <div class="flex items-center gap-1.5 sm:gap-2">
+                        <!-- Language Dropdown -->
+                        <div class="dropdown dropdown-end">
+                            <label tabindex="0" class="btn btn-ghost btn-circle btn-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" /></svg>
+                            </label>
+                            <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow-xl bg-base-100 rounded-box w-32 border border-base-200 mt-4">
+                                <li><a href="?lang=id" class="{{ app()->getLocale() == 'id' ? 'font-bold text-primary' : '' }}">Indonesia</a></li>
+                                <li><a href="?lang=en" class="{{ app()->getLocale() == 'en' ? 'font-bold text-primary' : '' }}">English</a></li>
+                            </ul>
+                        </div>
+                        <x-theme-toggle />
+                    </div>
+                    <div class="flex items-center gap-2 sm:gap-4">
                         @auth
-                            <a href="{{ url('/dashboard') }}" class="btn btn-primary btn-lg px-8">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
-                                Buka Dashboard
-                            </a>
+                            <a href="{{ url('/dashboard') }}" class="text-xs sm:text-sm font-semibold hover:text-primary transition-colors">Dashboard</a>
                         @else
-                            <a href="{{ route('login') }}" class="btn btn-primary btn-lg px-8">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" /></svg>
-                                Mulai Sekarang
-                            </a>
+                            <a href="{{ route('login') }}" class="text-xs sm:text-sm font-semibold hover:text-primary transition-colors">Log in</a>
+                            @if (Route::has('register'))
+                                <a href="{{ route('register') }}" class="text-xs sm:text-sm font-semibold bg-primary text-primary-content px-3 sm:px-4 py-1.5 sm:py-2 rounded-full hover:bg-primary/90 transition-colors shadow-sm">Sign up</a>
+                            @endif
                         @endauth
                     </div>
                 </div>
+            </div>
+        </div>
+    </nav>
+    @endif
 
-                <!-- Right: Workflow visual -->
-                <div class="flex-1 w-full max-w-md">
-                    <div class="card bg-base-100 border border-base-300 shadow-sm w-full">
-                        <div class="card-body p-4 sm:p-6">
-                            <div class="flex flex-wrap items-center gap-2 mb-7">
-                                <div class="flex gap-1.5 shrink-0">
-                                    <span class="w-2.5 h-2.5 rounded-full bg-error"></span>
-                                    <span class="w-2.5 h-2.5 rounded-full bg-warning"></span>
-                                    <span class="w-2.5 h-2.5 rounded-full bg-success"></span>
+    <!-- Hero Section -->
+    <main class="flex-1 relative flex flex-col items-center pt-16 sm:pt-24 pb-0 px-4 sm:px-6 lg:px-8 overflow-hidden bg-grid-pattern">
+        <!-- Radial gradient to highlight the center and fade the grid -->
+        <div class="absolute inset-0 bg-base-100 [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black_70%)] pointer-events-none"></div>
+        
+        <div class="relative z-10 w-full max-w-4xl mx-auto text-center flex flex-col items-center">
+            
+            <div class="inline-flex items-center gap-2 px-3 py-1 mb-6 sm:mb-8 rounded-full border border-base-300 bg-base-200/50 text-xs font-semibold uppercase tracking-wider text-base-content/80">
+                <span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                DokuFlow Workflow Engine
+            </div>
+            
+            <h1 class="text-3xl sm:text-5xl md:text-7xl font-extrabold tracking-tighter leading-[1.1] sm:leading-[1.05] mb-6">
+                Control your documents. <br class="hidden sm:block"/>
+                <span class="typing-wrapper text-base-content/60 transition-all duration-300 hover:text-transparent hover:bg-clip-text hover:bg-gradient-to-r hover:from-primary hover:to-secondary hover:-translate-y-1 hover:drop-shadow-sm cursor-default">
+                    <span class="typing-text" id="typewriter-text"></span>
+                </span>
+            </h1>
+            
+            <p class="mt-4 max-w-2xl text-lg sm:text-xl text-base-content/60 font-medium mb-10">
+                A unified platform to create, review, approve, and distribute your corporate documents with complete audit trails and automated workflows.
+            </p>
+            
+            <div class="flex flex-col sm:flex-row gap-4 w-full sm:w-auto justify-center">
+                @auth
+                    <a href="{{ url('/dashboard') }}" class="inline-flex justify-center items-center gap-2 px-8 py-3.5 text-sm font-bold bg-primary text-primary-content rounded-full hover:bg-primary/90 transition-transform hover:scale-105 active:scale-95 shadow-xl shadow-primary/20">
+                        Go to Workspace
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                    </a>
+                @else
+                    <a href="{{ route('register') }}" class="inline-flex justify-center items-center gap-2 px-8 py-3.5 text-sm font-bold bg-primary text-primary-content rounded-full hover:bg-primary/90 transition-transform hover:scale-105 active:scale-95 shadow-xl shadow-primary/20">
+                        Start for free
+                    </a>
+                    <a href="{{ route('login') }}" class="inline-flex justify-center items-center gap-2 px-8 py-3.5 text-sm font-bold bg-base-200 text-base-content rounded-full border border-base-300 hover:bg-base-300 transition-colors">
+                        Sign in
+                    </a>
+                @endauth
+            </div>
+        </div>
+        
+        <!-- Large UI Mockup (Centered) -->
+        <div class="relative z-10 w-full max-w-5xl mx-auto mt-20 mask-fade-bottom px-4 sm:px-0">
+            <div class="rounded-t-2xl border border-base-300 bg-base-100 shadow-2xl overflow-hidden ring-1 ring-base-content/5">
+                <!-- Mac-like Window Header -->
+                <div class="bg-base-200/50 border-b border-base-300 px-4 py-3 flex items-center justify-between">
+                    <div class="flex gap-2">
+                        <div class="w-3 h-3 rounded-full bg-error/50"></div>
+                        <div class="w-3 h-3 rounded-full bg-warning/50"></div>
+                        <div class="w-3 h-3 rounded-full bg-success/50"></div>
+                    </div>
+                    <div class="text-xs font-mono text-base-content/40 bg-base-200 px-3 py-1 rounded border border-base-300">
+                        dokuflow.app
+                    </div>
+                    <div class="w-12"></div> <!-- Spacer for centering -->
+                </div>
+                
+                <!-- App content mockup -->
+                <div class="p-6 md:p-10 grid grid-cols-1 md:grid-cols-4 gap-8 h-[450px]">
+                    <!-- Sidebar mock -->
+                    <div class="hidden md:flex flex-col gap-6 border-r border-base-200 pr-8">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-8 h-8 rounded bg-primary/20"></div>
+                            <div class="h-4 bg-base-content/80 rounded w-24"></div>
+                        </div>
+                        <div class="space-y-4">
+                            <div class="h-4 bg-base-content/20 rounded w-full"></div>
+                            <div class="h-4 bg-base-content/20 rounded w-3/4"></div>
+                            <div class="h-4 bg-base-content/20 rounded w-5/6"></div>
+                            <div class="h-4 bg-base-content/20 rounded w-2/3"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Main content mock -->
+                    <div class="col-span-1 md:col-span-3 flex flex-col gap-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <div class="h-8 bg-base-content/80 rounded w-1/3"></div>
+                            <div class="h-10 bg-primary rounded-lg w-32"></div>
+                        </div>
+                        
+                        <!-- List Items -->
+                        <div class="border border-base-200 rounded-xl p-5 flex justify-between items-center bg-base-100">
+                            <div class="flex gap-5 items-center">
+                                <div class="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
+                                    <div class="w-6 h-6 bg-primary/40 rounded-sm"></div>
                                 </div>
-                                <span class="text-xs font-medium text-base-content/40 ml-2">Workflow</span>
+                                <div class="space-y-2.5">
+                                    <div class="h-4 bg-base-content/80 rounded w-48"></div>
+                                    <div class="h-3 bg-base-content/40 rounded w-32"></div>
+                                </div>
                             </div>
-
-                            <!-- Step 1 -->
-                            <div class="flex items-start gap-4">
-                                <div class="flex flex-col items-center shrink-0">
-                                    <div class="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-semibold">1</div>
-                                    <div class="w-px h-9 bg-base-300"></div>
+                            <div class="h-7 bg-warning/20 rounded-full w-24"></div>
+                        </div>
+                        
+                        <div class="border border-base-200 rounded-xl p-5 flex justify-between items-center bg-base-100">
+                            <div class="flex gap-5 items-center">
+                                <div class="w-12 h-12 bg-success/10 rounded-xl flex items-center justify-center">
+                                    <div class="w-6 h-6 bg-success/40 rounded-sm"></div>
                                 </div>
-                                <div class="pb-5">
-                                    <p class="font-semibold text-sm text-base-content">Dibuat</p>
-                                    <p class="text-xs text-base-content/50 mt-0.5">User membuat draft dokumen baru</p>
-                                </div>
-                            </div>
-                            <!-- Step 2 -->
-                            <div class="flex items-start gap-4">
-                                <div class="flex flex-col items-center shrink-0">
-                                    <div class="w-8 h-8 rounded-full bg-warning/10 text-warning flex items-center justify-center text-sm font-semibold">2</div>
-                                    <div class="w-px h-9 bg-base-300"></div>
-                                </div>
-                                <div class="pb-5">
-                                    <p class="font-semibold text-sm text-base-content">Menunggu</p>
-                                    <p class="text-xs text-base-content/50 mt-0.5">Division Head meninjau & menyetujui</p>
+                                <div class="space-y-2.5">
+                                    <div class="h-4 bg-base-content/80 rounded w-56"></div>
+                                    <div class="h-3 bg-base-content/40 rounded w-24"></div>
                                 </div>
                             </div>
-                            <!-- Step 3 -->
-                            <div class="flex items-start gap-4">
-                                <div class="flex flex-col items-center shrink-0">
-                                    <div class="w-8 h-8 rounded-full bg-success/10 text-success flex items-center justify-center text-sm font-semibold">3</div>
+                            <div class="h-7 bg-success/20 rounded-full w-24"></div>
+                        </div>
+                        
+                        <div class="border border-base-200 rounded-xl p-5 flex justify-between items-center bg-base-100">
+                            <div class="flex gap-5 items-center">
+                                <div class="w-12 h-12 bg-base-200 rounded-xl flex items-center justify-center">
+                                    <div class="w-6 h-6 bg-base-content/20 rounded-sm"></div>
                                 </div>
-                                <div>
-                                    <p class="font-semibold text-sm text-base-content">Terbit</p>
-                                    <p class="text-xs text-base-content/50 mt-0.5">Dokumen aktif & bisa dibagikan</p>
-                                </div>
-                            </div>
-
-                            <div class="divider my-4"></div>
-
-                            <div class="space-y-2.5">
-                                <div class="flex flex-wrap items-center justify-between gap-2">
-                                    <span class="text-xs text-base-content/50">Revisi v2.3</span>
-                                    <span class="badge badge-success badge-sm gap-1.5">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-white"></span>
-                                        Active
-                                    </span>
-                                </div>
-                                <div class="flex flex-wrap items-center justify-between gap-2">
-                                    <span class="text-xs text-base-content/50">Approval cycle</span>
-                                    <span class="badge badge-warning badge-sm gap-1.5">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
-                                        Pending
-                                    </span>
-                                </div>
-                                <div class="flex flex-wrap items-center justify-between gap-2">
-                                    <span class="text-xs text-base-content/50">Shared links</span>
-                                    <span class="badge badge-ghost badge-sm">3 active</span>
+                                <div class="space-y-2.5">
+                                    <div class="h-4 bg-base-content/80 rounded w-40"></div>
+                                    <div class="h-3 bg-base-content/40 rounded w-28"></div>
                                 </div>
                             </div>
+                            <div class="h-7 bg-base-200 rounded-full w-20"></div>
                         </div>
                     </div>
                 </div>
             </div>
-        </section>
+        </div>
+    </main>
 
-        <!-- Footer -->
-        <footer class="footer footer-center bg-base-100 border-t border-base-300 p-5 text-xs text-base-content/30">
-            <span>&copy; {{ date('Y') }} {{ config('app.name', 'DokuFlow') }}. All rights reserved.</span>
-        </footer>
-    </div>
+    <!-- Footer -->
+    <footer class="py-8 text-center text-sm font-medium text-base-content/40 border-t border-base-200 bg-base-100 z-10 relative">
+        &copy; {{ date('Y') }} {{ config('app.name', 'DokuFlow') }}. All rights reserved.
+    </footer>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const text = "From draft to distribution.";
+            const el = document.getElementById("typewriter-text");
+            let i = 0;
+            const speed = 75; // milliseconds per character
+            
+            function type() {
+                if (i < text.length) {
+                    el.textContent += text.charAt(i);
+                    i++;
+                    setTimeout(type, speed);
+                }
+            }
+            
+            // Start the typing effect with a slight delay
+            setTimeout(type, 500);
+        });
+    </script>
 </body>
 </html>
- 

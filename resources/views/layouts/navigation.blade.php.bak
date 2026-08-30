@@ -16,83 +16,55 @@
     }
     
     .nav-item-new {
-        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        transition: all 0.3s ease-out;
         position: relative;
-    }
-    
-    .nav-item-new:hover {
-        background-color: transparent !important;
-        transform: translateY(-2px);
-        filter: drop-shadow(0px 8px 16px rgba(0, 0, 0, 0.5)) drop-shadow(0px 4px 6px rgba(0, 0, 0, 0.4));
-    }
-    
-    [data-theme='dark'] .nav-item-new:hover {
-        filter: drop-shadow(0px 8px 16px rgba(255, 255, 255, 0.6)) drop-shadow(0px 4px 6px rgba(255, 255, 255, 0.7));
-    }
-    
-    /* Tactile click effect */
-    .nav-item-new:active {
-        transform: scale(0.96) translateY(0) !important;
-        transition-duration: 0.1s !important;
-        background-color: oklch(var(--b2)) !important;
+        overflow: hidden;
+        z-index: 1;
     }
     
     .nav-item-new .icon-wrapper {
-        transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        transition: all 0.3s ease-out;
         display: flex;
         align-items: center;
         justify-content: center;
         width: 38px;
         height: 38px;
         border-radius: 12px;
-        background-color: oklch(var(--b2));
+        
         color: oklch(var(--bc) / 0.5);
+        z-index: 2;
     }
     
-    .nav-item-new:hover .icon-wrapper {
-        background-color: oklch(var(--p));
-        color: oklch(var(--pc));
-        transform: scale(1.1) rotate(-4deg);
-        box-shadow: 0 6px 16px -4px oklch(var(--p) / 0.5);
+    .nav-item-new .text-label {
+        transition: color 0.3s ease-out;
+        z-index: 2;
+        position: relative;
+        color: inherit;
     }
 
-    /* Icon squish on click */
-    .nav-item-new:active .icon-wrapper {
-        transform: scale(0.92) !important;
-        transition-duration: 0.1s !important;
-    }
-    
+    /* Active State */
     .nav-item-new-active {
-        background-color: oklch(var(--b2) / 0.8) !important;
-        box-shadow: inset 4px 0 0 0 oklch(var(--p)), 0 4px 12px -4px rgba(0,0,0,0.05) !important;
-        color: oklch(var(--bc)) !important;
+        background: linear-gradient(90deg, oklch(var(--p) / 0.1), transparent) !important;
+        border-left: 3px solid oklch(var(--p));
+        border-radius: 0.75rem;
     }
     
     .nav-item-new-active .icon-wrapper {
-        background-color: oklch(var(--p));
-        color: oklch(var(--pc));
-        box-shadow: 0 6px 16px -4px oklch(var(--p) / 0.5);
-        transform: scale(1.05);
+        color: oklch(var(--p)) !important;
+        
+        text-shadow: 0 0 12px oklch(var(--p) / 0.8), 0 0 20px oklch(var(--p) / 0.4);
     }
-
+    
+    .nav-item-new-active .icon-wrapper svg {
+        filter: drop-shadow(0 0 4px oklch(var(--p) / 0.8));
+    }
+    
     .nav-item-new-active span.text-label {
-        color: oklch(var(--bc)) !important;
+        color: oklch(var(--p)) !important;
         font-weight: 700;
     }
-    
-    .nav-item-new span.text-label {
-        transition: transform 0.25s ease, color 0.2s ease;
-    }
-    .nav-item-new:hover span.text-label {
-        transform: translateX(3px);
-        color: oklch(var(--bc));
-    }
-    
-    .nav-item-new:active span.text-label {
-        transform: translateX(1px) !important;
-        transition-duration: 0.1s !important;
-    }
-    
+
+                
     .scrollbar-hide::-webkit-scrollbar {
         display: none;
     }
@@ -106,91 +78,85 @@
               fixed inset-y-0 left-0 z-50 -translate-x-full 
               lg:static lg:translate-x-0 lg:my-4 lg:ml-4 lg:rounded-[28px] lg:h-[calc(100vh-2rem)]
               overflow-hidden transition-all duration-300 ease-out"
-       :class="open ? 'translate-x-0 w-[260px] max-w-[85vw]' : '-translate-x-full lg:translate-x-0 lg:w-[92px]'">
+       :class="open ? 'translate-x-0 w-[240px] max-w-[85vw]' : '-translate-x-full lg:translate-x-0 lg:w-[92px]'">
     
     <!-- Logo Header -->
-    <div class="h-16 flex items-center shrink-0 overflow-hidden mt-4" :class="open ? 'px-6' : 'justify-center px-0'">
+    <div class="pt-6 pb-6 flex items-center shrink-0 overflow-hidden" :class="open ? 'px-6' : 'justify-center px-0'">
         <div class="w-full flex items-center justify-between" x-show="open">
-            <a href="{{ route('dashboard') }}" class="flex items-center gap-4 group">
-                <div class="w-8 h-8 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <x-application-logo class="h-6 w-6 text-primary shrink-0" />
-                </div>
-                <span class="font-bold text-lg tracking-tight">{{ config('app.name', 'DokuFlow') }}</span>
+            <a href="{{ route('dashboard') }}" class="flex items-center gap-3 group relative">
+                <div class="absolute -inset-4 bg-gradient-to-r from-primary/0 via-secondary/20 to-primary/0 opacity-0 group-hover:opacity-100 blur-xl transition-opacity duration-500 rounded-full z-0 pointer-events-none"></div>
+                <x-application-logo class="h-8 w-8 text-primary shrink-0 group-hover:scale-110 group-hover:rotate-12 transition-all duration-300 relative z-10" />
+                <span class="font-bold text-lg tracking-tight group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-primary group-hover:to-secondary transition-all duration-300 relative z-10">{{ config('app.name', 'DokuFlow') }}</span>
             </a>
-            <button type="button" class="btn btn-ghost btn-circle btn-sm hover:bg-base-200" @click="toggle()" aria-label="Toggle sidebar">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 lg:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden lg:block" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" /></svg>
+            <button type="button" class="btn btn-ghost btn-circle btn-sm hidden lg:flex hover:bg-base-200" @click="toggle()">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" /></svg>
             </button>
         </div>
 
-        <button type="button" class="w-full h-full hidden lg:flex items-center justify-center group mt-4" x-show="!open" @click="toggle()" aria-label="Expand sidebar">
-            <div class="w-11 h-11 flex items-center justify-center rounded-2xl transition-all duration-300 border border-transparent group-hover:border-primary/50 group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-primary/20 group-hover:-rotate-3 mb-3">
-                <x-application-logo class="h-7 w-7 text-primary transition-all duration-300 shrink-0 group-hover:drop-shadow-sm" />
-            </div>
+        <button type="button" class="w-full h-full hidden lg:flex items-center justify-center group relative" x-show="!open" @click="toggle()">
+            <div class="absolute inset-2 bg-gradient-to-br from-primary/20 to-secondary/20 opacity-0 group-hover:opacity-100 blur-md transition-opacity duration-300 rounded-full z-0"></div>
+            <x-application-logo class="h-8 w-8 text-primary group-hover:scale-125 group-hover:-rotate-12 group-hover:text-secondary transition-all duration-300 shrink-0 relative z-10" />
         </button>
     </div>
 
     <!-- Navigation List -->
-    <nav class="flex-1 px-4 mt-2 space-y-1 overflow-y-auto overflow-x-hidden scrollbar-hide">
+    <nav class="flex-1 flex flex-col px-4 py-2 space-y-2 overflow-y-auto overflow-x-hidden scrollbar-hide">
         
-        <span class="px-2 text-[10px] font-extrabold text-base-content/40 uppercase tracking-[0.2em] whitespace-nowrap" :class="open ? 'block' : 'lg:hidden'">Menu</span>
+        <span class="px-2 pt-2 pb-0 text-[10px] font-extrabold text-base-content/40 uppercase tracking-[0.2em] whitespace-nowrap" :class="open ? 'block' : 'lg:hidden'">Menu</span>
 
         <a href="{{ route('dashboard') }}"
-           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+           class="nav-item-new group flex transition-all duration-300 hover:bg-primary/10" items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('dashboard') ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : 'Dashboard'">
-            <div class="icon-wrapper shrink-0">
+            <div class="icon-wrapper shrink-0 flex bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-md group-hover:shadow-primary/40 bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-[0_0_15px_rgba(0,0,0,0.2)]" items-center justify-center w-[38px] h-[38px] rounded-xl">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">Dashboard</span>
+            <span class="text-label whitespace-nowrap transition-colors duration-300 group-hover:text-primary" :class="open ? '' : 'lg:hidden'">Dashboard</span>
         </a>
 
         @if(auth()->user()->isDirector())
         <a href="{{ route('director.documents.index') }}"
-           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+           class="nav-item-new group flex transition-all duration-300 hover:bg-primary/10" items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('director.documents.*') ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('All Document') }}'">
-            <div class="icon-wrapper shrink-0">
+            <div class="icon-wrapper shrink-0 flex bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-md group-hover:shadow-primary/40 bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-[0_0_15px_rgba(0,0,0,0.2)]" items-center justify-center w-[38px] h-[38px] rounded-xl">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('All Document') }}</span>
+            <span class="text-label whitespace-nowrap transition-colors duration-300 group-hover:text-primary" :class="open ? '' : 'lg:hidden'">{{ __('All Document') }}</span>
         </a>
         @endif
 
         @if(!auth()->user()->isAdmin())
-        @if(!auth()->user()->isDirector())
         <a href="{{ route('documents.index', ['type' => 'general']) }}"
-           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
-                  {{ request()->routeIs('documents.*') && request('type', '') === 'general' ? 'nav-item-new-active' : '' }}"
+           class="nav-item-new group flex transition-all duration-300 hover:bg-primary/10" items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+                  {{ request()->routeIs('documents.*') && (request('type') === 'general' || !request()->has('type')) ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Dokumen Umum') }}'">
-            <div class="icon-wrapper shrink-0">
+            <div class="icon-wrapper shrink-0 flex bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-md group-hover:shadow-primary/40 bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-[0_0_15px_rgba(0,0,0,0.2)]" items-center justify-center w-[38px] h-[38px] rounded-xl">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Umum') }}</span>
+            <span class="text-label whitespace-nowrap transition-colors duration-300 group-hover:text-primary" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Umum') }}</span>
         </a>
-        @endif
 
         <a href="{{ route('documents.index', ['type' => 'mine']) }}"
-           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
-                  {{ request()->routeIs('documents.*') && request('type', '') === 'mine' ? 'nav-item-new-active' : '' }}"
+           class="nav-item-new group flex transition-all duration-300 hover:bg-primary/10" items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+                  {{ request()->routeIs('documents.*') && request('type') === 'mine' ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Dokumen Saya') }}'">
-            <div class="icon-wrapper shrink-0">
+            <div class="icon-wrapper shrink-0 flex bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-md group-hover:shadow-primary/40 bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-[0_0_15px_rgba(0,0,0,0.2)]" items-center justify-center w-[38px] h-[38px] rounded-xl">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Saya') }}</span>
+            <span class="text-label whitespace-nowrap transition-colors duration-300 group-hover:text-primary" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Saya') }}</span>
         </a>
 
-        @if(!auth()->user()->isDirector())
         <a href="{{ route('documents.index', ['type' => 'shared']) }}"
-           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
-                  {{ request()->routeIs('documents.*') && request('type', '') === 'shared' ? 'nav-item-new-active' : '' }}"
+           class="nav-item-new group flex transition-all duration-300 hover:bg-primary/10" items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+                  {{ request()->routeIs('documents.*') && request('type') === 'shared' ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : 'Shared Documents'">
-            <div class="icon-wrapper shrink-0 relative">
+            <div class="icon-wrapper shrink-0 relative flex bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-md group-hover:shadow-primary/40 bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-[0_0_15px_rgba(0,0,0,0.2)]" items-center justify-center w-[38px] h-[38px] rounded-xl">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
                 @php($sharedDocsCount = auth()->user()->sharedDocumentsCount())
                 @if($sharedDocsCount > 0)
@@ -200,34 +166,31 @@
                     </span>
                 @endif
             </div>
-            <span class="text-label whitespace-nowrap flex-1 flex items-center justify-between" :class="open ? '' : 'lg:hidden'">
+            <span class="text-label whitespace-nowrap flex-1 flex items-center justify-between transition-colors duration-300 group-hover:text-primary" :class="open ? '' : 'lg:hidden'">
                 <span>Shared Documents</span>
                 @if($sharedDocsCount > 0)
                     <span class="badge badge-error badge-sm font-bold text-white px-2 shadow-sm shadow-error/50">{{ $sharedDocsCount }}</span>
                 @endif
             </span>
         </a>
-        @endif
 
-        @if(!auth()->user()->isDirector())
         <a href="{{ route('documents.index', ['type' => 'division']) }}"
-           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
-                  {{ request()->routeIs('documents.*') && request('type', '') === 'division' ? 'nav-item-new-active' : '' }}"
+           class="nav-item-new group flex transition-all duration-300 hover:bg-primary/10" items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+                  {{ request()->routeIs('documents.*') && request('type') === 'division' ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Dokumen Divisi') }}'">
-            <div class="icon-wrapper shrink-0">
+            <div class="icon-wrapper shrink-0 flex bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-md group-hover:shadow-primary/40 bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-[0_0_15px_rgba(0,0,0,0.2)]" items-center justify-center w-[38px] h-[38px] rounded-xl">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Divisi') }}</span>
+            <span class="text-label whitespace-nowrap transition-colors duration-300 group-hover:text-primary" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Divisi') }}</span>
         </a>
-        @endif
 
         <a href="{{ route('signatures.requests.index') }}"
-           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+           class="nav-item-new group flex transition-all duration-300 hover:bg-primary/10" items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('signatures.requests.*') ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Signature Approvals') }}'">
-            <div class="icon-wrapper shrink-0 relative">
+            <div class="icon-wrapper shrink-0 relative flex bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-md group-hover:shadow-primary/40 bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-[0_0_15px_rgba(0,0,0,0.2)]" items-center justify-center w-[38px] h-[38px] rounded-xl">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                 @php($pendingTtdCount = auth()->user()->receivedSignatureRequests()->where('status', 'pending')->count())
                 @if($pendingTtdCount > 0)
@@ -237,7 +200,7 @@
                     </span>
                 @endif
             </div>
-            <span class="text-label whitespace-nowrap flex-1 flex items-center justify-between" :class="open ? '' : 'lg:hidden'">
+            <span class="text-label whitespace-nowrap flex-1 flex items-center justify-between transition-colors duration-300 group-hover:text-primary" :class="open ? '' : 'lg:hidden'">
                 <span>{{ __('Signature Approvals') }}</span>
                 @if($pendingTtdCount > 0)
                     <span class="badge badge-error badge-sm font-bold text-white px-2 shadow-sm shadow-error/50">{{ $pendingTtdCount }}</span>
@@ -248,11 +211,11 @@
 
         @if(auth()->user()->isHead() || auth()->user()->isDirector() || auth()->user()->isAdmin())
         <a href="{{ route('approvals.index') }}"
-           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+           class="nav-item-new group flex transition-all duration-300 hover:bg-primary/10" items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('approvals.*') ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Persetujuan') }}'">
-            <div class="icon-wrapper shrink-0 relative">
+            <div class="icon-wrapper shrink-0 relative flex bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-md group-hover:shadow-primary/40 bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-[0_0_15px_rgba(0,0,0,0.2)]" items-center justify-center w-[38px] h-[38px] rounded-xl">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 @php($pendingApprovalCount = auth()->user()->pendingApprovalsCount())
                 @if($pendingApprovalCount > 0)
@@ -262,7 +225,7 @@
                     </span>
                 @endif
             </div>
-            <span class="text-label whitespace-nowrap flex-1 flex items-center justify-between" :class="open ? '' : 'lg:hidden'">
+            <span class="text-label whitespace-nowrap flex-1 flex items-center justify-between transition-colors duration-300 group-hover:text-primary" :class="open ? '' : 'lg:hidden'">
                 <span>{{ __('Persetujuan') }}</span>
                 @if($pendingApprovalCount > 0)
                     <span class="badge badge-error badge-sm font-bold text-white px-2 shadow-sm shadow-error/50">{{ $pendingApprovalCount }}</span>
@@ -273,16 +236,38 @@
 
         @if(auth()->user()->isAdmin())
         <a href="{{ route('documents.index', ['type' => 'mine']) }}"
-           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+           class="nav-item-new group flex transition-all duration-300 hover:bg-primary/10" items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('documents.*') && request('type', '') === 'mine' ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Dokumen Saya') }}'">
             <div class="icon-wrapper shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Saya') }}</span>
+            <span class="text-label whitespace-nowrap transition-colors duration-300 group-hover:text-primary" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Saya') }}</span>
         </a>
 
+        <a href="{{ route('documents.index', ['type' => 'shared']) }}"
+           class="nav-item-new group flex transition-all duration-300 hover:bg-primary/10" items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+                  {{ request()->routeIs('documents.*') && request('type', '') === 'shared' ? 'nav-item-new-active' : '' }}"
+           :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
+           :title="open ? '' : 'Shared Documents'">
+            <div class="icon-wrapper shrink-0 relative">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                @php($adminSharedDocsCount = auth()->user()->sharedDocumentsCount())
+                @if($adminSharedDocsCount > 0)
+                    <span class="absolute -top-1 -right-1 flex h-3 w-3">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-3 w-3 border-2 border-base-100 bg-error"></span>
+                    </span>
+                @endif
+            </div>
+            <span class="text-label whitespace-nowrap flex-1 flex items-center justify-between transition-colors duration-300 group-hover:text-primary" :class="open ? '' : 'lg:hidden'">
+                <span>Shared Documents</span>
+                @if($adminSharedDocsCount > 0)
+                    <span class="badge badge-error badge-sm font-bold text-white px-2 shadow-sm shadow-error/50">{{ $adminSharedDocsCount }}</span>
+                @endif
+            </span>
+        </a>
         @endif
 
         @can('admin')
@@ -291,33 +276,33 @@
         </div>
 
         <a href="{{ route('admin.companies.index') }}"
-           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+           class="nav-item-new group flex transition-all duration-300 hover:bg-primary/10" items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('admin.companies.*') ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Perusahaan') }}'">
-            <div class="icon-wrapper shrink-0">
+            <div class="icon-wrapper shrink-0 flex bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-md group-hover:shadow-primary/40 bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-[0_0_15px_rgba(0,0,0,0.2)]" items-center justify-center w-[38px] h-[38px] rounded-xl">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Perusahaan') }}</span>
+            <span class="text-label whitespace-nowrap transition-colors duration-300 group-hover:text-primary" :class="open ? '' : 'lg:hidden'">{{ __('Perusahaan') }}</span>
         </a>
 
         <a href="{{ route('admin.branches.index') }}"
-           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+           class="nav-item-new group flex transition-all duration-300 hover:bg-primary/10" items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('admin.branches.*') ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Cabang') }}'">
-            <div class="icon-wrapper shrink-0">
+            <div class="icon-wrapper shrink-0 flex bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-md group-hover:shadow-primary/40 bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-[0_0_15px_rgba(0,0,0,0.2)]" items-center justify-center w-[38px] h-[38px] rounded-xl">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Cabang') }}</span>
+            <span class="text-label whitespace-nowrap transition-colors duration-300 group-hover:text-primary" :class="open ? '' : 'lg:hidden'">{{ __('Cabang') }}</span>
         </a>
 
         <a href="{{ route('signatures.requests.index') }}"
-           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+           class="nav-item-new group flex transition-all duration-300 hover:bg-primary/10" items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('signatures.requests.*') ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Tanda Tangan') }}'">
-            <div class="icon-wrapper shrink-0 relative">
+            <div class="icon-wrapper shrink-0 relative flex bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-md group-hover:shadow-primary/40 bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-[0_0_15px_rgba(0,0,0,0.2)]" items-center justify-center w-[38px] h-[38px] rounded-xl">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                 @php($pendingAdminTtdCount = auth()->user()->receivedSignatureRequests()->where('status', 'pending')->count())
                 @if($pendingAdminTtdCount > 0)
@@ -327,7 +312,7 @@
                     </span>
                 @endif
             </div>
-            <span class="text-label whitespace-nowrap flex-1 flex items-center justify-between" :class="open ? '' : 'lg:hidden'">
+            <span class="text-label whitespace-nowrap flex-1 flex items-center justify-between transition-colors duration-300 group-hover:text-primary" :class="open ? '' : 'lg:hidden'">
                 <span>{{ __('Tanda Tangan') }}</span>
                 @if($pendingAdminTtdCount > 0)
                     <span class="badge badge-error badge-sm font-bold text-white px-2 shadow-sm shadow-error/50">{{ $pendingAdminTtdCount }}</span>
@@ -336,69 +321,69 @@
         </a>
 
         <a href="{{ route('admin.divisions.index') }}"
-           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+           class="nav-item-new group flex transition-all duration-300 hover:bg-primary/10" items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('admin.divisions.*') ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Divisi') }}'">
-            <div class="icon-wrapper shrink-0">
+            <div class="icon-wrapper shrink-0 flex bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-md group-hover:shadow-primary/40 bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-[0_0_15px_rgba(0,0,0,0.2)]" items-center justify-center w-[38px] h-[38px] rounded-xl">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Divisi') }}</span>
+            <span class="text-label whitespace-nowrap transition-colors duration-300 group-hover:text-primary" :class="open ? '' : 'lg:hidden'">{{ __('Divisi') }}</span>
         </a>
 
         <a href="{{ route('admin.documents.index') }}"
-           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+           class="nav-item-new group flex transition-all duration-300 hover:bg-primary/10" items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('admin.documents.*') ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Semua Dokumen') }}'">
-            <div class="icon-wrapper shrink-0">
+            <div class="icon-wrapper shrink-0 flex bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-md group-hover:shadow-primary/40 bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-[0_0_15px_rgba(0,0,0,0.2)]" items-center justify-center w-[38px] h-[38px] rounded-xl">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Semua Dokumen') }}</span>
+            <span class="text-label whitespace-nowrap transition-colors duration-300 group-hover:text-primary" :class="open ? '' : 'lg:hidden'">{{ __('Semua Dokumen') }}</span>
         </a>
 
         <a href="{{ route('admin.document-types.index') }}"
-           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+           class="nav-item-new group flex transition-all duration-300 hover:bg-primary/10" items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('admin.document-types.*') ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Jenis Dokumen') }}'">
-            <div class="icon-wrapper shrink-0">
+            <div class="icon-wrapper shrink-0 flex bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-md group-hover:shadow-primary/40 bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-[0_0_15px_rgba(0,0,0,0.2)]" items-center justify-center w-[38px] h-[38px] rounded-xl">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Jenis Dokumen') }}</span>
+            <span class="text-label whitespace-nowrap transition-colors duration-300 group-hover:text-primary" :class="open ? '' : 'lg:hidden'">{{ __('Jenis Dokumen') }}</span>
         </a>
 
         <a href="{{ route('admin.templates.index') }}"
-           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+           class="nav-item-new group flex transition-all duration-300 hover:bg-primary/10" items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('admin.templates.*') || request()->routeIs('admin.template-categories.*') ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Template Dokumen') }}'">
-            <div class="icon-wrapper shrink-0">
+            <div class="icon-wrapper shrink-0 flex bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-md group-hover:shadow-primary/40 bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-[0_0_15px_rgba(0,0,0,0.2)]" items-center justify-center w-[38px] h-[38px] rounded-xl">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Template Dokumen') }}</span>
+            <span class="text-label whitespace-nowrap transition-colors duration-300 group-hover:text-primary" :class="open ? '' : 'lg:hidden'">{{ __('Template Dokumen') }}</span>
         </a>
 
         <a href="{{ route('admin.users.index') }}"
-           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+           class="nav-item-new group flex transition-all duration-300 hover:bg-primary/10" items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('admin.users.*') ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Pengguna') }}'">
-            <div class="icon-wrapper shrink-0">
+            <div class="icon-wrapper shrink-0 flex bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-md group-hover:shadow-primary/40 bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-[0_0_15px_rgba(0,0,0,0.2)]" items-center justify-center w-[38px] h-[38px] rounded-xl">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Pengguna') }}</span>
+            <span class="text-label whitespace-nowrap transition-colors duration-300 group-hover:text-primary" :class="open ? '' : 'lg:hidden'">{{ __('Pengguna') }}</span>
         </a>
 
         <a href="{{ route('admin.retention.edit') }}"
-           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+           class="nav-item-new group flex transition-all duration-300 hover:bg-primary/10" items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('admin.retention.*') ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Retensi') }}'">
-            <div class="icon-wrapper shrink-0">
+            <div class="icon-wrapper shrink-0 flex bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-md group-hover:shadow-primary/40 bg-base-200 transition-all duration-300 group-hover:text-primary group-hover:bg-primary/20 group-hover:shadow-[0_0_15px_rgba(0,0,0,0.2)]" items-center justify-center w-[38px] h-[38px] rounded-xl">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Retensi') }}</span>
+            <span class="text-label whitespace-nowrap transition-colors duration-300 group-hover:text-primary" :class="open ? '' : 'lg:hidden'">{{ __('Retensi') }}</span>
         </a>
         @endcan
     </nav>
@@ -406,21 +391,25 @@
     <!-- User Footer (Redesigned) -->
     <div class="mt-auto px-4 pb-4 pt-2" x-data="{ profileOpen: false }">
         <button type="button"
-                class="w-full flex items-center gap-3.5 p-2 rounded-2xl border border-base-300 bg-base-100/50 hover:bg-base-200 hover:shadow-lg transition-all duration-300 relative group"
+                class="w-full flex items-center gap-3.5 p-2 rounded-2xl border border-transparent bg-base-100/50 hover:shadow-[0_0_20px_-5px_oklch(var(--p)/0.4)] transition-all duration-300 relative group overflow-hidden z-10"
                 :class="open ? '' : 'lg:justify-center lg:px-0 lg:border-transparent lg:bg-transparent lg:hover:bg-transparent'"
                 @click="profileOpen = !profileOpen"
                 @click.outside="profileOpen = false">
                 
+            <!-- Colorful background fill on hover -->
+            <div class="absolute inset-0 bg-gradient-to-r from-primary/10 via-secondary/10 to-primary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10"></div>
+            <div class="absolute inset-0 rounded-2xl border border-base-300 group-hover:border-primary/30 transition-colors duration-300 -z-10" :class="open ? '' : 'lg:hidden'"></div>
+                
             @if(Auth::user()->avatar_url)
-                <img src="{{ Auth::user()->avatar_url }}" alt="{{ Auth::user()->name }}" class="h-10 w-10 rounded-[10px] object-cover shrink-0 shadow-sm group-hover:scale-105 transition-transform">
+                <img src="{{ Auth::user()->avatar_url }}" alt="{{ Auth::user()->name }}" class="h-10 w-10 rounded-[10px] object-cover shrink-0 shadow-sm group-hover:scale-110 group-hover:ring-2 group-hover:ring-primary group-hover:ring-offset-2 group-hover:ring-offset-base-100 transition-all duration-300">
             @else
-                <div class="flex items-center justify-center h-10 w-10 rounded-[10px] bg-primary/20 text-primary text-sm font-bold shrink-0 group-hover:scale-105 transition-transform shadow-sm">
+                <div class="flex items-center justify-center h-10 w-10 rounded-[10px] bg-primary/10 text-primary text-sm font-bold shrink-0 shadow-sm group-hover:scale-110 group-hover:bg-gradient-to-br group-hover:from-primary group-hover:to-secondary group-hover:text-primary-content group-hover:ring-2 group-hover:ring-primary group-hover:ring-offset-2 group-hover:ring-offset-base-100 transition-all duration-300 relative z-10">
                     {{ strtoupper(substr(Auth::user()->name, 0, 1)) }}
                 </div>
             @endif
             
-            <div class="flex-1 min-w-0 text-left" :class="open ? '' : 'lg:hidden'">
-                <div class="font-bold text-sm text-base-content truncate leading-tight">{{ Auth::user()->name }}</div>
+            <div class="flex-1 min-w-0 text-left relative z-10" :class="open ? '' : 'lg:hidden'">
+                <div class="font-bold text-sm text-base-content truncate leading-tight group-hover:text-primary transition-colors duration-300">{{ Auth::user()->name }}</div>
                 <div class="text-[11px] font-medium text-base-content/50 truncate">{{ Auth::user()->email }}</div>
             </div>
             

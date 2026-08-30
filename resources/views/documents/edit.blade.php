@@ -23,59 +23,124 @@
         $hasDraftOnly = !$pending && !$document->currentVersion;
     @endphp
 
-    <div class="h-[calc(100vh-4rem)] flex flex-col bg-base-200/50">
+    <div class="w-full flex-1 flex flex-col min-h-0 bg-base-200/50">
 
         {{-- Top Navigation & Action Bar --}}
-        <div class="bg-base-100 border-b border-base-300 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-sm">
-            <div class="flex items-center gap-3 min-w-0">
-                <a href="{{ route('documents.show', $document) }}" class="btn btn-ghost btn-sm btn-square" title="{{ __('Kembali') }}">
+        <div class="bg-base-100 border-b border-base-300 px-3 sm:px-4 py-2.5 flex flex-col md:flex-row md:items-center md:justify-between gap-2.5 sm:gap-3 shrink-0 shadow-xs">
+            {{-- Left on desktop / Top on mobile: Back & Full Document Information (NEVER CUT) --}}
+            <div class="flex items-start sm:items-center gap-2.5 min-w-0 flex-1">
+                <a href="{{ route('documents.show', $document) }}" 
+                   class="btn btn-ghost btn-sm btn-square shrink-0 text-base-content/70 hover:text-base-content mt-0.5 sm:mt-0" 
+                   title="{{ __('Kembali ke Detail Dokumen') }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
                 </a>
-                <div class="min-w-0">
-                    <div class="flex items-center gap-2">
-                        <h1 class="text-base sm:text-lg font-bold truncate">{{ $document->title }}</h1>
+                <div class="min-w-0 flex-1">
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 min-w-0">
+                        <h1 class="text-sm sm:text-base font-bold text-base-content break-words" title="{{ $document->title }}">
+                            {{ $document->title }}
+                        </h1>
                         @if($document->document_number)
-                            <span class="badge badge-ghost badge-sm hidden sm:inline-flex">
+                            <span class="badge badge-ghost badge-xs sm:badge-sm shrink-0 font-medium self-start sm:self-auto font-mono">
                                 {{ $document->document_number }}
                             </span>
                         @endif
                     </div>
-                    <p class="text-xs text-base-content/60">
-                        {{ __('ONLYOFFICE Document Editor') }} &bull; v{{ $version->version_number }}
+                    <div class="flex items-center flex-wrap gap-1.5 text-[11px] text-base-content/60 leading-none mt-1">
+                        <span>{{ __('ONLYOFFICE Document Editor') }} &bull;</span>
+                        <span class="font-medium">v{{ $version->version_number }}</span>
                         @if($pending)
-                            <span class="badge badge-warning badge-xs ml-1">{{ __('Pending Review') }}</span>
+                            <span class="badge badge-warning badge-xs">{{ __('Pending') }}</span>
                         @elseif($hasDraftOnly)
-                            <span class="badge badge-info badge-xs ml-1">{{ __('Draft') }}</span>
+                            <span class="badge badge-info badge-xs">{{ __('Draft') }}</span>
                         @endif
-                    </p>
+                    </div>
                 </div>
             </div>
 
-            <div class="flex flex-wrap items-center gap-2">
-                {{-- Quick Actions: QR Code & Signature --}}
-                <button type="button"
-                        onclick="insertQrCodeToEditor()"
-                        class="btn btn-sm btn-outline btn-primary gap-1.5"
-                        title="{{ __('Sisipkan QR Code Verifikasi Dokumen') }}">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+            {{-- Right on desktop / Below document info on mobile: Action Icons & Buttons --}}
+            <div class="flex items-center gap-1 sm:gap-1.5 self-end md:self-center ml-auto shrink-0 w-full md:w-auto justify-end pt-1 md:pt-0 border-t border-base-200/60 md:border-t-0">
+                {{-- Download DOCX --}}
+                <a href="{{ route('documents.download', $document) }}"
+                   class="btn btn-ghost btn-sm gap-1.5 px-2.5 sm:px-3 text-base-content/70 hover:text-base-content"
+                   title="{{ __('Download DOCX') }}"
+                   aria-label="{{ __('Download DOCX') }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
-                    <span>{{ __('Sisip QR Code') }}</span>
+                    <span class="hidden xl:inline">{{ __('Download DOCX') }}</span>
+                </a>
+
+                {{-- Discard Changes --}}
+                @if($document->currentVersion)
+                    @can('update', $document)
+                        <button type="button"
+                                class="btn btn-outline btn-error btn-sm gap-1.5 px-2.5 sm:px-3"
+                                x-on:click="$dispatch('open-modal', 'confirm-discard-version-{{ $document->id }}')"
+                                title="{{ __('Discard Changes') }}"
+                                aria-label="{{ __('Discard Changes') }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            <span class="hidden lg:inline">{{ __('Discard Changes') }}</span>
+                        </button>
+                    @endcan
+                @else
+                    @can('delete', $document)
+                        <button type="button"
+                                class="btn btn-outline btn-error btn-sm gap-1.5 px-2.5 sm:px-3"
+                                x-on:click="$dispatch('open-modal', 'confirm-discard-{{ $document->id }}')"
+                                title="{{ __('Discard') }}"
+                                aria-label="{{ __('Discard') }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            <span class="hidden lg:inline">{{ __('Discard') }}</span>
+                        </button>
+                    @endcan
+                @endif
+
+                {{-- Selesai Edit --}}
+                <button type="button"
+                        id="btn-selesai-edit"
+                        onclick="finishEditingDocument()"
+                        class="btn btn-primary btn-sm px-3 sm:px-4 gap-1.5 font-medium shadow-xs"
+                        title="{{ __('Selesai Edit') }}"
+                        aria-label="{{ __('Selesai Edit') }}">
+                    <svg id="icon-selesai-edit" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span id="spinner-selesai-edit" class="loading loading-spinner loading-xs hidden"></span>
+                    <span id="text-selesai-edit" class="hidden sm:inline">{{ __('Selesai Edit') }}</span>
                 </button>
 
+                <div class="h-4 w-px bg-base-300 mx-0.5 sm:mx-1"></div>
+
+                {{-- Quick Actions: Sisip QR Code --}}
+                <button type="button"
+                        onclick="insertQrCodeToEditor()"
+                        class="btn btn-sm btn-outline btn-primary gap-1.5 px-2.5 sm:px-3 font-medium"
+                        title="{{ __('Sisipkan QR Code Verifikasi Dokumen') }}"
+                        aria-label="{{ __('Sisip QR Code') }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                    </svg>
+                    <span class="hidden lg:inline">{{ __('Sisip QR Code') }}</span>
+                </button>
+
+                {{-- Quick Actions: Sisip TTD --}}
                 <div class="dropdown dropdown-end">
-                    <label tabindex="0" class="btn btn-sm btn-outline btn-secondary gap-1.5 cursor-pointer">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <label tabindex="0" class="btn btn-sm btn-outline btn-secondary gap-1.5 px-2.5 sm:px-3 font-medium cursor-pointer" title="{{ __('Sisipkan Tanda Tangan Digital') }}" aria-label="{{ __('Sisip TTD') }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                         </svg>
-                        <span>{{ __('Sisip TTD') }}</span>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <span class="hidden lg:inline">{{ __('Sisip TTD') }}</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 opacity-60 hidden lg:inline shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                         </svg>
                     </label>
-                    <ul tabindex="0" class="dropdown-content z-30 menu p-2 shadow-lg bg-base-100 rounded-box w-64 border border-base-300 mt-1">
+                    <ul tabindex="0" class="dropdown-content z-30 menu p-2 shadow-xl bg-base-100 rounded-2xl w-64 border border-base-300 mt-1">
                         <li class="menu-title text-xs font-semibold px-2 py-1 text-base-content/60">{{ __('Pilih Tanda Tangan') }}</li>
                         @if($userSignatureUrl || $userSignatureDataUri)
                             <li>
@@ -105,40 +170,6 @@
                         </li>
                     </ul>
                 </div>
-
-                <div class="h-4 w-px bg-base-300 mx-1 hidden sm:block"></div>
-
-                <a href="{{ route('documents.download', $document) }}" class="btn btn-ghost btn-sm">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    {{ __('Download DOCX') }}
-                </a>
-
-                @if($document->currentVersion)
-                    @can('update', $document)
-                        <button type="button" class="btn btn-outline btn-error btn-sm" x-on:click="$dispatch('open-modal', 'confirm-discard-version-{{ $document->id }}')">
-                            {{ __('Discard Changes') }}
-                        </button>
-                    @endcan
-                @else
-                    @can('delete', $document)
-                        <button type="button" class="btn btn-outline btn-error btn-sm" x-on:click="$dispatch('open-modal', 'confirm-discard-{{ $document->id }}')">
-                            {{ __('Discard') }}
-                        </button>
-                    @endcan
-                @endif
-
-                <button type="button"
-                        id="btn-selesai-edit"
-                        onclick="finishEditingDocument()"
-                        class="btn btn-primary btn-sm px-5 gap-2">
-                    <svg id="icon-selesai-edit" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span id="spinner-selesai-edit" class="loading loading-spinner loading-xs hidden"></span>
-                    <span id="text-selesai-edit">{{ __('Selesai Edit') }}</span>
-                </button>
             </div>
         </div>
 
@@ -279,6 +310,14 @@
 
                 try {
                     const config = @json($onlyOfficeConfig);
+                    // Always use desktop type to bypass ONLYOFFICE Community Edition mobile license restriction
+                    config.type = 'desktop';
+                    config.editorConfig = config.editorConfig || {};
+                    config.editorConfig.mode = 'edit';
+                    config.editorConfig.customization = config.editorConfig.customization || {};
+                    config.editorConfig.customization.zoom = 100;
+                    config.editorConfig.customization.compactHeader = true;
+                    config.editorConfig.customization.mobile = { force: false };
                     
                     config.events = config.events || {};
                     config.events.onAppReady = function() {
@@ -464,14 +503,12 @@
                         var connector = window.docEditor.createConnector();
                         var script = `
                             var oDocument = Api.GetDocument();
+                            var oBlock = Api.CreateBlockLvlSdt();
                             var oParagraph = Api.CreateParagraph();
-                            var oImage = Api.CreateImage("${signatureUrl}", 140 * 36000, 140 * 36000);
-                            oParagraph.AddElement(oImage, 0);
-                            
-                            var oBlockLvlSdt = Api.CreateBlockLvlSdt();
-                            oBlockLvlSdt.SetLabel("pending_sig_${requestId}");
-                            oBlockLvlSdt.AddElement(oParagraph, 0);
-                            oDocument.InsertContent([oBlockLvlSdt]);
+                            oParagraph.AddText("\${PENDING_SIG_${requestId}}");
+                            oBlock.AddElement(oParagraph, 0);
+                            oBlock.SetLabel("pending_sig_${requestId}");
+                            oDocument.InsertContent([oBlock]);
                         `;
                         connector.callCommand(new Function(script), function() {
                             console.log("Pending signature block content control inserted for request " + "${requestId}");
