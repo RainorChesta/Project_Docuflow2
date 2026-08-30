@@ -125,7 +125,7 @@
          x-transition:leave="transition ease-in duration-150"
          x-transition:leave-start="opacity-100 scale-100 translate-y-0"
          x-transition:leave-end="opacity-0 scale-95 -translate-y-1"
-         class="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-base-100 border border-base-300 rounded-xl shadow-2xl overflow-hidden z-50"
+         class="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] max-w-sm sm:w-96 bg-base-100 border border-base-300 rounded-xl shadow-2xl overflow-hidden z-50"
          x-cloak>
 
         {{-- Header --}}

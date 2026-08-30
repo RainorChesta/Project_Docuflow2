@@ -12,9 +12,9 @@
                 'title' => $t->title,
                 'description' => $t->description,
                 'document_type_id' => $t->document_type_id,
-                'document_type_label' => $t->documentType->code . ' - ' . $t->documentType->name,
+                'document_type_code' => $t->documentType?->code ?? 'DOC',
+                'document_type_label' => ($t->documentType?->code ?? 'DOC') . ' - ' . ($t->documentType?->name ?? 'Dokumen'),
                 'file_name' => $t->file_original_name,
-                'file_url' => route('onlyoffice.templates.file', $t),
             ])),
             documentTypes: @js($documentTypes->map(fn($dt) => ['id' => $dt->id, 'label' => $dt->code . ' - ' . $dt->name])),
             get filteredTemplates() {
@@ -31,21 +31,6 @@
                     groups[t.document_type_label].push(t);
                 });
                 return groups;
-            },
-            previewStates: {},
-            async loadPreview(tmpl) {
-                if (this.previewStates[tmpl.id]) return;
-                this.previewStates[tmpl.id] = 'loading';
-                try {
-                    const res = await fetch(tmpl.file_url);
-                    if (!res.ok) throw new Error('HTTP ' + res.status);
-                    const buffer = await res.arrayBuffer();
-                    const result = await mammoth.convertToHtml({ arrayBuffer: buffer });
-                    tmpl.preview_html = result.value;
-                    this.previewStates[tmpl.id] = 'done';
-                } catch (e) {
-                    this.previewStates[tmpl.id] = 'error';
-                }
             }
         }">
 
@@ -56,7 +41,7 @@
                     {{-- Blank Document --}}
                     <a href="{{ route('documents.create') }}"
                        class="group w-36 h-48 flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-base-300 bg-base-100 hover:border-primary hover:bg-primary/5 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md">
-                        <div class="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/20 transition-colors">
+                        <div class="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/20 group-hover:scale-110 transition-all">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4" /></svg>
                         </div>
                         <span class="text-sm font-medium text-base-content/70 group-hover:text-primary transition-colors">{{ __('Dokumen Kosong') }}</span>
@@ -67,16 +52,32 @@
                     @if(isset($frequentTemplates) && $frequentTemplates->isNotEmpty())
                         @foreach($frequentTemplates as $tmpl)
                         <a href="{{ route('documents.create') }}?template_id={{ $tmpl->id }}"
-                           x-data="{ freqTmpl: templates.find(t => t.id == {{ $tmpl->id }}) }"
-                           x-init="if(freqTmpl) loadPreview(freqTmpl)"
                            class="group w-36 h-48 flex flex-col rounded-xl border-2 border-base-300 bg-base-100 hover:border-primary hover:bg-primary/5 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md overflow-hidden">
-                            <div class="flex-1 bg-base-200/50 border-b border-base-300 relative overflow-hidden">
-                                <div class="absolute top-2 left-2 bg-primary/10 text-primary text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide z-10 backdrop-blur-sm">
+                            <div class="flex-1 bg-gradient-to-br from-base-200/70 to-base-300/30 p-2.5 flex items-center justify-center relative overflow-hidden">
+                                <div class="absolute top-2 left-2 bg-primary/15 text-primary text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide z-10 backdrop-blur-sm">
                                     {{ __('Top') }}
                                 </div>
-                                <div x-show="freqTmpl && freqTmpl.preview_html" x-html="freqTmpl.preview_html" class="template-thumb-preview w-full h-full px-1.5 py-1 overflow-hidden"></div>
-                                <div x-show="!freqTmpl || !freqTmpl.preview_html" class="w-full h-full flex items-center justify-center">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-primary/30 group-hover:text-primary/50 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                {{-- Stylized Mini Paper Document --}}
+                                <div class="w-20 h-24 bg-base-100 rounded-lg shadow-xs border border-base-300/70 p-2 flex flex-col justify-between group-hover:shadow-sm group-hover:scale-105 transition-all duration-200">
+                                    <div>
+                                        <div class="flex items-center justify-between gap-1 mb-1.5 pb-1 border-b border-base-200">
+                                            <div class="w-3 h-3 rounded bg-primary/10 flex items-center justify-center shrink-0">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-2 h-2 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                            </div>
+                                            <div class="w-6 h-1 bg-primary/30 rounded-full"></div>
+                                        </div>
+                                        <div class="space-y-1">
+                                            <div class="w-full h-1 bg-base-content/15 rounded-full"></div>
+                                            <div class="w-4/5 h-1 bg-base-content/15 rounded-full"></div>
+                                            <div class="w-3/4 h-1 bg-base-content/10 rounded-full"></div>
+                                            <div class="w-1/2 h-1 bg-base-content/10 rounded-full"></div>
+                                        </div>
+                                    </div>
+                                    <div class="pt-0.5 flex items-center justify-between">
+                                        <span class="text-[7.5px] font-bold text-primary truncate max-w-full px-1 py-0.5 rounded bg-primary/10">{{ $tmpl->documentType?->code ?? 'DOC' }}</span>
+                                    </div>
                                 </div>
                             </div>
                             <div class="p-2 flex flex-col justify-center bg-base-100 z-10">
@@ -92,14 +93,14 @@
                 </div>
             </div>
 
-              {{-- Template Gallery --}}
+            {{-- Template Gallery --}}
             @if($templates->isNotEmpty())
             <div>
-                <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                     <h3 class="text-sm font-semibold text-base-content/50 uppercase tracking-wider">{{ __('Dari Template') }}</h3>
-                    <div class="flex items-center gap-2">
-                        <input type="text" x-model="search" placeholder="{{ __('Cari template...') }}" class="input input-bordered input-sm w-52">
-                        <select x-model="typeFilter" class="select select-bordered select-sm">
+                    <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto">
+                        <input type="text" x-model="search" placeholder="{{ __('Cari template...') }}" class="input input-bordered input-sm w-full sm:w-52">
+                        <select x-model="typeFilter" class="select select-bordered select-sm w-full sm:w-auto">
                             <option value="">{{ __('Semua Tipe') }}</option>
                             <template x-for="dt in documentTypes" :key="dt.id">
                                 <option :value="dt.id" x-text="dt.label"></option>
@@ -126,13 +127,30 @@
                         <div class="flex overflow-x-auto pb-4 gap-4 snap-x">
                             <template x-for="tmpl in items.slice(0, 10)" :key="tmpl.id">
                                 <a :href="'{{ route('documents.create') }}?template_id=' + tmpl.id"
-                                   class="group flex-none w-40 h-48 flex flex-col rounded-xl border-2 border-base-300 bg-base-100 hover:border-primary hover:bg-primary/5 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md overflow-hidden snap-start"
-                                   x-init="loadPreview(tmpl)">
+                                   class="group flex-none w-40 h-48 flex flex-col rounded-xl border-2 border-base-300 bg-base-100 hover:border-primary hover:bg-primary/5 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md overflow-hidden snap-start">
                                     {{-- Preview thumbnail area --}}
-                                    <div class="flex-1 bg-base-200/50 border-b border-base-300 relative overflow-hidden">
-                                        <div x-show="tmpl.preview_html" x-html="tmpl.preview_html" class="template-thumb-preview w-full h-full px-1.5 py-1 overflow-hidden"></div>
-                                        <div x-show="!tmpl.preview_html" class="w-full h-full flex items-center justify-center">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-primary/30 group-hover:text-primary/50 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                    <div class="flex-1 bg-gradient-to-br from-base-200/70 to-base-300/30 p-2.5 flex items-center justify-center relative overflow-hidden">
+                                        {{-- Stylized Mini Paper Document --}}
+                                        <div class="w-22 h-26 bg-base-100 rounded-lg shadow-xs border border-base-300/70 p-2 flex flex-col justify-between group-hover:shadow-sm group-hover:scale-105 transition-all duration-200">
+                                            <div>
+                                                <div class="flex items-center justify-between gap-1 mb-1.5 pb-1 border-b border-base-200">
+                                                    <div class="w-3 h-3 rounded bg-primary/10 flex items-center justify-center shrink-0">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-2 h-2 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                        </svg>
+                                                    </div>
+                                                    <div class="w-7 h-1 bg-primary/30 rounded-full"></div>
+                                                </div>
+                                                <div class="space-y-1">
+                                                    <div class="w-full h-1 bg-base-content/15 rounded-full"></div>
+                                                    <div class="w-4/5 h-1 bg-base-content/15 rounded-full"></div>
+                                                    <div class="w-3/4 h-1 bg-base-content/10 rounded-full"></div>
+                                                    <div class="w-1/2 h-1 bg-base-content/10 rounded-full"></div>
+                                                </div>
+                                            </div>
+                                            <div class="pt-0.5 flex items-center justify-between">
+                                                <span class="text-[7.5px] font-bold text-primary truncate max-w-full px-1 py-0.5 rounded bg-primary/10" x-text="tmpl.document_type_code || 'DOC'"></span>
+                                            </div>
                                         </div>
                                     </div>
                                     {{-- Info --}}
@@ -168,6 +186,7 @@
                 <p class="text-sm">{{ __('Belum ada template tersedia. Admin dapat mengunggah template di menu pengaturan.') }}</p>
             </div>
             @endif
+
             {{-- DaisyUI Modal for All Templates --}}
             <dialog x-ref="allTemplatesModal" class="modal">
                 <div class="modal-box w-11/12 max-w-5xl">
@@ -181,12 +200,29 @@
                     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 max-h-[60vh] overflow-y-auto p-1">
                         <template x-for="tmpl in selectedModalItems" :key="tmpl.id">
                             <a :href="'{{ route('documents.create') }}?template_id=' + tmpl.id"
-                               class="group flex flex-col h-48 rounded-xl border-2 border-base-300 bg-base-100 hover:border-primary hover:bg-primary/5 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md overflow-hidden"
-                               x-init="loadPreview(tmpl)">
-                                <div class="flex-1 bg-base-200/50 border-b border-base-300 relative overflow-hidden">
-                                    <div x-show="tmpl.preview_html" x-html="tmpl.preview_html" class="template-thumb-preview w-full h-full px-1.5 py-1 overflow-hidden"></div>
-                                    <div x-show="!tmpl.preview_html" class="w-full h-full flex items-center justify-center">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-primary/30 group-hover:text-primary/50 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                               class="group flex flex-col h-48 rounded-xl border-2 border-base-300 bg-base-100 hover:border-primary hover:bg-primary/5 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md overflow-hidden">
+                                <div class="flex-1 bg-gradient-to-br from-base-200/70 to-base-300/30 p-2.5 flex items-center justify-center relative overflow-hidden">
+                                    {{-- Stylized Mini Paper Document --}}
+                                    <div class="w-22 h-26 bg-base-100 rounded-lg shadow-xs border border-base-300/70 p-2 flex flex-col justify-between group-hover:shadow-sm group-hover:scale-105 transition-all duration-200">
+                                        <div>
+                                            <div class="flex items-center justify-between gap-1 mb-1.5 pb-1 border-b border-base-200">
+                                                <div class="w-3 h-3 rounded bg-primary/10 flex items-center justify-center shrink-0">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-2 h-2 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                    </svg>
+                                                </div>
+                                                <div class="w-7 h-1 bg-primary/30 rounded-full"></div>
+                                            </div>
+                                            <div class="space-y-1">
+                                                <div class="w-full h-1 bg-base-content/15 rounded-full"></div>
+                                                <div class="w-4/5 h-1 bg-base-content/15 rounded-full"></div>
+                                                <div class="w-3/4 h-1 bg-base-content/10 rounded-full"></div>
+                                                <div class="w-1/2 h-1 bg-base-content/10 rounded-full"></div>
+                                            </div>
+                                        </div>
+                                        <div class="pt-0.5 flex items-center justify-between">
+                                            <span class="text-[7.5px] font-bold text-primary truncate max-w-full px-1 py-0.5 rounded bg-primary/10" x-text="tmpl.document_type_code || 'DOC'"></span>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="p-2 flex flex-col justify-center bg-base-100 z-10">
@@ -203,7 +239,4 @@
             </dialog>
         </div>
     </div>
-    @if($templates->isNotEmpty())
-        <script src="https://cdn.jsdelivr.net/npm/mammoth@1.7.0/mammoth.browser.min.js"></script>
-    @endif
 </x-app-layout>

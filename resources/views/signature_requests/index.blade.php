@@ -39,7 +39,7 @@
                     </div>
                 @else
                     <div class="overflow-x-auto">
-                        <table class="table w-full">
+                        <table class="table w-full min-w-[640px]">
                             <thead>
                                 <tr>
                                     <th>{{ __('Signature Requester') }}</th>
@@ -58,7 +58,7 @@
                                         </td>
                                         <td>
                                             @if($req->document)
-                                                <a href="{{ route('documents.show', $req->document) }}" class="font-medium text-sm text-base-content no-underline hover:text-primary transition-colors">
+                                                <a href="{{ route('documents.show', $req->document) }}" class="font-medium text-sm text-base-content no-underline hover:text-primary transition-colors break-words">
                                                     {{ $req->document->title }}
                                                 </a>
                                                 <div class="text-xs font-mono text-base-content/50">{{ $req->document->document_number }}</div>
@@ -163,7 +163,7 @@
                     </div>
                 @else
                     <div class="overflow-x-auto">
-                        <table class="table w-full">
+                        <table class="table w-full min-w-[640px]">
                             <thead>
                                 <tr>
                                     <th>{{ __('Target Signature Owner') }}</th>
@@ -182,7 +182,7 @@
                                         </td>
                                         <td>
                                             @if($req->document)
-                                                <a href="{{ route('documents.show', $req->document) }}" class="font-medium text-sm text-base-content no-underline hover:text-primary transition-colors">
+                                                <a href="{{ route('documents.show', $req->document) }}" class="font-medium text-sm text-base-content no-underline hover:text-primary transition-colors break-words">
                                                     {{ $req->document->title }}
                                                 </a>
                                                 <div class="text-xs font-mono text-base-content/50">{{ $req->document->document_number }}</div>

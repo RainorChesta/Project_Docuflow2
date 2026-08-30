@@ -21,8 +21,13 @@
     }
     
     .nav-item-new:hover {
-        background-color: oklch(var(--b2) / 0.6);
-        transform: translateY(-1px);
+        background-color: transparent !important;
+        transform: translateY(-2px);
+        filter: drop-shadow(0px 8px 16px rgba(0, 0, 0, 0.5)) drop-shadow(0px 4px 6px rgba(0, 0, 0, 0.4));
+    }
+    
+    [data-theme='dark'] .nav-item-new:hover {
+        filter: drop-shadow(0px 8px 16px rgba(255, 255, 255, 0.6)) drop-shadow(0px 4px 6px rgba(255, 255, 255, 0.7));
     }
     
     /* Tactile click effect */
@@ -101,10 +106,10 @@
               fixed inset-y-0 left-0 z-50 -translate-x-full 
               lg:static lg:translate-x-0 lg:my-4 lg:ml-4 lg:rounded-[28px] lg:h-[calc(100vh-2rem)]
               overflow-hidden transition-all duration-300 ease-out"
-       :class="open ? 'translate-x-0 w-[240px] max-w-[85vw]' : '-translate-x-full lg:translate-x-0 lg:w-[92px]'">
+       :class="open ? 'translate-x-0 w-[260px] max-w-[85vw]' : '-translate-x-full lg:translate-x-0 lg:w-[92px]'">
     
     <!-- Logo Header -->
-    <div class="h-16 flex items-center shrink-0 overflow-hidden" :class="open ? 'px-6' : 'justify-center px-0'">
+    <div class="h-16 flex items-center shrink-0 overflow-hidden mt-4" :class="open ? 'px-6' : 'justify-center px-0'">
         <div class="w-full flex items-center justify-between" x-show="open">
             <a href="{{ route('dashboard') }}" class="flex items-center gap-4 group">
                 <div class="w-8 h-8 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -112,20 +117,21 @@
                 </div>
                 <span class="font-bold text-lg tracking-tight">{{ config('app.name', 'DokuFlow') }}</span>
             </a>
-            <button type="button" class="btn btn-ghost btn-circle btn-sm hidden lg:flex hover:bg-base-200" @click="toggle()">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" /></svg>
+            <button type="button" class="btn btn-ghost btn-circle btn-sm hover:bg-base-200" @click="toggle()" aria-label="Toggle sidebar">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 lg:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden lg:block" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" /></svg>
             </button>
         </div>
 
-        <button type="button" class="w-full h-full hidden lg:flex items-center justify-center group" x-show="!open" @click="toggle()">
-            <div class="w-10 h-10 flex items-center justify-center transition-all duration-300 group-hover:scale-110">
-                <x-application-logo class="h-7 w-7 text-primary transition-colors shrink-0" />
+        <button type="button" class="w-full h-full hidden lg:flex items-center justify-center group mt-4" x-show="!open" @click="toggle()" aria-label="Expand sidebar">
+            <div class="w-11 h-11 flex items-center justify-center rounded-2xl transition-all duration-300 border border-transparent group-hover:border-primary/50 group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-primary/20 group-hover:-rotate-3 mb-3">
+                <x-application-logo class="h-7 w-7 text-primary transition-all duration-300 shrink-0 group-hover:drop-shadow-sm" />
             </div>
         </button>
     </div>
 
     <!-- Navigation List -->
-    <nav class="flex-1 px-4 mt-6 space-y-1 overflow-y-auto overflow-x-hidden scrollbar-hide">
+    <nav class="flex-1 px-4 mt-2 space-y-1 overflow-y-auto overflow-x-hidden scrollbar-hide">
         
         <span class="px-2 text-[10px] font-extrabold text-base-content/40 uppercase tracking-[0.2em] whitespace-nowrap" :class="open ? 'block' : 'lg:hidden'">Menu</span>
 
@@ -154,6 +160,7 @@
         @endif
 
         @if(!auth()->user()->isAdmin())
+        @if(!auth()->user()->isDirector())
         <a href="{{ route('documents.index', ['type' => 'general']) }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('documents.*') && request('type', '') === 'general' ? 'nav-item-new-active' : '' }}"
@@ -164,6 +171,7 @@
             </div>
             <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Umum') }}</span>
         </a>
+        @endif
 
         <a href="{{ route('documents.index', ['type' => 'mine']) }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
@@ -176,6 +184,7 @@
             <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Saya') }}</span>
         </a>
 
+        @if(!auth()->user()->isDirector())
         <a href="{{ route('documents.index', ['type' => 'shared']) }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('documents.*') && request('type', '') === 'shared' ? 'nav-item-new-active' : '' }}"
@@ -198,7 +207,9 @@
                 @endif
             </span>
         </a>
+        @endif
 
+        @if(!auth()->user()->isDirector())
         <a href="{{ route('documents.index', ['type' => 'division']) }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('documents.*') && request('type', '') === 'division' ? 'nav-item-new-active' : '' }}"
@@ -209,6 +220,7 @@
             </div>
             <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Divisi') }}</span>
         </a>
+        @endif
 
         <a href="{{ route('signatures.requests.index') }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
@@ -271,28 +283,6 @@
             <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Saya') }}</span>
         </a>
 
-        <a href="{{ route('documents.index', ['type' => 'shared']) }}"
-           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
-                  {{ request()->routeIs('documents.*') && request('type', '') === 'shared' ? 'nav-item-new-active' : '' }}"
-           :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
-           :title="open ? '' : 'Shared Documents'">
-            <div class="icon-wrapper shrink-0 relative">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-                @php($adminSharedDocsCount = auth()->user()->sharedDocumentsCount())
-                @if($adminSharedDocsCount > 0)
-                    <span class="absolute -top-1 -right-1 flex h-3 w-3">
-                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
-                      <span class="relative inline-flex rounded-full h-3 w-3 border-2 border-base-100 bg-error"></span>
-                    </span>
-                @endif
-            </div>
-            <span class="text-label whitespace-nowrap flex-1 flex items-center justify-between" :class="open ? '' : 'lg:hidden'">
-                <span>Shared Documents</span>
-                @if($adminSharedDocsCount > 0)
-                    <span class="badge badge-error badge-sm font-bold text-white px-2 shadow-sm shadow-error/50">{{ $adminSharedDocsCount }}</span>
-                @endif
-            </span>
-        </a>
         @endif
 
         @can('admin')

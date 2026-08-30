@@ -16,12 +16,12 @@
 
             {{-- Filters --}}
             <form method="GET" action="{{ route('admin.templates.index') }}" class="mb-4">
-                <div class="flex flex-wrap items-end gap-2">
-                    <div class="form-control">
-                        <input type="text" name="search" value="{{ request('search') }}" placeholder="{{ __('Cari template...') }}" class="input input-bordered input-sm w-56">
+                <div class="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2">
+                    <div class="form-control flex-1 min-w-[180px]">
+                        <input type="text" name="search" value="{{ request('search') }}" placeholder="{{ __('Cari template...') }}" class="input input-bordered input-sm w-full">
                     </div>
                     <div class="form-control">
-                        <select name="document_type_id" class="select select-bordered select-sm">
+                        <select name="document_type_id" class="select select-bordered select-sm w-full sm:w-auto">
                             <option value="">{{ __('Semua Tipe Dokumen') }}</option>
                             @foreach($documentTypes as $dt)
                                 <option value="{{ $dt->id }}" {{ request('document_type_id') == $dt->id ? 'selected' : '' }}>{{ $dt->code }} - {{ $dt->name }}</option>
@@ -29,19 +29,21 @@
                         </select>
                     </div>
                     <div class="form-control">
-                        <select name="status" class="select select-bordered select-sm">
+                        <select name="status" class="select select-bordered select-sm w-full sm:w-auto">
                             <option value="">{{ __('Semua Status') }}</option>
                             <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>{{ __('Aktif') }}</option>
                             <option value="archived" {{ request('status') === 'archived' ? 'selected' : '' }}>{{ __('Diarsipkan') }}</option>
                         </select>
                     </div>
-                    <button type="submit" class="btn btn-sm btn-ghost">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                        {{ __('Filter') }}
-                    </button>
-                    @if(request()->hasAny(['search', 'document_type_id', 'status']))
-                        <a href="{{ route('admin.templates.index') }}" class="btn btn-sm btn-ghost text-base-content/50">{{ __('Reset') }}</a>
-                    @endif
+                    <div class="flex items-center gap-2">
+                        <button type="submit" class="btn btn-sm btn-outline btn-primary">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                            {{ __('Filter') }}
+                        </button>
+                        @if(request()->hasAny(['search', 'document_type_id', 'status']))
+                            <a href="{{ route('admin.templates.index') }}" class="btn btn-sm btn-ghost text-base-content/50">{{ __('Reset') }}</a>
+                        @endif
+                    </div>
                 </div>
             </form>
 

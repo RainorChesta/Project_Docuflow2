@@ -352,4 +352,47 @@ class CompanyAndBranchTest extends TestCase
         $adminResp->assertSee('name="company_id"', false);
         $adminResp->assertSee('name="branch_id"', false);
     }
+
+    public function test_document_scope_modal_preselects_origin_branch_and_syncs_distributions(): void
+    {
+        $companyA = Company::create(['name' => 'PT Alfa', 'code' => 'ALF']);
+        $branchPusatA = Branch::create(['company_id' => $companyA->id, 'name' => 'Pusat Alfa', 'is_pusat' => true]);
+        $division = Division::create(['code' => 'HR', 'name' => 'Human Resources']);
+        $docType = DocumentType::create(['code' => 'S.KEL', 'name' => 'Surat Keluar']);
+
+        $user = User::factory()->create(['division_id' => $division->id]);
+        $user->companies()->sync([$companyA->id]);
+        $user->branches()->sync([$branchPusatA->id]);
+
+        $documentService = app(DocumentService::class);
+        $doc = $documentService->create([
+            'title' => 'Dokumen Scope Test',
+            'document_type_id' => $docType->id,
+            'division_id' => $division->id,
+            'branch_id' => $branchPusatA->id,
+            'company_id' => $companyA->id,
+            'visibility' => Document::VISIBILITY_DIVISION,
+        ], $user->id);
+        $doc->versions()->first()->update(['status' => 'active']);
+
+        // 1. Check document show view renders with the origin branch ID pre-selected in selectedBranches
+        $showResp = $this->actingAs($user)->get(route('documents.show', $doc));
+        $showResp->assertOk();
+        $showResp->assertSee('selectedBranches: [' . $branchPusatA->id . '].map(String)', false);
+
+        // 2. Update visibility to general with target branch
+        $patchResp = $this->actingAs($user)->patch(route('documents.update-visibility', $doc), [
+            'visibility' => 'general',
+            'target_branch_ids' => [$branchPusatA->id],
+        ]);
+        $patchResp->assertRedirect();
+
+        $doc->refresh();
+        $this->assertSame(Document::VISIBILITY_GENERAL, $doc->visibility);
+        $this->assertDatabaseHas('document_distributions', [
+            'document_id' => $doc->id,
+            'target_branch_id' => $branchPusatA->id,
+        ]);
+    }
 }
+

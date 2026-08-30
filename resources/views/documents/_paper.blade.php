@@ -237,6 +237,12 @@
         color: #1a1a1a;
         font-weight: 600;
     }
+    .doku-paper-scope,
+    .doku-paper-scope *,
+    .doku-paper,
+    .doku-paper * {
+        overflow-anchor: none !important;
+    }
         </style>
     @endpush
 @endonce
@@ -270,23 +276,12 @@
 
 @once
 <script>
-    function autoFitDokuPaper(scope, force = false) {
+    function setDokuPaperZoom(scope, zoomLevel = 100) {
         if (!scope) return;
         var paper = scope.querySelector('.doku-paper');
         if (!paper) return;
 
-        if (!force && scope.dataset.manualZoom) return;
-
-        var paperWidth = parseFloat(paper.style.width) || 794;
-        var scopeStyle = getComputedStyle(scope);
-        var paddingX = parseFloat(scopeStyle.paddingLeft) + parseFloat(scopeStyle.paddingRight);
-        var availableWidth = scope.clientWidth - paddingX;
-
-        var zoom = 100;
-        if (availableWidth > 0 && availableWidth < paperWidth) {
-            zoom = Math.floor((availableWidth / paperWidth) * 100);
-        }
-
+        var zoom = Math.max(50, Math.min(200, zoomLevel));
         scope.dataset.zoom = zoom;
         paper.style.zoom = zoom / 100;
         
@@ -300,8 +295,14 @@
     document.addEventListener('click', function (e) {
         var btn = e.target.closest('[data-paper-zoom-in], [data-paper-zoom-out], [data-paper-zoom-reset]');
         if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
         var scope = btn.closest('.doku-paper-scope');
         if (!scope) return;
+        
+        // Find scroll container (<main> or window)
+        var mainEl = btn.closest('main') || document.querySelector('main') || document.documentElement;
+        var btnRectBefore = btn.getBoundingClientRect();
         
         scope.dataset.manualZoom = 'true';
         
@@ -315,28 +316,12 @@
             delete scope.dataset.manualZoom;
         }
         
-        scope.dataset.zoom = zoom;
-        var paper = scope.querySelector('.doku-paper');
-        if (paper) paper.style.zoom = zoom / 100;
-        
-        var label = scope.querySelector('[data-paper-zoom-label]');
-        if (label) label.textContent = zoom + '%';
-        
-        if (btn.hasAttribute('data-paper-zoom-reset')) {
-             autoFitDokuPaper(scope, true);
-        }
-    });
-
-    const paperResizeObserver = new ResizeObserver(function(entries) {
-        entries.forEach(function(entry) {
-            autoFitDokuPaper(entry.target);
-        });
+        setDokuPaperZoom(scope, zoom);
     });
 
     document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.doku-paper-scope').forEach(function(scope) {
-            paperResizeObserver.observe(scope);
-            setTimeout(() => autoFitDokuPaper(scope, true), 100);
+            setDokuPaperZoom(scope, 100);
         });
     });
 
@@ -346,12 +331,10 @@
                 mutation.addedNodes.forEach(function(node) {
                     if (node.nodeType === 1) {
                         if (node.classList && node.classList.contains('doku-paper-scope')) {
-                            paperResizeObserver.observe(node);
-                            setTimeout(() => autoFitDokuPaper(node, true), 10);
+                            setDokuPaperZoom(node, 100);
                         } else if (node.querySelectorAll) {
                             node.querySelectorAll('.doku-paper-scope').forEach(function(scope) {
-                                paperResizeObserver.observe(scope);
-                                setTimeout(() => autoFitDokuPaper(scope, true), 10);
+                                setDokuPaperZoom(scope, 100);
                             });
                         }
                     }

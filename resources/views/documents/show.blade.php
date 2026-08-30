@@ -42,7 +42,7 @@
         @endif
     @endforeach
 
-    <div class="py-6">
+    <div class="pb-6">
         <div class="max-w-7xl mx-auto w-full">
             @if(session('success'))
                 <div class="alert alert-success mb-4">
@@ -136,9 +136,9 @@
             @endphp
             <div class="card bg-base-100 border border-base-300 shadow-sm mb-6 print:hidden">
                 <div class="card-body">
-                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-base-200 pb-4">
-                        <div class="flex items-center gap-2 min-w-0">
-                            <h1 class="text-xl font-bold text-base-content truncate min-w-0">{{ $document->title }}</h1>
+                    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4 border-b border-base-200 pb-4">
+                        <div class="flex items-center flex-wrap gap-2 min-w-0 flex-1">
+                            <h1 class="text-lg sm:text-xl font-bold text-base-content break-words">{{ $document->title }}</h1>
                             @php
                                 $contextService = app(\App\Services\CompanyContextService::class);
                                 $activeBranchId = $contextService->getActiveBranchId(auth()->user());
@@ -148,10 +148,14 @@
                                 <span class="badge badge-secondary badge-sm shrink-0" title="Dokumen Lintas Cabang">↗ Lintas Cabang</span>
                             @endif
                         </div>
-                        <span class="badge badge-outline badge-sm shrink-0">{{ $document->document_number }}</span>
+                        @if($document->document_number)
+                            <div class="shrink-0 self-start sm:self-center">
+                                <span class="badge badge-outline badge-sm font-mono">{{ $document->document_number }}</span>
+                            </div>
+                        @endif
                     </div>
 
-                    <div class="grid grid-cols-2 md:grid-cols-6 gap-x-4 gap-y-5 pt-4 text-sm">
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-4 gap-y-5 pt-4 text-sm">
                         <div>
                             <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Perusahaan / Cabang') }}</span>
                             <p class="font-medium mt-1">
@@ -210,73 +214,79 @@
                         </div>
                     </div>
 
-                    {{-- Actions (di bawah keterangan, sejajar menyamping) --}}
+                    {{-- Actions (di bawah keterangan, sejajar menyamping dalam satu baris, scrollable jika layar sempit) --}}
                     @php $isFileBased = $document->displayVersion()?->file_path; @endphp
-                    <div class="flex flex-wrap items-center gap-2 mt-5 pt-4 border-t border-base-200">
-                        @can('update', $document)
-                            @if(request('saving') == 1)
-                                <a href="{{ route('documents.edit', $document) }}" id="btn-edit-document" class="btn btn-primary btn-sm pointer-events-none opacity-50">
-                                    <span id="spinner-edit-document" class="loading loading-spinner loading-xs"></span>
-                                    <svg id="icon-edit-document" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                    </svg>
-                                    <span id="text-edit-document">{{ __('Menyimpan...') }}</span>
-                                </a>
-                            @else
-                                <a href="{{ route('documents.edit', $document) }}" id="btn-edit-document" class="btn btn-primary btn-sm">
-                                    <span id="spinner-edit-document" class="loading loading-spinner loading-xs hidden"></span>
-                                    <svg id="icon-edit-document" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                    </svg>
-                                    <span id="text-edit-document">{{ __('Edit Dokumen') }}</span>
-                                </a>
+                    <div class="mt-5 pt-4 border-t border-base-200 w-full overflow-x-auto scrollbar-hide touch-pan-x">
+                        <div class="flex items-center justify-center sm:justify-start gap-2 flex-nowrap min-w-max py-1 px-1">
+                            @can('update', $document)
+                                @if(request('saving') == 1)
+                                    <a href="{{ route('documents.edit', $document) }}" id="btn-edit-document" class="btn btn-primary btn-sm pointer-events-none opacity-50 gap-1.5 shrink-0" title="{{ __('Edit Dokumen') }}">
+                                        <span id="spinner-edit-document" class="loading loading-spinner loading-xs"></span>
+                                        <svg id="icon-edit-document" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 hidden shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        <span id="text-edit-document" class="hidden sm:inline">{{ __('Menyimpan...') }}</span>
+                                    </a>
+                                @else
+                                    <a href="{{ route('documents.edit', $document) }}" id="btn-edit-document" class="btn btn-primary btn-sm gap-1.5 shrink-0" title="{{ __('Edit Dokumen') }}">
+                                        <span id="spinner-edit-document" class="loading loading-spinner loading-xs hidden"></span>
+                                        <svg id="icon-edit-document" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        <span id="text-edit-document" class="hidden sm:inline">{{ __('Edit Dokumen') }}</span>
+                                    </a>
+                                @endif
+                            @endcan
+                            <a href="{{ route('documents.download', $document) }}" class="btn btn-outline btn-primary btn-sm gap-1.5 shrink-0" title="{{ __('Download DOCX') }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                                <span class="hidden sm:inline">{{ __('Download DOCX') }}</span>
+                            </a>
+                            @can('manageAccess', $document)
+                                <button type="button" onclick="openShareModal()" class="btn btn-outline btn-primary btn-sm gap-1.5 shrink-0" title="{{ __('Bagikan') }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 0a3 3 0 11-5.367 2.684 3 3 0 015.367-2.684z" /></svg>
+                                    <span class="hidden sm:inline">{{ __('Bagikan') }}</span>
+                                </button>
+                            @endcan
+
+                            <button
+                                type="button"
+                                class="btn btn-ghost btn-sm border border-base-300 gap-1.5 shrink-0"
+                                onclick="openModal('version-modal')"
+                                title="{{ __('Lihat Versi') }} ({{ $document->versions->count() }})"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span class="hidden sm:inline">{{ __('Lihat Versi') }}</span>
+                                <span class="badge badge-ghost badge-xs">{{ $document->versions->count() }}</span>
+                            </button>
+
+                            @can('update', $document)
+                                <button type="button" class="btn btn-ghost btn-sm border border-base-300 gap-1.5 shrink-0" onclick="openModal('scope-modal')" title="{{ __('Ubah Cakupan') }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    <span class="hidden sm:inline">{{ __('Ubah Cakupan') }}</span>
+                                </button>
+                            @endcan
+
+                            {{-- Export to PDF (hanya untuk dokumen hasil editor) --}}
+                            @if(!$isFileBased)
+                                <button type="button" class="btn btn-ghost btn-sm border border-base-300 gap-1.5 shrink-0"
+                                        onclick="openModal('export-pdf-modal')"
+                                        title="{{ __('Export PDF') }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                    <span class="hidden sm:inline">{{ __('Export PDF') }}</span>
+                                </button>
                             @endif
-                        @endcan
-                        <a href="{{ route('documents.download', $document) }}" class="btn btn-outline btn-primary btn-sm">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                            </svg>
-                            {{ __('Download DOCX') }}
-                        </a>
-                        @can('manageAccess', $document)
-                            <button type="button" onclick="openShareModal()" class="btn btn-outline btn-primary btn-sm gap-1.5">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 0a3 3 0 11-5.367 2.684 3 3 0 015.367-2.684z" /></svg>
-                                <span>{{ __('Bagikan') }}</span>
+
+                            <button type="button" class="btn btn-ghost btn-sm border border-base-300 gap-1.5 shrink-0"
+                                    onclick="loadSummary()"
+                                    title="{{ __('Summarize Document') }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                <span class="hidden sm:inline">{{ __('Summarize Document') }}</span>
                             </button>
-                        @endcan
-
-                        <button
-                            type="button"
-                            class="btn btn-ghost btn-sm border border-base-300"
-                            onclick="openModal('version-modal')"
-                        >
-                            {{ __('Lihat Versi') }} ({{ $document->versions->count() }})
-                        </button>
-
-                        @can('update', $document)
-                            <button type="button" class="btn btn-ghost btn-sm border border-base-300" onclick="openModal('scope-modal')">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                {{ __('Ubah Cakupan') }}
-                            </button>
-                        @endcan
-
-                        {{-- Export to PDF (hanya untuk dokumen hasil editor) —
-                             buka modal supaya ukuran kertas bisa dipilih dulu
-                             sebelum export, terpisah dari paper_size tersimpan
-                             di dokumen (lihat #export-pdf-modal). --}}
-                        @if(!$isFileBased)
-                            <button type="button" class="btn btn-ghost btn-sm border border-base-300"
-                                    onclick="openModal('export-pdf-modal')">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                                {{ __('Export PDF') }}
-                            </button>
-                        @endif
-
-                        <button type="button" class="btn btn-ghost btn-sm border border-base-300"
-                                onclick="loadSummary()">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                            {{ __('Summarize Document') }}
-                        </button>
+                        </div>
                     </div>
 
                     @if(session('pdf_export'))
@@ -736,18 +746,26 @@
     </style>
     <script>
         @if($errors->has('file'))
-            document.getElementById('upload-version-modal').showModal();
+            openModal('upload-version-modal');
         @endif
 
         function openModal(modalId) {
             const modal = document.getElementById(modalId);
             if (!modal) return;
-            const scrollPos = window.scrollY;
+            // Teleport dialog to body so focusing elements inside it never causes <main> to scroll
+            if (modal.parentElement !== document.body) {
+                document.body.appendChild(modal);
+            }
             modal.showModal();
-            requestAnimationFrame(() => {
-                window.scrollTo({ top: scrollPos, behavior: 'instant' });
-            });
         }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('dialog.modal').forEach(function(modal) {
+                if (modal.parentElement !== document.body) {
+                    document.body.appendChild(modal);
+                }
+            });
+        });
 
         // ---- Bagikan modal (Google Docs model) ----
         const shareDataUrl = @json(route('shares.data', $document));
@@ -1141,6 +1159,16 @@
             </div>
             @php
                 $currentDistributions = $document->distributions()->pluck('target_branch_id')->toArray();
+                if (empty($currentDistributions)) {
+                    if ($document->branch_id) {
+                        $currentDistributions = [$document->branch_id];
+                    } elseif ($document->company_id) {
+                        $pusatBranch = \App\Models\Branch::where('company_id', $document->company_id)->where('is_pusat', true)->first();
+                        if ($pusatBranch) {
+                            $currentDistributions = [$pusatBranch->id];
+                        }
+                    }
+                }
                 $initialVisibility = $document->visibility;
             @endphp
             <form method="POST" action="{{ route('documents.update-visibility', $document) }}" class="space-y-4" x-data="{ visibility: '{{ $initialVisibility }}' }">
@@ -1310,7 +1338,7 @@
         </form>
     </dialog>
 
-    {{-- Edit restricted modal (dokumen berbasis unggahan) --}}
+    {{-- Edit Restricted Info Modal --}}
     <dialog id="edit-restricted-modal" class="modal">
         <div class="modal-box max-w-md max-h-[85vh] overflow-y-auto">
             <div class="flex flex-wrap items-center justify-between mb-4">
@@ -1329,10 +1357,10 @@
                 <li><span class="font-medium">{{ __('Unggah versi terbaru') }}</span> {{ __('untuk menggantikan isi dokumen saat ini.') }}</li>
             </ul>
             <div class="flex flex-wrap justify-end gap-2">
-                <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('edit-restricted-modal').close(); document.getElementById('version-modal').showModal();">
+                <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('edit-restricted-modal').close(); openModal('version-modal');">
                     {{ __('Lihat Versi') }}
                 </button>
-                <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('edit-restricted-modal').close(); document.getElementById('upload-version-modal').showModal();">
+                <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('edit-restricted-modal').close(); openModal('upload-version-modal');">
                     {{ __('Unggah Versi Terbaru') }}
                 </button>
             </div>

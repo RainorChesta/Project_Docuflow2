@@ -236,12 +236,19 @@ class DocumentController extends Controller
 
         // If a template_id is passed via URL, load the template for auto-fill
         $selectedTemplate = null;
+        $initialDocumentNumber = null;
         if ($templateId = $request->query('template_id')) {
             $selectedTemplate = DocumentTemplate::active()->with('documentType')->find($templateId);
+            if ($selectedTemplate && $selectedTemplate->documentType) {
+                $userDivision = ($user->isAdmin() || $user->isDirector())
+                    ? ($request->filled('division_id') ? Division::find($request->input('division_id')) : null)
+                    : $user->division;
+                $initialDocumentNumber = $this->documentService->previewNumber($userDivision, $selectedTemplate->documentType, $activeBranch);
+            }
         }
 
         return view('documents.create', compact(
-            'divisions', 'documentTypes', 'activeBranch', 'availableBranches', 'selectedTemplate'
+            'divisions', 'documentTypes', 'activeBranch', 'availableBranches', 'selectedTemplate', 'initialDocumentNumber'
         ));
     }
 
@@ -836,6 +843,7 @@ class DocumentController extends Controller
                     if (isset($targetBranches[$targetBranchId])) {
                         $branchUsers = \App\Models\User::whereHas('branches', fn($q) => $q->where('branches.id', $targetBranchId))
                             ->where('is_active', true)
+                            ->where('id', '!=', auth()->id())
                             ->get();
                             
                         $targetBranchName = $targetBranches[$targetBranchId]->name;

@@ -36,14 +36,41 @@
                     }
                     try {
                         const config = @json($onlyOfficeConfig);
-                        const savedY = window.scrollY;
+                        const mainEl = document.querySelector('main') || document.documentElement;
+                        let initialScrollTop = mainEl.scrollTop || 0;
+                        let userHasManuallyScrolled = false;
+
+                        // Listen for genuine user scroll events (mouse wheel, touch, key navigation)
+                        const markUserScrolled = function() {
+                            userHasManuallyScrolled = true;
+                        };
+                        window.addEventListener('wheel', markUserScrolled, { passive: true, capture: true });
+                        window.addEventListener('touchmove', markUserScrolled, { passive: true, capture: true });
+                        window.addEventListener('keydown', function(e) {
+                            if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', 'Space'].includes(e.code)) {
+                                userHasManuallyScrolled = true;
+                            }
+                        }, { passive: true, capture: true });
+
+                        function preventAutofocusScroll() {
+                            if (!userHasManuallyScrolled && mainEl) {
+                                if (mainEl.scrollTop !== initialScrollTop) {
+                                    mainEl.scrollTop = initialScrollTop;
+                                }
+                            }
+                        }
+
+                        // Maintain initial scroll position during ONLYOFFICE initialization window (3.5 seconds)
+                        const scrollGuardInterval = setInterval(preventAutofocusScroll, 30);
+                        setTimeout(function() {
+                            clearInterval(scrollGuardInterval);
+                        }, 3500);
+
                         config.events = config.events || {};
                         const origOnAppReady = config.events.onAppReady;
                         config.events.onAppReady = function() {
-                            if (window.scrollY !== savedY && savedY < 200) {
-                                window.scrollTo({ top: savedY, behavior: 'instant' });
-                            }
                             if (typeof origOnAppReady === 'function') origOnAppReady();
+                            preventAutofocusScroll();
 
                             // Execute macro to resolve pending signatures
                             const approvedSignatures = @json($approvedSignatures ?? []);
@@ -78,9 +105,23 @@
                                 `;
                                 connector.callCommand(new Function(script), function() {
                                     console.log("Pending signatures replaced automatically in preview.");
+                                    preventAutofocusScroll();
                                 });
                             }
                         };
+                        
+                        const origOnDocumentReady = config.events.onDocumentReady;
+                        config.events.onDocumentReady = function() {
+                            preventAutofocusScroll();
+                            setTimeout(preventAutofocusScroll, 50);
+                            setTimeout(preventAutofocusScroll, 150);
+                            setTimeout(preventAutofocusScroll, 300);
+                            setTimeout(preventAutofocusScroll, 600);
+                            setTimeout(preventAutofocusScroll, 1000);
+
+                            if (typeof origOnDocumentReady === 'function') origOnDocumentReady();
+                        };
+
                         window.docEditorPreview = new DocsAPI.DocEditor("docx-preview-{{ $version->id }}", config);
                     } catch (e) {
                         console.error('ONLYOFFICE initialization error:', e);

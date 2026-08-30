@@ -71,7 +71,7 @@
             <!-- Right Area -->
             <div class="flex flex-col flex-1 min-h-0 min-w-0 print:block print:h-auto print:overflow-visible">
                 <!-- Topbar -->
-                <header class="glass-panel h-[60px] flex items-center justify-between px-3 sm:px-6 shrink-0 z-30 lg:mt-4 lg:mr-4 lg:ml-2 mx-4 mt-4 rounded-[20px] transition-all duration-300 print:hidden">
+                <header class="glass-panel h-[60px] flex items-center justify-between px-2.5 sm:px-6 shrink-0 z-30 lg:mt-4 lg:mr-4 lg:ml-2 mx-2 sm:mx-4 mt-2 sm:mt-4 rounded-[20px] transition-all duration-300 print:hidden">
                     <div class="flex items-center gap-2 sm:gap-3 min-w-0">
                         <button type="button"
                                 class="btn btn-ghost btn-circle btn-sm shrink-0 lg:hidden hover:bg-base-200"
@@ -84,11 +84,13 @@
                             {{-- Header title removed per user request, relying on breadcrumbs instead --}}
                         @endisset
                     </div>
-                    <div class="flex items-center gap-1.5">
-                        {{-- Company & Branch Switcher --}}
-                        <div class="hidden sm:block">
+                    <div class="flex items-center gap-1 sm:gap-1.5">
+                        {{-- Company & Branch Switcher: far right on mobile, first on desktop --}}
+                        @if(!auth()->user()->isAdmin())
+                        <div class="order-last md:order-first">
                             <x-company-branch-switcher />
                         </div>
+                        @endif
 
                         {{-- Language Switcher (ID <-> EN) --}}
                         <div class="hover:bg-base-200 rounded-full transition-colors">
@@ -112,7 +114,7 @@
                         </button>
 
                         {{-- Notification Bell --}}
-                        <div class="hover:bg-base-200 rounded-full transition-colors ml-1">
+                        <div class="hover:bg-base-200 rounded-full transition-colors ml-0.5 sm:ml-1">
                             <x-notification-bell />
                         </div>
                     </div>
@@ -121,7 +123,7 @@
                 <!-- Page Content -->
                 <main class="flex-1 {{ request()->routeIs('documents.edit') ? 'p-0 flex flex-col min-h-0' : 'p-3 sm:p-6 overflow-y-auto' }} print:block print:h-auto print:overflow-visible print:p-0">
                     @if(!request()->routeIs('documents.edit'))
-                    <div class="print:hidden">
+                    <div class="print:hidden max-w-7xl mx-auto w-full pt-2 sm:pt-4">
                     @php
                         $crumbs = [];
                         $route = request()->route();

@@ -70,8 +70,8 @@
                     <x-application-logo class="h-8 w-8 text-primary" />
                     <span class="text-xl font-bold tracking-tight">{{ config('app.name', 'DokuFlow') }}</span>
                 </div>
-                <div class="flex items-center gap-6">
-                    <div class="flex items-center gap-2">
+                <div class="flex items-center gap-3 sm:gap-6">
+                    <div class="flex items-center gap-1.5 sm:gap-2">
                         <!-- Language Dropdown -->
                         <div class="dropdown dropdown-end">
                             <label tabindex="0" class="btn btn-ghost btn-circle btn-sm">
@@ -84,13 +84,13 @@
                         </div>
                         <x-theme-toggle />
                     </div>
-                    <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2 sm:gap-4">
                         @auth
-                            <a href="{{ url('/dashboard') }}" class="text-sm font-semibold hover:text-primary transition-colors">Dashboard</a>
+                            <a href="{{ url('/dashboard') }}" class="text-xs sm:text-sm font-semibold hover:text-primary transition-colors">Dashboard</a>
                         @else
-                            <a href="{{ route('login') }}" class="text-sm font-semibold hover:text-primary transition-colors">Log in</a>
+                            <a href="{{ route('login') }}" class="text-xs sm:text-sm font-semibold hover:text-primary transition-colors">Log in</a>
                             @if (Route::has('register'))
-                                <a href="{{ route('register') }}" class="text-sm font-semibold bg-primary text-primary-content px-4 py-2 rounded-full hover:bg-primary/90 transition-colors shadow-sm">Sign up</a>
+                                <a href="{{ route('register') }}" class="text-xs sm:text-sm font-semibold bg-primary text-primary-content px-3 sm:px-4 py-1.5 sm:py-2 rounded-full hover:bg-primary/90 transition-colors shadow-sm">Sign up</a>
                             @endif
                         @endauth
                     </div>
@@ -101,18 +101,18 @@
     @endif
 
     <!-- Hero Section -->
-    <main class="flex-1 relative flex flex-col items-center pt-24 pb-0 px-4 sm:px-6 lg:px-8 overflow-hidden bg-grid-pattern">
+    <main class="flex-1 relative flex flex-col items-center pt-16 sm:pt-24 pb-0 px-4 sm:px-6 lg:px-8 overflow-hidden bg-grid-pattern">
         <!-- Radial gradient to highlight the center and fade the grid -->
         <div class="absolute inset-0 bg-base-100 [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black_70%)] pointer-events-none"></div>
         
         <div class="relative z-10 w-full max-w-4xl mx-auto text-center flex flex-col items-center">
             
-            <div class="inline-flex items-center gap-2 px-3 py-1 mb-8 rounded-full border border-base-300 bg-base-200/50 text-xs font-semibold uppercase tracking-wider text-base-content/80">
+            <div class="inline-flex items-center gap-2 px-3 py-1 mb-6 sm:mb-8 rounded-full border border-base-300 bg-base-200/50 text-xs font-semibold uppercase tracking-wider text-base-content/80">
                 <span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
                 DokuFlow Workflow Engine
             </div>
             
-            <h1 class="text-5xl sm:text-6xl md:text-7xl font-extrabold tracking-tighter leading-[1.05] mb-6">
+            <h1 class="text-3xl sm:text-5xl md:text-7xl font-extrabold tracking-tighter leading-[1.1] sm:leading-[1.05] mb-6">
                 Control your documents. <br class="hidden sm:block"/>
                 <span class="typing-wrapper text-base-content/60 transition-all duration-300 hover:text-transparent hover:bg-clip-text hover:bg-gradient-to-r hover:from-primary hover:to-secondary hover:-translate-y-1 hover:drop-shadow-sm cursor-default">
                     <span class="typing-text" id="typewriter-text"></span>

@@ -97,12 +97,12 @@
          x-transition:leave="transition ease-in duration-150"
          x-transition:leave-start="opacity-100 scale-100 translate-y-0"
          x-transition:leave-end="opacity-0 scale-95 -translate-y-2"
-         class="fixed inset-x-0 top-[10%] z-[61] mx-auto w-full max-w-lg px-4">
+         class="fixed inset-x-0 top-[5%] sm:top-[10%] z-[61] mx-auto w-full max-w-lg px-2 sm:px-4">
 
         <div class="bg-base-100 border border-base-300 rounded-xl shadow-2xl overflow-hidden">
             {{-- Search input and Document Type Filter --}}
             <div class="p-3 border-b border-base-300 space-y-2">
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2 sm:gap-3">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-base-content/40 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
@@ -110,17 +110,17 @@
                            type="text"
                            x-model="query"
                            @input="search(1)"
-                           class="flex-1 bg-transparent border-none outline-none text-base-content placeholder-base-content/40 text-sm"
-                           placeholder="{{ __('Cari dokumen berdasarkan judul atau nomor...') }}" />
+                           class="flex-1 bg-transparent border-none outline-none text-base-content placeholder-base-content/40 text-sm min-w-0"
+                           placeholder="{{ __('Cari judul atau nomor...') }}" />
                     <kbd class="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono font-medium text-base-content/30 bg-base-200 rounded border border-base-300">ESC</kbd>
                 </div>
 
                 {{-- Document Type Quick Filter --}}
                 <div class="flex items-center gap-2 pt-1 border-t border-base-200/60">
-                    <span class="text-xs text-base-content/50">{{ __('Tipe:') }}</span>
+                    <span class="text-xs text-base-content/50 shrink-0">{{ __('Tipe:') }}</span>
                     <select x-model="documentTypeId"
                             @change="search(1)"
-                            class="select select-bordered select-xs text-xs bg-base-200/50">
+                            class="select select-bordered select-xs text-xs bg-base-200/50 max-w-[200px] sm:max-w-none">
                         <option value="">{{ __('Semua tipe dokumen') }}</option>
                         @foreach(\App\Models\DocumentType::orderBy('name')->get() as $dt)
                             <option value="{{ $dt->id }}">{{ $dt->code }} - {{ $dt->name }}</option>

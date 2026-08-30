@@ -69,8 +69,8 @@
                                     <div class="px-4 sm:px-5 py-3.5 flex flex-wrap items-center justify-between gap-2 hover:bg-base-50 transition-colors">
                                         <div class="flex items-center gap-3 min-w-0">
                                             <svg class="w-8 h-8 shrink-0 text-base-content/20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                                            <div class="min-w-0">
-                                                <a href="{{ route('documents.show', $doc) }}" class="text-sm font-medium text-base-content hover:text-primary truncate block">{{ $doc->title }}</a>
+                                            <div class="min-w-0 flex-1">
+                                                <a href="{{ route('documents.show', $doc) }}" class="text-sm font-medium text-base-content hover:text-primary break-words block">{{ $doc->title }}</a>
                                                 <p class="text-xs text-base-content/40 mt-0.5">
                                                     {{ $doc->document_number }} · {{ $doc->division?->code ?? '—' }} · {{ $doc->owner->name }}
                                                 </p>
@@ -155,8 +155,8 @@
                                 <div class="px-4 sm:px-5 py-3.5 flex flex-wrap items-center justify-between gap-2 hover:bg-base-50 transition-colors">
                                     <div class="flex items-center gap-3 min-w-0">
                                         <svg class="w-8 h-8 shrink-0 text-base-content/20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                                        <div class="min-w-0">
-                                            <a href="{{ route('documents.show', $doc) }}" class="text-sm font-medium text-base-content hover:text-primary truncate block">{{ $doc->title }}</a>
+                                        <div class="min-w-0 flex-1">
+                                            <a href="{{ route('documents.show', $doc) }}" class="text-sm font-medium text-base-content hover:text-primary break-words block">{{ $doc->title }}</a>
                                             <p class="text-xs text-base-content/40 mt-0.5">
                                                 {{ $doc->document_number }} · {{ $doc->division?->code ?? '—' }}
                                             </p>
@@ -215,7 +215,7 @@
             </p>
             @if(isset($expiringDocuments) && $expiringDocuments->count() > 0)
                 <div class="overflow-x-auto border border-base-200 rounded-lg">
-                    <table class="table table-sm w-full">
+                    <table class="table table-sm w-full min-w-[500px]">
                         <thead class="bg-base-200/50">
                             <tr>
                                 <th>{{ __('Nomor & Judul') }}</th>

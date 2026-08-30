@@ -19,8 +19,8 @@
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
-    <body class="h-screen h-[100dvh] bg-gradient-to-br from-primary/10 via-base-200 to-secondary/10 font-sans antialiased flex items-center justify-center p-4 overflow-hidden">
-        <div class="card bg-base-100 w-full {{ $size === 'sm' ? 'max-w-sm' : 'max-w-md' }} shadow-2xl border border-base-200 overflow-hidden">
+    <body class="min-h-screen min-h-[100dvh] bg-gradient-to-br from-primary/10 via-base-200 to-secondary/10 font-sans antialiased flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+        <div class="card bg-base-100 w-full {{ $size === 'sm' ? 'max-w-sm' : 'max-w-md' }} shadow-2xl border border-base-200 overflow-hidden my-auto">
             <div class="card-body {{ $size === 'sm' ? 'p-4 sm:p-5' : 'p-4 sm:p-8' }}">
                 <div class="text-center {{ $size === 'sm' ? 'mb-4' : 'mb-6' }} flex flex-col items-center {{ $size === 'sm' ? 'gap-2' : 'gap-3' }}">
                     <div class="self-end -mb-2">
