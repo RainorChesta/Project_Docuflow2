@@ -29,25 +29,30 @@ class SignatureController extends Controller
         // If requesting someone else's signature, check approval
         if ($user->id !== Auth::id()) {
             if (!$documentId) {
-                return response()->json(['success' => false, 'message' => 'ID dokumen diperlukan untuk memeriksa izin.'], 403);
+                return response()->json(['success' => false, 'message' => 'ID DOKUMEN DIPERLUKAN UNTUK MEMERIKSA IZIN.'], 403);
             }
 
-            $requestRecord = SignatureRequest::firstOrCreate([
-                'requester_id' => Auth::id(),
-                'target_user_id' => $user->id,
-                'document_id' => $documentId,
-            ], [
-                'status' => 'pending',
-                'requested_at' => now(),
-            ]);
+            // Find an active (non-used, non-rejected) signature request, or create a new pending request
+            $requestRecord = SignatureRequest::where('requester_id', Auth::id())
+                ->where('target_user_id', $user->id)
+                ->where('document_id', $documentId)
+                ->where('is_used', false)
+                ->whereIn('status', ['pending', 'approved'])
+                ->latest()
+                ->first();
+
+            if (!$requestRecord) {
+                $requestRecord = SignatureRequest::create([
+                    'requester_id' => Auth::id(),
+                    'target_user_id' => $user->id,
+                    'document_id' => $documentId,
+                    'status' => 'pending',
+                    'is_used' => false,
+                    'requested_at' => now(),
+                ]);
+            }
 
             if ($requestRecord->status !== 'approved') {
-                if ($requestRecord->status === 'rejected') {
-                    return response()->json([
-                        'success' => false, 
-                        'message' => 'Permintaan penggunaan tanda tangan telah ditolak oleh pengguna.' 
-                    ], 403);
-                }
 
                 $onlyOfficeService = app(\App\Services\OnlyOfficeService::class);
                 $internalBase = rtrim(config('onlyoffice.internal_url'), '/');
@@ -60,7 +65,7 @@ class SignatureController extends Controller
                     'request_id' => $requestRecord->id,
                     'url' => $placeholderUrl,
                     'token' => $token,
-                    'message' => 'Permintaan penggunaan tanda tangan telah dikirim ke pengguna terkait. Tanda tangan disisipkan sebagai placeholder sementara.',
+                    'message' => 'PERMINTAAN PENGGUNAAN TANDA TANGAN TELAH DIKIRIM KE PENGGUNA TERKAIT. TANDA TANGAN DISISIPKAN SEBAGAI PLACEHOLDER SEMENTARA.',
                 ]);
             }
         }
@@ -82,7 +87,7 @@ class SignatureController extends Controller
             ]);
         }
 
-        return response()->json(['success' => false, 'message' => 'Tanda tangan belum dibuat.'], 404);
+        return response()->json(['success' => false, 'message' => 'TANDA TANGAN BELUM DIBUAT.'], 404);
     }
 
     /**
@@ -99,9 +104,9 @@ class SignatureController extends Controller
 
         if (!$request->filled('signature_data') && !$request->hasFile('signature_image')) {
             if ($request->wantsJson()) {
-                return response()->json(['success' => false, 'message' => 'Silakan gambar atau unggah tanda tangan.'], 422);
+                return response()->json(['success' => false, 'message' => 'SILAKAN GAMBAR ATAU UNGGAH TANDA TANGAN.'], 422);
             }
-            return back()->with('error', 'Silakan gambar atau unggah tanda tangan.');
+            return back()->with('error', 'SILAKAN GAMBAR ATAU UNGGAH TANDA TANGAN.');
         }
 
         $onlyOfficeService = app(\App\Services\OnlyOfficeService::class);
@@ -113,9 +118,9 @@ class SignatureController extends Controller
             $imageData = file_get_contents($file->getRealPath());
             if ($imageData === false) {
                 if ($request->wantsJson()) {
-                    return response()->json(['success' => false, 'message' => 'Gagal membaca file gambar.'], 422);
+                    return response()->json(['success' => false, 'message' => 'GAGAL MEMBACA FILE GAMBAR.'], 422);
                 }
-                return back()->with('error', 'Gagal membaca file gambar.');
+                return back()->with('error', 'GAGAL MEMBACA FILE GAMBAR.');
             }
             $signatureType = 'upload';
         } else {
@@ -123,9 +128,9 @@ class SignatureController extends Controller
 
             if (!preg_match('/^data:image\/(\w+);base64,/', $dataUrl, $type)) {
                 if ($request->wantsJson()) {
-                    return response()->json(['success' => false, 'message' => 'Format gambar tanda tangan tidak valid.'], 422);
+                    return response()->json(['success' => false, 'message' => 'FORMAT GAMBAR TANDA TANGAN TIDAK VALID.'], 422);
                 }
-                return back()->with('error', 'Format gambar tanda tangan tidak valid.');
+                return back()->with('error', 'FORMAT GAMBAR TANDA TANGAN TIDAK VALID.');
             }
 
             $imageData = substr($dataUrl, strpos($dataUrl, ',') + 1);
@@ -133,9 +138,9 @@ class SignatureController extends Controller
 
             if ($imageData === false) {
                 if ($request->wantsJson()) {
-                    return response()->json(['success' => false, 'message' => 'Gagal memproses gambar tanda tangan.'], 422);
+                    return response()->json(['success' => false, 'message' => 'GAGAL MEMPROSES GAMBAR TANDA TANGAN.'], 422);
                 }
-                return back()->with('error', 'Gagal memproses gambar tanda tangan.');
+                return back()->with('error', 'GAGAL MEMPROSES GAMBAR TANDA TANGAN.');
             }
         }
 
@@ -169,7 +174,7 @@ class SignatureController extends Controller
 
             return response()->json([
                 'success'        => true,
-                'message'        => 'Tanda tangan digital berhasil disimpan.',
+                'message'        => 'TANDA TANGAN DIGITAL BERHASIL DISIMPAN.',
                 'url'            => asset('storage/' . $signature->file_path),
                 'onlyoffice_url' => $onlyOfficeUrl,
                 'token'          => $token,
@@ -197,7 +202,7 @@ class SignatureController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'success' => true,
-                'message' => 'Tanda tangan digital berhasil dihapus.',
+                'message' => 'TANDA TANGAN DIGITAL BERHASIL DIHAPUS.',
             ]);
         }
 
@@ -205,16 +210,63 @@ class SignatureController extends Controller
     }
 
     /**
-     * Get list of users with roles for Jodit editor toolbar signature dropdown.
+     * Get list of users with roles and signature request status for a document.
      */
-    public function availableUsers(): JsonResponse
+    public function availableUsers(Request $request): JsonResponse
     {
         $currentUser = Auth::user();
+        $documentId = $request->query('document_id');
+
+        $requestsGrouped = collect();
+        if ($documentId) {
+            $requestsGrouped = SignatureRequest::where('document_id', $documentId)
+                ->where('requester_id', $currentUser->id)
+                ->latest()
+                ->get()
+                ->groupBy('target_user_id');
+        }
+
+        $availableToReplaceCount = 0;
 
         $users = User::with('division')
             ->where('is_active', true)
             ->get()
-            ->map(function ($u) use ($currentUser) {
+            ->map(function ($u) use ($currentUser, $requestsGrouped, &$availableToReplaceCount) {
+                $isMe = $u->id === $currentUser->id;
+                $userRequests = $requestsGrouped->get($u->id, collect());
+
+                // Find approved and unused request if available
+                $approvedAvailableReq = $userRequests->first(fn($r) => $r->isApproved() && !$r->is_used);
+                $pendingReq = $userRequests->first(fn($r) => $r->isPending());
+                $latestReq = $userRequests->first();
+
+                $requestStatus = 'none'; // none, pending, approved, rejected, used
+                $requestId = null;
+                $isAvailableToReplace = false;
+                $availableCredits = 0;
+
+                if ($isMe) {
+                    $requestStatus = 'me';
+                } elseif ($userRequests->isNotEmpty()) {
+                    $availableCredits = $userRequests->filter(fn($r) => $r->isApproved() && !$r->is_used)->count();
+                    $availableToReplaceCount += $availableCredits;
+
+                    if ($approvedAvailableReq) {
+                        $requestId = $approvedAvailableReq->id;
+                        $requestStatus = 'approved';
+                        $isAvailableToReplace = true;
+                    } elseif ($pendingReq) {
+                        $requestId = $pendingReq->id;
+                        $requestStatus = 'pending';
+                    } elseif ($latestReq && $latestReq->is_used) {
+                        $requestId = $latestReq->id;
+                        $requestStatus = 'used';
+                    } elseif ($latestReq && $latestReq->isRejected()) {
+                        $requestId = $latestReq->id;
+                        $requestStatus = 'rejected';
+                    }
+                }
+
                 return [
                     'id' => $u->id,
                     'name' => $u->name,
@@ -225,14 +277,77 @@ class SignatureController extends Controller
                         default => 'Staff',
                     },
                     'division' => $u->division ? $u->division->name : 'Umum',
-                    'is_me' => $u->id === $currentUser->id,
+                    'is_me' => $isMe,
                     'has_signature' => $u->hasSignature(),
-                    'placeholder' => $u->id === $currentUser->id ? '[ttd.me]' : '[ttd:' . $u->name . ']',
+                    'placeholder' => $isMe ? '[ttd.me]' : '[ttd:' . $u->name . ']',
+                    'request_id' => $requestId,
+                    'request_status' => $requestStatus,
+                    'is_available_to_replace' => $isAvailableToReplace,
+                    'available_credits' => $availableCredits,
                 ];
             });
 
         return response()->json([
             'users' => $users,
+            'available_to_replace_count' => $availableToReplaceCount,
+        ]);
+    }
+
+    /**
+     * Consume an approved signature replacement (1-to-1 rule).
+     */
+    public function consume(Request $request, SignatureRequest $signatureRequest): JsonResponse
+    {
+        $currentUser = Auth::user();
+
+        if ($signatureRequest->requester_id !== $currentUser->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki hak untuk menggunakan persetujuan tanda tangan ini.',
+            ], 403);
+        }
+
+        if ($signatureRequest->is_used) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Persetujuan tanda tangan ini sudah pernah digunakan (hanya berlaku 1x penggantian).',
+            ], 422);
+        }
+
+        if (!$signatureRequest->isApproved()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Permintaan tanda tangan belum disetujui.',
+            ], 422);
+        }
+
+        $targetUser = $signatureRequest->targetUser;
+        if (!$targetUser || !$targetUser->hasSignature()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tanda tangan pengguna tidak ditemukan.',
+            ], 404);
+        }
+
+        $signatureRequest->update([
+            'is_used' => true,
+            'used_at' => now(),
+        ]);
+
+        $onlyOfficeService = app(\App\Services\OnlyOfficeService::class);
+        $onlyOfficeUrl = $onlyOfficeService->getSignatureFileUrl($targetUser);
+        $token = $onlyOfficeUrl ? $onlyOfficeService->generateInsertImageToken($onlyOfficeUrl) : null;
+        $sig = $targetUser->signature;
+
+        return response()->json([
+            'success'        => true,
+            'message'        => 'Tanda tangan resmi berhasil dimuat.',
+            'url'            => $onlyOfficeUrl,
+            'token'          => $token,
+            'client_url'     => asset('storage/' . $sig->file_path),
+            'request_id'     => $signatureRequest->id,
+            'target_user_id' => $targetUser->id,
+            'target_user_name' => $targetUser->name,
         ]);
     }
 
@@ -286,7 +401,18 @@ class SignatureController extends Controller
             }
         }
 
-        return back()->with('success', 'Permintaan tanda tangan telah disetujui. Dokumen sedang diperbarui di latar belakang.');
+        $signatureRequest->loadMissing(['requester', 'document', 'targetUser']);
+        if ($signatureRequest->requester && $signatureRequest->document) {
+            $signatureRequest->requester->notify(
+                new \App\Notifications\SignatureRequestApprovedNotification(
+                    $signatureRequest,
+                    $signatureRequest->document,
+                    $signatureRequest->targetUser?->name ?? Auth::user()->name
+                )
+            );
+        }
+
+        return back()->with('success', 'Permintaan tanda tangan telah disetujui.');
     }
 
     /**

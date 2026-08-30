@@ -15,16 +15,20 @@ class SignatureRequest extends Model
         'target_user_id',
         'document_id',
         'status',
+        'is_used',
         'rejected_reason',
         'requested_at',
         'responded_at',
+        'used_at',
     ];
 
     protected function casts(): array
     {
         return [
+            'is_used' => 'boolean',
             'requested_at' => 'datetime',
             'responded_at' => 'datetime',
+            'used_at' => 'datetime',
         ];
     }
 
@@ -56,5 +60,15 @@ class SignatureRequest extends Model
     public function isRejected(): bool
     {
         return $this->status === 'rejected';
+    }
+
+    public function isUsed(): bool
+    {
+        return (bool) $this->is_used;
+    }
+
+    public function isAvailable(): bool
+    {
+        return $this->isApproved() && !$this->is_used;
     }
 }

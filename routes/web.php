@@ -53,6 +53,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/signature-requests', [SignatureController::class, 'requestsIndex'])->name('signatures.requests.index');
     Route::post('/signature-requests/{signatureRequest}/approve', [SignatureController::class, 'approve'])->name('signatures.requests.approve');
     Route::post('/signature-requests/{signatureRequest}/reject', [SignatureController::class, 'reject'])->name('signatures.requests.reject');
+    Route::post('/signature-requests/{signatureRequest}/consume', [SignatureController::class, 'consume'])->name('signatures.requests.consume');
 
     // Documents
     Route::get('/documents/choose', [DocumentController::class, 'choose'])->name('documents.choose');
