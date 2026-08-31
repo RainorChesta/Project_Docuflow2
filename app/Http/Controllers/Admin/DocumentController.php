@@ -207,7 +207,10 @@ class DocumentController extends Controller
 
             $allDivisions = Division::orderBy('name');
             if (!empty($search)) {
-                $allDivisions->where('name', 'like', "%{$search}%");
+                $allDivisions->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('code', 'like', "%{$search}%");
+                });
             }
             $allDivisions = $allDivisions->get();
             
@@ -217,7 +220,7 @@ class DocumentController extends Controller
                     'id' => $div->id,
                     'type' => 'division',
                     'name' => $div->name,
-                    'code' => $div->code,
+                    'code' => strtoupper($div->code),
                     'doc_count' => $count,
                     'url' => route('admin.documents.index', array_filter([
                         'company_id' => $selectedCompanyId,

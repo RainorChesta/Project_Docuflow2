@@ -263,6 +263,15 @@
                 </div>
             </div>
 
+            {{-- Signature Search Input --}}
+            <div class="relative mb-3">
+                <input type="text" id="signature-search-input" oninput="filterSignatureUsers(this.value)" placeholder="{{ __('Cari tanda tangan (nama, peran, divisi)...') }}" class="input input-bordered input-sm w-full pl-9 pr-8 bg-base-100 focus:border-primary focus:ring-1 focus:ring-primary text-xs sm:text-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <button type="button" id="signature-search-clear" onclick="clearSignatureSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content text-xs p-1">✕</button>
+            </div>
+
             <div id="signature-users-list" class="space-y-2.5 max-h-80 overflow-y-auto pr-1">
                 <div class="flex justify-center py-6 text-sm text-base-content/60">
                     <span class="loading loading-spinner loading-sm mr-2"></span> {{ __('MEMUAT PENGGUNA...') }}
@@ -524,17 +533,24 @@
                 }
             }
 
+            let allSignatureUsersData = [];
+
             function openSignatureSelectorModal() {
                 const modal = document.getElementById('signature-users-modal');
                 const list = document.getElementById('signature-users-list');
                 const badge = document.getElementById('signature-available-count-badge');
                 const badgeText = document.getElementById('signature-available-count-text');
+                const searchInput = document.getElementById('signature-search-input');
+                if (searchInput) searchInput.value = '';
+                const clearBtn = document.getElementById('signature-search-clear');
+                if (clearBtn) clearBtn.classList.add('hidden');
+
                 modal.showModal();
 
                 fetch('{{ route("signatures.users") }}?document_id={{ $document->id }}')
                     .then(res => res.json())
                     .then(data => {
-                        const users = data.users || [];
+                        allSignatureUsersData = data.users || [];
                         const availableCount = data.available_to_replace_count || 0;
 
                         if (badge && badgeText) {
@@ -546,73 +562,129 @@
                             }
                         }
 
-                        if (users.length === 0) {
-                            list.innerHTML = '<p class="text-sm text-base-content/60 text-center py-4 uppercase">{{ __("TIDAK ADA PENGGUNA DITEMUKAN.") }}</p>';
-                            return;
-                        }
-
-                        list.innerHTML = users.map(u => {
-                            let actionHtml = '';
-
-                            if (!u.has_signature) {
-                                actionHtml = `<span class="text-xs text-base-content/40 italic uppercase">{{ __('BELUM ADA TTD') }}</span>`;
-                            } else if (u.is_me) {
-                                actionHtml = `<button type="button" onclick="insertMySignature()" class="btn btn-xs btn-primary gap-1 uppercase font-bold">{{ __('SISIPKAN TTD SAYA') }}</button>`;
-                            } else if (u.is_available_to_replace) {
-                                const creditLabel = u.available_credits > 1 ? ` (${u.available_credits}X)` : '';
-                                actionHtml = `
-                                    <div class="flex items-center gap-1.5">
-                                        <span class="badge badge-success badge-xs font-bold uppercase">{{ __('DISETUJUI') }}${creditLabel}</span>
-                                        <button type="button" onclick="consumeSignatureReplacement(${u.request_id}, '${u.name}')" class="btn btn-xs btn-success text-white gap-1 shadow-sm font-bold uppercase">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                            {{ __('GANTI TTD') }}
-                                        </button>
-                                    </div>
-                                `;
-                            } else if (u.request_status === 'pending') {
-                                actionHtml = `
-                                    <span class="badge badge-warning badge-xs gap-1 py-2 px-2.5 font-bold uppercase">
-                                        ⏳ {{ __('MENUNGGU PERSETUJUAN') }}
-                                    </span>
-                                `;
-                            } else if (u.request_status === 'used') {
-                                actionHtml = `
-                                    <div class="flex items-center gap-1.5">
-                                        <span class="badge badge-ghost badge-xs text-base-content/60 gap-1 py-2 px-2 font-bold uppercase">
-                                            ✓ {{ __('SUDAH DIGUNAKAN') }}
-                                        </span>
-                                        <button type="button" onclick="fetchUserSignatureAndInsert(${u.id}, '${u.name}')" class="btn btn-xs btn-outline btn-primary gap-1 uppercase font-bold">
-                                            {{ __('MINTA LAGI') }}
-                                        </button>
-                                    </div>
-                                `;
-                            } else {
-                                actionHtml = `
-                                    <button type="button" onclick="fetchUserSignatureAndInsert(${u.id}, '${u.name}')" class="btn btn-xs btn-outline btn-primary gap-1 uppercase font-bold">
-                                        {{ __('MINTA TTD') }}
-                                    </button>
-                                `;
-                            }
-
-                            return `
-                                <div class="flex items-center justify-between p-2.5 rounded-xl border border-base-200 hover:bg-base-200/40 transition-all ${u.is_available_to_replace ? 'bg-success/5 border-success/30' : ''}">
-                                    <div class="pr-2">
-                                        <div class="flex items-center gap-1.5 mb-0.5">
-                                            <p class="text-sm font-semibold leading-tight text-base-content uppercase">${u.name}</p>
-                                            ${u.is_me ? '<span class="badge badge-primary badge-xs uppercase font-bold">Saya</span>' : ''}
-                                        </div>
-                                        <p class="text-xs text-base-content/60 uppercase">${u.role} &bull; ${u.division}</p>
-                                    </div>
-                                    <div class="shrink-0">
-                                        ${actionHtml}
-                                    </div>
-                                </div>
-                            `;
-                        }).join('');
+                        renderSignatureUsersList(allSignatureUsersData);
                     })
                     .catch(err => {
                         list.innerHTML = '<p class="text-sm text-error text-center py-4 uppercase">{{ __("GAGAL MEMUAT PENGGUNA.") }}</p>';
                     });
+            }
+
+            function filterSignatureUsers(query) {
+                const clearBtn = document.getElementById('signature-search-clear');
+                if (clearBtn) {
+                    clearBtn.classList.toggle('hidden', !query);
+                }
+                const q = (query || '').toLowerCase().trim();
+                const filtered = allSignatureUsersData.filter(u => {
+                    if (!q) return true;
+                    return (u.name && u.name.toLowerCase().includes(q)) ||
+                           (u.email && u.email.toLowerCase().includes(q)) ||
+                           (u.role && u.role.toLowerCase().includes(q)) ||
+                           (u.division && u.division.toLowerCase().includes(q)) ||
+                           (u.rejected_reason && u.rejected_reason.toLowerCase().includes(q));
+                });
+                renderSignatureUsersList(filtered);
+            }
+
+            function clearSignatureSearch() {
+                const searchInput = document.getElementById('signature-search-input');
+                if (searchInput) {
+                    searchInput.value = '';
+                    filterSignatureUsers('');
+                }
+            }
+
+            function renderSignatureUsersList(users) {
+                const list = document.getElementById('signature-users-list');
+                if (!list) return;
+
+                if (!users || users.length === 0) {
+                    list.innerHTML = '<p class="text-sm text-base-content/60 text-center py-6 uppercase">{{ __("TIDAK ADA PENGGUNA DITEMUKAN.") }}</p>';
+                    return;
+                }
+
+                list.innerHTML = users.map(u => {
+                    let actionHtml = '';
+
+                    if (!u.has_signature) {
+                        actionHtml = `<span class="text-xs text-base-content/40 italic uppercase">{{ __('BELUM ADA TTD') }}</span>`;
+                    } else if (u.is_me) {
+                        actionHtml = `<button type="button" onclick="insertMySignature()" class="btn btn-xs btn-primary gap-1 uppercase font-bold">{{ __('SISIPKAN TTD SAYA') }}</button>`;
+                    } else if (u.is_available_to_replace) {
+                        const creditLabel = u.available_credits > 1 ? ` (${u.available_credits}X)` : '';
+                        actionHtml = `
+                            <div class="flex items-center gap-1.5">
+                                <span class="badge badge-success badge-xs font-bold uppercase">{{ __('DISETUJUI') }}${creditLabel}</span>
+                                <button type="button" onclick="consumeSignatureReplacement(${u.request_id}, '${u.name}')" class="btn btn-xs btn-success text-white gap-1 shadow-sm font-bold uppercase">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                    {{ __('GANTI TTD') }}
+                                </button>
+                            </div>
+                        `;
+                    } else if (u.request_status === 'pending') {
+                        actionHtml = `
+                            <span class="badge badge-warning badge-xs gap-1 py-2 px-2.5 font-bold uppercase">
+                                ⏳ {{ __('MENUNGGU PERSETUJUAN') }}
+                            </span>
+                        `;
+                    } else if (u.request_status === 'rejected') {
+                        actionHtml = `
+                            <div class="flex items-center gap-1.5">
+                                <span class="badge badge-error badge-xs gap-1 py-1 px-2 font-bold uppercase text-white">
+                                    ✕ {{ __('Ditolak') }}
+                                </span>
+                                <button type="button" onclick="fetchUserSignatureAndInsert(${u.id}, '${u.name}')" class="btn btn-xs btn-outline btn-error gap-1 uppercase font-bold">
+                                    {{ __('MINTA LAGI') }}
+                                </button>
+                            </div>
+                        `;
+                    } else if (u.request_status === 'used') {
+                        actionHtml = `
+                            <div class="flex items-center gap-1.5">
+                                <span class="badge badge-ghost badge-xs text-base-content/60 gap-1 py-2 px-2 font-bold uppercase">
+                                    ✓ {{ __('SUDAH DIGUNAKAN') }}
+                                </span>
+                                <button type="button" onclick="fetchUserSignatureAndInsert(${u.id}, '${u.name}')" class="btn btn-xs btn-outline btn-primary gap-1 uppercase font-bold">
+                                    {{ __('MINTA LAGI') }}
+                                </button>
+                            </div>
+                        `;
+                    } else {
+                        actionHtml = `
+                            <button type="button" onclick="fetchUserSignatureAndInsert(${u.id}, '${u.name}')" class="btn btn-xs btn-outline btn-primary gap-1 uppercase font-bold">
+                                {{ __('MINTA TTD') }}
+                            </button>
+                        `;
+                    }
+
+                    const reasonHtml = (u.request_status === 'rejected' && u.rejected_reason)
+                        ? `<div class="mt-1.5 p-2 rounded-lg bg-error/10 border border-error/20 text-xs text-error font-medium flex items-start gap-1.5">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
+                                <div>
+                                    <span class="font-bold">{{ __('Alasan:') }}</span>
+                                    <span>${u.rejected_reason}</span>
+                                </div>
+                           </div>`
+                        : '';
+
+                    return `
+                        <div class="flex flex-col p-2.5 rounded-xl border border-base-200 hover:bg-base-200/40 transition-all ${u.is_available_to_replace ? 'bg-success/5 border-success/30' : (u.request_status === 'rejected' ? 'bg-error/5 border-error/20' : '')}">
+                            <div class="flex items-center justify-between">
+                                <div class="pr-2">
+                                    <div class="flex items-center gap-1.5 mb-0.5">
+                                        <p class="text-sm font-semibold leading-tight text-base-content uppercase">${u.name}</p>
+                                        ${u.is_me ? '<span class="badge badge-primary badge-xs uppercase font-bold">Saya</span>' : ''}
+                                    </div>
+                                    <p class="text-xs text-base-content/60 uppercase">${u.role} &bull; ${u.division}</p>
+                                </div>
+                                <div class="shrink-0">
+                                    ${actionHtml}
+                                </div>
+                            </div>
+                            ${reasonHtml}
+                        </div>
+                    `;
+                }).join('');
             }
 
             function consumeSignatureReplacement(requestId, userName) {
@@ -735,7 +807,7 @@
                     });
             }
 
-            // Real-time Echo Listener for signature approval notifications on screen
+            // Real-time Echo Listener for signature approval and rejection notifications on screen
             document.addEventListener('DOMContentLoaded', function() {
                 if (typeof window.Echo !== 'undefined') {
                     window.Echo.private('App.Models.User.{{ auth()->id() }}')
@@ -745,6 +817,12 @@
                                     'TANDA TANGAN TELAH DISETUJUI',
                                     (notification.message || 'TANDA TANGAN TELAH DISETUJUI OLEH PEMILIK TTD. SILAKAN BUKA MENU TANDA TANGAN UNTUK MELAKUKAN REPLACE SIGNATURE.').toUpperCase(),
                                     true
+                                );
+                            } else if (notification.type === 'signature_request_rejected' && notification.document_id == {{ $document->id }}) {
+                                showSignatureScreenAlert(
+                                    'PERMINTAAN TANDA TANGAN DITOLAK',
+                                    (notification.message || 'PERMINTAAN TANDA TANGAN TELAH DITOLAK OLEH PEMILIK TTD.').toUpperCase(),
+                                    false
                                 );
                             }
                         });

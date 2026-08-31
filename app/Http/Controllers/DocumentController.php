@@ -305,13 +305,13 @@ class DocumentController extends Controller
                 'string',
                 'max:100',
                 'unique:documents,document_number',
-                // Format resmi: seq/tipe/divisi/pusat/bulan-romawi/tahun
-                'regex:/^\d{3}\/[A-Z0-9.\-]+\/[A-Z0-9.\-]+\/[A-Z0-9.\-]+\/(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII)\/\d{4}$/',
+                // Format resmi: seq/tipe/divisi/pusat/bulan-romawi/tahun (non-SOP) atau seq/SOP/pusat/bulan-romawi/tahun (SOP)
+                'regex:/^\d{3}\/[A-Z0-9.\-]+(?:\/[A-Z0-9.\-]+){1,2}\/(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII)\/\d{4}$/',
             ];
         }
 
         $validated = $request->validate($rules, [
-            'document_number.regex' => 'Format nomor tidak sesuai. Contoh: 029/S.ED/HRD/JBM/VIII/2026',
+            'document_number.regex' => 'Format nomor tidak sesuai. Contoh: 029/S.ED/HRD/JBM/VIII/2026 atau 001/SOP/JBM/VIII/2026',
         ]);
 
         $validated['division_id'] = ($user->isAdmin() || $user->isDirector())

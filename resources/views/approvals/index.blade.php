@@ -48,12 +48,35 @@
                                 <a href="{{ route('documents.preview', ['document' => $doc, 'from' => 'approvals']) }}" class="btn btn-ghost btn-sm btn-square text-base-content/60 hover:text-primary hover:bg-primary/10" title="{{ __('Pratinjau') }}">
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="size-4"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
                                 </a>
-                                <form method="POST" action="{{ route('approvals.rollback-request.reject', $doc) }}" class="inline">
-                                    @csrf
-                                    <button class="btn btn-ghost btn-sm btn-square text-base-content/60 hover:text-error hover:bg-error/10" title="{{ __('Tolak') }}">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                    </button>
-                                </form>
+                                <button type="button" onclick="document.getElementById('reject-rollback-modal-{{ $doc->id }}').showModal()" class="btn btn-ghost btn-sm btn-square text-base-content/60 hover:text-error hover:bg-error/10" title="{{ __('Tolak') }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+
+                                {{-- Reject Rollback Modal --}}
+                                <dialog id="reject-rollback-modal-{{ $doc->id }}" class="modal text-left">
+                                    <div class="modal-box">
+                                        <h3 class="font-bold text-lg text-base-content">{{ __('Tolak Permintaan Rollback') }}</h3>
+                                        <p class="py-2 text-sm text-base-content/70">
+                                            {!! __('Tolak permintaan rollback dokumen :doc ke versi v:ver?', ['doc' => '<strong>'.$doc->title.'</strong>', 'ver' => '<strong>'.$doc->pendingRollbackVersion->version_number.'</strong>']) !!}
+                                        </p>
+                                        <form method="POST" action="{{ route('approvals.rollback-request.reject', $doc) }}">
+                                            @csrf
+                                            <div class="form-control mb-4">
+                                                <label class="label">
+                                                    <span class="label-text font-medium">{{ __('Catatan / Alasan Penolakan (Opsional)') }}</span>
+                                                </label>
+                                                <textarea name="notes" class="textarea textarea-bordered w-full text-sm" rows="3" placeholder="{{ __('Tuliskan alasan penolakan untuk pemohon...') }}"></textarea>
+                                            </div>
+                                            <div class="modal-action">
+                                                <button type="button" onclick="document.getElementById('reject-rollback-modal-{{ $doc->id }}').close()" class="btn btn-ghost">{{ __('Batal') }}</button>
+                                                <button type="submit" class="btn btn-error text-white">{{ __('Tolak Rollback') }}</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                    <form method="dialog" class="modal-backdrop">
+                                        <button>{{ __('Batal') }}</button>
+                                    </form>
+                                </dialog>
                                 <form method="POST" action="{{ route('approvals.rollback-request.approve', $doc) }}" class="inline">
                                     @csrf
                                     <button class="btn btn-ghost btn-sm btn-square text-base-content/60 hover:text-success hover:bg-success/10" title="{{ __('Setujui') }}" onclick="return confirm('{{ __('Setujui rollback ke v:version?', ['version' => $doc->pendingRollbackVersion->version_number]) }}')">
@@ -93,12 +116,35 @@
                                 <a href="{{ route('documents.preview', ['document' => $version->document, 'from' => 'approvals']) }}" class="btn btn-ghost btn-sm btn-square text-base-content/60 hover:text-primary hover:bg-primary/10" title="{{ __('Pratinjau') }}">
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="size-4"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
                                 </a>
-                                <form method="POST" action="{{ route('approvals.reject', [$version->document, $version]) }}" class="inline">
-                                    @csrf
-                                    <button class="btn btn-ghost btn-sm btn-square text-base-content/60 hover:text-error hover:bg-error/10" title="{{ __('Tolak') }}">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                    </button>
-                                </form>
+                                <button type="button" onclick="document.getElementById('reject-version-modal-{{ $version->id }}').showModal()" class="btn btn-ghost btn-sm btn-square text-base-content/60 hover:text-error hover:bg-error/10" title="{{ __('Tolak') }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+
+                                {{-- Reject Version Modal --}}
+                                <dialog id="reject-version-modal-{{ $version->id }}" class="modal text-left">
+                                    <div class="modal-box">
+                                        <h3 class="font-bold text-lg text-base-content">{{ __('Tolak Dokumen') }}</h3>
+                                        <p class="py-2 text-sm text-base-content/70">
+                                            {!! __('Tolak dokumen :doc (v:ver) yang diajukan oleh :author?', ['doc' => '<strong>'.$version->document->title.'</strong>', 'ver' => '<strong>'.$version->version_number.'</strong>', 'author' => '<strong>'.$version->author_name.'</strong>']) !!}
+                                        </p>
+                                        <form method="POST" action="{{ route('approvals.reject', [$version->document, $version]) }}">
+                                            @csrf
+                                            <div class="form-control mb-4">
+                                                <label class="label">
+                                                    <span class="label-text font-medium">{{ __('Catatan / Alasan Penolakan (Opsional)') }}</span>
+                                                </label>
+                                                <textarea name="notes" class="textarea textarea-bordered w-full text-sm" rows="3" placeholder="{{ __('Tuliskan catatan atau masukan perbaikan...') }}"></textarea>
+                                            </div>
+                                            <div class="modal-action">
+                                                <button type="button" onclick="document.getElementById('reject-version-modal-{{ $version->id }}').close()" class="btn btn-ghost">{{ __('Batal') }}</button>
+                                                <button type="submit" class="btn btn-error text-white">{{ __('Tolak Dokumen') }}</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                    <form method="dialog" class="modal-backdrop">
+                                        <button>{{ __('Batal') }}</button>
+                                    </form>
+                                </dialog>
                                 <form method="POST" action="{{ route('approvals.approve', [$version->document, $version]) }}" class="inline">
                                     @csrf
                                     <button class="btn btn-ghost btn-sm btn-square text-base-content/60 hover:text-success hover:bg-success/10" title="{{ __('Setujui') }}" onclick="return confirm('{{ __('Setujui dokumen ini?') }}')">

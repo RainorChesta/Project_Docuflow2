@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Division;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\Signature;
@@ -192,5 +193,53 @@ class DigitalSignatureTest extends TestCase
         $secondConsumeResp = $this->actingAs($requester)->postJson(route('signatures.requests.consume', $sigRequest));
         $secondConsumeResp->assertStatus(422)
             ->assertJson(['success' => false]);
+    }
+
+    public function test_requester_receives_notification_when_signature_request_is_rejected(): void
+    {
+        \Illuminate\Support\Facades\Notification::fake();
+
+        $division = Division::create(['name' => 'IT Dept', 'code' => 'IT']);
+        $requester = User::factory()->create(['division_id' => $division->id, 'name' => 'Requester User']);
+        $targetUser = User::factory()->create(['division_id' => $division->id, 'name' => 'Signer User']);
+
+        $docType = DocumentType::create(['name' => 'Surat Keputusan', 'code' => 'SK']);
+        $document = Document::create([
+            'document_number' => '003/SK/DIV/2026',
+            'title' => 'Document Requiring Signature',
+            'document_type_id' => $docType->id,
+            'owner_id' => $requester->id,
+            'visibility' => 'general',
+        ]);
+
+        $sigRequest = SignatureRequest::create([
+            'requester_id' => $requester->id,
+            'target_user_id' => $targetUser->id,
+            'document_id' => $document->id,
+            'status' => 'pending',
+            'requested_at' => now(),
+        ]);
+
+        // Target user rejects request with reason
+        $response = $this->actingAs($targetUser)->post(route('signatures.requests.reject', $sigRequest), [
+            'reason' => 'Draft needs more detail',
+        ]);
+
+        $response->assertSessionHas('success');
+        $this->assertTrue($sigRequest->fresh()->isRejected());
+        $this->assertSame('Draft needs more detail', $sigRequest->fresh()->rejected_reason);
+
+        // Assert requester received rejection notification
+        \Illuminate\Support\Facades\Notification::assertSentTo(
+            $requester,
+            \App\Notifications\SignatureRequestRejectedNotification::class,
+            function ($notification) use ($document, $targetUser) {
+                $data = $notification->toArray($targetUser);
+                return $data['type'] === 'signature_request_rejected'
+                    && $data['icon'] === 'rejected'
+                    && $data['document_id'] === $document->id
+                    && $data['reason'] === 'Draft needs more detail';
+            }
+        );
     }
 }

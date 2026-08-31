@@ -18,29 +18,45 @@ class ContextSwitchController extends Controller
     /**
      * Switch active company and/or branch.
      */
-    public function switch(Request $request): RedirectResponse
+    public function switch(Request $request): RedirectResponse|JsonResponse
     {
         $user = auth()->user();
         $validated = $request->validate([
-            'company_id' => 'required|exists:companies,id',
-            'branch_id' => 'nullable|exists:branches,id',
+            'company_id' => 'required',
+            'branch_id' => 'nullable',
         ]);
 
         $companyId = (int) $validated['company_id'];
-        
+        $company = Company::find($companyId);
+
+        if (!$company) {
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['error' => __('Perusahaan tidak ditemukan.')], 404);
+            }
+            return back()->with('error', __('Perusahaan tidak ditemukan.'));
+        }
+
         // Authorize company
         if (!$user->isAdmin() && !$user->companies()->where('companies.id', $companyId)->exists()) {
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['error' => __('Akses perusahaan tidak diizinkan.')], 403);
+            }
             return back()->with('error', __('Akses perusahaan tidak diizinkan.'));
         }
 
         session(['active_company_id' => $companyId]);
 
         $branchId = $validated['branch_id'] ?? null;
-        if ($branchId) {
-            $branch = Branch::where('id', $branchId)->where('company_id', $companyId)->first();
-            if ($branch) {
-                if ($user->isAdmin() || $user->branches()->where('branches.id', $branch->id)->exists()) {
-                    session(['active_branch_id' => $branch->id]);
+        if (!empty($branchId) && is_numeric($branchId)) {
+            $branch = Branch::where('id', (int) $branchId)->where('company_id', $companyId)->first();
+            if ($branch && ($user->isAdmin() || $user->branches()->where('branches.id', $branch->id)->exists())) {
+                session(['active_branch_id' => $branch->id]);
+            } else {
+                $defaultBranch = $this->contextService->getAvailableBranches($user, $companyId)->first();
+                if ($defaultBranch) {
+                    session(['active_branch_id' => $defaultBranch->id]);
+                } else {
+                    session()->forget('active_branch_id');
                 }
             }
         } else {
@@ -53,7 +69,57 @@ class ContextSwitchController extends Controller
             }
         }
 
-        return back()->with('success', __('Konteks perusahaan & cabang berhasil dialihkan.'));
+        session()->save();
+
+        // If switching while viewing/editing a document not belonging to the new context,
+        // redirect to documents index instead of throwing a 403 error.
+        $referer = $request->headers->get('referer');
+        $destination = null;
+
+        if ($referer) {
+            $refererPath = parse_url($referer, PHP_URL_PATH) ?? '';
+            if (preg_match('#/documents/(\d+)(/edit|/preview)?#', $refererPath, $matches)) {
+                $docId = (int) $matches[1];
+                $doc = \App\Models\Document::find($docId);
+                if ($doc) {
+                    $activeBranchId = session('active_branch_id');
+                    $activeCompanyId = session('active_company_id');
+                    $docInScope = false;
+
+                    if ($user->isAdmin() || $user->isDirector()) {
+                        $docInScope = true;
+                    } elseif ($activeBranchId && (int) $doc->branch_id === (int) $activeBranchId) {
+                        $docInScope = true;
+                    } elseif (!$doc->branch_id && $activeCompanyId && (int) $doc->company_id === (int) $activeCompanyId) {
+                        $docInScope = true;
+                    } elseif ($activeBranchId && $doc->distributions()->where('target_branch_id', $activeBranchId)->exists()) {
+                        $docInScope = true;
+                    }
+
+                    if ($docInScope) {
+                        $destination = $referer;
+                    } else {
+                        $destination = route('documents.index');
+                    }
+                }
+            }
+        }
+
+        if (!$destination) {
+            $destination = $referer ?: route('dashboard');
+        }
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => __('Konteks perusahaan & cabang berhasil dialihkan.'),
+                'active_company_id' => session('active_company_id'),
+                'active_branch_id' => session('active_branch_id'),
+                'redirect' => $destination,
+            ]);
+        }
+
+        return redirect()->to($destination)->with('success', __('Konteks perusahaan & cabang berhasil dialihkan.'));
     }
 
     /**

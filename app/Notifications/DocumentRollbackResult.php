@@ -8,15 +8,15 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
 
 /**
- * Sent to the document author when their version is approved or rejected.
+ * Sent to the rollback requester when their rollback request is approved or rejected.
  */
-class DocumentApprovalResult extends Notification
+class DocumentRollbackResult extends Notification
 {
     use Queueable;
 
     public function __construct(
         public Document $document,
-        public DocumentVersion $version,
+        public ?DocumentVersion $targetVersion,
         public string $status, // 'approved' | 'rejected'
         public string $reviewerName,
         public ?string $notes = null,
@@ -30,21 +30,21 @@ class DocumentApprovalResult extends Notification
     public function toArray(object $notifiable): array
     {
         $isApproved = $this->status === 'approved';
-        $title = $isApproved ? __('Dokumen Disetujui') : __('Dokumen Ditolak');
+        $verNum = $this->targetVersion?->version_number ?? '?';
+        $title = $isApproved ? __('Rollback Disetujui') : __('Rollback Ditolak');
         $message = $isApproved
-            ? __('Dokumen ":doc" (v:ver) Anda telah disetujui oleh :reviewer.', [
+            ? __('Permintaan rollback dokumen ":doc" (v:ver) telah disetujui oleh :reviewer.', [
                 'doc'      => $this->document->title,
-                'ver'      => $this->version->version_number,
+                'ver'      => $verNum,
                 'reviewer' => $this->reviewerName,
             ])
-            : __('Dokumen ":doc" (v:ver) Anda ditolak oleh :reviewer.', [
+            : __('Permintaan rollback dokumen ":doc" ditolak oleh :reviewer.', [
                 'doc'      => $this->document->title,
-                'ver'      => $this->version->version_number,
                 'reviewer' => $this->reviewerName,
             ]);
 
         return [
-            'type'        => 'approval_result',
+            'type'        => $isApproved ? 'rollback_approved' : 'rollback_rejected',
             'title'       => $title,
             'message'     => $message,
             'url'         => route('documents.show', $this->document),
@@ -60,5 +60,3 @@ class DocumentApprovalResult extends Notification
         return $this->toArray($notifiable);
     }
 }
-
-

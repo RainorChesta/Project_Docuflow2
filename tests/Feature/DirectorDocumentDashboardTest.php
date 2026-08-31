@@ -232,4 +232,28 @@ class DirectorDocumentDashboardTest extends TestCase
         $gridResp->assertOk();
         $gridResp->assertSee('Sample View Document');
     }
+
+    public function test_director_can_switch_folder_view_mode_for_divisions(): void
+    {
+        // 1. Division Folders in List view
+        $listResp = $this->actingAs($this->director)->get(route('director.documents.index', [
+            'company_id' => $this->company->id,
+            'branch_id' => $this->cabangBranch->id,
+            'view_mode' => 'list',
+        ]));
+        $listResp->assertOk();
+        $listResp->assertSee('Nama Divisi');
+        $listResp->assertSee('Human Resources Department');
+        $listResp->assertSee('HRD');
+
+        // 2. Division Folders in Grid view
+        $gridResp = $this->actingAs($this->director)->get(route('director.documents.index', [
+            'company_id' => $this->company->id,
+            'branch_id' => $this->cabangBranch->id,
+            'view_mode' => 'grid',
+        ]));
+        $gridResp->assertOk();
+        $gridResp->assertSee('Human Resources Department');
+        $gridResp->assertSee('HRD');
+    }
 }

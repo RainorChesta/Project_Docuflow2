@@ -91,6 +91,7 @@
                 signature: `<path stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z' />`,
                 document: `<path stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' />`,
                 approval: `<path stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' />`,
+                rejected: `<path stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z' />`,
                 bell: `<path stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9' />`,
             };
             return icons[type] || icons.bell;
@@ -154,24 +155,39 @@
                     <template x-for="notif in notifications" :key="notif.id">
                         <li>
                             <a :href="notif.url"
-                               class="flex items-start gap-3 px-4 py-3 transition-colors"
-                               :class="notif.read ? 'hover:bg-base-200' : 'bg-primary/5 hover:bg-primary/10'"
+                               class="flex items-start gap-3 px-4 py-3 transition-colors border-l-2"
+                               :class="((notif.icon === 'rejected' || (notif.type || '').includes('reject'))
+                                   ? (notif.read ? 'border-l-error/30 hover:bg-base-200' : 'border-l-error bg-error/5 hover:bg-error/10')
+                                   : (notif.read ? 'border-l-transparent hover:bg-base-200' : 'border-l-primary bg-primary/5 hover:bg-primary/10'))"
                                @click="markAsRead(notif.id)">
                                 {{-- Icon --}}
                                 <div class="mt-0.5 shrink-0 h-8 w-8 flex items-center justify-center rounded-full"
-                                     :class="notif.read ? 'bg-base-200 text-base-content/40' : 'bg-primary/15 text-primary'">
+                                     :class="notif.read ? 'bg-base-200 text-base-content/40' : ((notif.icon === 'rejected' || (notif.type || '').includes('reject')) ? 'bg-error/10 text-error' : 'bg-primary/15 text-primary')">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                                          x-html="iconForType(notif.icon)">
                                     </svg>
                                 </div>
                                 <div class="flex-1 min-w-0">
-                                    <div class="text-sm font-medium text-base-content" :class="notif.read ? 'opacity-60' : ''" x-text="notif.title"></div>
-                                    <div class="text-xs text-base-content/50 mt-0.5 line-clamp-2" x-text="notif.message"></div>
-                                    <div class="text-[10px] text-base-content/30 mt-1" x-text="notif.time"></div>
+                                    <div class="text-sm font-medium"
+                                         :class="notif.read
+                                            ? ((notif.icon === 'rejected' || (notif.type || '').includes('reject')) ? 'text-error/70' : 'text-base-content/60')
+                                            : ((notif.icon === 'rejected' || (notif.type || '').includes('reject')) ? 'text-error font-semibold' : 'text-base-content')"
+                                         x-text="notif.title"></div>
+                                    <div class="text-xs text-base-content/60 mt-0.5" :class="notif.reason ? '' : 'line-clamp-2'" x-text="notif.message"></div>
+                                    <template x-if="notif.reason">
+                                        <div class="mt-1.5 p-2 rounded-lg bg-error/10 border border-error/20 text-[11px] text-error font-medium flex items-start gap-1.5">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
+                                            <div>
+                                                <span class="font-bold">{{ __('Alasan:') }}</span>
+                                                <span x-text="notif.reason"></span>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <div class="text-[10px] text-base-content/40 mt-1" x-text="notif.time"></div>
                                 </div>
                                 {{-- Unread dot --}}
                                 <div x-show="!notif.read" class="mt-2 shrink-0">
-                                    <span class="block h-2 w-2 rounded-full bg-primary"></span>
+                                    <span class="block h-2 w-2 rounded-full" :class="(notif.icon === 'rejected' || (notif.type || '').includes('reject')) ? 'bg-error' : 'bg-primary'"></span>
                                 </div>
                             </a>
                         </li>
