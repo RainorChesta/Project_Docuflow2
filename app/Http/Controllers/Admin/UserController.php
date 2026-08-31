@@ -70,7 +70,7 @@ class UserController extends Controller
             $user->branches()->sync($branchIds);
         }
 
-        return redirect()->route('admin.users.index')->with('success', 'User created.');
+        return redirect()->route('admin.users.index')->with('success', __('Pengguna berhasil dibuat.'));
     }
 
     public function edit(User $user): View
@@ -128,7 +128,7 @@ class UserController extends Controller
         $user->companies()->sync($companyIds);
         $user->branches()->sync($branchIds);
 
-        return redirect()->route('admin.users.index')->with('success', 'User updated.');
+        return redirect()->route('admin.users.index')->with('success', __('Pengguna berhasil diperbarui.'));
     }
 
     public function destroy(User $user): RedirectResponse

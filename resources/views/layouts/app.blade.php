@@ -7,6 +7,10 @@
 
         <title>{{ config('app.name', 'DokuFlow') }}</title>
 
+        <!-- Favicon -->
+        <link rel="icon" type="image/png" href="{{ asset('logo.png') }}">
+        <link rel="shortcut icon" type="image/png" href="{{ asset('logo.png') }}">
+
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700&display=swap" rel="stylesheet" />
@@ -102,9 +106,21 @@
                             <x-theme-toggle />
                         </div>
 
-                        {{-- Global Search --}}
+                        {{-- Global Search (Desktop Pill + Mobile Icon) --}}
                         <button type="button"
-                                class="btn btn-ghost btn-circle btn-sm hover:bg-base-200 transition-colors"
+                                class="hidden sm:inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-base-200/60 hover:bg-base-200 border border-base-300/60 hover:border-base-300 text-xs text-base-content/60 hover:text-base-content transition-all shadow-2xs group cursor-pointer"
+                                title="{{ __('Cari Dokumen (Ctrl+K)') }}"
+                                aria-label="{{ __('Cari Dokumen') }}"
+                                @click="$dispatch('open-search')">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-base-content/50 group-hover:text-primary transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            <span class="font-normal text-xs text-base-content/50 group-hover:text-base-content/80 transition-colors">{{ __('Cari...') }}</span>
+                            <kbd class="kbd kbd-xs bg-base-100 dark:bg-base-300/80 border-base-300 text-[10px] text-base-content/50 px-1.5 py-0.2 rounded font-mono shadow-2xs">Ctrl K</kbd>
+                        </button>
+
+                        <button type="button"
+                                class="sm:hidden btn btn-ghost btn-circle btn-sm hover:bg-base-200 transition-colors"
                                 title="{{ __('Cari Dokumen') }}"
                                 aria-label="{{ __('Cari Dokumen') }}"
                                 @click="$dispatch('open-search')">
@@ -121,8 +137,7 @@
                 </header>
 
                 <!-- Page Content -->
-                <main class="flex-1 {{ request()->routeIs('documents.edit') ? 'p-0 flex flex-col min-h-0' : 'p-3 sm:p-6 overflow-y-auto' }} print:block print:h-auto print:overflow-visible print:p-0">
-                    @if(!request()->routeIs('documents.edit'))
+                <main class="flex-1 p-3 sm:p-6 overflow-y-auto print:block print:h-auto print:overflow-visible print:p-0">
                     <div class="print:hidden max-w-7xl mx-auto w-full pt-2 sm:pt-4">
                     @php
                         $crumbs = [];
@@ -153,7 +168,9 @@
 
                             if (str_starts_with($name, 'documents.')) {
                                 if (in_array($name, ['documents.choose', 'documents.create', 'documents.edit', 'documents.show', 'documents.preview', 'documents.preview-version'])) {
-                                    $crumbs[] = ['label' => $docTypeLabel, 'url' => $docTypeRoute];
+                                    if (!(request('from') === 'approvals' && in_array($name, ['documents.preview', 'documents.preview-version']))) {
+                                        $crumbs[] = ['label' => $docTypeLabel, 'url' => $docTypeRoute];
+                                    }
                                 }
                                 
                                 if ($name === 'documents.choose') {
@@ -169,8 +186,12 @@
                                 } elseif ($name === 'documents.show') {
                                     $crumbs[] = ['label' => __('Detail Dokumen'), 'url' => null];
                                 } elseif ($name === 'documents.preview' || $name === 'documents.preview-version') {
-                                    if ($doc = request()->route('document')) {
-                                        $crumbs[] = ['label' => __('Detail Dokumen'), 'url' => route('documents.show', $doc)];
+                                    if (request('from') === 'approvals') {
+                                        $crumbs[] = ['label' => __('Persetujuan'), 'url' => route('approvals.index')];
+                                    } else {
+                                        if ($doc = request()->route('document')) {
+                                            $crumbs[] = ['label' => __('Detail Dokumen'), 'url' => route('documents.show', $doc)];
+                                        }
                                     }
                                     $crumbs[] = ['label' => __('Pratinjau Dokumen'), 'url' => null];
                                 } elseif ($name === 'documents.index') {
@@ -216,7 +237,6 @@
                         <x-breadcrumbs :items="$crumbs" />
                     @endif
                     </div>
-                    @endif
 
                     {{ $slot }}
                 </main>

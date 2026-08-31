@@ -20,9 +20,9 @@
         @endif
         @if(auth()->user()->isAdmin())
             <form method="POST" action="{{ route('admin.documents.destroy', $doc) }}" class="inline"
-                  onsubmit="return confirm('Hapus dokumen \'{{ addslashes($doc->title) }}\' beserta semua versinya? Tindakan ini tidak bisa dibatalkan.')">
+                  onsubmit="return confirm('{{ __('Hapus dokumen :title beserta semua versinya? Tindakan ini tidak bisa dibatalkan.', ['title' => addslashes($doc->title)]) }}')">
                 @csrf @method('DELETE')
-                <button onclick="event.stopPropagation();" class="btn btn-ghost btn-xs btn-square text-error" title="Hapus">
+                <button onclick="event.stopPropagation();" class="btn btn-ghost btn-xs btn-square text-error" title="{{ __('Hapus') }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                 </button>
             </form>
@@ -67,7 +67,9 @@
 
     {{-- Document type badge --}}
     @if($doc->documentType)
-        <span class="badge badge-outline badge-xs opacity-60">{{ $doc->documentType->code }}</span>
+        <span class="badge badge-outline badge-xs opacity-60 max-w-[90%] inline-flex items-center" title="{{ $doc->documentType->name ?? $doc->documentType->code }}">
+            <span class="truncate">{{ $doc->documentType->code }}</span>
+        </span>
     @endif
 
 </a>

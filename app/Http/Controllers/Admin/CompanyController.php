@@ -42,7 +42,7 @@ class CompanyController extends Controller
             'code' => null,
         ]);
 
-        return redirect()->route('admin.companies.index')->with('success', 'Company created successfully with default Pusat branch.');
+        return redirect()->route('admin.companies.index')->with('success', __('Perusahaan berhasil dibuat dengan cabang Pusat default.'));
     }
 
     public function edit(Company $company): View
@@ -62,17 +62,17 @@ class CompanyController extends Controller
         $validated['code'] = strtoupper(trim($validated['code']));
         $company->update($validated);
 
-        return redirect()->route('admin.companies.index')->with('success', 'Company updated successfully.');
+        return redirect()->route('admin.companies.index')->with('success', __('Perusahaan berhasil diperbarui.'));
     }
 
     public function destroy(Company $company): RedirectResponse
     {
         $this->authorize('admin');
-        if ($company->documents()->exists()) {
-            return back()->with('error', 'Cannot delete company with associated documents.');
+        if ($company->documents()->withTrashed()->exists()) {
+            return back()->with('error', __('Tidak dapat menghapus perusahaan yang memiliki dokumen terkait.'));
         }
 
         $company->delete();
-        return redirect()->route('admin.companies.index')->with('success', 'Company deleted successfully.');
+        return redirect()->route('admin.companies.index')->with('success', __('Perusahaan berhasil dihapus.'));
     }
 }

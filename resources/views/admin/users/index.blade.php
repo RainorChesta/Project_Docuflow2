@@ -1,12 +1,12 @@
 <x-app-layout>
-    <x-slot name="header">Users</x-slot>
+    <x-slot name="header">{{ __('Pengguna') }}</x-slot>
 
     <div class="py-6">
         <div class="max-w-7xl mx-auto w-full">
             <div class="mb-4">
                 <a href="{{ route('admin.users.create') }}" class="btn btn-primary btn-sm">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-                    New User
+                    {{ __('Pengguna Baru') }}
                 </a>
             </div>
 
@@ -22,12 +22,12 @@
                     <table class="table min-w-[640px]">
                         <thead>
                             <tr>
-                                <th>Name / NIP</th>
-                                <th>Email / Phone</th>
-                                <th>Division</th>
-                                <th>Company & Cabang</th>
-                                <th>Role</th>
-                                <th>Active</th>
+                                <th>{{ __('Nama / NIP') }}</th>
+                                <th>{{ __('Email / Telepon') }}</th>
+                                <th>{{ __('Divisi') }}</th>
+                                <th>{{ __('Perusahaan & Cabang') }}</th>
+                                <th>{{ __('Peran') }}</th>
+                                <th>{{ __('Aktif') }}</th>
                                 <th></th>
                             </tr>
                         </thead>

@@ -33,7 +33,7 @@ class DivisionController extends Controller
 
         Division::create($validated);
 
-        return redirect()->route('admin.divisions.index')->with('success', 'Division created.');
+        return redirect()->route('admin.divisions.index')->with('success', __('Divisi berhasil dibuat.'));
     }
 
     public function edit(Division $division): View
@@ -52,16 +52,16 @@ class DivisionController extends Controller
 
         $division->update($validated);
 
-        return redirect()->route('admin.divisions.index')->with('success', 'Division updated.');
+        return redirect()->route('admin.divisions.index')->with('success', __('Divisi berhasil diperbarui.'));
     }
 
     public function destroy(Division $division): RedirectResponse
     {
         $this->authorize('admin');
         if ($division->documents()->exists() || $division->users()->exists()) {
-            return back()->withErrors(['error' => 'Cannot delete division with associated documents or users.']);
+            return back()->withErrors(['error' => __('Tidak dapat menghapus divisi yang memiliki dokumen atau pengguna terkait.')]);
         }
         $division->delete();
-        return redirect()->route('admin.divisions.index')->with('success', 'Division deleted.');
+        return redirect()->route('admin.divisions.index')->with('success', __('Divisi berhasil dihapus.'));
     }
 }

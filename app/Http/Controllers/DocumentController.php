@@ -305,13 +305,13 @@ class DocumentController extends Controller
                 'string',
                 'max:100',
                 'unique:documents,document_number',
-                // Format resmi: seq/tipe/divisi/pusat/bulan-romawi/tahun
-                'regex:/^\d{3}\/[A-Z0-9.\-]+\/[A-Z0-9.\-]+\/[A-Z0-9.\-]+\/(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII)\/\d{4}$/',
+                // Format resmi: seq/tipe/divisi/pusat/bulan-romawi/tahun (non-SOP) atau seq/SOP/pusat/bulan-romawi/tahun (SOP)
+                'regex:/^\d{3}\/[A-Z0-9.\-]+(?:\/[A-Z0-9.\-]+){1,2}\/(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII)\/\d{4}$/',
             ];
         }
 
         $validated = $request->validate($rules, [
-            'document_number.regex' => 'Format nomor tidak sesuai. Contoh: 029/S.ED/HRD/JBM/VIII/2026',
+            'document_number.regex' => 'Format nomor tidak sesuai. Contoh: 029/S.ED/HRD/JBM/VIII/2026 atau 001/SOP/JBM/VIII/2026',
         ]);
 
         $validated['division_id'] = ($user->isAdmin() || $user->isDirector())
@@ -428,6 +428,35 @@ class DocumentController extends Controller
             ]);
         }
 
+        // Validasi ketersediaan konfigurasi AI sebelum dispatch
+        if (!app()->environment('testing')) {
+            $hasKey = match ($model) {
+                'groq' => !empty(config('services.groq.key')),
+                'deepseek' => !empty(config('services.deepseek.key')),
+                'ollama' => !empty(config('services.ollama.url')),
+                default => !empty(config('services.groq.key')) || !empty(config('services.deepseek.key')) || !empty(config('services.ollama.url')),
+            };
+
+            if (!$hasKey) {
+                $msg = match ($model) {
+                    'groq' => 'GROQ_API_KEY belum diisi di file .env. Silakan tambahkan GROQ_API_KEY (dari console.groq.com) untuk menggunakan Groq.',
+                    'deepseek' => 'DEEPSEEK_API_KEY belum diisi di file .env. Silakan tambahkan DEEPSEEK_API_KEY untuk menggunakan DeepSeek.',
+                    'ollama' => 'OLLAMA_URL belum diisi di file .env.',
+                    default => 'Konfigurasi AI belum disetel di file .env. Silakan isi GROQ_API_KEY atau DEEPSEEK_API_KEY di file .env.',
+                };
+
+                $document->update([
+                    'summary_status' => Document::SUMMARY_FAILED,
+                    'summary_error' => $msg,
+                ]);
+
+                return response()->json([
+                    'status' => Document::SUMMARY_FAILED,
+                    'error' => $msg,
+                ], 422);
+            }
+        }
+
         // Jika force ringkas ulang atau status sebelumnya failed → reset status
         if ($force || $document->summary_status === Document::SUMMARY_FAILED) {
             $document->update([
@@ -455,6 +484,16 @@ class DocumentController extends Controller
     public function summaryStatus(Document $document): JsonResponse
     {
         $this->authorize('view', $document);
+
+        // Auto-detect antrean macet / worker tidak berjalan (lebih dari 2 menit di processing)
+        if ($document->summary_status === Document::SUMMARY_PROCESSING && $document->summary_started_at) {
+            if ($document->summary_started_at->diffInSeconds(now()) >= 120) {
+                $document->update([
+                    'summary_status' => Document::SUMMARY_FAILED,
+                    'summary_error' => 'Proses ringkasan memakan waktu terlalu lama atau antrean (queue worker) belum dijalankan. Pastikan `php artisan queue:work` aktif atau ubah QUEUE_CONNECTION=sync di .env.',
+                ]);
+            }
+        }
 
         return response()->json([
             'status' => $document->summary_status,
@@ -634,8 +673,8 @@ class DocumentController extends Controller
         }
 
         $message = $version->wasRecentlyCreated
-            ? 'Edit saved. Pending approval.'
-            : 'Versi v' . $version->version_number . ' diperbarui (tetap menunggu approval).';
+            ? __('Perubahan disimpan. Menunggu persetujuan.')
+            : __('Versi v:version diperbarui (tetap menunggu persetujuan).', ['version' => $version->version_number]);
 
         return redirect()->route('documents.show', $document)->with('success', $message);
     }
@@ -654,8 +693,8 @@ class DocumentController extends Controller
         }
 
         return redirect()->route('documents.index', ['type' => 'mine'])->with('success', $discarded
-            ? 'Versi pending v' . $discarded->version_number . ' di-discard.'
-            : 'Tidak ada versi pending untuk di-discard.');
+            ? __('Versi pending v:version dibuang.', ['version' => $discarded->version_number])
+            : __('Tidak ada versi pending untuk dibuang.'));
     }
 
     public function saveDraft(Request $request, Document $document): RedirectResponse
@@ -681,7 +720,7 @@ class DocumentController extends Controller
 
         $this->versionService->saveDraft($document, $validated['content'], auth()->user());
 
-        return redirect()->route('documents.show', $document)->with('success', 'Draft saved.');
+        return redirect()->route('documents.show', $document)->with('success', __('Draf berhasil disimpan.'));
     }
 
     public function destroy(Document $document): RedirectResponse
@@ -690,7 +729,7 @@ class DocumentController extends Controller
 
         $document->delete();
 
-        return redirect()->route('documents.index')->with('success', 'Document discarded.');
+        return redirect()->route('documents.index')->with('success', __('Dokumen berhasil dihapus.'));
     }
 
     public function uploadVersion(Request $request, Document $document): RedirectResponse
@@ -728,23 +767,26 @@ class DocumentController extends Controller
             }
         }
 
-        return redirect()->route('documents.show', $document)->with('success', 'Versi baru diunggah. Menunggu approval.');
+        return redirect()->route('documents.show', $document)->with('success', __('Versi baru diunggah. Menunggu persetujuan.'));
     }
 
     /**
-     * Download the latest version of the document as DOCX.
+     * Download the latest version of the document as DOCX, or a specific version if requested.
      */
-    public function download(Document $document)
+    public function download(Request $request, Document $document)
     {
         $this->authorize('view', $document);
 
-        $version = $document->displayVersion();
+        $version = $request->filled('version_id')
+            ? $document->versions()->where('id', $request->input('version_id'))->first()
+            : $document->displayVersion();
+
         abort_unless($version && $version->file_path, 404, 'File not found');
 
         $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
         abort_unless($disk->exists($version->file_path), 404, 'Physical file not found');
 
-        $downloadName = $document->title;
+        $downloadName = $version->file_original_name ?? $document->title;
         if (!str_ends_with(strtolower($downloadName), '.docx') && !str_ends_with(strtolower($downloadName), '.pdf')) {
             $downloadName .= '.docx';
         }
@@ -881,7 +923,7 @@ class DocumentController extends Controller
             'division_id' => $document->division_id,
         ]);
 
-        return back()->with('success', 'Document visibility updated.');
+        return back()->with('success', __('Visibilitas dokumen berhasil diperbarui.'));
     }
 
     /**

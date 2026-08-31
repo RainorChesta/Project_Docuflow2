@@ -19,9 +19,10 @@ class SearchController extends Controller
         $q = trim($request->get('q', ''));
         $documentTypeId = $request->get('document_type_id');
         $documentType = $request->get('document_type'); // accept either id or code
+        $visibility = $request->get('visibility');
         $lang = $request->get('lang', app()->getLocale());
 
-        if (strlen($q) < 2 && !$documentTypeId && !$documentType) {
+        if (strlen($q) < 2 && !$documentTypeId && !$documentType && !$visibility) {
             return response()->json([
                 'results' => [],
                 'pagination' => [
@@ -29,14 +30,24 @@ class SearchController extends Controller
                     'last_page' => 1,
                     'total' => 0,
                     'per_page' => 10,
+                    'has_more' => false,
                 ],
             ]);
         }
 
         $user = auth()->user();
 
-        $query = Document::with('owner:id,name', 'division:id,name,code', 'documentType:id,name,code')
-            ->visibleTo($user);
+        $query = Document::with([
+            'owner:id,name',
+            'division:id,name,code',
+            'documentType:id,name,code',
+            'branch:id,name,code',
+            'currentVersion:id,document_id,version_number,status'
+        ])->visibleTo($user);
+
+        if ($visibility && in_array($visibility, ['general', 'division', 'personal'], true)) {
+            $query->where('visibility', $visibility);
+        }
 
         if ($documentTypeId) {
             $query->where('document_type_id', $documentTypeId);
@@ -56,13 +67,7 @@ class SearchController extends Controller
                     $vQuery->where('content', 'like', "%{$q}%");
                 });
 
-                if ($lang === 'en') {
-                    $sub->orWhere('summary_density_brief', 'like', "%{$q}%")
-                        ->orWhere('summary_density_detailed', 'like', "%{$q}%");
-                } else {
-                    $sub->orWhere('summary_density_brief', 'like', "%{$q}%")
-                        ->orWhere('summary_density_detailed', 'like', "%{$q}%");
-                }
+                $sub->orWhere('summary', 'like', "%{$q}%");
             });
         }
 
@@ -75,9 +80,14 @@ class SearchController extends Controller
             'visibility'      => $doc->visibility,
             'owner'           => $doc->owner?->name,
             'division'        => $doc->division?->name,
+            'division_code'   => $doc->division?->code,
             'type'            => $doc->documentType?->name,
             'type_code'       => $doc->documentType?->code,
-            'updated_at'      => $doc->updated_at->diffForHumans(),
+            'branch'          => $doc->branch?->name,
+            'branch_code'     => $doc->branch?->code,
+            'version'         => $doc->currentVersion?->version_number ?? 1,
+            'is_expired'      => (bool) $doc->is_expired,
+            'updated_at'      => $doc->updated_at?->diffForHumans() ?? '',
             'url'             => route('documents.show', $doc),
         ]);
 

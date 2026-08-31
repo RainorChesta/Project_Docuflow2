@@ -84,7 +84,7 @@ class OnlyOfficeIntegrationTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('onlyoffice-editor-container');
-        $response->assertSee('ONLYOFFICE Document Editor');
+        $response->assertSee($this->document->title);
     }
 
     public function test_onlyoffice_file_endpoint_serves_document_binary()
@@ -245,4 +245,59 @@ class OnlyOfficeIntegrationTest extends TestCase
             'url' => 'http://host.docker.internal:8000/onlyoffice/users/' . $this->user->id . '/signature.png',
         ]);
     }
+
+    public function test_onlyoffice_keys_are_isolated_per_document_version()
+    {
+        $v2Path = 'documents/' . $this->document->id . '/v2.docx';
+        Storage::disk('local')->put($v2Path, 'fake-docx-v2-binary-content');
+
+        $version2 = $this->document->versions()->create([
+            'version_number' => 2,
+            'content' => '',
+            'file_path' => $v2Path,
+            'file_original_name' => 'Test ONLYOFFICE Doc v2.docx',
+            'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'author_id' => $this->user->id,
+            'author_name' => $this->user->name,
+            'status' => 'pending',
+        ]);
+
+        $service = app(OnlyOfficeService::class);
+        $keyV1 = $service->generateDocumentKey($this->document, $this->version);
+        $keyV2 = $service->generateDocumentKey($this->document, $version2);
+
+        $this->assertNotEquals($keyV1, $keyV2, 'ONLYOFFICE keys must be distinct between version 1 and version 2');
+        $this->assertStringContainsString('v1', $keyV1);
+        $this->assertStringContainsString('v2', $keyV2);
+    }
+
+    public function test_user_can_download_specific_version_docx()
+    {
+        $v2Path = 'documents/' . $this->document->id . '/v2.docx';
+        Storage::disk('local')->put($v2Path, 'fake-docx-v2-binary-content');
+
+        $version2 = $this->document->versions()->create([
+            'version_number' => 2,
+            'content' => '',
+            'file_path' => $v2Path,
+            'file_original_name' => 'Test ONLYOFFICE Doc v2.docx',
+            'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'author_id' => $this->user->id,
+            'author_name' => $this->user->name,
+            'status' => 'active',
+        ]);
+
+        $this->document->update(['current_version_id' => $version2->id]);
+
+        // Downloading without version_id gives latest (v2)
+        $responseLatest = $this->actingAs($this->user)->get(route('documents.download', $this->document));
+        $responseLatest->assertStatus(200);
+        $responseLatest->assertHeader('content-disposition', 'attachment; filename="Test ONLYOFFICE Doc v2.docx"');
+
+        // Downloading with version_id gives the previous version (v1)
+        $responseV1 = $this->actingAs($this->user)->get(route('documents.download', [$this->document, 'version_id' => $this->version->id]));
+        $responseV1->assertStatus(200);
+        $responseV1->assertHeader('content-disposition', 'attachment; filename="Test ONLYOFFICE Doc.docx"');
+    }
 }
+

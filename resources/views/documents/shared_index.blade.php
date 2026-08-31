@@ -1,9 +1,9 @@
 <x-app-layout>
-    <x-slot name="header">Shared Documents</x-slot>
+    <x-slot name="header">{{ __('Dokumen Dibagikan') }}</x-slot>
 
     <div class="pt-0 pb-6">
         <div class="max-w-7xl mx-auto w-full" x-data="{ viewMode: localStorage.getItem('docViewMode') || 'list' }" x-init="$watch('viewMode', val => localStorage.setItem('docViewMode', val))">
-            @include('documents._header', ['title' => 'Shared Documents', 'showCreate' => false])
+            @include('documents._header', ['title' => __('Dokumen Dibagikan'), 'showCreate' => false])
 
             @include('documents._search')
 
@@ -20,7 +20,7 @@
                         @forelse($documents as $doc)
                             @include('documents._list', ['doc' => $doc, 'type' => $type])
                         @empty
-                            <div class="p-4 sm:p-6 text-base-content/60">Tidak ada dokumen yang dibagikan dengan Anda.</div>
+                            <div class="p-4 sm:p-6 text-base-content/60">{{ __('Tidak ada dokumen yang dibagikan dengan Anda.') }}</div>
                         @endforelse
                     </div>
                 </div>
@@ -32,7 +32,7 @@
                     @include('documents._grid', ['doc' => $doc, 'type' => $type])
                 @empty
                     <div class="col-span-full p-4 sm:p-6 text-base-content/60 bg-base-100 rounded-xl border border-base-300 shadow-sm">
-                        Tidak ada dokumen yang dibagikan dengan Anda.
+                        {{ __('Tidak ada dokumen yang dibagikan dengan Anda.') }}
                     </div>
                 @endforelse
             </div>

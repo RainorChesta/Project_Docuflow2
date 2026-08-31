@@ -37,20 +37,21 @@ class DocumentApprovalResult extends Notification
                 'ver'      => $this->version->version_number,
                 'reviewer' => $this->reviewerName,
             ])
-            : __('Dokumen ":doc" (v:ver) Anda ditolak oleh :reviewer. Catatan: :notes', [
+            : __('Dokumen ":doc" (v:ver) Anda ditolak oleh :reviewer.', [
                 'doc'      => $this->document->title,
                 'ver'      => $this->version->version_number,
                 'reviewer' => $this->reviewerName,
-                'notes'    => $this->notes ?? '-',
             ]);
 
         return [
-            'type'    => 'approval_result',
-            'title'   => $title,
-            'message' => $message,
-            'url'     => route('documents.show', $this->document),
-            'icon'    => $isApproved ? 'approval' : 'document',
-            'document_id' => $this->document->id
+            'type'        => 'approval_result',
+            'title'       => $title,
+            'message'     => $message,
+            'url'         => route('documents.show', $this->document),
+            'icon'        => $isApproved ? 'approval' : 'rejected',
+            'document_id' => $this->document->id,
+            'notes'       => $this->notes,
+            'reason'      => $this->notes,
         ];
     }
 

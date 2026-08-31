@@ -11,6 +11,15 @@ class DocumentPolicy
     public function view(User $user, Document $document): bool
     {
         if ($user->isAdmin() || $user->isDirector()) return true;
+
+        // Signature Request Signer Exception:
+        // Users who are assigned to sign this document are granted view access to inspect
+        // the preview during signature approval, even across different companies or branches.
+        // This grants VIEW access ONLY (update, delete, approve, and manageAccess remain restricted).
+        if ($document->signatureRequests()->where('target_user_id', $user->id)->exists()) {
+            return true;
+        }
+
         $contextService = app(\App\Services\CompanyContextService::class);
         $activeBranchId = $contextService->getActiveBranchId($user);
         $activeCompanyId = $contextService->getActiveCompanyId($user);

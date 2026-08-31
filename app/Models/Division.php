@@ -9,6 +9,11 @@ class Division extends Model
 {
     protected $fillable = ['code', 'name'];
 
+    public function setCodeAttribute($value): void
+    {
+        $this->attributes['code'] = strtoupper(trim((string) $value));
+    }
+
     public function users(): HasMany
     {
         return $this->hasMany(User::class);

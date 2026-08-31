@@ -67,7 +67,8 @@ class DocumentService
                 $query->where('branch_id', $branch->id);
             }
 
-            if ($division) {
+            // SOP document numbers do not belong to a specific division scope
+            if ($division && strtoupper($documentType?->code ?? '') !== 'SOP') {
                 $query->where('division_id', $division->id);
             }
 
@@ -95,7 +96,8 @@ class DocumentService
             $query->where('branch_id', $branch->id);
         }
 
-        if ($division) {
+        // SOP document numbers do not belong to a specific division scope
+        if ($division && strtoupper($documentType?->code ?? '') !== 'SOP') {
             $query->where('division_id', $division->id);
         }
 
@@ -127,14 +129,29 @@ class DocumentService
         
         $branchCode = $branch ? $branch->effective_code : config('dokuflow.central_code', 'JBM');
 
-        // Non-division scopes (general/personal) pakai kode generik karena
-        // tidak terikat divisi manapun.
-        $divisionCode = $division ? $division->code : 'GEN';
-
         // "/" di kode tipe diganti "-" khusus untuk nomor dokumen, supaya
-        // jumlah segmen yang dipisah "/" tetap konsisten (6 segmen).
+        // jumlah segmen yang dipisah "/" tetap konsisten.
         $typeCode = $documentType?->code ?? 'GEN';
         $typeCodeForNumber = str_replace('/', '-', $typeCode);
+
+        // Khusus tipe SOP, nomor dokumen tidak menggunakan kode divisi.
+        // Format: {seq}/SOP/{branch}/{month}/{year} (contoh: 001/SOP/JBM/VIII/2026)
+        if (strtoupper($typeCode) === 'SOP') {
+            return sprintf(
+                '%03d/%s/%s/%s/%d',
+                $seq,
+                $typeCodeForNumber,
+                $branchCode,
+                $romanMonth,
+                $year
+            );
+        }
+
+        // Dokumen selain SOP: format menyertakan kode divisi.
+        // Non-division scopes (general/personal) pakai kode generik karena
+        // tidak terikat divisi manapun.
+        // Format: {seq}/{type}/{division}/{branch}/{month}/{year} (contoh: 001/S.ED/IT/JBM/VIII/2026)
+        $divisionCode = $division ? $division->code : 'GEN';
 
         return sprintf(
             '%03d/%s/%s/%s/%s/%d',

@@ -23,7 +23,7 @@
         <option value="">{{ __('Semua Divisi') }}</option>
         @foreach($divisions as $div)
             <option value="{{ $div->id }}" {{ request('division_id') == $div->id ? 'selected' : '' }}>
-                {{ $div->code }}
+                {{ $div->name }} ({{ strtoupper($div->code) }})
             </option>
         @endforeach
     </select>

@@ -5,6 +5,7 @@
         <div class="max-w-5xl mx-auto w-full" x-data="{
             search: '',
             typeFilter: '',
+            modalSearch: '',
             selectedModalType: '',
             selectedModalItems: [],
             templates: @js($templates->map(fn($t) => [
@@ -31,6 +32,16 @@
                     groups[t.document_type_label].push(t);
                 });
                 return groups;
+            },
+            get filteredModalItems() {
+                if (!this.modalSearch.trim()) return this.selectedModalItems;
+                const q = this.modalSearch.toLowerCase();
+                return this.selectedModalItems.filter(t => 
+                    (t.title && t.title.toLowerCase().includes(q)) || 
+                    (t.description && t.description.toLowerCase().includes(q)) ||
+                    (t.document_type_code && t.document_type_code.toLowerCase().includes(q)) ||
+                    (t.file_name && t.file_name.toLowerCase().includes(q))
+                );
             }
         }">
 
@@ -118,7 +129,7 @@
                                 <span x-text="typeName"></span>
                                 <span class="badge badge-sm badge-ghost ml-2" x-text="items.length"></span>
                             </h4>
-                            <button type="button" class="btn btn-sm btn-ghost text-primary hover:bg-primary/10" @click="selectedModalType = typeName; selectedModalItems = items; $refs.allTemplatesModal.showModal()">
+                            <button type="button" class="btn btn-sm btn-ghost text-primary hover:bg-primary/10" @click="selectedModalType = typeName; selectedModalItems = items; modalSearch = ''; $refs.allTemplatesModal.showModal()">
                                 {{ __('Lihat Semua') }}
                             </button>
                         </div>
@@ -163,13 +174,13 @@
                             
                             {{-- View All Card (shown if items > 10) --}}
                             <div x-show="items.length > 10" class="flex-none w-40 flex items-center justify-center snap-start">
-                                <button type="button" @click="selectedModalType = typeName; selectedModalItems = items; $refs.allTemplatesModal.showModal()"
+                                <button type="button" @click="selectedModalType = typeName; selectedModalItems = items; modalSearch = ''; $refs.allTemplatesModal.showModal()"
                                         class="group flex flex-col items-center justify-center h-full w-full rounded-xl border-2 border-dashed border-base-300 bg-base-50 hover:border-primary hover:bg-primary/5 transition-all duration-200">
                                     <div class="w-10 h-10 rounded-full bg-base-200 group-hover:bg-primary/20 flex items-center justify-center mb-2 transition-colors">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-base-content/50 group-hover:text-primary transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
                                     </div>
                                     <span class="text-xs font-medium text-base-content/60 group-hover:text-primary">{{ __('Lihat Semua') }}</span>
-                                    <span class="text-[10px] text-base-content/40" x-text="'+' + (items.length - 10) + ' template'"></span>
+                                    <span class="text-[10px] text-base-content/40" x-text="'+' + (items.length - 10) + ' ' + @json(__('template'))"></span>
                                 </button>
                             </div>
                         </div>
@@ -193,14 +204,29 @@
                     <form method="dialog">
                         <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
                     </form>
-                    <h3 class="font-bold text-lg mb-4 flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
-                        <span x-text="selectedModalType"></span>
-                    </h3>
+                    
+                    {{-- Modal Header with Title and Search --}}
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pr-8">
+                        <h3 class="font-bold text-lg flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
+                            <span x-text="selectedModalType"></span>
+                            <span class="badge badge-sm badge-ghost ml-1" x-text="filteredModalItems.length"></span>
+                        </h3>
+                        
+                        {{-- Modal Search Input --}}
+                        <div class="relative w-full sm:w-72">
+                            <input type="text" x-model="modalSearch" placeholder="{{ __('Cari di kategori ini...') }}" class="input input-bordered input-sm w-full pl-9 pr-8 bg-base-100 focus:border-primary">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            <button type="button" x-show="modalSearch" @click="modalSearch = ''" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content text-xs p-1">✕</button>
+                        </div>
+                    </div>
+
                     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 max-h-[60vh] overflow-y-auto p-1">
-                        <template x-for="tmpl in selectedModalItems" :key="tmpl.id">
+                        <template x-for="tmpl in filteredModalItems" :key="tmpl.id">
                             <a :href="'{{ route('documents.create') }}?template_id=' + tmpl.id"
-                               class="group flex flex-col h-48 rounded-xl border-2 border-base-300 bg-base-100 hover:border-primary hover:bg-primary/5 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md overflow-hidden">
+                                class="group flex flex-col h-48 rounded-xl border-2 border-base-300 bg-base-100 hover:border-primary hover:bg-primary/5 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md overflow-hidden">
                                 <div class="flex-1 bg-gradient-to-br from-base-200/70 to-base-300/30 p-2.5 flex items-center justify-center relative overflow-hidden">
                                     {{-- Stylized Mini Paper Document --}}
                                     <div class="w-22 h-26 bg-base-100 rounded-lg shadow-xs border border-base-300/70 p-2 flex flex-col justify-between group-hover:shadow-sm group-hover:scale-105 transition-all duration-200">
@@ -231,10 +257,15 @@
                                 </div>
                             </a>
                         </template>
+
+                        <div x-show="filteredModalItems.length === 0" class="col-span-full py-12 text-center text-base-content/50">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 mx-auto mb-2 text-base-content/20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            <p class="text-sm">{{ __('Tidak ada template yang cocok dengan pencarian.') }}</p>
+                        </div>
                     </div>
                 </div>
                 <form method="dialog" class="modal-backdrop">
-                    <button>close</button>
+                    <button>{{ __('Tutup') }}</button>
                 </form>
             </dialog>
         </div>

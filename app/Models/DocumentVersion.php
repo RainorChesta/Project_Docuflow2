@@ -22,6 +22,11 @@ class DocumentVersion extends Model
         ];
     }
 
+    public function getNotesAttribute(): ?string
+    {
+        return $this->review_notes;
+    }
+
     public function isFileUpload(): bool
     {
         return !is_null($this->file_path);

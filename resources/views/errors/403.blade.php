@@ -59,6 +59,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ __('Dokumen Tidak Bisa Diakses') }} - {{ config('app.name', 'DokuFlow') }}</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{{ asset('logo.png') }}">
+    <link rel="shortcut icon" type="image/png" href="{{ asset('logo.png') }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen bg-base-200 flex items-center justify-center p-4">

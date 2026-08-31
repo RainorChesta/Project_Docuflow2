@@ -35,7 +35,7 @@
                 </div>
             </div>
             
-            <button @click="show = false" class="absolute top-2 right-2 text-base-content/40 hover:text-base-content/80 transition-colors p-1" aria-label="Close">
+            <button @click="show = false" class="absolute top-2 right-2 text-base-content/40 hover:text-base-content/80 transition-colors p-1" aria-label="{{ __('Tutup') }}">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -44,29 +44,37 @@
     </div>
 @endif
 
-{{-- Global Signature Approval Toast (shows once per notification on any page) --}}
+{{-- Global Notification Toast (shows once per notification on any page) --}}
 @auth
 <div x-data="{
         toasts: [],
         init() {
-            this.checkApprovalNotifications();
+            this.checkNotifications();
         },
-        checkApprovalNotifications() {
+        checkNotifications() {
             fetch('{{ route('notifications.index') }}', {
                 headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
             })
             .then(r => r.json())
             .then(data => {
-                const shown = JSON.parse(localStorage.getItem('sig_approval_toasts_shown') || '[]');
-                const approvals = (data.notifications || []).filter(n => 
-                    n.type === 'signature_request_approved' && !n.read && !shown.includes(n.id)
+                const shown = JSON.parse(localStorage.getItem('general_toasts_shown') || '[]');
+                const newNotifs = (data.notifications || []).filter(n => 
+                    !n.read && !shown.includes(n.id)
                 );
-                if (approvals.length > 0) {
-                    // Show only the most recent one
-                    const notif = approvals[0];
-                    this.toasts = [{ id: notif.id, title: notif.title, message: notif.message, url: notif.url }];
-                    shown.push(notif.id);
-                    localStorage.setItem('sig_approval_toasts_shown', JSON.stringify(shown.slice(-50)));
+                if (newNotifs.length > 0) {
+                    // Show up to 3 most recent notifications
+                    this.toasts = newNotifs.slice(0, 3).map(notif => {
+                        shown.push(notif.id);
+                        return {
+                            id: notif.id,
+                            title: notif.title,
+                            message: notif.message,
+                            reason: notif.reason,
+                            url: notif.url,
+                            isRejected: notif.icon === 'rejected' || (notif.type || '').includes('reject')
+                        };
+                    });
+                    localStorage.setItem('general_toasts_shown', JSON.stringify(shown.slice(-50)));
                     // Auto-dismiss after 8 seconds
                     setTimeout(() => { this.toasts = []; }, 8000);
                 }
@@ -85,22 +93,39 @@
              x-transition:leave="transition ease-in duration-200"
              x-transition:leave-start="opacity-100 translate-x-0"
              x-transition:leave-end="opacity-0 translate-x-8"
-             class="pointer-events-auto alert bg-base-100 border border-success/50 text-base-content shadow-2xl flex flex-row items-start gap-3 w-80 sm:w-96 rounded-xl relative overflow-hidden">
+             class="pointer-events-auto alert bg-base-100 text-base-content shadow-2xl flex flex-row items-start gap-3 w-80 sm:w-96 rounded-xl relative overflow-hidden"
+             :class="toast.isRejected ? 'border border-error/50' : 'border border-success/50'">
             <!-- Decorative left border -->
-            <div class="absolute left-0 top-0 bottom-0 w-1 bg-success"></div>
+            <div class="absolute left-0 top-0 bottom-0 w-1" :class="toast.isRejected ? 'bg-error' : 'bg-success'"></div>
 
-            <div class="w-10 h-10 rounded-full bg-success/10 flex items-center justify-center shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" class="text-success h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+            <div class="w-10 h-10 rounded-full flex items-center justify-center shrink-0" :class="toast.isRejected ? 'bg-error/10 text-error' : 'bg-success/10 text-success'">
+                <template x-if="toast.isRejected">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </template>
+                <template x-if="!toast.isRejected">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </template>
             </div>
 
             <div class="flex-1 min-w-0 py-1">
-                <h3 class="font-bold text-sm text-base-content uppercase" x-text="toast.title"></h3>
-                <p class="text-xs text-base-content/70 mt-1 leading-relaxed uppercase line-clamp-3" x-text="toast.message"></p>
+                <h3 class="font-bold text-sm text-base-content uppercase" :class="toast.isRejected ? 'text-error' : ''" x-text="toast.title"></h3>
+                <p class="text-xs text-base-content/70 mt-1 leading-relaxed uppercase" :class="toast.reason ? '' : 'line-clamp-3'" x-text="toast.message"></p>
+                <template x-if="toast.reason">
+                    <div class="mt-1.5 p-2 rounded-lg bg-error/10 border border-error/20 text-[11px] text-error font-medium flex items-start gap-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
+                        <div>
+                            <span class="font-bold">{{ __('Alasan:') }}</span>
+                            <span x-text="toast.reason"></span>
+                        </div>
+                    </div>
+                </template>
                 <div class="mt-2">
-                    <a :href="toast.url" class="text-xs font-semibold text-success hover:text-success/80 transition-colors flex items-center gap-1 uppercase">
-                        BUKA DOKUMEN
+                    <a :href="toast.url" class="text-xs font-semibold hover:opacity-80 transition-colors flex items-center gap-1 uppercase" :class="toast.isRejected ? 'text-error' : 'text-success'">
+                        {{ __('Buka Dokumen') }}
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                         </svg>
@@ -108,7 +133,7 @@
                 </div>
             </div>
 
-            <button @click="dismiss(toast.id)" class="absolute top-2 right-2 text-base-content/40 hover:text-base-content/80 transition-colors p-1" aria-label="Close">
+            <button @click="dismiss(toast.id)" class="absolute top-2 right-2 text-base-content/40 hover:text-base-content/80 transition-colors p-1" aria-label="{{ __('Tutup') }}">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>

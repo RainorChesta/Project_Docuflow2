@@ -178,6 +178,11 @@ class Document extends Model
         return $this->hasMany(DocumentDivisionShare::class);
     }
 
+    public function signatureRequests(): HasMany
+    {
+        return $this->hasMany(SignatureRequest::class);
+    }
+
     public function scopeActive($query)
     {
         return $query->whereHas('versions', fn($q) => $q->where('status', 'active'));

@@ -45,7 +45,10 @@ class NotificationController extends Controller
                     'document_added_division', 
                     'signature_request', 
                     'signature_request_approved',
+                    'signature_request_rejected',
                     'rollback_request',
+                    'rollback_approved',
+                    'rollback_rejected',
                     'document_expiring_urgent',
                     'document_expiring_warning',
                     'document_opened',
@@ -109,6 +112,7 @@ class NotificationController extends Controller
             'icon'     => $n->data['icon'] ?? 'bell',
             'read'     => !is_null($n->read_at),
             'time'     => $n->created_at->diffForHumans(),
+            'reason'   => $n->data['reason'] ?? ($n->data['notes'] ?? null),
         ])->values();
 
         $unreadCount = $filtered->whereNull('read_at')->count();

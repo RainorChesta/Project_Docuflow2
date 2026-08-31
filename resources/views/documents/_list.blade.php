@@ -9,7 +9,9 @@
                 {{ $doc->title }}
             </a>
             @if($doc->documentType)
-                <span class="badge badge-outline badge-sm shrink-0">{{ $doc->documentType->code }}</span>
+                <span class="badge badge-outline badge-sm shrink-0 max-w-[160px] inline-flex items-center" title="{{ $doc->documentType->name ?? $doc->documentType->code }}">
+                    <span class="truncate">{{ $doc->documentType->code }}</span>
+                </span>
             @endif
             @if(isset($type) && $type === 'shared')
                 @php $shareRole = $doc->shares->first()?->role; @endphp

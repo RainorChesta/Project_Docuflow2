@@ -32,6 +32,8 @@ class DocumentAccessNotificationTest extends TestCase
         parent::setUp();
         Cache::flush();
 
+        $company = \App\Models\Company::create(['name' => 'PT Jaya', 'code' => 'JBM']);
+        $branch = \App\Models\Branch::create(['company_id' => $company->id, 'name' => 'Pusat', 'is_pusat' => true]);
         $this->division = Division::create(['name' => 'IT Division', 'code' => 'IT']);
         $this->docType = DocumentType::create(['name' => 'Surat Edaran', 'code' => 'S.ED']);
 
@@ -40,16 +42,22 @@ class DocumentAccessNotificationTest extends TestCase
             'name' => 'Owner User',
             'is_active' => true,
         ]);
+        $this->owner->companies()->sync([$company->id]);
+        $this->owner->branches()->sync([$branch->id]);
 
         $this->recipient = User::factory()->create([
             'division_id' => $this->division->id,
             'name' => 'Recipient User',
             'is_active' => true,
         ]);
+        $this->recipient->companies()->sync([$company->id]);
+        $this->recipient->branches()->sync([$branch->id]);
 
         $this->document = Document::create([
             'title' => 'Important Policy Document',
             'document_number' => '001/S.ED/IT/JBM/VIII/2026',
+            'company_id' => $company->id,
+            'branch_id' => $branch->id,
             'division_id' => $this->division->id,
             'owner_id' => $this->owner->id,
             'document_type_id' => $this->docType->id,

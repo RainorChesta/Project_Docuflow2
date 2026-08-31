@@ -1,5 +1,12 @@
 <x-app-layout>
-    <x-slot name="header">Document Detail</x-slot>
+    <x-slot name="header">{{ __('Detail Dokumen') }}</x-slot>
+
+    @php
+        $companies = $companies ?? \App\Models\Company::with('branches')->get();
+        $divisions = $divisions ?? (auth()->user()?->isAdmin() ? \App\Models\Division::all() : \App\Models\Division::whereIn('id', auth()->user()?->allDivisionIds() ?? [])->get());
+        $approvedSignatures = $approvedSignatures ?? [];
+        $version = $version ?? $document->displayVersion();
+    @endphp
 
     <x-confirm-modal
         name="confirm-discard-{{ $document->id }}"
@@ -8,17 +15,19 @@
         :action="route('documents.destroy', $document)"
         method="DELETE"
         :confirmLabel="__('Delete Document')"
+        :cancelLabel="__('Batal')"
     />
 
     {{-- Konfirmasi approve rollback (banner pending rollback) --}}
     @if($document->hasPendingRollback() && auth()->user()->can('approve', $document))
         <x-confirm-modal
             name="confirm-approve-rollback"
-            title="{{ __('Approve') }} Rollback?"
-            message="{{ __('Rollback request will be submitted to the division head. If approved, all versions after v:version will be permanently deleted.', ['version' => $document->pendingRollbackVersion->version_number]) }}"
+            :title="__('Approve Rollback?')"
+            :message="__('Rollback request will be submitted to the division head. If approved, all versions after v:version will be permanently deleted.', ['version' => $document->pendingRollbackVersion->version_number])"
             :action="route('approvals.rollback-request.approve', $document)"
             method="POST"
-            confirmLabel="Approve Rollback"
+            :confirmLabel="__('Approve Rollback')"
+            :cancelLabel="__('Batal')"
             confirmClass="btn-success"
         />
     @endif
@@ -55,16 +64,16 @@
                 </div>
             @endif
 
-            <!-- Pending Rollback Banner -->
+            <!-- Pending Rollback Approval Banner -->
             @if($document->hasPendingRollback())
-                <div class="alert alert-warning mb-6 shadow-sm print:hidden">
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="alert alert-warning mb-6 rounded-2xl shadow-xs print:hidden">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
                         <div class="flex items-start sm:items-center gap-3 min-w-0">
-                            <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+                            <svg class="w-5 h-5 shrink-0 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                             </svg>
                             <div>
-                                <p class="font-semibold text-sm">{{ __('Permintaan rollback ke') }} v{{ $document->pendingRollbackVersion->version_number }}</p>
+                                <p class="font-semibold text-sm">{{ __('Menunggu Persetujuan Rollback') }} ({{ __('ke') }} v{{ $document->pendingRollbackVersion->version_number }})</p>
                                 <p class="text-xs text-base-content/70">
                                     {{ __('Diajukan oleh') }} {{ $document->rollbackRequestedBy?->name ?? '—' }}.
                                     {{ __('Versi setelah') }} v{{ $document->pendingRollbackVersion->version_number }} {{ __('akan dihapus permanen jika disetujui.') }}
@@ -75,18 +84,41 @@
                             <div class="flex flex-wrap gap-2 shrink-0">
                                 <form method="POST" action="{{ route('approvals.rollback-request.approve', $document) }}" class="inline">
                                     @csrf
-                                    <button class="btn btn-success btn-sm">
+                                    <button class="btn btn-success btn-sm rounded-xl">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                                        {{ __('Approve') }} Rollback
+                                        {{ __('Approve Rollback') }}
                                     </button>
                                 </form>
-                                <form method="POST" action="{{ route('approvals.rollback-request.reject', $document) }}" class="inline">
-                                    @csrf
-                                    <button class="btn btn-outline btn-error btn-sm">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                        {{ __('Reject') }}
-                                    </button>
-                                </form>
+                                <button type="button" onclick="document.getElementById('reject-rollback-modal-{{ $document->id }}').showModal()" class="btn btn-outline btn-error btn-sm rounded-xl">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                    {{ __('Reject') }}
+                                </button>
+
+                                {{-- Reject Rollback Modal --}}
+                                <dialog id="reject-rollback-modal-{{ $document->id }}" class="modal text-left">
+                                    <div class="modal-box rounded-2xl">
+                                        <h3 class="font-bold text-lg text-base-content">{{ __('Tolak Permintaan Rollback') }}</h3>
+                                        <p class="py-2 text-sm text-base-content/70">
+                                            {!! __('Tolak permintaan rollback dokumen :doc ke versi v:ver?', ['doc' => '<strong>'.$document->title.'</strong>', 'ver' => '<strong>'.$document->pendingRollbackVersion->version_number.'</strong>']) !!}
+                                        </p>
+                                        <form method="POST" action="{{ route('approvals.rollback-request.reject', $document) }}">
+                                            @csrf
+                                            <div class="form-control mb-4">
+                                                <label class="label">
+                                                    <span class="label-text font-medium">{{ __('Catatan / Alasan Penolakan (Opsional)') }}</span>
+                                                </label>
+                                                <textarea name="notes" class="textarea textarea-bordered w-full text-sm rounded-xl" rows="3" placeholder="{{ __('Tuliskan alasan penolakan untuk pemohon...') }}"></textarea>
+                                            </div>
+                                            <div class="modal-action">
+                                                <button type="button" onclick="document.getElementById('reject-rollback-modal-{{ $document->id }}').close()" class="btn btn-ghost rounded-xl">{{ __('Batal') }}</button>
+                                                <button type="submit" class="btn btn-error text-white rounded-xl">{{ __('Tolak Rollback') }}</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                    <form method="dialog" class="modal-backdrop">
+                                        <button>{{ __('Batal') }}</button>
+                                    </form>
+                                </dialog>
                             </div>
                         @endcan
                     </div>
@@ -96,8 +128,8 @@
             <!-- Pending Banner (paling atas) -->
             @php $pendingVersion = $document->versions->firstWhere('status', 'pending'); @endphp
             @if($pendingVersion)
-                <div class="alert alert-warning mb-6 shadow-sm print:hidden">
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="alert alert-warning mb-6 rounded-2xl shadow-xs print:hidden">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
                         <div class="flex items-start sm:items-center gap-3 min-w-0">
                             <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -112,21 +144,89 @@
                             @can('approve', $document)
                                 <form method="POST" action="{{ route('approvals.approve', [$document, $pendingVersion]) }}" class="inline">
                                     @csrf
-                                    <button class="btn btn-success btn-sm">
+                                    <button class="btn btn-success btn-sm rounded-xl">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
                                         {{ __('Approve') }}
                                     </button>
                                 </form>
-                                <form method="POST" action="{{ route('approvals.reject', [$document, $pendingVersion]) }}" class="inline">
-                                    @csrf
-                                    <button class="btn btn-error btn-sm">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                        {{ __('Reject') }}
-                                    </button>
-                                </form>
+                                <button type="button" onclick="document.getElementById('reject-version-modal-{{ $pendingVersion->id }}').showModal()" class="btn btn-error btn-sm rounded-xl">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                    {{ __('Reject') }}
+                                </button>
+
+                                {{-- Reject Version Modal --}}
+                                <dialog id="reject-version-modal-{{ $pendingVersion->id }}" class="modal text-left">
+                                    <div class="modal-box rounded-2xl">
+                                        <h3 class="font-bold text-lg text-base-content">{{ __('Tolak Dokumen') }}</h3>
+                                        <p class="py-2 text-sm text-base-content/70">
+                                            {!! __('Tolak dokumen :doc (v:ver) yang diajukan oleh :author?', ['doc' => '<strong>'.$document->title.'</strong>', 'ver' => '<strong>'.$pendingVersion->version_number.'</strong>', 'author' => '<strong>'.$pendingVersion->author_name.'</strong>']) !!}
+                                        </p>
+                                        <form method="POST" action="{{ route('approvals.reject', [$document, $pendingVersion]) }}">
+                                            @csrf
+                                            <div class="form-control mb-4">
+                                                <label class="label">
+                                                    <span class="label-text font-medium">{{ __('Catatan / Alasan Penolakan (Opsional)') }}</span>
+                                                </label>
+                                                <textarea name="notes" class="textarea textarea-bordered w-full text-sm rounded-xl" rows="3" placeholder="{{ __('Tuliskan catatan atau masukan perbaikan...') }}"></textarea>
+                                            </div>
+                                            <div class="modal-action">
+                                                <button type="button" onclick="document.getElementById('reject-version-modal-{{ $pendingVersion->id }}').close()" class="btn btn-ghost rounded-xl">{{ __('Batal') }}</button>
+                                                <button type="submit" class="btn btn-error text-white rounded-xl">{{ __('Tolak Dokumen') }}</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                    <form method="dialog" class="modal-backdrop">
+                                        <button>{{ __('Batal') }}</button>
+                                    </form>
+                                </dialog>
                             @endcan
                         </div>
                     </div>
+                </div>
+            @endif
+
+            {{-- Rejection Notice Banner --}}
+            @php
+                $latestRejectedVersion = $document->versions->where('status', 'rejected')->sortByDesc('updated_at')->first();
+            @endphp
+            @if($latestRejectedVersion && (!$document->currentVersion || $latestRejectedVersion->version_number >= $document->currentVersion->version_number))
+                <div id="rejection-notice-banner" class="mb-6 rounded-2xl border border-error/30 bg-error/10 p-4 sm:p-5 shadow-xs print:hidden">
+                    <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
+                        <div class="flex items-start gap-3 min-w-0 flex-1">
+                            <div class="p-2 rounded-xl bg-error/20 text-error shrink-0 mt-0.5">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <h4 class="font-bold text-sm text-error uppercase tracking-wide">{{ __('Dokumen Ditolak') }} (v{{ $latestRejectedVersion->version_number }})</h4>
+                                    <span class="text-xs text-base-content/50 font-medium">&bull; {{ $latestRejectedVersion->updated_at?->diffForHumans() }}</span>
+                                </div>
+                                <p class="text-xs text-base-content/70 mt-0.5">
+                                    {{ __('Pengajuan dokumen versi ini telah ditolak oleh peninjau.') }}
+                                </p>
+                            </div>
+                        </div>
+                        @can('update', $document)
+                            <div class="shrink-0 flex items-center justify-end pl-10 sm:pl-0">
+                                <a href="{{ route('documents.edit', $document) }}" class="btn btn-error btn-sm text-white font-semibold gap-2 shadow-xs rounded-xl whitespace-nowrap hover:brightness-95 transition-all">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                    <span>{{ __('Edit & Perbaiki') }}</span>
+                                </a>
+                            </div>
+                        @endcan
+                    </div>
+
+                    @if($latestRejectedVersion->notes)
+                        <div class="mt-3.5 sm:ml-10 p-3.5 rounded-xl bg-base-100/90 dark:bg-base-200/90 border border-error/20 text-xs text-base-content shadow-xs">
+                            <div class="font-semibold text-error text-[11px] mb-1.5 flex items-center gap-1.5 uppercase tracking-wider">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
+                                {{ __('Catatan Penolakan:') }}
+                            </div>
+                            <p class="text-base-content/85 text-xs leading-relaxed whitespace-pre-wrap break-words">{{ $latestRejectedVersion->notes }}</p>
+                        </div>
+                    @endif
                 </div>
             @endif
 
@@ -653,12 +753,22 @@
                 .join('');
         }
 
+        let summaryPollTimer = null;
+        let summaryPollAttempts = 0;
+        const MAX_POLL_ATTEMPTS = 60; // 60 x 2s = 120s max
+
         function loadSummary(force = false) {
             const card = document.getElementById('summary-card');
             const bodyWrapper = document.getElementById('summary-body-wrapper');
             const loading = document.getElementById('summary-loading');
             const error = document.getElementById('summary-error');
             const copyBtn = document.getElementById('summary-copy-btn');
+
+            if (summaryPollTimer) {
+                clearTimeout(summaryPollTimer);
+                summaryPollTimer = null;
+            }
+            summaryPollAttempts = 0;
 
             if (force) localStorage.removeItem(SUMMARY_KEY);
 
@@ -682,7 +792,10 @@
             })
             .then(r => r.json().then(data => ({ ok: r.ok, data })))
             .then(({ ok, data }) => {
-                if (!ok) throw new Error(data.error || 'Gagal memulai ringkasan.');
+                if (!ok) {
+                    showError(data.error || 'Gagal memulai ringkasan.');
+                    return;
+                }
                 if (data.status === 'completed' && data.summary) { finishSummary(data.summary); return; }
                 if (data.status === 'failed') { showError(data.error); return; }
                 pollSummary();
@@ -691,14 +804,22 @@
         }
 
         function pollSummary() {
+            summaryPollAttempts++;
+            if (summaryPollAttempts > MAX_POLL_ATTEMPTS) {
+                showError('Pembuatan ringkasan melebihi batas waktu (timeout). Pastikan antrean `php artisan queue:work` berjalan.');
+                return;
+            }
+
             fetch(SUMMARY_STATUS_URL, { headers: { 'Accept': 'application/json' } })
             .then(r => r.json())
             .then(data => {
                 if (data.status === 'completed' && data.summary) { finishSummary(data.summary); return; }
                 if (data.status === 'failed') { showError(data.error); return; }
-                setTimeout(pollSummary, 2000);
+                summaryPollTimer = setTimeout(pollSummary, 2000);
             })
-            .catch(() => setTimeout(pollSummary, 2000));
+            .catch(() => {
+                summaryPollTimer = setTimeout(pollSummary, 2000);
+            });
         }
 
         function finishSummary(summary) {
@@ -752,8 +873,8 @@
         function openModal(modalId) {
             const modal = document.getElementById(modalId);
             if (!modal) return;
-            // Teleport dialog to body so focusing elements inside it never causes <main> to scroll
-            if (modal.parentElement !== document.body) {
+            // Teleport dialog to body only if not inside an Alpine x-data component scope
+            if (modal.parentElement !== document.body && !modal.closest('[x-data]')) {
                 document.body.appendChild(modal);
             }
             modal.showModal();
@@ -761,7 +882,8 @@
 
         document.addEventListener('DOMContentLoaded', function() {
             document.querySelectorAll('dialog.modal').forEach(function(modal) {
-                if (modal.parentElement !== document.body) {
+                // DO NOT detach dialogs that belong to Alpine.js x-data components (e.g. switcher, search)
+                if (modal.parentElement !== document.body && !modal.closest('[x-data]')) {
                     document.body.appendChild(modal);
                 }
             });
@@ -1114,6 +1236,15 @@
                         @endif
                         @if($document->hasPendingRollback() && $document->pending_rollback_version_id === $version->id)
                             <span class="badge badge-warning badge-sm ml-2">Target Rollback</span>
+                        @endif
+                        @if($version->status === 'rejected' && $version->notes)
+                            <div class="w-full mt-1.5 p-2 rounded-lg bg-error/10 border border-error/20 text-xs text-error font-medium flex items-start gap-1.5">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
+                                <div>
+                                    <span class="font-bold">{{ __('Catatan Penolakan:') }}</span>
+                                    <span>{{ $version->notes }}</span>
+                                </div>
+                            </div>
                         @endif
                     </div>
                     <div class="flex flex-wrap gap-2 shrink-0">

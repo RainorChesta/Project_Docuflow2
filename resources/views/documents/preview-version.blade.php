@@ -27,19 +27,19 @@
                 <div class="card-body">
                     <div class="flex flex-wrap justify-between items-center gap-3 mb-4 pb-4 border-b border-base-300">
                         <div class="text-sm">
-                            <div><span class="text-base-content/60">Version:</span> v{{ $version->version_number }}</div>
-                            <div><span class="text-base-content/60">Author:</span> {{ $version->author_name }}</div>
-                            <div><span class="text-base-content/60">Status:</span>
+                            <div><span class="text-base-content/60">{{ __('Versi') }}:</span> v{{ $version->version_number }}</div>
+                            <div><span class="text-base-content/60">{{ __('Penulis') }}:</span> {{ $version->author_name }}</div>
+                            <div><span class="text-base-content/60">{{ __('Status') }}:</span>
                                 @if($version->id === $document->current_version_id)
-                                    <span class="badge badge-success badge-sm">Active</span>
+                                    <span class="badge badge-success badge-sm">{{ __('Aktif') }}</span>
                                 @elseif($version->status === 'inactive')
-                                    <span class="badge badge-neutral badge-sm">Inactive</span>
+                                    <span class="badge badge-neutral badge-sm">{{ __('Tidak Aktif') }}</span>
                                 @elseif($version->status === 'pending')
-                                    <span class="badge badge-warning badge-sm">Pending</span>
+                                    <span class="badge badge-warning badge-sm">{{ __('Tertunda') }}</span>
                                 @elseif($version->status === 'discarded' || $version->discarded_at)
-                                    <span class="badge badge-neutral badge-sm">Discarded</span>
+                                    <span class="badge badge-neutral badge-sm">{{ __('Dibuang') }}</span>
                                 @elseif($version->status === 'rejected')
-                                    <span class="badge badge-error badge-sm">Rejected</span>
+                                    <span class="badge badge-error badge-sm">{{ __('Ditolak') }}</span>
                                 @else
                                     <span class="badge badge-ghost badge-sm">{{ $version->status }}</span>
                                 @endif

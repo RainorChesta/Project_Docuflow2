@@ -88,7 +88,7 @@ class ApprovalController extends Controller
             ));
         }
 
-        return redirect()->route('approvals.index')->with('success', 'Version approved and activated.');
+        return redirect()->route('approvals.index')->with('success', __('Versi disetujui dan diaktifkan.'));
     }
 
     public function reject(Request $request, Document $document, DocumentVersion $version): RedirectResponse
@@ -116,7 +116,7 @@ class ApprovalController extends Controller
             ));
         }
 
-        return redirect()->route('approvals.index')->with('success', 'Version rejected.');
+        return redirect()->route('approvals.index')->with('success', __('Versi ditolak.'));
     }
 
     /**
@@ -158,34 +158,51 @@ class ApprovalController extends Controller
             }
         }
 
-        return redirect()->route('documents.show', $document)->with('success', 'Permintaan rollback diajukan. Menunggu approval kepala divisi.');
+        return redirect()->route('documents.show', $document)->with('success', __('Permintaan rollback diajukan. Menunggu persetujuan kepala divisi.'));
     }
 
     public function approveRollback(Document $document): RedirectResponse
     {
         $this->authorize('approve', $document);
 
+        $requester = $document->rollbackRequestedBy;
+        $targetVersion = $document->pendingRollbackVersion;
+        $reviewer = auth()->user();
+
         try {
-            $restored = $this->versionService->approveRollbackRequest($document, auth()->user());
+            $restored = $this->versionService->approveRollbackRequest($document, $reviewer);
         } catch (RuntimeException $e) {
             return back()->with('error', $e->getMessage());
         }
 
-        $this->auditService->log(auth()->user(), 'rollback.approved', 'document', $document->id, [
+        $this->auditService->log($reviewer, 'rollback.approved', 'document', $document->id, [
             'restored_version' => $restored->version_number,
         ]);
 
+        if ($requester && $requester->id !== $reviewer->id) {
+            $requester->notify(new \App\Notifications\DocumentRollbackResult(
+                $document,
+                $targetVersion,
+                'approved',
+                $reviewer->name
+            ));
+        }
+
         return redirect()->route('documents.show', $document)->with(
             'success',
-            'Rollback disetujui. Dokumen kembali ke versi v' . $restored->version_number . '.'
+            __('Rollback disetujui. Dokumen kembali ke versi v:version.', ['version' => $restored->version_number])
         );
     }
 
-    public function rejectRollback(Document $document): RedirectResponse
+    public function rejectRollback(Request $request, Document $document): RedirectResponse
     {
         $this->authorize('approve', $document);
 
-        $targetVersionNumber = $document->pendingRollbackVersion?->version_number;
+        $requester = $document->rollbackRequestedBy;
+        $targetVersion = $document->pendingRollbackVersion;
+        $targetVersionNumber = $targetVersion?->version_number;
+        $reviewer = auth()->user();
+        $notes = $request->input('notes') ?? $request->input('reason');
 
         try {
             $this->versionService->rejectRollbackRequest($document);
@@ -193,10 +210,21 @@ class ApprovalController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        $this->auditService->log(auth()->user(), 'rollback.rejected', 'document', $document->id, [
+        $this->auditService->log($reviewer, 'rollback.rejected', 'document', $document->id, [
             'target_version' => $targetVersionNumber,
+            'notes' => $notes,
         ]);
 
-        return redirect()->route('documents.show', $document)->with('success', 'Permintaan rollback ditolak.');
+        if ($requester && $requester->id !== $reviewer->id) {
+            $requester->notify(new \App\Notifications\DocumentRollbackResult(
+                $document,
+                $targetVersion,
+                'rejected',
+                $reviewer->name,
+                $notes
+            ));
+        }
+
+        return redirect()->route('documents.show', $document)->with('success', __('Permintaan rollback ditolak.'));
     }
 }
