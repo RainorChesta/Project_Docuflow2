@@ -125,6 +125,14 @@ Route::middleware('auth')->group(function () {
         Route::get('/templates/{template}/download', [DocumentTemplateController::class, 'download'])->name('templates.download');
         Route::get('/documents', [AdminDocumentController::class, 'index'])->name('documents.index');
         Route::delete('/documents/{document}', [AdminDocumentController::class, 'destroy'])->name('documents.destroy');
+
+        // Trash (Sampah Dokumen)
+        Route::get('/trash', [\App\Http\Controllers\Admin\TrashController::class, 'index'])->name('trash.index');
+        Route::post('/trash/bulk-restore', [\App\Http\Controllers\Admin\TrashController::class, 'bulkRestore'])->name('trash.bulk-restore');
+        Route::delete('/trash/bulk-force-delete', [\App\Http\Controllers\Admin\TrashController::class, 'bulkForceDelete'])->name('trash.bulk-force-delete');
+        Route::post('/trash/{id}/restore', [\App\Http\Controllers\Admin\TrashController::class, 'restore'])->name('trash.restore');
+        Route::delete('/trash/{id}/force-delete', [\App\Http\Controllers\Admin\TrashController::class, 'forceDelete'])->name('trash.force-delete');
+        Route::delete('/trash/empty', [\App\Http\Controllers\Admin\TrashController::class, 'emptyTrash'])->name('trash.empty');
     });
 
     // Profile

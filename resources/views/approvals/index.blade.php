@@ -66,6 +66,7 @@
 
                     {{-- Regular Approvals --}}
                     @forelse($pendingVersions as $version)
+                        @if($version->document)
                         <div class="group flex flex-col sm:flex-row items-start justify-between p-4 sm:px-6 transition-colors hover:bg-base-200/40 cursor-default">
                             <div class="flex items-start gap-4 min-w-0 flex-1">
                                 <div class="mt-1">
@@ -107,6 +108,7 @@
                                 </form>
                             </div>
                         </div>
+                        @endif
                     @empty
                         @if(!$pendingRollbacks->count())
                             <div class="p-16 text-center">

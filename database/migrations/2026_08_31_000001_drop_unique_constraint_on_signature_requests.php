@@ -18,19 +18,19 @@ return new class extends Migration
         // so we use a raw approach that works for both SQLite and MySQL/Postgres.
         $driver = Schema::getConnection()->getDriverName();
 
+        // Add a non-unique index first so MySQL foreign key constraints on requester_id remain satisfied
+        Schema::table('signature_requests', function (Blueprint $table) {
+            $table->index(['requester_id', 'target_user_id', 'document_id'], 'idx_req_target_doc');
+        });
+
+        // Drop the unique constraint index
         if ($driver === 'sqlite') {
-            // SQLite: drop index directly
             DB::statement('DROP INDEX IF EXISTS unique_req_target_doc');
         } else {
             Schema::table('signature_requests', function (Blueprint $table) {
                 $table->dropUnique('unique_req_target_doc');
             });
         }
-
-        // Add a non-unique index for performance on the same columns
-        Schema::table('signature_requests', function (Blueprint $table) {
-            $table->index(['requester_id', 'target_user_id', 'document_id'], 'idx_req_target_doc');
-        });
     }
 
     /**
@@ -38,10 +38,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('signature_requests', function (Blueprint $table) {
-            $table->dropIndex('idx_req_target_doc');
-        });
-
         $driver = Schema::getConnection()->getDriverName();
 
         if ($driver === 'sqlite') {
@@ -51,5 +47,9 @@ return new class extends Migration
                 $table->unique(['requester_id', 'target_user_id', 'document_id'], 'unique_req_target_doc');
             });
         }
+
+        Schema::table('signature_requests', function (Blueprint $table) {
+            $table->dropIndex('idx_req_target_doc');
+        });
     }
 };

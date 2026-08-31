@@ -28,7 +28,16 @@ class QrCodeService
         $token = rtrim(strtr(base64_encode(Crypt::encryptString((string) $document->id)), '+/', '-_'), '=');
 
         $path = route('documents.hash', ['token' => $token], false);
-        return rtrim(config('app.url'), '/') . $path;
+
+        // Dynamically detect current request host in web browser context (e.g. https://dokuflow.cmhgroup.id).
+        // Fall back to config('app.url') for CLI / queue workers.
+        if (app()->bound('request') && request()->getHttpHost()) {
+            $baseUrl = request()->schemeAndHttpHost();
+        } else {
+            $baseUrl = rtrim(config('app.url'), '/');
+        }
+
+        return rtrim($baseUrl, '/') . $path;
     }
 
     /**

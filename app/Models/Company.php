@@ -16,6 +16,16 @@ class Company extends Model
         'code',
     ];
 
+    protected static function booted(): void
+    {
+        static::deleting(function (Company $company) {
+            Document::withTrashed()->where('company_id', $company->id)->update([
+                'company_id' => null,
+                'branch_id' => null,
+            ]);
+        });
+    }
+
     public function branches(): HasMany
     {
         return $this->hasMany(Branch::class);
