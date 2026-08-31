@@ -168,6 +168,11 @@ class Document extends Model
         return $this->hasMany(DocumentShare::class);
     }
 
+    public function signatureRequests(): HasMany
+    {
+        return $this->hasMany(SignatureRequest::class);
+    }
+
     public function divisionShares(): HasMany
     {
         return $this->hasMany(DocumentDivisionShare::class);

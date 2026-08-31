@@ -28,7 +28,8 @@ class ApprovalController extends Controller
             $companyIds = $user->companies()->pluck('companies.id')->all();
 
             $pendingVersionsQuery = DocumentVersion::where('status', 'pending')
-                ->whereNull('discarded_at');
+                ->whereNull('discarded_at')
+                ->whereHas('document');
             $pendingRollbacksQuery = Document::whereNotNull('pending_rollback_version_id');
 
             if (!$user->isAdmin() && !empty($companyIds)) {

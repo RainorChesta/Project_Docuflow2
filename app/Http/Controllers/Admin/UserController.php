@@ -134,10 +134,85 @@ class UserController extends Controller
     public function destroy(User $user): RedirectResponse
     {
         $this->authorize('admin');
+
         if ($user->id === auth()->id()) {
-            return back()->withErrors(['error' => 'Cannot delete yourself.']);
+            return back()->withErrors(['error' => 'Tidak dapat menghapus akun Anda sendiri.']);
         }
-        $user->update(['is_active' => false]);
-        return redirect()->route('admin.users.index')->with('success', 'User deactivated.');
+
+        try {
+            \Illuminate\Support\Facades\DB::transaction(function () use ($user) {
+                // Hapus file tanda tangan jika ada
+                if ($user->signature) {
+                    if ($user->signature->file_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($user->signature->file_path)) {
+                        \Illuminate\Support\Facades\Storage::disk('public')->delete($user->signature->file_path);
+                    }
+                    $user->signature()->delete();
+                }
+
+                // Hapus foto profil jika ada
+                if ($user->profile_picture && \Illuminate\Support\Facades\Storage::disk('public')->exists($user->profile_picture)) {
+                    \Illuminate\Support\Facades\Storage::disk('public')->delete($user->profile_picture);
+                }
+
+                // Detach pivot tables
+                $user->companies()->detach();
+                $user->branches()->detach();
+                $user->divisions()->detach();
+
+                // Bersihkan relasi foreign key yang belum cascade
+                // 1. Dokumen yang dimiliki user: hapus atau nullkan owner
+                // Jika user memiliki dokumen, kita bisa nullkan atau hapus dokumen sesuai kebutuhan sistem
+                // Mengingat owner_id di dokumen:
+                \App\Models\DocumentAccessLink::where('created_by', $user->id)->delete();
+                \App\Models\DocumentDistribution::where('created_by', $user->id)->orWhere('target_user_id', $user->id)->delete();
+                
+                // Rollback request references
+                \App\Models\Document::where('rollback_requested_by_id', $user->id)->update([
+                    'rollback_requested_by_id' => null
+                ]);
+
+                // Version author / reviewer nullOnDelete
+                \App\Models\DocumentVersion::where('author_id', $user->id)->update(['author_id' => null]);
+                \App\Models\DocumentVersion::where('reviewer_id', $user->id)->update(['reviewer_id' => null]);
+
+                // Signature requests
+                \App\Models\SignatureRequest::where('requester_id', $user->id)->orWhere('target_user_id', $user->id)->delete();
+
+                // Document shares
+                \App\Models\DocumentShare::where('user_id', $user->id)->orWhere('invited_by', $user->id)->delete();
+                \App\Models\DocumentDivisionShare::where('invited_by', $user->id)->delete();
+
+                // Dokumen milik user: jika ada, kita hapus dokumen beserta versinya
+                $ownedDocuments = \App\Models\Document::where('owner_id', $user->id)->get();
+                foreach ($ownedDocuments as $doc) {
+                    foreach ($doc->versions as $version) {
+                        if ($version->file_path && \Illuminate\Support\Facades\Storage::disk('local')->exists($version->file_path)) {
+                            \Illuminate\Support\Facades\Storage::disk('local')->delete($version->file_path);
+                        }
+                    }
+                    $doc->versions()->delete();
+                    $doc->forceDelete();
+                }
+
+                // Document templates created by user
+                $ownedTemplates = \App\Models\DocumentTemplate::where('created_by', $user->id)->get();
+                foreach ($ownedTemplates as $tmpl) {
+                    if ($tmpl->file_path && \Illuminate\Support\Facades\Storage::disk(config('onlyoffice.storage_disk', 'local'))->exists($tmpl->file_path)) {
+                        \Illuminate\Support\Facades\Storage::disk(config('onlyoffice.storage_disk', 'local'))->delete($tmpl->file_path);
+                    }
+                    $tmpl->delete();
+                }
+
+                // Audit logs
+                \App\Models\AuditLog::where('user_id', $user->id)->update(['user_id' => null]);
+
+                // Hard delete user
+                $user->delete();
+            });
+
+            return redirect()->route('admin.users.index')->with('success', 'User berhasil dihapus secara permanen.');
+        } catch (\Throwable $e) {
+            return back()->withErrors(['error' => 'Gagal menghapus user: ' . $e->getMessage()]);
+        }
     }
 }
