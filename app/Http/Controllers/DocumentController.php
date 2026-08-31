@@ -428,6 +428,35 @@ class DocumentController extends Controller
             ]);
         }
 
+        // Validasi ketersediaan konfigurasi AI sebelum dispatch
+        if (!app()->environment('testing')) {
+            $hasKey = match ($model) {
+                'groq' => !empty(config('services.groq.key')),
+                'deepseek' => !empty(config('services.deepseek.key')),
+                'ollama' => !empty(config('services.ollama.url')),
+                default => !empty(config('services.groq.key')) || !empty(config('services.deepseek.key')) || !empty(config('services.ollama.url')),
+            };
+
+            if (!$hasKey) {
+                $msg = match ($model) {
+                    'groq' => 'GROQ_API_KEY belum diisi di file .env. Silakan tambahkan GROQ_API_KEY (dari console.groq.com) untuk menggunakan Groq.',
+                    'deepseek' => 'DEEPSEEK_API_KEY belum diisi di file .env. Silakan tambahkan DEEPSEEK_API_KEY untuk menggunakan DeepSeek.',
+                    'ollama' => 'OLLAMA_URL belum diisi di file .env.',
+                    default => 'Konfigurasi AI belum disetel di file .env. Silakan isi GROQ_API_KEY atau DEEPSEEK_API_KEY di file .env.',
+                };
+
+                $document->update([
+                    'summary_status' => Document::SUMMARY_FAILED,
+                    'summary_error' => $msg,
+                ]);
+
+                return response()->json([
+                    'status' => Document::SUMMARY_FAILED,
+                    'error' => $msg,
+                ], 422);
+            }
+        }
+
         // Jika force ringkas ulang atau status sebelumnya failed → reset status
         if ($force || $document->summary_status === Document::SUMMARY_FAILED) {
             $document->update([
@@ -455,6 +484,16 @@ class DocumentController extends Controller
     public function summaryStatus(Document $document): JsonResponse
     {
         $this->authorize('view', $document);
+
+        // Auto-detect antrean macet / worker tidak berjalan (lebih dari 2 menit di processing)
+        if ($document->summary_status === Document::SUMMARY_PROCESSING && $document->summary_started_at) {
+            if ($document->summary_started_at->diffInSeconds(now()) >= 120) {
+                $document->update([
+                    'summary_status' => Document::SUMMARY_FAILED,
+                    'summary_error' => 'Proses ringkasan memakan waktu terlalu lama atau antrean (queue worker) belum dijalankan. Pastikan `php artisan queue:work` aktif atau ubah QUEUE_CONNECTION=sync di .env.',
+                ]);
+            }
+        }
 
         return response()->json([
             'status' => $document->summary_status,
@@ -732,19 +771,22 @@ class DocumentController extends Controller
     }
 
     /**
-     * Download the latest version of the document as DOCX.
+     * Download the latest version of the document as DOCX, or a specific version if requested.
      */
-    public function download(Document $document)
+    public function download(Request $request, Document $document)
     {
         $this->authorize('view', $document);
 
-        $version = $document->displayVersion();
+        $version = $request->filled('version_id')
+            ? $document->versions()->where('id', $request->input('version_id'))->first()
+            : $document->displayVersion();
+
         abort_unless($version && $version->file_path, 404, 'File not found');
 
         $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
         abort_unless($disk->exists($version->file_path), 404, 'Physical file not found');
 
-        $downloadName = $document->title;
+        $downloadName = $version->file_original_name ?? $document->title;
         if (!str_ends_with(strtolower($downloadName), '.docx') && !str_ends_with(strtolower($downloadName), '.pdf')) {
             $downloadName .= '.docx';
         }

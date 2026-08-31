@@ -96,7 +96,7 @@
     @endif
 
     <!-- Hero Section -->
-    <main class="flex-1 relative flex flex-col items-center pt-16 sm:pt-24 pb-0 px-4 sm:px-6 lg:px-8 overflow-hidden bg-grid-pattern">
+    <main class="flex-1 relative flex flex-col items-center justify-center md:justify-start pt-12 sm:pt-16 md:pt-24 pb-12 md:pb-0 px-4 sm:px-6 lg:px-8 overflow-hidden bg-grid-pattern">
         <!-- Radial gradient to highlight the center and fade the grid -->
         <div class="absolute inset-0 bg-base-100 [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black_70%)] pointer-events-none"></div>
         
@@ -135,8 +135,8 @@
             </div>
         </div>
         
-        <!-- Large UI Mockup (Centered) -->
-        <div class="relative z-10 w-full max-w-5xl mx-auto mt-20 mask-fade-bottom px-4 sm:px-0">
+        <!-- Large UI Mockup (Centered - Hidden when screen shrinks on mobile/tablet) -->
+        <div class="hidden md:block relative z-10 w-full max-w-5xl mx-auto mt-12 md:mt-20 mask-fade-bottom px-4 sm:px-0">
             <div class="rounded-t-2xl border border-base-300 bg-base-100 shadow-2xl overflow-hidden ring-1 ring-base-content/5">
                 <!-- Mac-like Window Header -->
                 <div class="bg-base-200/50 border-b border-base-300 px-4 py-3 flex items-center justify-between">

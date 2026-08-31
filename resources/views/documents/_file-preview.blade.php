@@ -9,7 +9,7 @@
             <span class="font-medium text-base-content">{{ $version->file_original_name ?? ($document->title . '.docx') }}</span>
         </div>
         <div class="flex items-center gap-2">
-            <a href="{{ route('documents.download', $document) }}" class="btn btn-primary btn-xs">
+            <a href="{{ route('documents.download', [$document, 'version_id' => $version->id]) }}" class="btn btn-primary btn-xs">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
@@ -19,11 +19,11 @@
     </div>
 
     @if($isPdf)
-        <iframe src="{{ $fileUrl }}" class="w-full border-0" style="height: 80vh;" title="{{ __('Pratinjau dokumen') }}"></iframe>
+        <iframe src="{{ $fileUrl }}" class="w-full border-0 rounded-lg h-[72vh] sm:h-[80vh] lg:h-[1123px] min-h-[520px] sm:min-h-[650px] lg:min-h-[1123px]" title="{{ __('Pratinjau dokumen') }}"></iframe>
     @else
         @if(isset($onlyOfficeConfig))
-            <div class="w-full border border-base-300 rounded-lg overflow-hidden" style="width: 100%; height: 850px; min-height: 80vh;">
-                <div id="docx-preview-{{ $version->id }}"></div>
+            <div class="w-full border border-base-300 rounded-lg overflow-hidden shadow-xs bg-base-100 h-[72vh] sm:h-[80vh] lg:h-[1150px] min-h-[520px] sm:min-h-[650px] lg:min-h-[1123px]">
+                <div id="docx-preview-{{ $version->id }}" class="w-full h-full"></div>
             </div>
 
             <script src="{{ rtrim(config('onlyoffice.url'), '/') }}/web-apps/apps/api/documents/api.js"></script>
@@ -36,41 +36,62 @@
                     }
                     try {
                         const config = @json($onlyOfficeConfig);
+                        const isMobileOrTablet = window.innerWidth < 1024;
+
+                        // Always use desktop type to bypass ONLYOFFICE Community Edition mobile license restriction
+                        config.type = 'desktop';
+                        config.editorConfig = config.editorConfig || {};
+                        config.editorConfig.customization = config.editorConfig.customization || {};
+                        config.editorConfig.customization.compactHeader = true;
+                        config.editorConfig.customization.autoFocus = false;
+                        config.editorConfig.customization.mobile = { force: false };
+
+                        if (isMobileOrTablet) {
+                            // Responsive mode for small/shrinking viewports:
+                            config.editorConfig.customization.compactToolbar = true;
+                            config.editorConfig.customization.leftMenu = false;
+                            config.editorConfig.customization.rightMenu = false;
+                            config.editorConfig.customization.ruler = false;
+                            config.editorConfig.customization.toolbarHideFileName = true;
+                            config.editorConfig.customization.zoom = -2; // Fit to Width
+                        } else {
+                            // Desktop screen - preserve standard layout intact
+                            config.editorConfig.customization.compactToolbar = false;
+                            config.editorConfig.customization.leftMenu = true;
+                            config.editorConfig.customization.rightMenu = true;
+                            config.editorConfig.customization.ruler = true;
+                            config.editorConfig.customization.toolbarHideFileName = false;
+                            config.editorConfig.customization.zoom = 100;
+                        }
+
                         const mainEl = document.querySelector('main') || document.documentElement;
-                        let initialScrollTop = mainEl.scrollTop || 0;
-                        let userHasManuallyScrolled = false;
+                        const initialScrollTop = mainEl.scrollTop || 0;
+                        let guardActive = true;
 
-                        // Listen for genuine user scroll events (mouse wheel, touch, key navigation)
-                        const markUserScrolled = function() {
-                            userHasManuallyScrolled = true;
+                        // Allow normal user scrolling immediately upon any user interaction
+                        const releaseGuard = function() {
+                            guardActive = false;
                         };
-                        window.addEventListener('wheel', markUserScrolled, { passive: true, capture: true });
-                        window.addEventListener('touchmove', markUserScrolled, { passive: true, capture: true });
-                        window.addEventListener('keydown', function(e) {
-                            if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', 'Space'].includes(e.code)) {
-                                userHasManuallyScrolled = true;
-                            }
-                        }, { passive: true, capture: true });
+                        window.addEventListener('wheel', releaseGuard, { passive: true, capture: true });
+                        window.addEventListener('touchmove', releaseGuard, { passive: true, capture: true });
+                        window.addEventListener('pointerdown', releaseGuard, { passive: true, capture: true });
+                        window.addEventListener('mousedown', releaseGuard, { passive: true, capture: true });
+                        window.addEventListener('keydown', releaseGuard, { passive: true, capture: true });
 
-                        function preventAutofocusScroll() {
-                            if (!userHasManuallyScrolled && mainEl) {
-                                if (mainEl.scrollTop !== initialScrollTop) {
-                                    mainEl.scrollTop = initialScrollTop;
-                                }
+                        function restoreScrollIfAutofocused() {
+                            if (guardActive && mainEl && mainEl.scrollTop !== initialScrollTop) {
+                                mainEl.scrollTop = initialScrollTop;
                             }
                         }
 
-                        // Maintain initial scroll position during ONLYOFFICE initialization window (3.5 seconds)
-                        const scrollGuardInterval = setInterval(preventAutofocusScroll, 30);
-                        setTimeout(function() {
-                            clearInterval(scrollGuardInterval);
-                        }, 3500);
+                        // Release guard after 1.5s max so it never blocks scrolling
+                        setTimeout(releaseGuard, 1500);
 
                         config.events = config.events || {};
                         const origOnAppReady = config.events.onAppReady;
                         config.events.onAppReady = function() {
                             if (typeof origOnAppReady === 'function') origOnAppReady();
-                            preventAutofocusScroll();
+                            restoreScrollIfAutofocused();
 
                             // Execute macro to resolve pending signatures
                             const approvedSignatures = @json($approvedSignatures ?? []);
@@ -105,19 +126,15 @@
                                 `;
                                 connector.callCommand(new Function(script), function() {
                                     console.log("Pending signatures replaced automatically in preview.");
-                                    preventAutofocusScroll();
                                 });
                             }
                         };
                         
                         const origOnDocumentReady = config.events.onDocumentReady;
                         config.events.onDocumentReady = function() {
-                            preventAutofocusScroll();
-                            setTimeout(preventAutofocusScroll, 50);
-                            setTimeout(preventAutofocusScroll, 150);
-                            setTimeout(preventAutofocusScroll, 300);
-                            setTimeout(preventAutofocusScroll, 600);
-                            setTimeout(preventAutofocusScroll, 1000);
+                            restoreScrollIfAutofocused();
+                            setTimeout(restoreScrollIfAutofocused, 50);
+                            setTimeout(releaseGuard, 300);
 
                             if (typeof origOnDocumentReady === 'function') origOnDocumentReady();
                         };
@@ -131,7 +148,7 @@
                 });
             </script>
         @else
-            <div id="docx-preview-{{ $version->id }}" class="prose max-w-none px-4 py-6 border border-base-300 rounded-lg min-h-[200px]">
+            <div id="docx-preview-{{ $version->id }}" class="prose max-w-none px-6 py-8 border border-base-300 rounded-lg bg-base-100 shadow-xs" style="min-height: 1123px;">
                 <p class="text-base-content/50 text-sm">{{ __('Memuat isi dokumen...') }}</p>
             </div>
 

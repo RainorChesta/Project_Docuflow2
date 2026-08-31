@@ -242,4 +242,65 @@ class DigitalSignatureTest extends TestCase
             }
         );
     }
+
+    public function test_cross_company_or_branch_signer_can_view_document_preview_only(): void
+    {
+        $companyA = \App\Models\Company::create(['name' => 'Company A', 'code' => 'CMPA']);
+        $branchA = \App\Models\Branch::create(['company_id' => $companyA->id, 'name' => 'Branch A', 'is_pusat' => true]);
+
+        $companyB = \App\Models\Company::create(['name' => 'Company B', 'code' => 'CMPB']);
+        $branchB = \App\Models\Branch::create(['company_id' => $companyB->id, 'name' => 'Branch B', 'is_pusat' => true]);
+
+        $authorA = User::factory()->create(['name' => 'Author Company A']);
+        $authorA->companies()->sync([$companyA->id]);
+        $authorA->branches()->sync([$branchA->id]);
+
+        $signerB = User::factory()->create(['name' => 'Signer Company B']);
+        $signerB->companies()->sync([$companyB->id]);
+        $signerB->branches()->sync([$branchB->id]);
+
+        $otherUserB = User::factory()->create(['name' => 'Unrelated User Company B']);
+        $otherUserB->companies()->sync([$companyB->id]);
+        $otherUserB->branches()->sync([$branchB->id]);
+
+        $docType = DocumentType::create(['name' => 'Memo Internal', 'code' => 'MI']);
+        $document = Document::create([
+            'document_number' => '004/MI/CMPA/2026',
+            'title' => 'Cross Company Doc',
+            'document_type_id' => $docType->id,
+            'company_id' => $companyA->id,
+            'branch_id' => $branchA->id,
+            'owner_id' => $authorA->id,
+            'visibility' => 'personal',
+        ]);
+
+        // Unrelated user from Company B cannot view the document
+        $this->actingAs($otherUserB)->get(route('documents.show', $document))
+            ->assertStatus(403);
+
+        // Signer B without request cannot view yet
+        $this->actingAs($signerB)->get(route('documents.show', $document))
+            ->assertStatus(403);
+
+        // Create signature request for Signer B
+        SignatureRequest::create([
+            'requester_id' => $authorA->id,
+            'target_user_id' => $signerB->id,
+            'document_id' => $document->id,
+            'status' => 'pending',
+            'requested_at' => now(),
+        ]);
+
+        // Signer B can now view the document and preview
+        $this->actingAs($signerB)->get(route('documents.show', $document))
+            ->assertStatus(200);
+
+        // Signer B cannot edit/update the document
+        $this->actingAs($signerB)->get(route('documents.edit', $document))
+            ->assertStatus(403);
+
+        // Signer B cannot delete the document
+        $this->actingAs($signerB)->delete(route('documents.destroy', $document))
+            ->assertStatus(403);
+    }
 }

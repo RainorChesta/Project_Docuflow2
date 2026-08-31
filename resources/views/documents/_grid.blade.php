@@ -67,7 +67,9 @@
 
     {{-- Document type badge --}}
     @if($doc->documentType)
-        <span class="badge badge-outline badge-xs opacity-60">{{ $doc->documentType->code }}</span>
+        <span class="badge badge-outline badge-xs opacity-60 max-w-[90%] inline-flex items-center" title="{{ $doc->documentType->name ?? $doc->documentType->code }}">
+            <span class="truncate">{{ $doc->documentType->code }}</span>
+        </span>
     @endif
 
 </a>

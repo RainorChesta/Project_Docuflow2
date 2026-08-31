@@ -18,15 +18,18 @@ class OnlyOfficeService
      */
     public function generateDocumentKey(Document $document, DocumentVersion $version): string
     {
-        $cacheKey = 'onlyoffice_doc_key_' . $document->id;
+        $updatedAt = $version->updated_at ? $version->updated_at->timestamp : ($version->created_at ? $version->created_at->timestamp : time());
+        $cacheKey = 'onlyoffice_doc_key_' . $document->id . '_v' . $version->id . '_' . $updatedAt;
         
-        return \Illuminate\Support\Facades\Cache::remember($cacheKey, now()->addDays(1), function () use ($document, $version) {
-            $timeKey = uniqid() . '_' . microtime(true);
+        return \Illuminate\Support\Facades\Cache::remember($cacheKey, now()->addDays(1), function () use ($document, $version, $updatedAt) {
+            $timeKey = uniqid();
             
             $raw = sprintf(
-                'doc_%d_v%d_%s',
+                'doc_%d_v%d_%d_%d_%s',
                 $document->id,
                 $version->version_number,
+                $version->id,
+                $updatedAt,
                 $timeKey
             );
 
@@ -204,14 +207,16 @@ class OnlyOfficeService
      */
     public function generateTemplateKey(\App\Models\DocumentTemplate $template): string
     {
-        $cacheKey = 'onlyoffice_template_key_' . $template->id;
+        $updatedAt = $template->updated_at ? $template->updated_at->timestamp : ($template->created_at ? $template->created_at->timestamp : time());
+        $cacheKey = 'onlyoffice_template_key_' . $template->id . '_' . $updatedAt;
         
-        return \Illuminate\Support\Facades\Cache::remember($cacheKey, now()->addDays(1), function () use ($template) {
-            $timeKey = uniqid() . '_' . microtime(true);
+        return \Illuminate\Support\Facades\Cache::remember($cacheKey, now()->addDays(1), function () use ($template, $updatedAt) {
+            $timeKey = uniqid();
             
             $raw = sprintf(
-                'tpl_%d_%s',
+                'tpl_%d_%d_%s',
                 $template->id,
+                $updatedAt,
                 $timeKey
             );
 
@@ -314,11 +319,12 @@ class OnlyOfficeService
                 ],
                 'customization' => [
                     'autoFocus' => false,
+                    'zoom' => 100,
+                    'compactHeader' => true,
                     'autosave' => (bool) config('onlyoffice.autosave', true),
                     'forcesave' => (bool) config('onlyoffice.forcesave', true),
                     'chat' => false,
                     'comments' => false,
-                    'compactHeader' => false,
                     'toolbarNoTabs' => false,
                     'feedback' => false,
                     'goback' => [
@@ -394,11 +400,12 @@ class OnlyOfficeService
                 ],
                 'customization' => [
                     'autoFocus' => false,
+                    'zoom' => 100,
+                    'compactHeader' => true,
                     'autosave' => (bool) config('onlyoffice.autosave', true),
                     'forcesave' => (bool) config('onlyoffice.forcesave', true),
                     'chat' => false,
                     'comments' => false,
-                    'compactHeader' => false,
                     'toolbarNoTabs' => false,
                     'feedback' => false,
                     'goback' => [

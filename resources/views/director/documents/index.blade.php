@@ -449,8 +449,8 @@
                 </div>
             @endif
 
-            {{-- 4. DOCUMENT RESULTS SECTION (Only rendered when in a division) --}}
-            @if($selectedDivisionId)
+            {{-- 4. DOCUMENT RESULTS SECTION (Rendered when in a division or when searching/filtering in a branch) --}}
+            @if($selectedDivisionId || ($selectedBranchId && $hasSearchOrFilter))
                 <div class="space-y-4 pt-2">
                     
                     {{-- Results Header with View Mode Toggle --}}
@@ -541,14 +541,18 @@
                                                     </td>
                                                     <td>
                                                         @if($doc->division)
-                                                            <span class="badge badge-ghost badge-sm">{{ $doc->division->name }}</span>
+                                                            <span class="badge badge-ghost badge-sm max-w-[140px] inline-flex items-center" title="{{ $doc->division->name }}">
+                                                                <span class="truncate">{{ $doc->division->name }}</span>
+                                                            </span>
                                                         @else
                                                             <span class="text-base-content/40">—</span>
                                                         @endif
                                                     </td>
                                                     <td>
                                                         @if($doc->documentType)
-                                                            <span class="badge badge-outline badge-sm">{{ $doc->documentType->name }}</span>
+                                                            <span class="badge badge-outline badge-sm max-w-[140px] inline-flex items-center" title="{{ $doc->documentType->name }}">
+                                                                <span class="truncate">{{ $doc->documentType->name }}</span>
+                                                            </span>
                                                         @else
                                                             <span class="text-base-content/40">—</span>
                                                         @endif

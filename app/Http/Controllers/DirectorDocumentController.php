@@ -35,7 +35,7 @@ class DirectorDocumentController extends Controller
         $currentCompany = null;
         if ($selectedCompanyId) {
             $compQuery = Company::where('id', $selectedCompanyId);
-            if (!$user->isAdmin()) {
+            if (!$user->isAdmin() && !$user->isDirector()) {
                 $compQuery->whereHas('users', fn($q) => $q->where('users.id', $user->id));
             }
             $currentCompany = $compQuery->first();
@@ -50,7 +50,7 @@ class DirectorDocumentController extends Controller
         $currentBranch = null;
         if ($selectedBranchId && $selectedCompanyId) {
             $branchQuery = Branch::where('id', $selectedBranchId)->where('company_id', $selectedCompanyId);
-            if (!$user->isAdmin()) {
+            if (!$user->isAdmin() && !$user->isDirector()) {
                 $branchQuery->whereHas('users', fn($q) => $q->where('users.id', $user->id));
             }
             $currentBranch = $branchQuery->first();
@@ -168,7 +168,7 @@ class DirectorDocumentController extends Controller
         // Level 1: Inside Company -> Show Branch folders
         elseif ($selectedCompanyId && !$selectedBranchId) {
             $branchesQuery = Branch::where('company_id', $selectedCompanyId);
-            if (!$user->isAdmin()) {
+            if (!$user->isAdmin() && !$user->isDirector()) {
                 $branchesQuery->whereHas('users', fn($uq) => $uq->where('users.id', $user->id));
             }
             
@@ -194,8 +194,14 @@ class DirectorDocumentController extends Controller
                 ];
             });
         }
-        // Level 2: Inside Branch -> Show Division folders
-        elseif ($selectedBranchId && !$selectedDivisionId) {
+
+        $hasSearchOrFilter = $selectedDivisionId 
+            || ($search !== null && trim($search) !== '') 
+            || ($selectedDocTypeId !== null && $selectedDocTypeId !== '') 
+            || ($selectedOwnerId !== null && $selectedOwnerId !== '');
+
+        // Level 2: Inside Branch -> Show Division folders when not actively searching/filtering
+        if ($selectedBranchId && !$selectedDivisionId && !$hasSearchOrFilter) {
             $branchDocDivisions = Document::where('branch_id', $selectedBranchId)
                 ->whereNotNull('division_id')
                 ->select('division_id')
@@ -203,14 +209,7 @@ class DirectorDocumentController extends Controller
                 ->groupBy('division_id')
                 ->pluck('count', 'division_id');
 
-            $allDivisions = Division::orderBy('name');
-            if (!empty($search)) {
-                $allDivisions->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('code', 'like', "%{$search}%");
-                });
-            }
-            $allDivisions = $allDivisions->get();
+            $allDivisions = Division::orderBy('name')->get();
             
             $folders = $allDivisions->map(function ($div) use ($branchDocDivisions, $selectedCompanyId, $selectedBranchId, $viewMode) {
                 $count = $branchDocDivisions[$div->id] ?? 0;
@@ -236,24 +235,32 @@ class DirectorDocumentController extends Controller
         $availableDocumentTypes = collect();
         $availableCreators = collect();
 
-        $hasSearchOrFilter = $selectedDivisionId 
-            || ($search !== null && trim($search) !== '') 
-            || $selectedDocTypeId 
-            || $selectedOwnerId;
-
-        // Documents are only queried inside a selected division
-        if ($selectedDivisionId) {
+        // Documents are queried if inside a division OR when searching/filtering inside a branch
+        if ($selectedDivisionId || ($selectedBranchId && $hasSearchOrFilter)) {
             // Populate filter options dynamically from documents in this selected division and branch
-            $branchDocTypes = DocumentType::whereHas('documents', fn($q) => $q->where('division_id', $selectedDivisionId)->where('branch_id', $selectedBranchId))->orderBy('name')->get();
+            $branchDocTypes = DocumentType::whereHas('documents', function ($q) use ($selectedDivisionId, $selectedBranchId) {
+                $q->where('branch_id', $selectedBranchId);
+                if ($selectedDivisionId) {
+                    $q->where('division_id', $selectedDivisionId);
+                }
+            })->orderBy('name')->get();
             $availableDocumentTypes = $branchDocTypes->isNotEmpty() ? $branchDocTypes : DocumentType::orderBy('name')->get();
 
-            $availableCreators = User::whereHas('documents', fn($q) => $q->where('division_id', $selectedDivisionId)->where('branch_id', $selectedBranchId))->orderBy('name')->get(['id', 'name']);
+            $availableCreators = User::whereHas('documents', function ($q) use ($selectedDivisionId, $selectedBranchId) {
+                $q->where('branch_id', $selectedBranchId);
+                if ($selectedDivisionId) {
+                    $q->where('division_id', $selectedDivisionId);
+                }
+            })->orderBy('name')->get(['id', 'name']);
 
-            $docQuery = Document::where('division_id', $selectedDivisionId)
-                ->where('branch_id', $selectedBranchId)
+            $docQuery = Document::where('branch_id', $selectedBranchId)
                 ->with(['owner', 'division', 'documentType', 'currentVersion', 'versions', 'branch.company']);
 
-            // Apply search filter for documents inside division
+            if ($selectedDivisionId) {
+                $docQuery->where('division_id', $selectedDivisionId);
+            }
+
+            // Apply search filter for documents inside division/branch
             if (!empty($search)) {
                 $docQuery->where(function ($q) use ($search) {
                     $q->where('title', 'like', "%{$search}%")

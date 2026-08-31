@@ -155,7 +155,9 @@
                                         <div class="flex items-center gap-2 mt-0.5">
                                             <span class="text-xs font-mono text-base-content/60">{{ $doc->document_number }}</span>
                                             @if($doc->documentType)
-                                                <span class="badge badge-xs badge-outline">{{ $doc->documentType->name }}</span>
+                                                <span class="badge badge-xs badge-outline max-w-[150px] inline-flex items-center" title="{{ $doc->documentType->name }}">
+                                                    <span class="truncate">{{ $doc->documentType->name }}</span>
+                                                </span>
                                             @endif
                                         </div>
                                     </td>

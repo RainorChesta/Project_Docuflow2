@@ -28,14 +28,20 @@ class DocumentSummarizeTest extends TestCase
     {
         parent::setUp();
 
+        $company = \App\Models\Company::create(['name' => 'PT Jaya', 'code' => 'JBM']);
+        $branch = \App\Models\Branch::create(['company_id' => $company->id, 'name' => 'Pusat', 'is_pusat' => true]);
         $division = Division::create(['code' => 'HRD', 'name' => 'Human Resources']);
         $docType = DocumentType::create(['name' => 'Surat Edaran', 'code' => 'S.ED']);
         $this->user = User::factory()->create(['division_id' => $division->id]);
+        $this->user->companies()->sync([$company->id]);
+        $this->user->branches()->sync([$branch->id]);
 
         $this->document = Document::create([
             'document_number' => '001/S.ED/HRD/JBM/VIII/2026',
             'title' => 'Dokumen Uji Ringkasan AI',
             'visibility' => Document::VISIBILITY_DIVISION,
+            'company_id' => $company->id,
+            'branch_id' => $branch->id,
             'division_id' => $division->id,
             'owner_id' => $this->user->id,
             'document_type_id' => $docType->id,

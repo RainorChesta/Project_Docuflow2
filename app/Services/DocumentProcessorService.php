@@ -57,9 +57,10 @@ class DocumentProcessorService
             $modifiedContent = file_get_contents($tempDocxPath);
             $disk->put($filePath, $modifiedContent);
 
-            // Clean up temp files
-            unlink($tempDocxPath);
-            
+            // Touch version and document to rotate ONLYOFFICE cache key
+            $version->touch();
+            $document->touch();
+
             // Force OnlyOffice to fetch the new modified file by clearing its cache key
             \Illuminate\Support\Facades\Cache::forget('onlyoffice_doc_key_' . $document->id);
 

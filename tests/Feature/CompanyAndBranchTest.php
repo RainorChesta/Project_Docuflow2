@@ -390,9 +390,9 @@ class CompanyAndBranchTest extends TestCase
         $director->companies()->sync([$company->id]);
         $director->branches()->sync([$branch->id]);
 
-        $admin = User::factory()->create(['system_role' => 'admin']);
-        $admin->companies()->sync([$company->id]);
-        $admin->branches()->sync([$branch->id]);
+        $regularUser = User::factory()->create(['system_role' => 'user']);
+        $regularUser->companies()->sync([$company->id]);
+        $regularUser->branches()->sync([$branch->id]);
 
         // Director on director.documents.index: company & branch switcher is hidden
         $directorResp = $this->actingAs($director)->get(route('director.documents.index'));
@@ -400,11 +400,11 @@ class CompanyAndBranchTest extends TestCase
         $directorResp->assertDontSee('name="company_id"', false);
         $directorResp->assertDontSee('name="branch_id"', false);
 
-        // Admin on director.documents.index: switcher is visible
-        $adminResp = $this->actingAs($admin)->get(route('director.documents.index'));
-        $adminResp->assertOk();
-        $adminResp->assertSee('name="company_id"', false);
-        $adminResp->assertSee('name="branch_id"', false);
+        // Regular user with company/branch: switcher is visible
+        $regularUserResp = $this->actingAs($regularUser)->get(route('documents.index'));
+        $regularUserResp->assertOk();
+        $regularUserResp->assertSee('name="company_id"', false);
+        $regularUserResp->assertSee('name="branch_id"', false);
     }
 
     public function test_document_scope_modal_preselects_origin_branch_and_syncs_distributions(): void
