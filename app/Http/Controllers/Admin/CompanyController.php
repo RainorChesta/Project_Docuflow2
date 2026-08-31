@@ -68,7 +68,7 @@ class CompanyController extends Controller
     public function destroy(Company $company): RedirectResponse
     {
         $this->authorize('admin');
-        if ($company->documents()->exists()) {
+        if ($company->documents()->withTrashed()->exists()) {
             return back()->with('error', __('Tidak dapat menghapus perusahaan yang memiliki dokumen terkait.'));
         }
 
