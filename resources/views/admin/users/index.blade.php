@@ -58,11 +58,46 @@
                                             {{ $user->system_role }}
                                         </span>
                                     </td>
-                                    <td>{{ $user->is_active ? __('Ya') : __('Tidak') }}</td>
-                                    <td class="text-right">
+                                    <td>{{ $user->is_active ? 'Yes' : 'No' }}</td>
+                                    <td class="text-right whitespace-nowrap">
                                         <a href="{{ route('admin.users.edit', $user) }}" class="btn btn-ghost btn-xs btn-square text-primary" title="{{ __('Edit') }}">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                         </a>
+                                        @if(auth()->id() !== $user->id)
+                                            <button type="button" onclick="document.getElementById('delete-user-modal-{{ $user->id }}').showModal()" class="btn btn-ghost btn-xs btn-square text-error" title="{{ __('Hapus User') }}">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                            </button>
+
+                                            {{-- Delete Confirmation Modal --}}
+                                            <dialog id="delete-user-modal-{{ $user->id }}" class="modal text-left whitespace-normal">
+                                                <div class="modal-box">
+                                                    <h3 class="font-bold text-lg text-error flex items-center gap-2">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                        </svg>
+                                                        {{ __('Konfirmasi Hapus Permanen User') }}
+                                                    </h3>
+                                                    <p class="py-4 text-sm text-base-content/80">
+                                                        {{ __('Apakah Anda yakin ingin menghapus user') }} <span class="font-semibold text-base-content">{{ $user->name }}</span> ({{ $user->email }}) {{ __('secara permanen? Semua data terkait (tanda tangan, akses, dokumen yang dibuat) akan ikut terhapus dan tindakan ini tidak dapat dibatalkan.') }}
+                                                    </p>
+                                                    <div class="modal-action flex justify-end gap-2">
+                                                        <button type="button" onclick="document.getElementById('delete-user-modal-{{ $user->id }}').close()" class="btn btn-ghost">
+                                                            {{ __('Batal') }}
+                                                        </button>
+                                                        <form method="POST" action="{{ route('admin.users.destroy', $user) }}" class="inline">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                            <button type="submit" class="btn btn-error">
+                                                                {{ __('Hapus Permanen') }}
+                                                            </button>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                                <form method="dialog" class="modal-backdrop">
+                                                    <button>{{ __('close') }}</button>
+                                                </form>
+                                            </dialog>
+                                        @endif
                                     </td>
                                 </tr>
                             @endforeach

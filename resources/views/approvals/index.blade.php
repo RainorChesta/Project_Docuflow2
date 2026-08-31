@@ -1,175 +1,229 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-light text-3xl tracking-tight text-base-content">{{ __('Inbox Persetujuan') }}</h2>
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div>
+                <h2 class="text-xl font-bold text-base-content leading-tight">
+                    {{ __('Persetujuan Dokumen') }}
+                </h2>
+                <p class="text-xs text-base-content/60 mt-0.5">
+                    {{ __('Kelola permintaan persetujuan versi dokumen dan rollback divisi') }}
+                </p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <span class="badge badge-primary badge-outline gap-1 text-xs py-2.5 px-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    {{ $pendingVersions->count() + $pendingRollbacks->count() }} {{ __('Menunggu') }}
+                </span>
+            </div>
+        </div>
     </x-slot>
 
-    <div class="py-4 md:py-8">
-        <div class="max-w-5xl mx-auto px-4 sm:px-6 w-full space-y-8">
-            @if(session('success'))
-                <div class="alert alert-success shadow-sm rounded-lg border-0 bg-success/10 text-success-content">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-5 w-5" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    <span>{{ session('success') }}</span>
-                </div>
-            @endif
+    <div class="py-6 space-y-6">
+        @if(session('success'))
+            <div class="alert alert-success shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-5 w-5" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <span>{{ session('success') }}</span>
+            </div>
+        @endif
+        @if(session('error'))
+            <div class="alert alert-error shadow-sm">
+                <span>{{ session('error') }}</span>
+            </div>
+        @endif
 
-            <div class="bg-base-100/50 backdrop-blur-xl border border-base-200/50 rounded-2xl overflow-hidden shadow-sm">
-                <!-- Header Tabs / Info -->
-                <div class="border-b border-base-200/50 px-6 py-4 flex items-center justify-between bg-base-100">
-                    <h3 class="font-medium text-base-content/80">{{ __('Tugas Menunggu') }}</h3>
-                    <div class="flex gap-2">
-                        @if($pendingRollbacks->count())
-                            <span class="badge badge-error badge-sm">{{ $pendingRollbacks->count() }} {{ __('Rollbacks') }}</span>
-                        @endif
-                        <span class="badge badge-primary badge-sm">{{ $pendingVersions->count() }} {{ __('Dokumen') }}</span>
+        {{-- Pending Rollback Requests Section --}}
+        @if($pendingRollbacks->count())
+            <div class="card bg-base-100 border border-warning/30 shadow-sm overflow-hidden">
+                <div class="px-5 py-4 bg-warning/10 border-b border-warning/20 flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-lg bg-warning/20 text-warning flex items-center justify-center shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-base text-base-content flex items-center gap-2">
+                                {{ __('Permintaan Rollback Dokumen') }}
+                                <span class="badge badge-warning badge-sm font-semibold">{{ $pendingRollbacks->count() }}</span>
+                            </h3>
+                            <p class="text-xs text-base-content/60">
+                                {{ __('Permintaan dari staf untuk mengembalikan dokumen ke versi sebelumnya.') }}
+                            </p>
+                        </div>
                     </div>
                 </div>
 
-                <div class="divide-y divide-base-200/50">
-                    {{-- Rollbacks --}}
-                    @foreach($pendingRollbacks as $doc)
-                        <div class="group flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 sm:px-6 transition-colors hover:bg-base-200/40 cursor-default">
-                            <div class="flex items-start gap-4 min-w-0 flex-1">
-                                <div class="mt-1">
-                                    <div class="w-2 h-2 rounded-full bg-error ring-4 ring-error/20"></div>
-                                </div>
-                                <div class="min-w-0">
-                                    <div class="flex items-center gap-2 mb-0.5">
-                                        <p class="font-medium text-base-content truncate">{{ $doc->title }}</p>
-                                        <span class="badge badge-outline border-error/30 text-error text-[10px] uppercase font-bold px-1.5 h-4">{{ __('Rollback v' . $doc->pendingRollbackVersion->version_number) }}</span>
-                                    </div>
-                                    <p class="text-xs text-base-content/50 truncate">
-                                        {{ __('Diminta oleh') }} {{ $doc->rollbackRequestedBy?->name ?? '—' }} &bull; {{ $doc->rollback_requested_at?->diffForHumans() }}
-                                    </p>
-                                </div>
-                            </div>
-                            
-                            <!-- Actions -->
-                            <div class="flex items-center gap-1 mt-3 sm:mt-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity focus-within:opacity-100">
-                                <a href="{{ route('documents.preview', ['document' => $doc, 'from' => 'approvals']) }}" class="btn btn-ghost btn-sm btn-square text-base-content/60 hover:text-primary hover:bg-primary/10" title="{{ __('Pratinjau') }}">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="size-4"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
-                                </a>
-                                <button type="button" onclick="document.getElementById('reject-rollback-modal-{{ $doc->id }}').showModal()" class="btn btn-ghost btn-sm btn-square text-base-content/60 hover:text-error hover:bg-error/10" title="{{ __('Tolak') }}">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                </button>
-
-                                {{-- Reject Rollback Modal --}}
-                                <dialog id="reject-rollback-modal-{{ $doc->id }}" class="modal text-left">
-                                    <div class="modal-box">
-                                        <h3 class="font-bold text-lg text-base-content">{{ __('Tolak Permintaan Rollback') }}</h3>
-                                        <p class="py-2 text-sm text-base-content/70">
-                                            {!! __('Tolak permintaan rollback dokumen :doc ke versi v:ver?', ['doc' => '<strong>'.$doc->title.'</strong>', 'ver' => '<strong>'.$doc->pendingRollbackVersion->version_number.'</strong>']) !!}
-                                        </p>
-                                        <form method="POST" action="{{ route('approvals.rollback-request.reject', $doc) }}">
-                                            @csrf
-                                            <div class="form-control mb-4">
-                                                <label class="label">
-                                                    <span class="label-text font-medium">{{ __('Catatan / Alasan Penolakan (Opsional)') }}</span>
-                                                </label>
-                                                <textarea name="notes" class="textarea textarea-bordered w-full text-sm" rows="3" placeholder="{{ __('Tuliskan alasan penolakan untuk pemohon...') }}"></textarea>
-                                            </div>
-                                            <div class="modal-action">
-                                                <button type="button" onclick="document.getElementById('reject-rollback-modal-{{ $doc->id }}').close()" class="btn btn-ghost">{{ __('Batal') }}</button>
-                                                <button type="submit" class="btn btn-error text-white">{{ __('Tolak Rollback') }}</button>
-                                            </div>
-                                        </form>
-                                    </div>
-                                    <form method="dialog" class="modal-backdrop">
-                                        <button>{{ __('Batal') }}</button>
-                                    </form>
-                                </dialog>
-                                <form method="POST" action="{{ route('approvals.rollback-request.approve', $doc) }}" class="inline">
-                                    @csrf
-                                    <button class="btn btn-ghost btn-sm btn-square text-base-content/60 hover:text-success hover:bg-success/10" title="{{ __('Setujui') }}" onclick="return confirm('{{ __('Setujui rollback ke v:version?', ['version' => $doc->pendingRollbackVersion->version_number]) }}')">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                    @endforeach
-
-                    {{-- Regular Approvals --}}
-                    @forelse($pendingVersions as $version)
-                        @if($version->document)
-                        <div class="group flex flex-col sm:flex-row items-start justify-between p-4 sm:px-6 transition-colors hover:bg-base-200/40 cursor-default">
-                            <div class="flex items-start gap-4 min-w-0 flex-1">
-                                <div class="mt-1">
-                                    <div class="w-2 h-2 rounded-full bg-primary ring-4 ring-primary/20"></div>
-                                </div>
-                                <div class="min-w-0 w-full pr-4">
-                                    <div class="flex flex-wrap items-center gap-2 mb-0.5">
-                                        <p class="font-medium text-base-content truncate max-w-full">{{ $version->document->title }}</p>
-                                        <span class="badge badge-outline border-primary/30 text-primary text-[10px] uppercase font-bold px-1.5 h-4">v{{ $version->version_number }}</span>
-                                    </div>
-                                    <p class="text-xs text-base-content/50 truncate">
-                                        {{ $version->author_name }} &bull; {{ $version->created_at->diffForHumans() }}
-                                    </p>
-                                    
-                                    @if(strip_tags($version->content))
-                                        <div class="mt-2 text-sm text-base-content/70 line-clamp-2 max-w-2xl bg-base-100/50 p-2 rounded border border-base-200/50">
-                                            {!! strip_tags($version->content) !!}
+                <div class="overflow-x-auto">
+                    <table class="table w-full min-w-[640px]">
+                        <thead>
+                            <tr class="bg-base-200/40 text-xs font-semibold uppercase tracking-wider text-base-content/70">
+                                <th class="py-3 px-5">{{ __('Dokumen') }}</th>
+                                <th class="py-3 px-4">{{ __('Target Versi') }}</th>
+                                <th class="py-3 px-4">{{ __('Diajukan Oleh') }}</th>
+                                <th class="py-3 px-4">{{ __('Waktu') }}</th>
+                                <th class="py-3 px-5 text-right">{{ __('Aksi') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-base-200">
+                            @foreach($pendingRollbacks as $doc)
+                                <tr class="hover:bg-base-200/40 transition-colors">
+                                    <td class="px-5 py-4">
+                                        <a href="{{ route('documents.show', $doc) }}" class="font-semibold text-sm text-base-content hover:text-primary transition-colors block break-words">
+                                            {{ $doc->title }}
+                                        </a>
+                                        @if($doc->document_number)
+                                            <span class="text-xs font-mono text-base-content/50 block mt-0.5">{{ $doc->document_number }}</span>
+                                        @endif
+                                    </td>
+                                    <td class="px-4 py-4">
+                                        <span class="badge badge-warning badge-sm font-semibold">v{{ $doc->pendingRollbackVersion->version_number }}</span>
+                                    </td>
+                                    <td class="px-4 py-4">
+                                        <div class="font-medium text-sm text-base-content">{{ $doc->rollbackRequestedBy?->name ?? '—' }}</div>
+                                        <div class="text-xs text-base-content/50">{{ $doc->rollbackRequestedBy?->email ?? '' }}</div>
+                                    </td>
+                                    <td class="px-4 py-4 text-xs text-base-content/60 whitespace-nowrap">
+                                        {{ $doc->rollback_requested_at ? $doc->rollback_requested_at->diffForHumans() : '-' }}
+                                    </td>
+                                    <td class="px-5 py-4 text-right">
+                                        <div class="flex items-center justify-end gap-2">
+                                            <form method="POST" action="{{ route('approvals.rollback-request.approve', $doc) }}" class="inline">
+                                                @csrf
+                                                <button class="btn btn-success btn-xs gap-1 font-medium" onclick="return confirm('{{ __('Setujui permintaan rollback ke versi v:version? Semua versi setelahnya akan dihapus permanen.', ['version' => $doc->pendingRollbackVersion->version_number]) }}')">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                                                    {{ __('Approve') }}
+                                                </button>
+                                            </form>
+                                            <form method="POST" action="{{ route('approvals.rollback-request.reject', $doc) }}" class="inline">
+                                                @csrf
+                                                <button class="btn btn-error btn-outline btn-xs gap-1 font-medium">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                                    {{ __('Reject') }}
+                                                </button>
+                                            </form>
                                         </div>
-                                    @endif
-                                </div>
-                            </div>
-                            
-                            <!-- Actions -->
-                            <div class="flex items-center gap-1 mt-3 sm:mt-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity focus-within:opacity-100 shrink-0">
-                                <a href="{{ route('documents.preview', ['document' => $version->document, 'from' => 'approvals']) }}" class="btn btn-ghost btn-sm btn-square text-base-content/60 hover:text-primary hover:bg-primary/10" title="{{ __('Pratinjau') }}">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="size-4"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
-                                </a>
-                                <button type="button" onclick="document.getElementById('reject-version-modal-{{ $version->id }}').showModal()" class="btn btn-ghost btn-sm btn-square text-base-content/60 hover:text-error hover:bg-error/10" title="{{ __('Tolak') }}">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                </button>
-
-                                {{-- Reject Version Modal --}}
-                                <dialog id="reject-version-modal-{{ $version->id }}" class="modal text-left">
-                                    <div class="modal-box">
-                                        <h3 class="font-bold text-lg text-base-content">{{ __('Tolak Dokumen') }}</h3>
-                                        <p class="py-2 text-sm text-base-content/70">
-                                            {!! __('Tolak dokumen :doc (v:ver) yang diajukan oleh :author?', ['doc' => '<strong>'.$version->document->title.'</strong>', 'ver' => '<strong>'.$version->version_number.'</strong>', 'author' => '<strong>'.$version->author_name.'</strong>']) !!}
-                                        </p>
-                                        <form method="POST" action="{{ route('approvals.reject', [$version->document, $version]) }}">
-                                            @csrf
-                                            <div class="form-control mb-4">
-                                                <label class="label">
-                                                    <span class="label-text font-medium">{{ __('Catatan / Alasan Penolakan (Opsional)') }}</span>
-                                                </label>
-                                                <textarea name="notes" class="textarea textarea-bordered w-full text-sm" rows="3" placeholder="{{ __('Tuliskan catatan atau masukan perbaikan...') }}"></textarea>
-                                            </div>
-                                            <div class="modal-action">
-                                                <button type="button" onclick="document.getElementById('reject-version-modal-{{ $version->id }}').close()" class="btn btn-ghost">{{ __('Batal') }}</button>
-                                                <button type="submit" class="btn btn-error text-white">{{ __('Tolak Dokumen') }}</button>
-                                            </div>
-                                        </form>
-                                    </div>
-                                    <form method="dialog" class="modal-backdrop">
-                                        <button>{{ __('Batal') }}</button>
-                                    </form>
-                                </dialog>
-                                <form method="POST" action="{{ route('approvals.approve', [$version->document, $version]) }}" class="inline">
-                                    @csrf
-                                    <button class="btn btn-ghost btn-sm btn-square text-base-content/60 hover:text-success hover:bg-success/10" title="{{ __('Setujui') }}" onclick="return confirm('{{ __('Setujui dokumen ini?') }}')">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                        @endif
-                    @empty
-                        @if(!$pendingRollbacks->count())
-                            <div class="p-16 text-center">
-                                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-base-200/50 mb-4 text-base-content/30">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-8">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
-                                    </svg>
-                                </div>
-                                <h3 class="text-base font-medium text-base-content">{{ __('Inbox Kosong') }}</h3>
-                                <p class="text-sm text-base-content/50 mt-1">{{ __('Tidak ada dokumen yang memerlukan persetujuan.') }}</p>
-                            </div>
-                        @endif
-                    @endforelse
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
                 </div>
             </div>
+        @endif
+
+        {{-- Pending Document Versions Section --}}
+        <div class="card bg-base-100 border border-base-300 shadow-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-base-300 flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-base text-base-content flex items-center gap-2">
+                            {{ __('Menunggu Persetujuan Versi Dokumen') }}
+                            <span class="badge badge-primary badge-sm font-semibold">{{ $pendingVersions->count() }}</span>
+                        </h3>
+                        <p class="text-xs text-base-content/60">
+                            {{ __('Daftar pembaruan konten dan draf revisi yang diajukan untuk disetujui.') }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            @if($pendingVersions->isEmpty())
+                <div class="py-12 text-center text-base-content/50 space-y-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-base-content/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p class="text-sm font-medium">{{ __('Semua dokumen telah ditinjau') }}</p>
+                    <p class="text-xs text-base-content/40">{{ __('Tidak ada versi dokumen yang sedang menunggu persetujuan.') }}</p>
+                </div>
+            @else
+                <div class="overflow-x-auto">
+                    <table class="table w-full min-w-[640px]">
+                        <thead>
+                            <tr class="bg-base-200/40 text-xs font-semibold uppercase tracking-wider text-base-content/70">
+                                <th class="py-3 px-5">{{ __('Dokumen') }}</th>
+                                <th class="py-3 px-4">{{ __('Versi') }}</th>
+                                <th class="py-3 px-4">{{ __('Penulis') }}</th>
+                                <th class="py-3 px-4">{{ __('Waktu Pengajuan') }}</th>
+                                <th class="py-3 px-5 text-right">{{ __('Aksi') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-base-200">
+                            @foreach($pendingVersions as $version)
+                                @if(!$version->document)
+                                    @continue
+                                @endif
+                                <tr class="hover:bg-base-200/40 transition-colors">
+                                    <td class="px-5 py-4">
+                                        <a href="{{ route('documents.show', $version->document) }}" class="font-semibold text-sm text-base-content hover:text-primary transition-colors block break-words">
+                                            {{ $version->document->title }}
+                                        </a>
+                                        @if($version->document->document_number)
+                                            <span class="text-xs font-mono text-base-content/50 block mt-0.5">{{ $version->document->document_number }}</span>
+                                        @endif
+                                    </td>
+                                    <td class="px-4 py-4">
+                                        <span class="badge badge-warning badge-sm font-semibold">v{{ $version->version_number }}</span>
+                                    </td>
+                                    <td class="px-4 py-4">
+                                        <div class="font-medium text-sm text-base-content">{{ $version->author_name }}</div>
+                                        <div class="text-xs text-base-content/50">{{ $version->author?->email ?? '' }}</div>
+                                    </td>
+                                    <td class="px-4 py-4 text-xs text-base-content/60 whitespace-nowrap">
+                                        {{ $version->created_at ? $version->created_at->diffForHumans() : '-' }}
+                                    </td>
+                                    <td class="px-5 py-4 text-right">
+                                        <div class="flex items-center justify-end gap-2">
+                                            <form method="POST" action="{{ route('approvals.approve', [$version->document, $version]) }}" class="inline">
+                                                @csrf
+                                                <button type="submit" class="btn btn-success btn-xs gap-1 font-medium" onclick="return confirm('{{ __('Setujui versi ini (v:version)?', ['version' => $version->version_number]) }}')">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                                                    {{ __('Approve') }}
+                                                </button>
+                                            </form>
+
+                                            <button type="button" onclick="document.getElementById('reject-doc-modal-{{ $version->id }}').showModal()" class="btn btn-error btn-outline btn-xs gap-1 font-medium">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                                {{ __('Reject') }}
+                                            </button>
+                                        </div>
+
+                                        {{-- Reject Reason Modal --}}
+                                        <dialog id="reject-doc-modal-{{ $version->id }}" class="modal text-left">
+                                            <div class="modal-box">
+                                                <h3 class="font-bold text-lg text-base-content">{{ __('Tolak Versi Dokumen') }}</h3>
+                                                <p class="py-2 text-sm text-base-content/70">
+                                                    {!! __('Tolak versi :version dari dokumen :doc.', ['version' => '<strong>v'.$version->version_number.'</strong>', 'doc' => '<strong>'.$version->document->title.'</strong>']) !!}
+                                                </p>
+                                                <form method="POST" action="{{ route('approvals.reject', [$version->document, $version]) }}">
+                                                    @csrf
+                                                    <div class="form-control mb-4">
+                                                        <label class="label">
+                                                            <span class="label-text font-medium">{{ __('Catatan / Alasan Penolakan (Opsional)') }}</span>
+                                                        </label>
+                                                        <textarea name="notes" class="textarea textarea-bordered w-full text-sm" rows="3" placeholder="{{ __('Tuliskan alasan penolakan atau catatan revisi...') }}"></textarea>
+                                                    </div>
+                                                    <div class="modal-action">
+                                                        <button type="button" onclick="document.getElementById('reject-doc-modal-{{ $version->id }}').close()" class="btn btn-ghost">{{ __('Batal') }}</button>
+                                                        <button type="submit" class="btn btn-error">{{ __('Tolak Versi') }}</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                            <form method="dialog" class="modal-backdrop">
+                                                <button>close</button>
+                                            </form>
+                                        </dialog>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
         </div>
     </div>
 </x-app-layout>
