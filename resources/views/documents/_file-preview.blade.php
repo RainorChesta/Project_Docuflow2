@@ -13,13 +13,13 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
-                {{ __('Download DOCX') }}
+                {{ __('Unduh DOCX') }}
             </a>
         </div>
     </div>
 
     @if($isPdf)
-        <iframe src="{{ $fileUrl }}" class="w-full border-0" style="height: 80vh;" title="Pratinjau dokumen"></iframe>
+        <iframe src="{{ $fileUrl }}" class="w-full border-0" style="height: 80vh;" title="{{ __('Pratinjau dokumen') }}"></iframe>
     @else
         @if(isset($onlyOfficeConfig))
             <div class="w-full border border-base-300 rounded-lg overflow-hidden" style="width: 100%; height: 850px; min-height: 80vh;">
@@ -31,7 +31,7 @@
                 document.addEventListener('DOMContentLoaded', function() {
                     if (typeof DocsAPI === 'undefined') {
                         document.getElementById('docx-preview-{{ $version->id }}').innerHTML =
-                            '<p class="text-error text-sm p-4">Gagal memuat editor ONLYOFFICE.</p>';
+                            '<p class="text-error text-sm p-4">' + @json(__('Gagal memuat editor ONLYOFFICE.')) + '</p>';
                         return;
                     }
                     try {
@@ -126,13 +126,13 @@
                     } catch (e) {
                         console.error('ONLYOFFICE initialization error:', e);
                         document.getElementById('docx-preview-{{ $version->id }}').innerHTML =
-                            '<p class="text-error text-sm p-4">Gagal memuat pratinjau. Silakan unduh dokumen untuk melihat isinya.</p>';
+                            '<p class="text-error text-sm p-4">' + @json(__('Gagal memuat pratinjau. Silakan unduh dokumen untuk melihat isinya.')) + '</p>';
                     }
                 });
             </script>
         @else
             <div id="docx-preview-{{ $version->id }}" class="prose max-w-none px-4 py-6 border border-base-300 rounded-lg min-h-[200px]">
-                <p class="text-base-content/50 text-sm">Memuat isi dokumen…</p>
+                <p class="text-base-content/50 text-sm">{{ __('Memuat isi dokumen...') }}</p>
             </div>
 
             <script src="https://cdn.jsdelivr.net/npm/mammoth@1.7.0/mammoth.browser.min.js"></script>
@@ -143,11 +143,11 @@
                         .then(function (buffer) { return mammoth.convertToHtml({ arrayBuffer: buffer }); })
                         .then(function (result) {
                             document.getElementById('docx-preview-{{ $version->id }}').innerHTML =
-                                result.value || '<p class="text-base-content/50 text-sm">Dokumen kosong.</p>';
+                                result.value || ('<p class="text-base-content/50 text-sm">' + @json(__('Dokumen kosong.')) + '</p>');
                         })
                         .catch(function () {
                             document.getElementById('docx-preview-{{ $version->id }}').innerHTML =
-                                '<p class="text-error text-sm">Gagal memuat pratinjau. Silakan unduh dokumen untuk melihat isinya.</p>';
+                                '<p class="text-error text-sm">' + @json(__('Gagal memuat pratinjau. Silakan unduh dokumen untuk melihat isinya.')) + '</p>';
                         });
                 })();
             </script>

@@ -1,5 +1,5 @@
 <x-app-layout>
-    <x-slot name="header">Document Detail</x-slot>
+    <x-slot name="header">{{ __('Detail Dokumen') }}</x-slot>
 
     <x-confirm-modal
         name="confirm-discard-{{ $document->id }}"
@@ -8,17 +8,19 @@
         :action="route('documents.destroy', $document)"
         method="DELETE"
         :confirmLabel="__('Delete Document')"
+        :cancelLabel="__('Batal')"
     />
 
     {{-- Konfirmasi approve rollback (banner pending rollback) --}}
     @if($document->hasPendingRollback() && auth()->user()->can('approve', $document))
         <x-confirm-modal
             name="confirm-approve-rollback"
-            title="{{ __('Approve') }} Rollback?"
-            message="{{ __('Rollback request will be submitted to the division head. If approved, all versions after v:version will be permanently deleted.', ['version' => $document->pendingRollbackVersion->version_number]) }}"
+            :title="__('Approve Rollback?')"
+            :message="__('Rollback request will be submitted to the division head. If approved, all versions after v:version will be permanently deleted.', ['version' => $document->pendingRollbackVersion->version_number])"
             :action="route('approvals.rollback-request.approve', $document)"
             method="POST"
-            confirmLabel="Approve Rollback"
+            :confirmLabel="__('Approve Rollback')"
+            :cancelLabel="__('Batal')"
             confirmClass="btn-success"
         />
     @endif
@@ -77,7 +79,7 @@
                                     @csrf
                                     <button class="btn btn-success btn-sm">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                                        {{ __('Approve') }} Rollback
+                                        {{ __('Approve Rollback') }}
                                     </button>
                                 </form>
                                 <form method="POST" action="{{ route('approvals.rollback-request.reject', $document) }}" class="inline">

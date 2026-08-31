@@ -162,7 +162,7 @@
                                 <div class="w-full lg:w-48 shrink-0">
                                     <select name="document_type_id" 
                                             class="select select-bordered select-sm w-full text-xs bg-base-100 shadow-sm focus:shadow-md focus:border-primary transition-all">
-                                        <option value="">{{ __('Document Type') }} (Semua)</option>
+                                        <option value="">{{ __('Semua Tipe Dokumen') }}</option>
                                         @foreach($availableDocumentTypes as $dt)
                                             <option value="{{ $dt->id }}" {{ $selectedDocTypeId == $dt->id ? 'selected' : '' }}>
                                                 {{ $dt->name }} ({{ $dt->code }})
@@ -175,7 +175,7 @@
                                 <div class="w-full lg:w-48 shrink-0">
                                     <select name="owner_id" 
                                             class="select select-bordered select-sm w-full text-xs bg-base-100 shadow-sm focus:shadow-md focus:border-primary transition-all">
-                                        <option value="">{{ __('Created By') }} (Semua)</option>
+                                        <option value="">{{ __('Semua Pembuat') }}</option>
                                         @foreach($availableCreators as $creator)
                                             <option value="{{ $creator->id }}" {{ $selectedOwnerId == $creator->id ? 'selected' : '' }}>
                                                 {{ $creator->name }}
@@ -421,7 +421,7 @@
                                                     <td>
                                                         @if($doc->branch)
                                                             <span class="font-medium">{{ $doc->branch->name }}</span>
-                                                            @if($doc->branch->is_pusat)<span class="text-primary font-semibold">(Pusat)</span>@endif
+                                                            @if($doc->branch->is_pusat)<span class="text-primary font-semibold">({{ __('Pusat') }})</span>@endif
                                                             <span class="text-base-content/40 block">{{ $doc->branch->company?->name }}</span>
                                                         @else
                                                             <span class="text-base-content/40">—</span>

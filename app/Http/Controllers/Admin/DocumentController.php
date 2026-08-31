@@ -309,6 +309,6 @@ class DocumentController extends Controller
         $document->versions()->delete();
         $document->forceDelete();
 
-        return redirect()->route('admin.documents.index')->with('success', 'Dokumen dihapus permanen.');
+        return redirect()->route('admin.documents.index')->with('success', __('Dokumen dihapus permanen.'));
     }
 }

@@ -412,7 +412,7 @@ class SignatureController extends Controller
             );
         }
 
-        return back()->with('success', 'Permintaan tanda tangan telah disetujui.');
+        return back()->with('success', __('Permintaan tanda tangan telah disetujui.'));
     }
 
     /**
@@ -421,15 +421,15 @@ class SignatureController extends Controller
     public function reject(Request $request, SignatureRequest $signatureRequest): RedirectResponse
     {
         if (Auth::id() !== $signatureRequest->target_user_id) {
-            abort(403, 'Anda tidak berhak menolak permintaan ini.');
+            abort(403, __('Anda tidak berhak menolak permintaan ini.'));
         }
 
         $signatureRequest->update([
             'status' => 'rejected',
-            'rejected_reason' => $request->input('reason', 'Ditolak oleh pemilik tanda tangan.'),
+            'rejected_reason' => $request->input('reason', __('Ditolak oleh pemilik tanda tangan.')),
             'responded_at' => now(),
         ]);
 
-        return back()->with('success', 'Permintaan tanda tangan telah ditolak.');
+        return back()->with('success', __('Permintaan tanda tangan telah ditolak.'));
     }
 }

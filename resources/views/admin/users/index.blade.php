@@ -1,12 +1,12 @@
 <x-app-layout>
-    <x-slot name="header">Users</x-slot>
+    <x-slot name="header">{{ __('Pengguna') }}</x-slot>
 
     <div class="py-6">
         <div class="max-w-7xl mx-auto w-full">
             <div class="mb-4">
                 <a href="{{ route('admin.users.create') }}" class="btn btn-primary btn-sm">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-                    New User
+                    {{ __('Pengguna Baru') }}
                 </a>
             </div>
 
@@ -22,12 +22,12 @@
                     <table class="table min-w-[640px]">
                         <thead>
                             <tr>
-                                <th>Name / NIP</th>
-                                <th>Email / Phone</th>
-                                <th>Division</th>
-                                <th>Company & Cabang</th>
-                                <th>Role</th>
-                                <th>Active</th>
+                                <th>{{ __('Nama / NIP') }}</th>
+                                <th>{{ __('Email / Telepon') }}</th>
+                                <th>{{ __('Divisi') }}</th>
+                                <th>{{ __('Perusahaan & Cabang') }}</th>
+                                <th>{{ __('Peran') }}</th>
+                                <th>{{ __('Aktif') }}</th>
                                 <th></th>
                             </tr>
                         </thead>
@@ -58,9 +58,9 @@
                                             {{ $user->system_role }}
                                         </span>
                                     </td>
-                                    <td>{{ $user->is_active ? 'Yes' : 'No' }}</td>
+                                    <td>{{ $user->is_active ? __('Ya') : __('Tidak') }}</td>
                                     <td class="text-right">
-                                        <a href="{{ route('admin.users.edit', $user) }}" class="btn btn-ghost btn-xs btn-square text-primary" title="Edit">
+                                        <a href="{{ route('admin.users.edit', $user) }}" class="btn btn-ghost btn-xs btn-square text-primary" title="{{ __('Edit') }}">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                         </a>
                                     </td>

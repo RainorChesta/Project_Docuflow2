@@ -1,4 +1,4 @@
-<x-guest-layout title="Konfirmasi Password" description="Konfirmasi password Anda untuk melanjutkan">
+<x-guest-layout :title="__('Konfirmasi Password')" :description="__('Konfirmasi password Anda untuk melanjutkan')">
     <div class="mb-4 text-sm text-base-content/70">
         {{ __('This is a secure area of the application. Please confirm your password before continuing.') }}
     </div>

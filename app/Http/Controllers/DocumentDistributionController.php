@@ -68,6 +68,6 @@ class DocumentDistributionController extends Controller
             }
         }
 
-        return back()->with('success', 'Document distributed successfully.');
+        return back()->with('success', __('Dokumen berhasil didistribusikan.'));
     }
 }

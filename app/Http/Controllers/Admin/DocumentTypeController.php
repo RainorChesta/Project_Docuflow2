@@ -31,7 +31,7 @@ class DocumentTypeController extends Controller
 
         DocumentType::create($validated);
 
-        return redirect()->route('admin.document-types.index')->with('success', 'Document type created.');
+        return redirect()->route('admin.document-types.index')->with('success', __('Tipe dokumen berhasil dibuat.'));
     }
 
     public function edit(DocumentType $documentType): View
@@ -48,17 +48,17 @@ class DocumentTypeController extends Controller
 
         $documentType->update($validated);
 
-        return redirect()->route('admin.document-types.index')->with('success', 'Document type updated.');
+        return redirect()->route('admin.document-types.index')->with('success', __('Tipe dokumen berhasil diperbarui.'));
     }
 
     public function destroy(DocumentType $documentType): RedirectResponse
     {
         if ($documentType->documents()->exists()) {
-            return back()->with('error', 'Tipe dokumen ini masih dipakai, tidak bisa dihapus.');
+            return back()->with('error', __('Tipe dokumen ini masih dipakai, tidak bisa dihapus.'));
         }
 
         $documentType->delete();
 
-        return redirect()->route('admin.document-types.index')->with('success', 'Document type deleted.');
+        return redirect()->route('admin.document-types.index')->with('success', __('Tipe dokumen berhasil dihapus.'));
     }
 }

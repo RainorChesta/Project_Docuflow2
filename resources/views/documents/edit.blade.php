@@ -2,20 +2,22 @@
 
     <x-confirm-modal
         name="confirm-discard-{{ $document->id }}"
-        title="Discard Document?"
-        message="Are you sure you want to discard this document and all its changes?"
+        :title="__('Discard Document?')"
+        :message="__('Are you sure you want to discard this document and all its changes?')"
         :action="route('documents.destroy', $document)"
         method="DELETE"
-        confirmLabel="Discard"
+        :confirmLabel="__('Discard')"
+        :cancelLabel="__('Batal')"
     />
 
     <x-confirm-modal
         name="confirm-discard-version-{{ $document->id }}"
-        title="Discard Changes?"
-        message="Are you sure you want to discard the pending changes? The approved version will remain intact."
+        :title="__('Discard Changes?')"
+        :message="__('Are you sure you want to discard the pending changes? The approved version will remain intact.')"
         :action="route('documents.discard', $document)"
         method="POST"
-        confirmLabel="Discard Changes"
+        :confirmLabel="__('Discard Changes')"
+        :cancelLabel="__('Batal')"
     />
 
     @php

@@ -1,14 +1,21 @@
 @props([
     'name',
-    'title' => 'Confirm Action',
-    'message' => 'Are you sure you want to proceed?',
+    'title' => null,
+    'message' => null,
     'action',
     'method' => 'DELETE',
-    'confirmLabel' => 'Delete',
-    'cancelLabel' => 'Cancel',
+    'confirmLabel' => null,
+    'cancelLabel' => null,
     'confirmClass' => 'btn-error',
     'reopenOnCancel' => null,
 ])
+
+@php
+    $title = $title ?? __('Konfirmasi Aksi');
+    $message = $message ?? __('Apakah Anda yakin ingin melanjutkan?');
+    $confirmLabel = $confirmLabel ?? __('Hapus');
+    $cancelLabel = $cancelLabel ?? __('Batal');
+@endphp
 
 <x-modal :name="$name" :show="false" maxWidth="sm">
     <div class="p-4 sm:p-6">

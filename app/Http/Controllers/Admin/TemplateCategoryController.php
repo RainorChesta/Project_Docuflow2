@@ -33,7 +33,7 @@ class TemplateCategoryController extends Controller
         TemplateCategory::create($validated);
 
         return redirect()->route('admin.template-categories.index')
-            ->with('success', 'Kategori template berhasil dibuat.');
+            ->with('success', __('Kategori template berhasil dibuat.'));
     }
 
     public function edit(TemplateCategory $templateCategory): View
@@ -50,18 +50,18 @@ class TemplateCategoryController extends Controller
         $templateCategory->update($validated);
 
         return redirect()->route('admin.template-categories.index')
-            ->with('success', 'Kategori template berhasil diperbarui.');
+            ->with('success', __('Kategori template berhasil diperbarui.'));
     }
 
     public function destroy(TemplateCategory $templateCategory): RedirectResponse
     {
         if ($templateCategory->templates()->exists()) {
-            return back()->with('error', 'Kategori ini masih memiliki template, tidak bisa dihapus.');
+            return back()->with('error', __('Kategori ini masih memiliki template, tidak bisa dihapus.'));
         }
 
         $templateCategory->delete();
 
         return redirect()->route('admin.template-categories.index')
-            ->with('success', 'Kategori template berhasil dihapus.');
+            ->with('success', __('Kategori template berhasil dihapus.'));
     }
 }

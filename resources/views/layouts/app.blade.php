@@ -153,7 +153,9 @@
 
                             if (str_starts_with($name, 'documents.')) {
                                 if (in_array($name, ['documents.choose', 'documents.create', 'documents.edit', 'documents.show', 'documents.preview', 'documents.preview-version'])) {
-                                    $crumbs[] = ['label' => $docTypeLabel, 'url' => $docTypeRoute];
+                                    if (!(request('from') === 'approvals' && in_array($name, ['documents.preview', 'documents.preview-version']))) {
+                                        $crumbs[] = ['label' => $docTypeLabel, 'url' => $docTypeRoute];
+                                    }
                                 }
                                 
                                 if ($name === 'documents.choose') {
@@ -169,8 +171,12 @@
                                 } elseif ($name === 'documents.show') {
                                     $crumbs[] = ['label' => __('Detail Dokumen'), 'url' => null];
                                 } elseif ($name === 'documents.preview' || $name === 'documents.preview-version') {
-                                    if ($doc = request()->route('document')) {
-                                        $crumbs[] = ['label' => __('Detail Dokumen'), 'url' => route('documents.show', $doc)];
+                                    if (request('from') === 'approvals') {
+                                        $crumbs[] = ['label' => __('Persetujuan'), 'url' => route('approvals.index')];
+                                    } else {
+                                        if ($doc = request()->route('document')) {
+                                            $crumbs[] = ['label' => __('Detail Dokumen'), 'url' => route('documents.show', $doc)];
+                                        }
                                     }
                                     $crumbs[] = ['label' => __('Pratinjau Dokumen'), 'url' => null];
                                 } elseif ($name === 'documents.index') {

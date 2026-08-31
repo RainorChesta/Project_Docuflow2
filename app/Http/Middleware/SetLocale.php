@@ -15,11 +15,20 @@ class SetLocale
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $locale = Session::get('locale', config('app.locale', 'id'));
+        $locale = $request->query('lang') ?? $request->query('locale');
 
-        if (in_array($locale, ['id', 'en'])) {
-            App::setLocale($locale);
+        if ($locale && in_array($locale, ['id', 'en'])) {
+            Session::put('locale', $locale);
+            cookie()->queue('locale', $locale, 60 * 24 * 365);
+        } else {
+            $locale = Session::get('locale') ?? $request->cookie('locale');
         }
+
+        if (!$locale || !in_array($locale, ['id', 'en'])) {
+            $locale = config('app.locale', 'en');
+        }
+
+        App::setLocale($locale);
 
         return $next($request);
     }

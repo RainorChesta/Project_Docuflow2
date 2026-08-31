@@ -169,7 +169,7 @@
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-base-content/50 group-hover:text-primary transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
                                     </div>
                                     <span class="text-xs font-medium text-base-content/60 group-hover:text-primary">{{ __('Lihat Semua') }}</span>
-                                    <span class="text-[10px] text-base-content/40" x-text="'+' + (items.length - 10) + ' template'"></span>
+                                    <span class="text-[10px] text-base-content/40" x-text="'+' + (items.length - 10) + ' ' + @json(__('template'))"></span>
                                 </button>
                             </div>
                         </div>
@@ -200,7 +200,7 @@
                     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 max-h-[60vh] overflow-y-auto p-1">
                         <template x-for="tmpl in selectedModalItems" :key="tmpl.id">
                             <a :href="'{{ route('documents.create') }}?template_id=' + tmpl.id"
-                               class="group flex flex-col h-48 rounded-xl border-2 border-base-300 bg-base-100 hover:border-primary hover:bg-primary/5 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md overflow-hidden">
+                                class="group flex flex-col h-48 rounded-xl border-2 border-base-300 bg-base-100 hover:border-primary hover:bg-primary/5 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md overflow-hidden">
                                 <div class="flex-1 bg-gradient-to-br from-base-200/70 to-base-300/30 p-2.5 flex items-center justify-center relative overflow-hidden">
                                     {{-- Stylized Mini Paper Document --}}
                                     <div class="w-22 h-26 bg-base-100 rounded-lg shadow-xs border border-base-300/70 p-2 flex flex-col justify-between group-hover:shadow-sm group-hover:scale-105 transition-all duration-200">
@@ -234,7 +234,7 @@
                     </div>
                 </div>
                 <form method="dialog" class="modal-backdrop">
-                    <button>close</button>
+                    <button>{{ __('Tutup') }}</button>
                 </form>
             </dialog>
         </div>

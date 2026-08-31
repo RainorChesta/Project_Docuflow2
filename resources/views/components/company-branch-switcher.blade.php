@@ -45,7 +45,7 @@
                                 class="select select-bordered select-xs sm:select-sm text-xs bg-base-200/60 w-auto min-w-[130px] sm:min-w-[170px] max-w-[220px] sm:max-w-[280px]"
                                 title="{{ __('Pilih Cabang Aktif') }}">
                             @foreach($branches as $br)
-                                <option value="{{ $br->id }}">{{ $br->name }} @if($br->is_pusat)(Pusat)@else({{ $br->code }})@endif</option>
+                                <option value="{{ $br->id }}">{{ $br->name }} @if($br->is_pusat)({{ __('Pusat') }})@else({{ $br->code }})@endif</option>
                             @endforeach
                         </select>
                     </div>
@@ -123,7 +123,7 @@
                                 <select name="branch_id" x-model="branchId"
                                         class="select select-bordered select-sm w-full bg-base-100 text-sm focus:border-primary focus:ring-1 focus:ring-primary">
                                     @foreach($branches as $br)
-                                        <option value="{{ $br->id }}">{{ $br->name }} @if($br->is_pusat)(Pusat)@else({{ $br->code }})@endif</option>
+                                        <option value="{{ $br->id }}">{{ $br->name }} @if($br->is_pusat)({{ __('Pusat') }})@else({{ $br->code }})@endif</option>
                                     @endforeach
                                 </select>
                             </div>
@@ -144,7 +144,7 @@
                     </form>
                 </div>
                 <form method="dialog" class="modal-backdrop bg-black/60 backdrop-blur-sm">
-                    <button>close</button>
+                    <button>{{ __('Tutup') }}</button>
                 </form>
             </dialog>
         </div>

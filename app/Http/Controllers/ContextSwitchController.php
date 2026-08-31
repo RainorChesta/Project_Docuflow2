@@ -30,7 +30,7 @@ class ContextSwitchController extends Controller
         
         // Authorize company
         if (!$user->isAdmin() && !$user->companies()->where('companies.id', $companyId)->exists()) {
-            return back()->with('error', 'Unauthorized company access.');
+            return back()->with('error', __('Akses perusahaan tidak diizinkan.'));
         }
 
         session(['active_company_id' => $companyId]);
@@ -53,7 +53,7 @@ class ContextSwitchController extends Controller
             }
         }
 
-        return back()->with('success', 'Context switched.');
+        return back()->with('success', __('Konteks perusahaan & cabang berhasil dialihkan.'));
     }
 
     /**

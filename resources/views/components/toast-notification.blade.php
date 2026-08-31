@@ -35,7 +35,7 @@
                 </div>
             </div>
             
-            <button @click="show = false" class="absolute top-2 right-2 text-base-content/40 hover:text-base-content/80 transition-colors p-1" aria-label="Close">
+            <button @click="show = false" class="absolute top-2 right-2 text-base-content/40 hover:text-base-content/80 transition-colors p-1" aria-label="{{ __('Tutup') }}">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -49,24 +49,25 @@
 <div x-data="{
         toasts: [],
         init() {
-            this.checkApprovalNotifications();
+            this.checkNotifications();
         },
-        checkApprovalNotifications() {
+        checkNotifications() {
             fetch('{{ route('notifications.index') }}', {
                 headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
             })
             .then(r => r.json())
             .then(data => {
-                const shown = JSON.parse(localStorage.getItem('sig_approval_toasts_shown') || '[]');
-                const approvals = (data.notifications || []).filter(n => 
-                    n.type === 'signature_request_approved' && !n.read && !shown.includes(n.id)
+                const shown = JSON.parse(localStorage.getItem('general_toasts_shown') || '[]');
+                const newNotifs = (data.notifications || []).filter(n => 
+                    !n.read && !shown.includes(n.id)
                 );
-                if (approvals.length > 0) {
-                    // Show only the most recent one
-                    const notif = approvals[0];
-                    this.toasts = [{ id: notif.id, title: notif.title, message: notif.message, url: notif.url }];
-                    shown.push(notif.id);
-                    localStorage.setItem('sig_approval_toasts_shown', JSON.stringify(shown.slice(-50)));
+                if (newNotifs.length > 0) {
+                    // Show up to 3 most recent notifications
+                    this.toasts = newNotifs.slice(0, 3).map(notif => {
+                        shown.push(notif.id);
+                        return { id: notif.id, title: notif.title, message: notif.message, url: notif.url };
+                    });
+                    localStorage.setItem('general_toasts_shown', JSON.stringify(shown.slice(-50)));
                     // Auto-dismiss after 8 seconds
                     setTimeout(() => { this.toasts = []; }, 8000);
                 }
@@ -100,7 +101,7 @@
                 <p class="text-xs text-base-content/70 mt-1 leading-relaxed uppercase line-clamp-3" x-text="toast.message"></p>
                 <div class="mt-2">
                     <a :href="toast.url" class="text-xs font-semibold text-success hover:text-success/80 transition-colors flex items-center gap-1 uppercase">
-                        BUKA DOKUMEN
+                        {{ __('Buka Dokumen') }}
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                         </svg>
@@ -108,7 +109,7 @@
                 </div>
             </div>
 
-            <button @click="dismiss(toast.id)" class="absolute top-2 right-2 text-base-content/40 hover:text-base-content/80 transition-colors p-1" aria-label="Close">
+            <button @click="dismiss(toast.id)" class="absolute top-2 right-2 text-base-content/40 hover:text-base-content/80 transition-colors p-1" aria-label="{{ __('Tutup') }}">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>

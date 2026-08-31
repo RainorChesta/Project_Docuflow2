@@ -634,8 +634,8 @@ class DocumentController extends Controller
         }
 
         $message = $version->wasRecentlyCreated
-            ? 'Edit saved. Pending approval.'
-            : 'Versi v' . $version->version_number . ' diperbarui (tetap menunggu approval).';
+            ? __('Perubahan disimpan. Menunggu persetujuan.')
+            : __('Versi v:version diperbarui (tetap menunggu persetujuan).', ['version' => $version->version_number]);
 
         return redirect()->route('documents.show', $document)->with('success', $message);
     }
@@ -654,8 +654,8 @@ class DocumentController extends Controller
         }
 
         return redirect()->route('documents.index', ['type' => 'mine'])->with('success', $discarded
-            ? 'Versi pending v' . $discarded->version_number . ' di-discard.'
-            : 'Tidak ada versi pending untuk di-discard.');
+            ? __('Versi pending v:version dibuang.', ['version' => $discarded->version_number])
+            : __('Tidak ada versi pending untuk dibuang.'));
     }
 
     public function saveDraft(Request $request, Document $document): RedirectResponse
@@ -681,7 +681,7 @@ class DocumentController extends Controller
 
         $this->versionService->saveDraft($document, $validated['content'], auth()->user());
 
-        return redirect()->route('documents.show', $document)->with('success', 'Draft saved.');
+        return redirect()->route('documents.show', $document)->with('success', __('Draf berhasil disimpan.'));
     }
 
     public function destroy(Document $document): RedirectResponse
@@ -690,7 +690,7 @@ class DocumentController extends Controller
 
         $document->delete();
 
-        return redirect()->route('documents.index')->with('success', 'Document discarded.');
+        return redirect()->route('documents.index')->with('success', __('Dokumen berhasil dihapus.'));
     }
 
     public function uploadVersion(Request $request, Document $document): RedirectResponse
@@ -728,7 +728,7 @@ class DocumentController extends Controller
             }
         }
 
-        return redirect()->route('documents.show', $document)->with('success', 'Versi baru diunggah. Menunggu approval.');
+        return redirect()->route('documents.show', $document)->with('success', __('Versi baru diunggah. Menunggu persetujuan.'));
     }
 
     /**
@@ -881,7 +881,7 @@ class DocumentController extends Controller
             'division_id' => $document->division_id,
         ]);
 
-        return back()->with('success', 'Document visibility updated.');
+        return back()->with('success', __('Visibilitas dokumen berhasil diperbarui.'));
     }
 
     /**

@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ config('app.name', 'DokuFlow') }} — Login</title>
+    <title>{{ config('app.name', 'DokuFlow') }} — {{ __('Masuk') }}</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,15 +22,7 @@
     
     <!-- Top-right controls -->
     <div class="absolute top-6 right-6 flex items-center gap-2 z-50">
-        <div class="dropdown dropdown-end">
-            <label tabindex="0" class="btn btn-ghost btn-circle btn-sm bg-base-100/50 backdrop-blur-sm">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" /></svg>
-            </label>
-            <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow-xl bg-base-100 rounded-box w-32 border border-base-300 mt-1">
-                <li><a href="?lang=id" class="{{ app()->getLocale() == 'id' ? 'font-bold text-primary' : '' }}">Indonesia</a></li>
-                <li><a href="?lang=en" class="{{ app()->getLocale() == 'en' ? 'font-bold text-primary' : '' }}">English</a></li>
-            </ul>
-        </div>
+        <x-language-toggle />
         <div class="bg-base-100/50 backdrop-blur-sm rounded-full">
             <x-theme-toggle />
         </div>
@@ -45,8 +37,8 @@
                 <a href="/" class="inline-flex items-center justify-center p-3 bg-base-100 rounded-2xl shadow-sm border border-base-300 mb-6 hover:scale-105 transition-transform">
                     <x-application-logo class="w-10 h-10 text-primary" />
                 </a>
-                <h1 class="text-2xl font-bold tracking-tight text-base-content mb-2">Sign in to DokuFlow</h1>
-                <p class="text-sm text-base-content/60">Enter your credentials to access your dashboard</p>
+                <h1 class="text-2xl font-bold tracking-tight text-base-content mb-2">{{ __('Masuk ke DokuFlow') }}</h1>
+                <p class="text-sm text-base-content/60">{{ __('Masukkan kredensial Anda untuk mengakses dashboard') }}</p>
             </div>
 
             <!-- Main Card -->
@@ -59,7 +51,7 @@
 
                         <!-- Email Input -->
                         <div class="space-y-1.5">
-                            <label for="email" class="text-sm font-semibold text-base-content/80 block">Email Address</label>
+                            <label for="email" class="text-sm font-semibold text-base-content/80 block">{{ __('Alamat Email') }}</label>
                             <div class="relative">
                                 <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-base-content/40">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" /><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" /></svg>
@@ -73,9 +65,9 @@
                         <!-- Password Input -->
                         <div class="space-y-1.5" x-data="{ show: false }">
                             <div class="flex items-center justify-between">
-                                <label for="password" class="text-sm font-semibold text-base-content/80 block">Password</label>
+                                <label for="password" class="text-sm font-semibold text-base-content/80 block">{{ __('Kata Sandi') }}</label>
                                 @if (Route::has('password.request'))
-                                    <a href="{{ route('password.request') }}" class="text-xs font-medium text-primary hover:underline">Forgot?</a>
+                                    <a href="{{ route('password.request') }}" class="text-xs font-medium text-primary hover:underline">{{ __('Lupa?') }}</a>
                                 @endif
                             </div>
                             <div class="relative">
@@ -96,20 +88,20 @@
                         <div class="pt-2">
                             <label class="flex items-center gap-2 cursor-pointer w-max">
                                 <input type="checkbox" name="remember" class="checkbox checkbox-sm checkbox-primary border-base-300 rounded" />
-                                <span class="text-sm font-medium text-base-content/70">Keep me signed in</span>
+                                <span class="text-sm font-medium text-base-content/70">{{ __('Ingat saya') }}</span>
                             </label>
                         </div>
 
                         <button type="submit" class="w-full py-3 bg-primary hover:bg-primary/90 text-primary-content rounded-xl font-semibold text-sm transition-all hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0">
-                            Sign In
+                            {{ __('Masuk') }}
                         </button>
                     </form>
                 </div>
                 
                 <div class="p-6 border-t border-base-300 text-center">
                     <p class="text-sm text-base-content/60">
-                        Need an account? 
-                        <a href="{{ route('register') }}" class="font-semibold text-primary hover:underline">Register here</a>
+                        {{ __('Belum punya akun?') }} 
+                        <a href="{{ route('register') }}" class="font-semibold text-primary hover:underline">{{ __('Daftar di sini') }}</a>
                     </p>
                 </div>
             </div>

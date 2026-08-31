@@ -220,11 +220,11 @@
                             <!-- Quick Presets -->
                             <div class="flex flex-wrap items-center gap-1.5 mt-3">
                                 <span class="text-xs text-base-content/60 mr-1">{{ __('Pintasan:') }}</span>
-                                <button type="button" class="btn btn-xs btn-outline btn-primary rounded-full font-normal expiration-preset-btn" data-days="30">+30 Hari</button>
-                                <button type="button" class="btn btn-xs btn-outline btn-primary rounded-full font-normal expiration-preset-btn" data-days="90">+90 Hari (3 Bln)</button>
-                                <button type="button" class="btn btn-xs btn-outline btn-primary rounded-full font-normal expiration-preset-btn" data-days="180">+180 Hari (6 Bln)</button>
-                                <button type="button" class="btn btn-xs btn-outline btn-primary rounded-full font-normal expiration-preset-btn" data-days="365">+1 Tahun</button>
-                                <button type="button" class="btn btn-xs btn-outline btn-primary rounded-full font-normal expiration-preset-btn" data-days="730">+2 Tahun</button>
+                                <button type="button" class="btn btn-xs btn-outline btn-primary rounded-full font-normal expiration-preset-btn" data-days="30">+30 {{ __('Hari') }}</button>
+                                <button type="button" class="btn btn-xs btn-outline btn-primary rounded-full font-normal expiration-preset-btn" data-days="90">+90 {{ __('Hari (3 Bln)') }}</button>
+                                <button type="button" class="btn btn-xs btn-outline btn-primary rounded-full font-normal expiration-preset-btn" data-days="180">+180 {{ __('Hari (6 Bln)') }}</button>
+                                <button type="button" class="btn btn-xs btn-outline btn-primary rounded-full font-normal expiration-preset-btn" data-days="365">+1 {{ __('Tahun') }}</button>
+                                <button type="button" class="btn btn-xs btn-outline btn-primary rounded-full font-normal expiration-preset-btn" data-days="730">+2 {{ __('Tahun') }}</button>
                             </div>
 
                             <!-- Info / Display Result -->

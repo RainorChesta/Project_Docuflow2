@@ -87,7 +87,7 @@ class ApprovalController extends Controller
             ));
         }
 
-        return redirect()->route('approvals.index')->with('success', 'Version approved and activated.');
+        return redirect()->route('approvals.index')->with('success', __('Versi disetujui dan diaktifkan.'));
     }
 
     public function reject(Request $request, Document $document, DocumentVersion $version): RedirectResponse
@@ -115,7 +115,7 @@ class ApprovalController extends Controller
             ));
         }
 
-        return redirect()->route('approvals.index')->with('success', 'Version rejected.');
+        return redirect()->route('approvals.index')->with('success', __('Versi ditolak.'));
     }
 
     /**
@@ -157,7 +157,7 @@ class ApprovalController extends Controller
             }
         }
 
-        return redirect()->route('documents.show', $document)->with('success', 'Permintaan rollback diajukan. Menunggu approval kepala divisi.');
+        return redirect()->route('documents.show', $document)->with('success', __('Permintaan rollback diajukan. Menunggu persetujuan kepala divisi.'));
     }
 
     public function approveRollback(Document $document): RedirectResponse
@@ -176,7 +176,7 @@ class ApprovalController extends Controller
 
         return redirect()->route('documents.show', $document)->with(
             'success',
-            'Rollback disetujui. Dokumen kembali ke versi v' . $restored->version_number . '.'
+            __('Rollback disetujui. Dokumen kembali ke versi v:version.', ['version' => $restored->version_number])
         );
     }
 
@@ -196,6 +196,6 @@ class ApprovalController extends Controller
             'target_version' => $targetVersionNumber,
         ]);
 
-        return redirect()->route('documents.show', $document)->with('success', 'Permintaan rollback ditolak.');
+        return redirect()->route('documents.show', $document)->with('success', __('Permintaan rollback ditolak.'));
     }
 }

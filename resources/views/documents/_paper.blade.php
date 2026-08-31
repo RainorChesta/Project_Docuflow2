@@ -258,10 +258,10 @@
                 <option value="{{ $paperKey }}">{{ $paperKey }}</option>
             @endforeach
         </select>
-        <button type="button" class="doku-paper-zoom-btn" data-paper-zoom-out title="Perkecil" aria-label="Zoom out">−</button>
+        <button type="button" class="doku-paper-zoom-btn" data-paper-zoom-out title="{{ __('Perkecil') }}" aria-label="{{ __('Perkecil') }}">−</button>
         <span class="doku-paper-zoom-label" data-paper-zoom-label>100%</span>
-        <button type="button" class="doku-paper-zoom-btn" data-paper-zoom-in title="Perbesar" aria-label="Zoom in">+</button>
-        <button type="button" class="doku-paper-zoom-btn" data-paper-zoom-reset>Reset</button>
+        <button type="button" class="doku-paper-zoom-btn" data-paper-zoom-in title="{{ __('Perbesar') }}" aria-label="{{ __('Perbesar') }}">+</button>
+        <button type="button" class="doku-paper-zoom-btn" data-paper-zoom-reset>{{ __('Reset') }}</button>
     </div>
     <div class="doku-paper">
         @php
