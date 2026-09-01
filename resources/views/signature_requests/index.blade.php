@@ -130,7 +130,7 @@
                                     <td class="px-5 py-4 text-right whitespace-nowrap">
                                         <div class="flex items-center justify-end gap-1.5">
                                             @if($req->document)
-                                                <a href="{{ route('documents.preview', $req->document) }}" title="{{ __('Preview Dokumen') }}" class="btn btn-ghost btn-xs gap-1 font-medium">
+                                                <a href="{{ route('documents.preview', ['document' => $req->document, 'from' => 'signature_requests']) }}" title="{{ __('Preview Dokumen') }}" class="btn btn-ghost btn-xs gap-1 font-medium">
                                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -140,13 +140,79 @@
                                             @endif
 
                                             @if($req->isPending())
-                                                <form method="POST" action="{{ route('signatures.requests.approve', $req) }}" onsubmit="document.getElementById('loading-modal').showModal()" class="inline">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-success btn-xs gap-1 font-medium" onclick="return confirm('{{ __('Setujui permintaan tanda tangan? Tanda tangan Anda akan dibubuhkan secara otomatis ke dalam dokumen ini.') }}')" title="{{ __('Setujui penggunaan tanda tangan Anda pada dokumen ini') }}">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                                        {{ __('Approve TTD') }}
-                                                    </button>
-                                                </form>
+                                                <button type="button" onclick="document.getElementById('approve-modal-{{ $req->id }}').showModal()" class="btn btn-success btn-xs gap-1 font-medium" title="{{ __('Setujui penggunaan tanda tangan Anda pada dokumen ini') }}">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                                    {{ __('Approve TTD') }}
+                                                </button>
+
+                                                {{-- Custom Approve Signature Modal --}}
+                                                <dialog id="approve-modal-{{ $req->id }}" class="modal modal-bottom sm:modal-middle text-left whitespace-normal backdrop-blur-xs">
+                                                    <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-lg">
+                                                        {{-- Header --}}
+                                                        <div class="p-6 pb-4">
+                                                            <div class="flex items-start justify-between gap-4">
+                                                                <div class="flex items-center gap-3.5">
+                                                                    <div class="w-11 h-11 rounded-2xl bg-success/10 text-success flex items-center justify-center shrink-0 ring-4 ring-success/5 shadow-xs">
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                                        </svg>
+                                                                    </div>
+                                                                    <div>
+                                                                        <h3 class="font-bold text-lg text-base-content leading-snug">{{ __('Setujui Permintaan Tanda Tangan') }}</h3>
+                                                                        <p class="text-xs text-base-content/60 mt-0.5">{{ __('Tanda tangan Anda akan dibubuhkan secara otomatis ke dalam dokumen ini.') }}</p>
+                                                                    </div>
+                                                                </div>
+                                                                <button type="button" onclick="document.getElementById('approve-modal-{{ $req->id }}').close()" class="btn btn-ghost btn-sm btn-circle text-base-content/50 hover:text-base-content hover:bg-base-200">
+                                                                    ✕
+                                                                </button>
+                                                            </div>
+
+                                                            {{-- Target Document Info Box --}}
+                                                            <div class="mt-4 p-3.5 rounded-xl bg-base-200/60 border border-base-300/60 flex items-start gap-3">
+                                                                <div class="p-2 rounded-lg bg-base-100 text-base-content/70 shrink-0 shadow-xs">
+                                                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                                    </svg>
+                                                                </div>
+                                                                <div class="min-w-0 flex-1">
+                                                                    <div class="flex items-center gap-2 flex-wrap">
+                                                                        <span class="font-semibold text-sm text-base-content break-words">{{ $req->document?->title ?? __('Dokumen') }}</span>
+                                                                    </div>
+                                                                    <p class="text-xs text-base-content/60 mt-1">
+                                                                        {{ __('Diminta oleh') }}: <span class="font-medium text-base-content/80">{{ $req->requester->name }}</span>
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+
+                                                            {{-- Note Box --}}
+                                                            <div class="mt-3 p-3 rounded-xl bg-success/5 border border-success/15 flex items-start gap-2.5 text-xs text-base-content/70">
+                                                                <svg class="w-4 h-4 text-success shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                </svg>
+                                                                <span>{{ __('Pastikan Anda telah memeriksa isi dokumen sebelum memberikan persetujuan pembubuhan tanda tangan.') }}</span>
+                                                            </div>
+                                                        </div>
+
+                                                        {{-- Form / Modal Action Footer --}}
+                                                        <form method="POST" action="{{ route('signatures.requests.approve', $req) }}" onsubmit="document.getElementById('approve-modal-{{ $req->id }}').close(); document.getElementById('loading-modal').showModal();">
+                                                            @csrf
+                                                            <div class="bg-base-200/40 px-6 py-4 border-t border-base-200 flex items-center justify-end gap-2.5">
+                                                                <button type="button" onclick="document.getElementById('approve-modal-{{ $req->id }}').close()" class="btn btn-ghost btn-sm sm:btn-md rounded-xl font-medium text-base-content/70 hover:text-base-content px-4">
+                                                                    {{ __('Batal') }}
+                                                                </button>
+                                                                <button type="submit" class="btn btn-success btn-sm sm:btn-md text-white font-semibold rounded-xl px-5 shadow-xs hover:shadow-md hover:shadow-success/20 transition-all flex items-center gap-1.5">
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                                                    </svg>
+                                                                    {{ __('Ya, Setujui & Tanda Tangani') }}
+                                                                </button>
+                                                            </div>
+                                                        </form>
+                                                    </div>
+                                                    <form method="dialog" class="modal-backdrop">
+                                                        <button>{{ __('Batal') }}</button>
+                                                    </form>
+                                                </dialog>
 
                                                 <button type="button" onclick="document.getElementById('reject-modal-{{ $req->id }}').showModal()" class="btn btn-error btn-outline btn-xs gap-1 font-medium" title="{{ __('Tolak izin penggunaan tanda tangan Anda') }}">
                                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -154,36 +220,87 @@
                                                 </button>
 
                                                 {{-- Reject Reason Modal --}}
-                                                <dialog id="reject-modal-{{ $req->id }}" class="modal text-left whitespace-normal">
-                                                    <div class="modal-box">
-                                                        <h3 class="font-bold text-lg text-base-content flex items-center gap-2">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                                            </svg>
-                                                            {{ __('Tolak Permintaan Tanda Tangan') }}
-                                                        </h3>
-                                                        <p class="py-2 text-sm text-base-content/70">
-                                                            {!! __('Anda akan menolak permohonan penggunaan tanda tangan Anda oleh :name untuk dokumen :doc.', [
-                                                                'name' => '<strong>'.e($req->requester->name).'</strong>',
-                                                                'doc' => '<strong>'.e($req->document?->title ?? __('Dokumen')).'</strong>'
-                                                            ]) !!}
-                                                        </p>
+                                                <dialog id="reject-modal-{{ $req->id }}" class="modal modal-bottom sm:modal-middle text-left whitespace-normal backdrop-blur-xs">
+                                                    <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-lg">
+                                                        {{-- Header --}}
+                                                        <div class="p-6 pb-4">
+                                                            <div class="flex items-start justify-between gap-4">
+                                                                <div class="flex items-center gap-3.5">
+                                                                    <div class="w-11 h-11 rounded-2xl bg-error/10 text-error flex items-center justify-center shrink-0 ring-4 ring-error/5 shadow-xs">
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                                        </svg>
+                                                                    </div>
+                                                                    <div>
+                                                                        <h3 class="font-bold text-lg text-base-content leading-snug">{{ __('Tolak Permintaan Tanda Tangan') }}</h3>
+                                                                        <p class="text-xs text-base-content/60 mt-0.5">{{ __('Izin tanda tangan tidak akan diberikan.') }}</p>
+                                                                    </div>
+                                                                </div>
+                                                                <button type="button" onclick="document.getElementById('reject-modal-{{ $req->id }}').close()" class="btn btn-ghost btn-sm btn-circle text-base-content/50 hover:text-base-content hover:bg-base-200">
+                                                                    ✕
+                                                                </button>
+                                                            </div>
+
+                                                            {{-- Target Document Info Box --}}
+                                                            <div class="mt-4 p-3.5 rounded-xl bg-base-200/60 border border-base-300/60 flex items-start gap-3">
+                                                                <div class="p-2 rounded-lg bg-base-100 text-base-content/70 shrink-0 shadow-xs">
+                                                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                                    </svg>
+                                                                </div>
+                                                                <div class="min-w-0 flex-1">
+                                                                    <div class="flex items-center gap-2 flex-wrap">
+                                                                        <span class="font-semibold text-sm text-base-content break-words">{{ $req->document?->title ?? __('Dokumen') }}</span>
+                                                                    </div>
+                                                                    <p class="text-xs text-base-content/60 mt-1">
+                                                                        {{ __('Diminta oleh') }}: <span class="font-medium text-base-content/80">{{ $req->requester->name }}</span>
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {{-- Form --}}
                                                         <form method="POST" action="{{ route('signatures.requests.reject', $req) }}">
                                                             @csrf
-                                                            <div class="form-control mb-4">
-                                                                <label class="label">
-                                                                    <span class="label-text font-medium">{{ __('Alasan Penolakan (Opsional)') }}</span>
-                                                                </label>
-                                                                <textarea name="reason" class="textarea textarea-bordered w-full text-sm" rows="3" placeholder="{{ __('Tuliskan alasan penolakan izin tanda tangan...') }}"></textarea>
+                                                            <div class="px-6 pb-5 space-y-2">
+                                                                <div class="flex items-center justify-between">
+                                                                    <label for="reject-sig-reason-{{ $req->id }}" class="text-xs font-semibold text-base-content uppercase tracking-wider">
+                                                                        {{ __('Alasan Penolakan') }}
+                                                                    </label>
+                                                                    <span class="text-[11px] text-base-content/50 font-normal">({{ __('Opsional') }})</span>
+                                                                </div>
+                                                                <div class="relative">
+                                                                    <textarea 
+                                                                        id="reject-sig-reason-{{ $req->id }}"
+                                                                        name="reason" 
+                                                                        maxlength="500"
+                                                                        class="textarea textarea-bordered w-full text-sm rounded-xl bg-base-200/30 border-base-300 focus:border-error focus:ring-2 focus:ring-error/20 focus:outline-hidden transition-all placeholder:text-base-content/40 leading-relaxed min-h-[95px] p-3" 
+                                                                        placeholder="{{ __('Tuliskan alasan penolakan izin tanda tangan...') }}"></textarea>
+                                                                </div>
+                                                                <p class="text-[11px] text-base-content/50 flex items-center gap-1">
+                                                                    <svg class="w-3.5 h-3.5 text-base-content/40 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                    </svg>
+                                                                    {{ __('Catatan ini akan dikirimkan ke pemohon izin tanda tangan.') }}
+                                                                </p>
                                                             </div>
-                                                            <div class="modal-action">
-                                                                <button type="button" onclick="document.getElementById('reject-modal-{{ $req->id }}').close()" class="btn btn-ghost">{{ __('Batal') }}</button>
-                                                                <button type="submit" class="btn btn-error">{{ __('Tolak Permintaan') }}</button>
+
+                                                            {{-- Modal Action Footer --}}
+                                                            <div class="bg-base-200/40 px-6 py-4 border-t border-base-200 flex items-center justify-end gap-2.5">
+                                                                <button type="button" onclick="document.getElementById('reject-modal-{{ $req->id }}').close()" class="btn btn-ghost btn-sm sm:btn-md rounded-xl font-medium text-base-content/70 hover:text-base-content px-4">
+                                                                    {{ __('Batal') }}
+                                                                </button>
+                                                                <button type="submit" class="btn btn-error btn-sm sm:btn-md text-white font-semibold rounded-xl px-5 shadow-xs hover:shadow-md hover:shadow-error/20 transition-all flex items-center gap-1.5">
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                                                    </svg>
+                                                                    {{ __('Tolak Permintaan') }}
+                                                                </button>
                                                             </div>
                                                         </form>
                                                     </div>
                                                     <form method="dialog" class="modal-backdrop">
-                                                        <button>close</button>
+                                                        <button>{{ __('Batal') }}</button>
                                                     </form>
                                                 </dialog>
                                             @endif
@@ -284,7 +401,7 @@
                                     </td>
                                     <td class="px-5 py-4 text-right whitespace-nowrap">
                                         @if($req->document)
-                                            <a href="{{ route('documents.preview', $req->document) }}" title="{{ __('Preview Dokumen') }}" class="btn btn-ghost btn-xs gap-1 font-medium">
+                                            <a href="{{ route('documents.preview', ['document' => $req->document, 'from' => 'signature_requests']) }}" title="{{ __('Preview Dokumen') }}" class="btn btn-ghost btn-xs gap-1 font-medium">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />

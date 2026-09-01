@@ -3,8 +3,12 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ config('app.name', 'DokuFlow') }} — Register</title>
+    <title>{{ config('app.name', 'DokuFlow') }} — {{ __('Daftar') }}</title>
     
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{{ asset('logo.png') }}">
+    <link rel="shortcut icon" type="image/png" href="{{ asset('logo.png') }}">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -22,15 +26,7 @@
     
     <!-- Top-right controls -->
     <div class="absolute top-6 right-6 flex items-center gap-2 z-50">
-        <div class="dropdown dropdown-end">
-            <label tabindex="0" class="btn btn-ghost btn-circle btn-sm bg-base-100/50 backdrop-blur-sm">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" /></svg>
-            </label>
-            <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow-xl bg-base-100 rounded-box w-32 border border-base-300 mt-1">
-                <li><a href="?lang=id" class="{{ app()->getLocale() == 'id' ? 'font-bold text-primary' : '' }}">Indonesia</a></li>
-                <li><a href="?lang=en" class="{{ app()->getLocale() == 'en' ? 'font-bold text-primary' : '' }}">English</a></li>
-            </ul>
-        </div>
+        <x-language-toggle />
         <div class="bg-base-100/50 backdrop-blur-sm rounded-full">
             <x-theme-toggle />
         </div>
@@ -45,8 +41,8 @@
                 <a href="/" class="inline-flex items-center justify-center p-3 bg-base-100 rounded-2xl shadow-sm border border-base-300 mb-6 hover:scale-105 transition-transform">
                     <x-application-logo class="w-10 h-10 text-primary" />
                 </a>
-                <h1 class="text-2xl font-bold tracking-tight text-base-content mb-2">Create an Account</h1>
-                <p class="text-sm text-base-content/60">Fill in your details below to get started</p>
+                <h1 class="text-2xl font-bold tracking-tight text-base-content mb-2">{{ __('Buat Akun Baru') }}</h1>
+                <p class="text-sm text-base-content/60">{{ __('Isi data diri Anda di bawah ini untuk memulai') }}</p>
             </div>
 
             <!-- Main Card -->
@@ -57,7 +53,7 @@
 
                         <!-- Name Input -->
                         <div class="space-y-1.5">
-                            <label for="name" class="text-sm font-semibold text-base-content/80 block">Full Name</label>
+                            <label for="name" class="text-sm font-semibold text-base-content/80 block">{{ __('Nama Lengkap') }}</label>
                             <div class="relative">
                                 <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-base-content/40">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" /></svg>
@@ -70,7 +66,7 @@
 
                         <!-- Email Input -->
                         <div class="space-y-1.5">
-                            <label for="email" class="text-sm font-semibold text-base-content/80 block">Email Address</label>
+                            <label for="email" class="text-sm font-semibold text-base-content/80 block">{{ __('Alamat Email') }}</label>
                             <div class="relative">
                                 <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-base-content/40">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" /><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" /></svg>
@@ -83,7 +79,7 @@
 
                         <!-- Password Input -->
                         <div class="space-y-1.5" x-data="{ show: false }">
-                            <label for="password" class="text-sm font-semibold text-base-content/80 block">Password</label>
+                            <label for="password" class="text-sm font-semibold text-base-content/80 block">{{ __('Kata Sandi') }}</label>
                             <div class="relative">
                                 <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-base-content/40">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg>
@@ -101,7 +97,7 @@
                         
                         <!-- Confirm Password Input -->
                         <div class="space-y-1.5" x-data="{ show: false }">
-                            <label for="password_confirmation" class="text-sm font-semibold text-base-content/80 block">Confirm Password</label>
+                            <label for="password_confirmation" class="text-sm font-semibold text-base-content/80 block">{{ __('Konfirmasi Kata Sandi') }}</label>
                             <div class="relative">
                                 <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-base-content/40">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg>
@@ -118,15 +114,15 @@
                         </div>
 
                         <button type="submit" class="w-full py-3 mt-4 bg-primary hover:bg-primary/90 text-primary-content rounded-xl font-semibold text-sm transition-all hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0">
-                            Create Account
+                            {{ __('Daftar Akun') }}
                         </button>
                     </form>
                 </div>
                 
                 <div class="p-6 border-t border-base-300 text-center">
                     <p class="text-sm text-base-content/60">
-                        Already have an account? 
-                        <a href="{{ route('login') }}" class="font-semibold text-primary hover:underline">Sign in here</a>
+                        {{ __('Sudah punya akun?') }} 
+                        <a href="{{ route('login') }}" class="font-semibold text-primary hover:underline">{{ __('Masuk di sini') }}</a>
                     </p>
                 </div>
             </div>

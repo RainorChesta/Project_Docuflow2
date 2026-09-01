@@ -56,9 +56,9 @@ class DocumentService
      * Generate the final, authoritative document number. Locks the row
      * range to avoid duplicate sequences under concurrent submissions.
      */
-    public function generateId(?Division $division, ?DocumentType $documentType, ?\App\Models\Branch $branch = null): string
+    public function generateId(?Division $division, ?DocumentType $documentType, ?\App\Models\Branch $branch = null, ?\App\Models\UnitKerja $unitKerja = null): string
     {
-        return DB::transaction(function () use ($division, $documentType, $branch) {
+        return DB::transaction(function () use ($division, $documentType, $branch, $unitKerja) {
             $query = Document::withTrashed()
                 ->where('document_type_id', $documentType?->id)
                 ->whereYear('created_at', now()->year);
@@ -67,8 +67,16 @@ class DocumentService
                 $query->where('branch_id', $branch->id);
             }
 
-            if ($division) {
-                $query->where('division_id', $division->id);
+            if (strtoupper($documentType?->code ?? '') === 'SOP') {
+                if ($unitKerja) {
+                    $query->where('unit_kerja_id', $unitKerja->id);
+                } elseif ($division) {
+                    $query->where('division_id', $division->id);
+                }
+            } else {
+                if ($division) {
+                    $query->where('division_id', $division->id);
+                }
             }
 
             $lastDoc = $query->lockForUpdate()
@@ -77,7 +85,7 @@ class DocumentService
 
             $seq = $this->nextSequenceFrom($lastDoc);
 
-            return $this->formatNumber($division, $documentType, $seq, $branch);
+            return $this->formatNumber($division, $documentType, $seq, $branch, $unitKerja);
         });
     }
 
@@ -85,7 +93,7 @@ class DocumentService
      * Non-locking preview of the next number, purely indicative for the
      * create form.
      */
-    public function previewNumber(?Division $division, ?DocumentType $documentType, ?\App\Models\Branch $branch = null): string
+    public function previewNumber(?Division $division, ?DocumentType $documentType, ?\App\Models\Branch $branch = null, ?\App\Models\UnitKerja $unitKerja = null): string
     {
         $query = Document::withTrashed()
             ->where('document_type_id', $documentType?->id)
@@ -95,15 +103,23 @@ class DocumentService
             $query->where('branch_id', $branch->id);
         }
 
-        if ($division) {
-            $query->where('division_id', $division->id);
+        if (strtoupper($documentType?->code ?? '') === 'SOP') {
+            if ($unitKerja) {
+                $query->where('unit_kerja_id', $unitKerja->id);
+            } elseif ($division) {
+                $query->where('division_id', $division->id);
+            }
+        } else {
+            if ($division) {
+                $query->where('division_id', $division->id);
+            }
         }
 
         $lastDoc = $query->orderByDesc('id')->first();
 
         $seq = $this->nextSequenceFrom($lastDoc);
 
-        return $this->formatNumber($division, $documentType, $seq, $branch);
+        return $this->formatNumber($division, $documentType, $seq, $branch, $unitKerja);
     }
 
     private function nextSequenceFrom(?Document $lastDoc): int
@@ -119,7 +135,7 @@ class DocumentService
         return (int) $firstSegment + 1;
     }
 
-    private function formatNumber(?Division $division, ?DocumentType $documentType, int $seq, ?\App\Models\Branch $branch = null): string
+    private function formatNumber(?Division $division, ?DocumentType $documentType, int $seq, ?\App\Models\Branch $branch = null, ?\App\Models\UnitKerja $unitKerja = null): string
     {
         $now = Carbon::now();
         $year = $now->year;
@@ -127,14 +143,30 @@ class DocumentService
         
         $branchCode = $branch ? $branch->effective_code : config('dokuflow.central_code', 'JBM');
 
-        // Non-division scopes (general/personal) pakai kode generik karena
-        // tidak terikat divisi manapun.
-        $divisionCode = $division ? $division->code : 'GEN';
-
         // "/" di kode tipe diganti "-" khusus untuk nomor dokumen, supaya
-        // jumlah segmen yang dipisah "/" tetap konsisten (6 segmen).
+        // jumlah segmen yang dipisah "/" tetap konsisten.
         $typeCode = $documentType?->code ?? 'GEN';
         $typeCodeForNumber = str_replace('/', '-', $typeCode);
+
+        // Khusus tipe SOP:
+        // Format: {nomor_surat}/SOP-{kode_unit_kerja}/{kode_cabang}/{bulan_romawi}/{tahun}
+        // Contoh: 001/SOP-11/CDC-DIP/I/2023
+        if (strtoupper($typeCode) === 'SOP') {
+            $unitKerjaCode = $unitKerja ? $unitKerja->kode_unit_kerja : ($division ? $division->code : '00');
+            return sprintf(
+                '%03d/%s-%s/%s/%s/%d',
+                $seq,
+                $typeCodeForNumber,
+                $unitKerjaCode,
+                $branchCode,
+                $romanMonth,
+                $year
+            );
+        }
+
+        // Dokumen selain SOP: {seq}/{type}/{division}/{branch}/{month}/{year}
+        // Contoh: 001/S.ED/IT/JBM/VIII/2026
+        $divisionCode = $division ? $division->code : 'GEN';
 
         return sprintf(
             '%03d/%s/%s/%s/%s/%d',
@@ -150,6 +182,7 @@ class DocumentService
     public function create(array $data, int $ownerId): Document
     {
         $division = !empty($data['division_id']) ? Division::find($data['division_id']) : null;
+        $unitKerja = !empty($data['unit_kerja_id']) ? \App\Models\UnitKerja::find($data['unit_kerja_id']) : null;
         $documentType = DocumentType::findOrFail($data['document_type_id']);
         $branch = !empty($data['branch_id']) ? \App\Models\Branch::with('company')->find($data['branch_id']) : null;
 
@@ -157,7 +190,7 @@ class DocumentService
             $data['company_id'] = $branch->company_id;
         }
 
-        $data['document_number'] = $this->generateId($division, $documentType, $branch);
+        $data['document_number'] = $this->generateId($division, $documentType, $branch, $unitKerja);
         $data['visibility'] ??= Document::VISIBILITY_DIVISION;
         $data['owner_id'] = $ownerId;
 

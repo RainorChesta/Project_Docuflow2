@@ -70,7 +70,7 @@ class DocumentTemplateController extends Controller
         ]);
 
         return redirect()->route('admin.templates.index')
-            ->with('success', 'Template berhasil diunggah.');
+            ->with('success', __('Template berhasil diunggah.'));
     }
 
     public function createManual(): View
@@ -127,7 +127,7 @@ class DocumentTemplateController extends Controller
         $template->update(['file_path' => $relativeFilePath]);
 
         return redirect()->route('admin.templates.editor', $template)
-            ->with('success', 'Template berhasil dibuat. Silakan edit isinya.');
+            ->with('success', __('Template berhasil dibuat. Silakan edit isinya.'));
     }
 
     public function editor(DocumentTemplate $template, \App\Services\OnlyOfficeService $onlyOfficeService): View
@@ -176,7 +176,7 @@ class DocumentTemplateController extends Controller
         $template->save();
 
         return redirect()->route('admin.templates.index')
-            ->with('success', 'Template berhasil diperbarui.');
+            ->with('success', __('Template berhasil diperbarui.'));
     }
 
     public function destroy(DocumentTemplate $template): RedirectResponse
@@ -190,7 +190,7 @@ class DocumentTemplateController extends Controller
         $template->delete();
 
         return redirect()->route('admin.templates.index')
-            ->with('success', 'Template berhasil dihapus.');
+            ->with('success', __('Template berhasil dihapus.'));
     }
 
     /**
@@ -201,9 +201,9 @@ class DocumentTemplateController extends Controller
         $template->status = $template->isActive() ? 'archived' : 'active';
         $template->save();
 
-        $label = $template->isActive() ? 'diaktifkan' : 'diarsipkan';
+        $label = $template->isActive() ? __('diaktifkan') : __('diarsipkan');
 
-        return back()->with('success', "Template berhasil {$label}.");
+        return back()->with('success', __('Template berhasil :status.', ['status' => $label]));
     }
 
     /**

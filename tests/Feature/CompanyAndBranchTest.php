@@ -27,7 +27,7 @@ class CompanyAndBranchTest extends TestCase
 
         $response->assertRedirect('/admin/companies');
         $this->assertDatabaseHas('companies', [
-            'name' => 'PT Jaya Bersama',
+            'name' => 'PT JAYA BERSAMA',
             'code' => 'JBM',
         ]);
 
@@ -35,7 +35,7 @@ class CompanyAndBranchTest extends TestCase
         $this->assertNotNull($company);
         $this->assertDatabaseHas('branches', [
             'company_id' => $company->id,
-            'name' => 'Pusat',
+            'name' => 'PUSAT',
             'is_pusat' => 1,
             'code' => null,
         ]);
@@ -62,6 +62,56 @@ class CompanyAndBranchTest extends TestCase
         $number = $service->generateId($division, $docType, $branch);
 
         $this->assertStringContainsString('/IT/SBY/', $number);
+    }
+
+    public function test_sop_document_numbering_includes_unit_kerja_and_branch_code(): void
+    {
+        $company = Company::create(['name' => 'PT Jaya', 'code' => 'JBM']);
+        $branch = Branch::create(['company_id' => $company->id, 'name' => 'CDC Diponegoro', 'is_pusat' => false, 'code' => 'CDC-DIP']);
+        $unitKerja = \App\Models\UnitKerja::create(['cabang_id' => $branch->id, 'kode_unit_kerja' => '11', 'nama_unit_kerja' => 'Unit Operasional']);
+        $sopType = DocumentType::create(['code' => 'SOP', 'name' => 'Standard Operating Procedure']);
+
+        $service = app(DocumentService::class);
+        
+        $preview = $service->previewNumber(null, $sopType, $branch, $unitKerja);
+        $number = $service->generateId(null, $sopType, $branch, $unitKerja);
+
+        // SOP number must match format {seq}/SOP-{unit_kerja}/{branch}/{month}/{year} (5 segments)
+        // e.g. 001/SOP-11/CDC-DIP/I/2026
+        $this->assertStringContainsString('/SOP-11/CDC-DIP/', $preview);
+        $this->assertStringContainsString('/SOP-11/CDC-DIP/', $number);
+        $this->assertCount(5, explode('/', $number));
+    }
+
+    public function test_sop_numbering_sequence_increments_per_unit_kerja(): void
+    {
+        $company = Company::create(['name' => 'PT Jaya', 'code' => 'JBM']);
+        $branch = Branch::create(['company_id' => $company->id, 'name' => 'CDC Diponegoro', 'is_pusat' => false, 'code' => 'CDC-DIP']);
+        $unitKerja11 = \App\Models\UnitKerja::create(['cabang_id' => $branch->id, 'kode_unit_kerja' => '11', 'nama_unit_kerja' => 'Unit Operasional']);
+        $sopType = DocumentType::create(['code' => 'SOP', 'name' => 'Standard Operating Procedure']);
+
+        $service = app(DocumentService::class);
+        $user = User::factory()->create();
+
+        // Doc 1 from Unit Kerja 11
+        $doc1 = $service->create([
+            'title' => 'SOP Operasional 1',
+            'document_type_id' => $sopType->id,
+            'branch_id' => $branch->id,
+            'unit_kerja_id' => $unitKerja11->id,
+        ], $user->id);
+
+        $this->assertStringStartsWith('001/SOP-11/CDC-DIP/', $doc1->document_number);
+
+        // Doc 2 from Unit Kerja 11
+        $doc2 = $service->create([
+            'title' => 'SOP Operasional 2',
+            'document_type_id' => $sopType->id,
+            'branch_id' => $branch->id,
+            'unit_kerja_id' => $unitKerja11->id,
+        ], $user->id);
+
+        $this->assertStringStartsWith('002/SOP-11/CDC-DIP/', $doc2->document_number);
     }
 
     public function test_director_cannot_create_master_data(): void
@@ -258,7 +308,7 @@ class CompanyAndBranchTest extends TestCase
 
         // Admin can view director accordion with all companies
         $dirResponse = $this->actingAs($admin)->get(route('director.documents.index'))->assertOk();
-        $dirResponse->assertSee('PT Alfa');
+        $dirResponse->assertSee('PT ALFA');
     }
 
     public function test_user_cannot_access_documents_from_other_branch_or_company(): void
@@ -336,9 +386,9 @@ class CompanyAndBranchTest extends TestCase
         $director->companies()->sync([$company->id]);
         $director->branches()->sync([$branch->id]);
 
-        $admin = User::factory()->create(['system_role' => 'admin']);
-        $admin->companies()->sync([$company->id]);
-        $admin->branches()->sync([$branch->id]);
+        $regularUser = User::factory()->create(['system_role' => 'user']);
+        $regularUser->companies()->sync([$company->id]);
+        $regularUser->branches()->sync([$branch->id]);
 
         // Director on director.documents.index: company & branch switcher is hidden
         $directorResp = $this->actingAs($director)->get(route('director.documents.index'));
@@ -346,11 +396,11 @@ class CompanyAndBranchTest extends TestCase
         $directorResp->assertDontSee('name="company_id"', false);
         $directorResp->assertDontSee('name="branch_id"', false);
 
-        // Admin on director.documents.index: switcher is visible
-        $adminResp = $this->actingAs($admin)->get(route('director.documents.index'));
-        $adminResp->assertOk();
-        $adminResp->assertSee('name="company_id"', false);
-        $adminResp->assertSee('name="branch_id"', false);
+        // Regular user with company/branch: switcher is visible
+        $regularUserResp = $this->actingAs($regularUser)->get(route('documents.index'));
+        $regularUserResp->assertOk();
+        $regularUserResp->assertSee('name="company_id"', false);
+        $regularUserResp->assertSee('name="branch_id"', false);
     }
 
     public function test_document_scope_modal_preselects_origin_branch_and_syncs_distributions(): void
@@ -393,6 +443,139 @@ class CompanyAndBranchTest extends TestCase
             'document_id' => $doc->id,
             'target_branch_id' => $branchPusatA->id,
         ]);
+    }
+
+    public function test_context_switching_persists_active_company_and_branch_in_session(): void
+    {
+        $company1 = Company::create(['name' => 'PT Satu', 'code' => 'SAT']);
+        $branch1 = Branch::create(['company_id' => $company1->id, 'name' => 'Pusat Satu', 'is_pusat' => true]);
+
+        $company2 = Company::create(['name' => 'PT Dua', 'code' => 'DUA']);
+        $branch2 = Branch::create(['company_id' => $company2->id, 'name' => 'Pusat Dua', 'is_pusat' => true]);
+
+        $user = User::factory()->create();
+        $user->companies()->sync([$company1->id, $company2->id]);
+        $user->branches()->sync([$branch1->id, $branch2->id]);
+
+        // Switch to Company 2 & Branch 2
+        $response = $this->actingAs($user)->post(route('context.switch'), [
+            'company_id' => $company2->id,
+            'branch_id' => $branch2->id,
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('active_company_id', $company2->id);
+        $response->assertSessionHas('active_branch_id', $branch2->id);
+
+        // Switch with JSON request
+        $jsonResp = $this->actingAs($user)->postJson(route('context.switch'), [
+            'company_id' => $company1->id,
+            'branch_id' => $branch1->id,
+        ]);
+
+        $jsonResp->assertOk()
+            ->assertJson([
+                'success' => true,
+                'active_company_id' => $company1->id,
+                'active_branch_id' => $branch1->id,
+            ]);
+    }
+
+    public function test_switching_context_while_on_out_of_scope_document_redirects_safely_to_documents_index(): void
+    {
+        $company1 = Company::create(['name' => 'PT Satu', 'code' => 'SAT']);
+        $branch1 = Branch::create(['company_id' => $company1->id, 'name' => 'Pusat Satu', 'is_pusat' => true]);
+
+        $company2 = Company::create(['name' => 'PT Dua', 'code' => 'DUA']);
+        $branch2 = Branch::create(['company_id' => $company2->id, 'name' => 'Pusat Dua', 'is_pusat' => true]);
+
+        $docType = DocumentType::create(['code' => 'SK', 'name' => 'Surat Keputusan']);
+
+        $user = User::factory()->create();
+        $user->companies()->sync([$company1->id, $company2->id]);
+        $user->branches()->sync([$branch1->id, $branch2->id]);
+
+        $doc1 = Document::create([
+            'title' => 'Doc in Branch 1',
+            'document_number' => '001/SK/2026',
+            'company_id' => $company1->id,
+            'branch_id' => $branch1->id,
+            'document_type_id' => $docType->id,
+            'owner_id' => $user->id,
+            'visibility' => 'general',
+        ]);
+
+        // When switching while referer is /documents/{doc1->id}, user switches to Branch 2
+        // Since doc1 does not belong to Branch 2, user should be redirected to documents.index instead of 403
+        $response = $this->actingAs($user)
+            ->from(route('documents.show', $doc1))
+            ->post(route('context.switch'), [
+                'company_id' => $company2->id,
+                'branch_id' => $branch2->id,
+            ]);
+
+        $response->assertRedirect(route('documents.index'));
+        $response->assertSessionHas('active_company_id', $company2->id);
+        $response->assertSessionHas('active_branch_id', $branch2->id);
+    }
+
+    public function test_admin_create_document_has_company_branch_selector_and_handles_distribution(): void
+    {
+        $company = Company::create(['name' => 'Jaya Bhakti Mandiri', 'code' => 'JBM']);
+        $branch1 = Branch::create(['company_id' => $company->id, 'name' => 'Pusat', 'is_pusat' => true]);
+        $branch2 = Branch::create(['company_id' => $company->id, 'name' => 'Mitra Medicare Clinic Dharmahusada', 'is_pusat' => false, 'code' => 'MMCD']);
+        $division = Division::create(['code' => 'HR', 'name' => 'Human Resources']);
+        $docType = DocumentType::create(['code' => 'S.ED', 'name' => 'Surat Edaran']);
+
+        $admin = User::factory()->create(['system_role' => 'admin']);
+
+        // 1. Check create view renders company and branch selector
+        $viewResp = $this->actingAs($admin)->get(route('documents.create'));
+        $viewResp->assertOk();
+        $viewResp->assertSee(__('Cari perusahaan...'));
+        $viewResp->assertSee('JAYA BHAKTI MANDIRI');
+        $viewResp->assertSee('name="branch_ids[]"', false);
+
+        // 2. Submit creation with multiple branches
+        $postResp = $this->actingAs($admin)->post('/documents', [
+            'title' => 'Dokumen Multi Cabang Test',
+            'document_type_id' => $docType->id,
+            'division_id' => $division->id,
+            'branch_ids' => [$branch1->id, $branch2->id],
+        ]);
+
+        $doc = Document::where('title', 'Dokumen Multi Cabang Test')->first();
+        $this->assertNotNull($doc);
+        $this->assertSame($branch1->id, $doc->branch_id);
+        $this->assertSame($company->id, $doc->company_id);
+
+        // Distribution to branch 2 should exist
+        $this->assertDatabaseHas('document_distributions', [
+            'document_id' => $doc->id,
+            'source_branch_id' => $branch1->id,
+            'target_branch_id' => $branch2->id,
+        ]);
+    }
+
+    public function test_newly_created_user_appears_at_top_of_admin_users_list(): void
+    {
+        $admin = User::factory()->create(['system_role' => 'admin', 'name' => 'Existing Admin']);
+        $oldUser = User::factory()->create(['name' => 'Oldest User']);
+
+        // Admin visits users index before new creation
+        $respBefore = $this->actingAs($admin)->get(route('admin.users.index'));
+        $respBefore->assertOk();
+
+        // Create new user
+        $newUser = User::factory()->create(['name' => 'Brand New User']);
+
+        // Admin visits users index: newest user must be the first item in the paginated collection
+        $response = $this->actingAs($admin)->get(route('admin.users.index'));
+        $response->assertOk();
+
+        $paginatedUsers = $response->viewData('users');
+        $this->assertSame($newUser->id, $paginatedUsers->first()->id);
+        $this->assertSame('Brand New User', $paginatedUsers->first()->name);
     }
 }
 

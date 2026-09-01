@@ -9,6 +9,10 @@
 
         <title>{{ config('app.name', 'DokuFlow') }} — {{ $title ?? __('Authentication') }}</title>
 
+        <!-- Favicon -->
+        <link rel="icon" type="image/png" href="{{ asset('logo.png') }}">
+        <link rel="shortcut icon" type="image/png" href="{{ asset('logo.png') }}">
+
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700&display=swap" rel="stylesheet" />
@@ -23,7 +27,8 @@
         <div class="card bg-base-100 w-full {{ $size === 'sm' ? 'max-w-sm' : 'max-w-md' }} shadow-2xl border border-base-200 overflow-hidden my-auto">
             <div class="card-body {{ $size === 'sm' ? 'p-4 sm:p-5' : 'p-4 sm:p-8' }}">
                 <div class="text-center {{ $size === 'sm' ? 'mb-4' : 'mb-6' }} flex flex-col items-center {{ $size === 'sm' ? 'gap-2' : 'gap-3' }}">
-                    <div class="self-end -mb-2">
+                    <div class="self-end -mb-2 flex items-center gap-2">
+                        <x-language-toggle />
                         <x-theme-toggle />
                     </div>
                     <a href="/" class="inline-block">

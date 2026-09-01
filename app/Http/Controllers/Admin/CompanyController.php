@@ -31,18 +31,19 @@ class CompanyController extends Controller
             'code' => 'required|string|max:20|unique:companies,code',
         ]);
 
+        $validated['name'] = mb_strtoupper(trim($validated['name']));
         $validated['code'] = strtoupper(trim($validated['code']));
 
         $company = Company::create($validated);
 
         // Auto-create default "Pusat" branch
         $company->branches()->create([
-            'name' => 'Pusat',
+            'name' => 'PUSAT',
             'is_pusat' => true,
             'code' => null,
         ]);
 
-        return redirect()->route('admin.companies.index')->with('success', 'Company created successfully with default Pusat branch.');
+        return redirect()->route('admin.companies.index')->with('success', __('Perusahaan berhasil dibuat dengan cabang Pusat default.'));
     }
 
     public function edit(Company $company): View
@@ -59,20 +60,21 @@ class CompanyController extends Controller
             'code' => 'required|string|max:20|unique:companies,code,' . $company->id,
         ]);
 
+        $validated['name'] = mb_strtoupper(trim($validated['name']));
         $validated['code'] = strtoupper(trim($validated['code']));
         $company->update($validated);
 
-        return redirect()->route('admin.companies.index')->with('success', 'Company updated successfully.');
+        return redirect()->route('admin.companies.index')->with('success', __('Perusahaan berhasil diperbarui.'));
     }
 
     public function destroy(Company $company): RedirectResponse
     {
         $this->authorize('admin');
-        if ($company->documents()->exists()) {
-            return back()->with('error', 'Cannot delete company with associated documents.');
+        if ($company->documents()->withTrashed()->exists()) {
+            return back()->with('error', __('Tidak dapat menghapus perusahaan yang memiliki dokumen terkait.'));
         }
 
         $company->delete();
-        return redirect()->route('admin.companies.index')->with('success', 'Company deleted successfully.');
+        return redirect()->route('admin.companies.index')->with('success', __('Perusahaan berhasil dihapus.'));
     }
 }

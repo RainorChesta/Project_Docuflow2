@@ -17,16 +17,21 @@ class BranchController extends Controller
         $this->authorize('admin');
         $companyId = $request->get('company_id');
 
-        $query = Branch::with('company')->withCount('users', 'documents');
+        $companyQuery = Company::with(['branches' => function ($q) {
+            $q->withCount('users', 'documents')
+              ->orderByDesc('is_pusat')
+              ->orderBy('name');
+        }]);
 
         if ($companyId) {
-            $query->where('company_id', $companyId);
+            $companyQuery->where('id', $companyId);
         }
 
-        $branches = $query->orderBy('company_id')->orderBy('is_pusat', 'desc')->paginate(15);
+        $companyGroups = $companyQuery->orderBy('name')->paginate(15);
         $companies = Company::orderBy('name')->get();
+        $branches = $companyGroups; // For backwards compatibility
 
-        return view('admin.branches.index', compact('branches', 'companies', 'companyId'));
+        return view('admin.branches.index', compact('companyGroups', 'branches', 'companies', 'companyId'));
     }
 
     public function create(Request $request): View
@@ -70,13 +75,14 @@ class BranchController extends Controller
             'code.unique' => 'Branch code already exists in this company.',
         ]);
 
+        $validated['name'] = mb_strtoupper(trim($validated['name']));
         $validated['is_pusat'] = $isPusat;
         $validated['code'] = $isPusat ? null : strtoupper(trim($validated['code'] ?? ''));
 
         Branch::create($validated);
 
         return redirect()->route('admin.branches.index', ['company_id' => $validated['company_id']])
-            ->with('success', 'Branch created successfully.');
+            ->with('success', __('Cabang berhasil dibuat.'));
     }
 
     public function edit(Branch $branch): View
@@ -118,30 +124,31 @@ class BranchController extends Controller
         }
 
         $validated = $request->validate($rules, [
-            'company_id.unique' => 'This company already has a Pusat branch.',
-            'code.unique' => 'Branch code already exists in this company.',
+            'company_id.unique' => __('Perusahaan ini sudah memiliki cabang Pusat.'),
+            'code.unique' => __('Kode cabang sudah digunakan di perusahaan ini.'),
         ]);
 
+        $validated['name'] = mb_strtoupper(trim($validated['name']));
         $validated['is_pusat'] = $isPusat;
         $validated['code'] = $isPusat ? null : strtoupper(trim($validated['code'] ?? ''));
 
         $branch->update($validated);
 
         return redirect()->route('admin.branches.index', ['company_id' => $branch->company_id])
-            ->with('success', 'Branch updated successfully.');
+            ->with('success', __('Cabang berhasil diperbarui.'));
     }
 
     public function destroy(Branch $branch): RedirectResponse
     {
         $this->authorize('admin');
         if ($branch->documents()->exists()) {
-            return back()->with('error', 'Cannot delete branch with associated documents.');
+            return back()->with('error', __('Tidak dapat menghapus cabang yang memiliki dokumen terkait.'));
         }
 
         $companyId = $branch->company_id;
         $branch->delete();
 
         return redirect()->route('admin.branches.index', ['company_id' => $companyId])
-            ->with('success', 'Branch deleted successfully.');
+            ->with('success', __('Cabang berhasil dihapus.'));
     }
 }

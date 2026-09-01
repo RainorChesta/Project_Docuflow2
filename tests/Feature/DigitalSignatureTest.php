@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Division;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\Signature;
@@ -192,5 +193,114 @@ class DigitalSignatureTest extends TestCase
         $secondConsumeResp = $this->actingAs($requester)->postJson(route('signatures.requests.consume', $sigRequest));
         $secondConsumeResp->assertStatus(422)
             ->assertJson(['success' => false]);
+    }
+
+    public function test_requester_receives_notification_when_signature_request_is_rejected(): void
+    {
+        \Illuminate\Support\Facades\Notification::fake();
+
+        $division = Division::create(['name' => 'IT Dept', 'code' => 'IT']);
+        $requester = User::factory()->create(['division_id' => $division->id, 'name' => 'Requester User']);
+        $targetUser = User::factory()->create(['division_id' => $division->id, 'name' => 'Signer User']);
+
+        $docType = DocumentType::create(['name' => 'Surat Keputusan', 'code' => 'SK']);
+        $document = Document::create([
+            'document_number' => '003/SK/DIV/2026',
+            'title' => 'Document Requiring Signature',
+            'document_type_id' => $docType->id,
+            'owner_id' => $requester->id,
+            'visibility' => 'general',
+        ]);
+
+        $sigRequest = SignatureRequest::create([
+            'requester_id' => $requester->id,
+            'target_user_id' => $targetUser->id,
+            'document_id' => $document->id,
+            'status' => 'pending',
+            'requested_at' => now(),
+        ]);
+
+        // Target user rejects request with reason
+        $response = $this->actingAs($targetUser)->post(route('signatures.requests.reject', $sigRequest), [
+            'reason' => 'Draft needs more detail',
+        ]);
+
+        $response->assertSessionHas('success');
+        $this->assertTrue($sigRequest->fresh()->isRejected());
+        $this->assertSame('Draft needs more detail', $sigRequest->fresh()->rejected_reason);
+
+        // Assert requester received rejection notification
+        \Illuminate\Support\Facades\Notification::assertSentTo(
+            $requester,
+            \App\Notifications\SignatureRequestRejectedNotification::class,
+            function ($notification) use ($document, $targetUser) {
+                $data = $notification->toArray($targetUser);
+                return $data['type'] === 'signature_request_rejected'
+                    && $data['icon'] === 'rejected'
+                    && $data['document_id'] === $document->id
+                    && $data['reason'] === 'Draft needs more detail';
+            }
+        );
+    }
+
+    public function test_cross_company_or_branch_signer_can_view_document_preview_only(): void
+    {
+        $companyA = \App\Models\Company::create(['name' => 'Company A', 'code' => 'CMPA']);
+        $branchA = \App\Models\Branch::create(['company_id' => $companyA->id, 'name' => 'Branch A', 'is_pusat' => true]);
+
+        $companyB = \App\Models\Company::create(['name' => 'Company B', 'code' => 'CMPB']);
+        $branchB = \App\Models\Branch::create(['company_id' => $companyB->id, 'name' => 'Branch B', 'is_pusat' => true]);
+
+        $authorA = User::factory()->create(['name' => 'Author Company A']);
+        $authorA->companies()->sync([$companyA->id]);
+        $authorA->branches()->sync([$branchA->id]);
+
+        $signerB = User::factory()->create(['name' => 'Signer Company B']);
+        $signerB->companies()->sync([$companyB->id]);
+        $signerB->branches()->sync([$branchB->id]);
+
+        $otherUserB = User::factory()->create(['name' => 'Unrelated User Company B']);
+        $otherUserB->companies()->sync([$companyB->id]);
+        $otherUserB->branches()->sync([$branchB->id]);
+
+        $docType = DocumentType::create(['name' => 'Memo Internal', 'code' => 'MI']);
+        $document = Document::create([
+            'document_number' => '004/MI/CMPA/2026',
+            'title' => 'Cross Company Doc',
+            'document_type_id' => $docType->id,
+            'company_id' => $companyA->id,
+            'branch_id' => $branchA->id,
+            'owner_id' => $authorA->id,
+            'visibility' => 'personal',
+        ]);
+
+        // Unrelated user from Company B cannot view the document
+        $this->actingAs($otherUserB)->get(route('documents.show', $document))
+            ->assertStatus(403);
+
+        // Signer B without request cannot view yet
+        $this->actingAs($signerB)->get(route('documents.show', $document))
+            ->assertStatus(403);
+
+        // Create signature request for Signer B
+        SignatureRequest::create([
+            'requester_id' => $authorA->id,
+            'target_user_id' => $signerB->id,
+            'document_id' => $document->id,
+            'status' => 'pending',
+            'requested_at' => now(),
+        ]);
+
+        // Signer B can now view the document and preview
+        $this->actingAs($signerB)->get(route('documents.show', $document))
+            ->assertStatus(200);
+
+        // Signer B cannot edit/update the document
+        $this->actingAs($signerB)->get(route('documents.edit', $document))
+            ->assertStatus(403);
+
+        // Signer B cannot delete the document
+        $this->actingAs($signerB)->delete(route('documents.destroy', $document))
+            ->assertStatus(403);
     }
 }

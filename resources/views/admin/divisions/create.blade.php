@@ -10,14 +10,14 @@
                         <label for="code" class="label">
                             <span class="label-text font-medium">Code</span>
                         </label>
-                        <input type="text" name="code" id="code" class="input input-bordered w-full" maxlength="10" required>
+                        <input type="text" name="code" id="code" class="input input-bordered w-full uppercase" maxlength="10" required>
                         @error('code') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                     </div>
                     <div class="form-control w-full mb-4">
                         <label for="name" class="label">
                             <span class="label-text font-medium">Name</span>
                         </label>
-                        <input type="text" name="name" id="name" class="input input-bordered w-full" required>
+                        <input type="text" name="name" id="name" class="input input-bordered w-full capitalize" required>
                         @error('name') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                     </div>
                     <div class="flex flex-wrap justify-end">

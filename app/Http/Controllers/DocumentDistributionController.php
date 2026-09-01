@@ -19,7 +19,7 @@ class DocumentDistributionController extends Controller
 
     public function store(Request $request, Document $document): RedirectResponse
     {
-        $this->authorize('update', $document);
+        $this->authorize('manageScope', $document);
 
         $validated = $request->validate([
             'target_branch_ids' => 'required|array',
@@ -68,6 +68,6 @@ class DocumentDistributionController extends Controller
             }
         }
 
-        return back()->with('success', 'Document distributed successfully.');
+        return back()->with('success', __('Dokumen berhasil didistribusikan.'));
     }
 }

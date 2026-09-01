@@ -13,9 +13,10 @@ class Document extends Model
     use SoftDeletes;
     protected $fillable = [
         'document_number', 'title', 'summary', 'summary_status', 'summary_error',
-        'summary_started_at', 'summary_completed_at', 'visibility', 'division_id', 'company_id', 'branch_id', 'owner_id',
+        'summary_started_at', 'summary_completed_at', 'visibility', 'division_id', 'unit_kerja_id', 'company_id', 'branch_id', 'owner_id',
         'document_type_id', 'template_id', 'is_public', 'current_version_id',
         'pending_rollback_version_id', 'rollback_requested_by_id', 'rollback_requested_at',
+        'pending_title', 'rename_requested_by_id', 'rename_requested_at', 'rename_request_notes',
         'paper_size', 'paper_margin',
         'general_access', 'link_role', 'share_token',
         'expiration_date', 'is_expired', 'is_expiration_notified', 'expiration_notif_status',
@@ -27,6 +28,7 @@ class Document extends Model
             'is_public' => 'boolean',
             'is_expired' => 'boolean',
             'rollback_requested_at' => 'datetime',
+            'rename_requested_at' => 'datetime',
             'summary_started_at' => 'datetime',
             'summary_completed_at' => 'datetime',
             'expiration_date' => 'date',
@@ -96,6 +98,11 @@ class Document extends Model
         return $this->belongsTo(Branch::class);
     }
 
+    public function unitKerja(): BelongsTo
+    {
+        return $this->belongsTo(UnitKerja::class, 'unit_kerja_id');
+    }
+
     public function documentType(): BelongsTo
     {
         return $this->belongsTo(DocumentType::class);
@@ -129,6 +136,16 @@ class Document extends Model
     public function hasPendingRollback(): bool
     {
         return !is_null($this->pending_rollback_version_id);
+    }
+
+    public function renameRequestedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'rename_requested_by_id');
+    }
+
+    public function hasPendingRename(): bool
+    {
+        return !empty(trim($this->pending_title ?? ''));
     }
 
     /**
@@ -238,32 +255,53 @@ class Document extends Model
         $companyIds = $user->allCompanyIds();
         $divisionIds = $user->allDivisionIds();
 
-        if (!empty($branchIds)) {
-            $query->where(function ($q) use ($branchIds, $companyIds) {
-                $q->whereIn('branch_id', $branchIds)
-                  ->orWhere(function ($sub) use ($companyIds) {
-                      $sub->whereNull('branch_id')
-                          ->whereIn('company_id', $companyIds);
-                  });
-            });
-        } elseif (!empty($companyIds)) {
-            $query->whereIn('company_id', $companyIds);
-        }
-
         if ($user->isDirector()) {
+            if (!empty($branchIds)) {
+                $query->where(function ($q) use ($branchIds, $companyIds) {
+                    $q->whereIn('branch_id', $branchIds)
+                      ->orWhere(function ($sub) use ($companyIds) {
+                          $sub->whereNull('branch_id')
+                              ->whereIn('company_id', $companyIds);
+                      });
+                });
+            } elseif (!empty($companyIds)) {
+                $query->whereIn('company_id', $companyIds);
+            }
             return $query;
         }
 
-        return $query->where(function (Builder $q) use ($user, $divisionIds, $branchIds) {
-            $q->where('visibility', self::VISIBILITY_GENERAL)
-                ->orWhere('owner_id', $user->id)
-                ->orWhere(function (Builder $sub) use ($divisionIds) {
-                    $sub->where('visibility', self::VISIBILITY_DIVISION)
-                        ->whereIn('division_id', $divisionIds);
-                })
-                ->orWhereHas('shares', fn(Builder $s) => $s->where('user_id', $user->id))
-                ->orWhereHas('divisionShares', fn(Builder $ds) => $ds->whereIn('division_id', $divisionIds))
-                ->orWhereHas('distributions', fn(Builder $dist) => $dist->whereIn('target_branch_id', $branchIds));
+        return $query->where(function (Builder $q) use ($user, $divisionIds, $branchIds, $companyIds) {
+            // Explicitly shared with user or division (accessible across branches/companies)
+            $q->whereHas('shares', fn(Builder $s) => $s->where('user_id', $user->id));
+
+            if (!empty($divisionIds)) {
+                $q->orWhereHas('divisionShares', fn(Builder $ds) => $ds->whereIn('division_id', $divisionIds));
+            }
+
+            // Documents within the user's active branch/company scope
+            $q->orWhere(function (Builder $inScope) use ($user, $divisionIds, $branchIds, $companyIds) {
+                if (!empty($branchIds)) {
+                    $inScope->where(function ($b) use ($branchIds, $companyIds) {
+                        $b->whereIn('branch_id', $branchIds)
+                          ->orWhere(function ($sub) use ($companyIds) {
+                              $sub->whereNull('branch_id')
+                                  ->whereIn('company_id', $companyIds);
+                          });
+                    });
+                } elseif (!empty($companyIds)) {
+                    $inScope->whereIn('company_id', $companyIds);
+                }
+
+                $inScope->where(function (Builder $sub) use ($user, $divisionIds, $branchIds) {
+                    $sub->where('visibility', self::VISIBILITY_GENERAL)
+                        ->orWhere('owner_id', $user->id)
+                        ->orWhere(function (Builder $d) use ($divisionIds) {
+                            $d->where('visibility', self::VISIBILITY_DIVISION)
+                              ->whereIn('division_id', $divisionIds);
+                        })
+                        ->orWhereHas('distributions', fn(Builder $dist) => $dist->whereIn('target_branch_id', $branchIds));
+                });
+            });
         });
     }
 

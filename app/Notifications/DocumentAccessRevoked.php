@@ -42,7 +42,7 @@ class DocumentAccessRevoked extends Notification
             'title'       => __('Akses Dokumen Dicabut'),
             'message'     => $message,
             'url'         => route('documents.index'),
-            'icon'        => 'document',
+            'icon'        => 'rejected',
             'document_id' => $this->document->id,
         ];
     }

@@ -93,7 +93,7 @@ class DocumentShareService
     {
         $documentId = $share->document_id;
         $userId = $share->user_id;
-        $document = $share->document;
+        $document = $share->document ?? Document::withTrashed()->find($documentId);
 
         $share->delete();
 
@@ -143,7 +143,7 @@ class DocumentShareService
     {
         $documentId = $share->document_id;
         $divisionId = $share->division_id;
-        $document = $share->document;
+        $document = $share->document ?? Document::withTrashed()->find($documentId);
         $divisionName = $share->division?->name;
 
         $share->delete();

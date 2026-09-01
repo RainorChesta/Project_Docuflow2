@@ -8,8 +8,13 @@
             <a href="{{ route('documents.show', ['document' => $doc, 'type' => request('type')]) }}" class="font-medium break-words text-base-content no-underline hover:text-primary transition-colors">
                 {{ $doc->title }}
             </a>
+            @if($doc->hasPendingRename())
+                <span class="badge badge-warning badge-outline badge-xs shrink-0" title="{{ __('Menunggu Persetujuan Ubah Nama') }}">{{ __('Ubah Nama') }}</span>
+            @endif
             @if($doc->documentType)
-                <span class="badge badge-outline badge-sm shrink-0">{{ $doc->documentType->code }}</span>
+                <span class="badge badge-outline badge-sm shrink-0 max-w-[160px] inline-flex items-center" title="{{ $doc->documentType->name ?? $doc->documentType->code }}">
+                    <span class="truncate">{{ $doc->documentType->code }}</span>
+                </span>
             @endif
             @if(isset($type) && $type === 'shared')
                 @php $shareRole = $doc->shares->first()?->role; @endphp

@@ -77,6 +77,9 @@ Route::middleware('auth')->group(function () {
     Route::patch('/documents/{document}/visibility', [DocumentController::class, 'updateVisibility'])->name('documents.update-visibility');
     Route::post('/documents/{document}/discard', [DocumentController::class, 'discard'])->name('documents.discard');
     Route::post('/documents/{document}/toggle-public', [DocumentController::class, 'togglePublic'])->name('documents.toggle-public');
+    Route::post('/documents/{document}/rename', [DocumentController::class, 'rename'])->name('documents.rename');
+    Route::post('/documents/{document}/request-rename', [DocumentController::class, 'requestRename'])->name('documents.request-rename');
+    Route::post('/documents/{document}/cancel-rename', [DocumentController::class, 'cancelRenameRequest'])->name('documents.cancel-rename');
 
     // Approvals
     Route::get('/approvals', [ApprovalController::class, 'index'])->name('approvals.index');
@@ -85,6 +88,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/documents/{document}/versions/{version}/rollback', [ApprovalController::class, 'rollback'])->name('approvals.rollback');
     Route::post('/documents/{document}/rollback-request/approve', [ApprovalController::class, 'approveRollback'])->name('approvals.rollback-request.approve');
     Route::post('/documents/{document}/rollback-request/reject', [ApprovalController::class, 'rejectRollback'])->name('approvals.rollback-request.reject');
+    Route::post('/documents/{document}/rename-request/approve', [ApprovalController::class, 'approveRename'])->name('approvals.rename-request.approve');
+    Route::post('/documents/{document}/rename-request/reject', [ApprovalController::class, 'rejectRename'])->name('approvals.rename-request.reject');
 
     // Document Shares (Google Docs model)
     Route::post('/documents/{document}/shares', [DocumentShareController::class, 'store'])->name('shares.store');
@@ -110,10 +115,19 @@ Route::middleware('auth')->group(function () {
     // Director Accordion Browsing
     Route::get('/director/documents', [\App\Http\Controllers\DirectorDocumentController::class, 'index'])->name('director.documents.index');
 
+    // Trash (Sampah Dokumen) - Accessible to all roles
+    Route::get('/trash', [\App\Http\Controllers\TrashController::class, 'index'])->name('trash.index');
+    Route::post('/trash/bulk-restore', [\App\Http\Controllers\TrashController::class, 'bulkRestore'])->name('trash.bulk-restore');
+    Route::delete('/trash/bulk-force-delete', [\App\Http\Controllers\TrashController::class, 'bulkForceDelete'])->name('trash.bulk-force-delete');
+    Route::post('/trash/{id}/restore', [\App\Http\Controllers\TrashController::class, 'restore'])->name('trash.restore');
+    Route::delete('/trash/{id}/force-delete', [\App\Http\Controllers\TrashController::class, 'forceDelete'])->name('trash.force-delete');
+    Route::delete('/trash/empty', [\App\Http\Controllers\TrashController::class, 'emptyTrash'])->name('trash.empty');
+
     // Admin
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::resource('companies', \App\Http\Controllers\Admin\CompanyController::class);
         Route::resource('branches', \App\Http\Controllers\Admin\BranchController::class);
+        Route::resource('unit-kerja', \App\Http\Controllers\Admin\UnitKerjaController::class);
         Route::resource('divisions', DivisionController::class);
         Route::resource('users', UserController::class);
         Route::get('/retention', [RetentionController::class, 'edit'])->name('retention.edit');
@@ -127,6 +141,14 @@ Route::middleware('auth')->group(function () {
         Route::get('/templates/{template}/download', [DocumentTemplateController::class, 'download'])->name('templates.download');
         Route::get('/documents', [AdminDocumentController::class, 'index'])->name('documents.index');
         Route::delete('/documents/{document}', [AdminDocumentController::class, 'destroy'])->name('documents.destroy');
+
+        // Trash (Sampah Dokumen) - Legacy admin aliases redirecting to general trash
+        Route::get('/trash', fn() => redirect()->route('trash.index'))->name('trash.index');
+        Route::post('/trash/bulk-restore', [\App\Http\Controllers\TrashController::class, 'bulkRestore'])->name('trash.bulk-restore');
+        Route::delete('/trash/bulk-force-delete', [\App\Http\Controllers\TrashController::class, 'bulkForceDelete'])->name('trash.bulk-force-delete');
+        Route::post('/trash/{id}/restore', [\App\Http\Controllers\TrashController::class, 'restore'])->name('trash.restore');
+        Route::delete('/trash/{id}/force-delete', [\App\Http\Controllers\TrashController::class, 'forceDelete'])->name('trash.force-delete');
+        Route::delete('/trash/empty', [\App\Http\Controllers\TrashController::class, 'emptyTrash'])->name('trash.empty');
     });
 
     // Profile
@@ -147,7 +169,7 @@ Route::get('/onlyoffice/templates/{template}/file', [\App\Http\Controllers\OnlyO
 Route::match(['get', 'post'], '/onlyoffice/templates/{template}/callback', [\App\Http\Controllers\OnlyOfficeController::class, 'templateCallback'])->name('onlyoffice.templates.callback')->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class]);
 
 // Share-token link access (Google Docs model)
-Route::get('/shared/{token}', [DocumentShareController::class, 'accessByToken'])->name('documents.shared');
+Route::get('/shared/{token}', [DocumentShareController::class, 'accessByToken'])->name('documents.shared')->middleware(['auth', 'signature.required']);
 
 require __DIR__.'/auth.php';
 

@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ config('app.name', 'DokuFlow') }} — Document Management System</title>
     
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{{ asset('logo.png') }}">
+    <link rel="shortcut icon" type="image/png" href="{{ asset('logo.png') }}">
+
     <!-- New Font: Plus Jakarta Sans -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -72,25 +76,16 @@
                 </div>
                 <div class="flex items-center gap-3 sm:gap-6">
                     <div class="flex items-center gap-1.5 sm:gap-2">
-                        <!-- Language Dropdown -->
-                        <div class="dropdown dropdown-end">
-                            <label tabindex="0" class="btn btn-ghost btn-circle btn-sm">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" /></svg>
-                            </label>
-                            <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow-xl bg-base-100 rounded-box w-32 border border-base-200 mt-4">
-                                <li><a href="?lang=id" class="{{ app()->getLocale() == 'id' ? 'font-bold text-primary' : '' }}">Indonesia</a></li>
-                                <li><a href="?lang=en" class="{{ app()->getLocale() == 'en' ? 'font-bold text-primary' : '' }}">English</a></li>
-                            </ul>
-                        </div>
+                        <x-language-toggle />
                         <x-theme-toggle />
                     </div>
                     <div class="flex items-center gap-2 sm:gap-4">
                         @auth
-                            <a href="{{ url('/dashboard') }}" class="text-xs sm:text-sm font-semibold hover:text-primary transition-colors">Dashboard</a>
+                            <a href="{{ url('/dashboard') }}" class="text-xs sm:text-sm font-semibold hover:text-primary transition-colors">{{ __('Dashboard') }}</a>
                         @else
-                            <a href="{{ route('login') }}" class="text-xs sm:text-sm font-semibold hover:text-primary transition-colors">Log in</a>
+                            <a href="{{ route('login') }}" class="text-xs sm:text-sm font-semibold hover:text-primary transition-colors">{{ __('Log in') }}</a>
                             @if (Route::has('register'))
-                                <a href="{{ route('register') }}" class="text-xs sm:text-sm font-semibold bg-primary text-primary-content px-3 sm:px-4 py-1.5 sm:py-2 rounded-full hover:bg-primary/90 transition-colors shadow-sm">Sign up</a>
+                                <a href="{{ route('register') }}" class="text-xs sm:text-sm font-semibold bg-primary text-primary-content px-3 sm:px-4 py-1.5 sm:py-2 rounded-full hover:bg-primary/90 transition-colors shadow-sm">{{ __('Sign up') }}</a>
                             @endif
                         @endauth
                     </div>
@@ -101,7 +96,7 @@
     @endif
 
     <!-- Hero Section -->
-    <main class="flex-1 relative flex flex-col items-center pt-16 sm:pt-24 pb-0 px-4 sm:px-6 lg:px-8 overflow-hidden bg-grid-pattern">
+    <main class="flex-1 relative flex flex-col items-center justify-center md:justify-start pt-12 sm:pt-16 md:pt-24 pb-12 md:pb-0 px-4 sm:px-6 lg:px-8 overflow-hidden bg-grid-pattern">
         <!-- Radial gradient to highlight the center and fade the grid -->
         <div class="absolute inset-0 bg-base-100 [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black_70%)] pointer-events-none"></div>
         
@@ -109,39 +104,39 @@
             
             <div class="inline-flex items-center gap-2 px-3 py-1 mb-6 sm:mb-8 rounded-full border border-base-300 bg-base-200/50 text-xs font-semibold uppercase tracking-wider text-base-content/80">
                 <span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
-                DokuFlow Workflow Engine
+                {{ __('DokuFlow Workflow Engine') }}
             </div>
             
             <h1 class="text-3xl sm:text-5xl md:text-7xl font-extrabold tracking-tighter leading-[1.1] sm:leading-[1.05] mb-6">
-                Control your documents. <br class="hidden sm:block"/>
+                {{ __('Control your documents.') }} <br class="hidden sm:block"/>
                 <span class="typing-wrapper text-base-content/60 transition-all duration-300 hover:text-transparent hover:bg-clip-text hover:bg-gradient-to-r hover:from-primary hover:to-secondary hover:-translate-y-1 hover:drop-shadow-sm cursor-default">
                     <span class="typing-text" id="typewriter-text"></span>
                 </span>
             </h1>
             
             <p class="mt-4 max-w-2xl text-lg sm:text-xl text-base-content/60 font-medium mb-10">
-                A unified platform to create, review, approve, and distribute your corporate documents with complete audit trails and automated workflows.
+                {{ __('A unified platform to create, review, approve, and distribute your corporate documents with complete audit trails and automated workflows.') }}
             </p>
             
             <div class="flex flex-col sm:flex-row gap-4 w-full sm:w-auto justify-center">
                 @auth
                     <a href="{{ url('/dashboard') }}" class="inline-flex justify-center items-center gap-2 px-8 py-3.5 text-sm font-bold bg-primary text-primary-content rounded-full hover:bg-primary/90 transition-transform hover:scale-105 active:scale-95 shadow-xl shadow-primary/20">
-                        Go to Workspace
+                        {{ __('Go to Workspace') }}
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                     </a>
                 @else
                     <a href="{{ route('register') }}" class="inline-flex justify-center items-center gap-2 px-8 py-3.5 text-sm font-bold bg-primary text-primary-content rounded-full hover:bg-primary/90 transition-transform hover:scale-105 active:scale-95 shadow-xl shadow-primary/20">
-                        Start for free
+                        {{ __('Start for free') }}
                     </a>
                     <a href="{{ route('login') }}" class="inline-flex justify-center items-center gap-2 px-8 py-3.5 text-sm font-bold bg-base-200 text-base-content rounded-full border border-base-300 hover:bg-base-300 transition-colors">
-                        Sign in
+                        {{ __('Sign in') }}
                     </a>
                 @endauth
             </div>
         </div>
         
-        <!-- Large UI Mockup (Centered) -->
-        <div class="relative z-10 w-full max-w-5xl mx-auto mt-20 mask-fade-bottom px-4 sm:px-0">
+        <!-- Large UI Mockup (Centered - Hidden when screen shrinks on mobile/tablet) -->
+        <div class="hidden md:block relative z-10 w-full max-w-5xl mx-auto mt-12 md:mt-20 mask-fade-bottom px-4 sm:px-0">
             <div class="rounded-t-2xl border border-base-300 bg-base-100 shadow-2xl overflow-hidden ring-1 ring-base-content/5">
                 <!-- Mac-like Window Header -->
                 <div class="bg-base-200/50 border-b border-base-300 px-4 py-3 flex items-center justify-between">
@@ -226,12 +221,12 @@
 
     <!-- Footer -->
     <footer class="py-8 text-center text-sm font-medium text-base-content/40 border-t border-base-200 bg-base-100 z-10 relative">
-        &copy; {{ date('Y') }} {{ config('app.name', 'DokuFlow') }}. All rights reserved.
+        &copy; {{ date('Y') }} {{ config('app.name', 'DokuFlow') }}. {{ __('All rights reserved.') }}
     </footer>
 
     <script>
         document.addEventListener("DOMContentLoaded", () => {
-            const text = "From draft to distribution.";
+            const text = @json(__('From draft to distribution.'));
             const el = document.getElementById("typewriter-text");
             let i = 0;
             const speed = 75; // milliseconds per character

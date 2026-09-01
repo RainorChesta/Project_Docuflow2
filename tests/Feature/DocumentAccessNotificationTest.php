@@ -32,6 +32,8 @@ class DocumentAccessNotificationTest extends TestCase
         parent::setUp();
         Cache::flush();
 
+        $company = \App\Models\Company::create(['name' => 'PT Jaya', 'code' => 'JBM']);
+        $branch = \App\Models\Branch::create(['company_id' => $company->id, 'name' => 'Pusat', 'is_pusat' => true]);
         $this->division = Division::create(['name' => 'IT Division', 'code' => 'IT']);
         $this->docType = DocumentType::create(['name' => 'Surat Edaran', 'code' => 'S.ED']);
 
@@ -40,16 +42,22 @@ class DocumentAccessNotificationTest extends TestCase
             'name' => 'Owner User',
             'is_active' => true,
         ]);
+        $this->owner->companies()->sync([$company->id]);
+        $this->owner->branches()->sync([$branch->id]);
 
         $this->recipient = User::factory()->create([
             'division_id' => $this->division->id,
             'name' => 'Recipient User',
             'is_active' => true,
         ]);
+        $this->recipient->companies()->sync([$company->id]);
+        $this->recipient->branches()->sync([$branch->id]);
 
         $this->document = Document::create([
             'title' => 'Important Policy Document',
             'document_number' => '001/S.ED/IT/JBM/VIII/2026',
+            'company_id' => $company->id,
+            'branch_id' => $branch->id,
             'division_id' => $this->division->id,
             'owner_id' => $this->owner->id,
             'document_type_id' => $this->docType->id,
@@ -247,4 +255,53 @@ class DocumentAccessNotificationTest extends TestCase
         // Now should count as 2
         $this->assertSame(2, $this->recipient->sharedDocumentsCount());
     }
+
+    public function test_user_sees_shared_and_revoked_notifications_in_notification_endpoint_across_branches(): void
+    {
+        // Setup recipient in different branch/company context
+        $company2 = \App\Models\Company::create(['name' => 'PT Berbeda', 'code' => 'PBD']);
+        $branch2 = \App\Models\Branch::create(['company_id' => $company2->id, 'name' => 'Cabang 2', 'is_pusat' => false]);
+        $recipient2 = User::factory()->create([
+            'division_id' => $this->division->id,
+            'name' => 'Cross Branch Recipient',
+            'is_active' => true,
+        ]);
+        $recipient2->companies()->sync([$company2->id]);
+        $recipient2->branches()->sync([$branch2->id]);
+
+        // 1. Owner shares document with recipient2
+        $shareResponse = $this->actingAs($this->owner)->post(route('shares.store', $this->document), [
+            'type' => 'user',
+            'user_id' => $recipient2->id,
+            'role' => 'editor',
+        ]);
+        $shareResponse->assertRedirect();
+
+        // Recipient2 in branch2 context fetches notifications
+        $notifResp = $this->actingAs($recipient2)->getJson(route('notifications.index'));
+        $notifResp->assertOk();
+        $notifResp->assertJsonPath('unread_count', 1);
+        $notifResp->assertJsonFragment(['type' => 'document_shared']);
+
+        // Unread count endpoint
+        $countResp = $this->actingAs($recipient2)->getJson(route('notifications.unread-count'));
+        $countResp->assertOk();
+        $countResp->assertJsonPath('unread_count', 1);
+
+        // 2. Owner revokes access from recipient2
+        $share = DocumentShare::where('document_id', $this->document->id)->where('user_id', $recipient2->id)->firstOrFail();
+        $deleteResp = $this->actingAs($this->owner)->delete(route('shares.destroy', [$this->document, $share]));
+        $deleteResp->assertRedirect();
+
+        // Recipient2 fetches notifications again -> should see document_access_revoked
+        $revokedNotifResp = $this->actingAs($recipient2)->getJson(route('notifications.index'));
+        $revokedNotifResp->assertOk();
+        $revokedNotifResp->assertJsonPath('unread_count', 1);
+        $revokedNotifResp->assertJsonFragment(['type' => 'document_access_revoked']);
+
+        $countResp2 = $this->actingAs($recipient2)->getJson(route('notifications.unread-count'));
+        $countResp2->assertOk();
+        $countResp2->assertJsonPath('unread_count', 1);
+    }
 }
+

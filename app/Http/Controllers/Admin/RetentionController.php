@@ -32,6 +32,6 @@ class RetentionController extends Controller
         Setting::set('version_retention_days', $validated['retention_days']);
         Setting::set('document_retention_years', $validated['document_retention_years']);
 
-        return back()->with('success', 'Retention periods saved successfully.');
+        return back()->with('success', __('Periode retensi berhasil disimpan.'));
     }
 }

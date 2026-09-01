@@ -29,6 +29,7 @@ class DirectorDocumentDashboardTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        app()->setLocale('id');
 
         $this->company = Company::create(['name' => 'Cahaya Medika Healthcare', 'code' => 'CMH']);
         $this->pusatBranch = Branch::create(['company_id' => $this->company->id, 'name' => 'Pusat', 'is_pusat' => true]);
@@ -57,11 +58,11 @@ class DirectorDocumentDashboardTest extends TestCase
         $response = $this->actingAs($this->director)->get(route('director.documents.index'));
 
         $response->assertOk();
-        $response->assertSee('Semua Perusahaan');
+        $response->assertSee(__('Semua Perusahaan'));
         $response->assertSee('Cahaya Medika Healthcare');
         $response->assertSee('CMH');
         // Filters must not appear on root company folder level
-        $response->assertDontSee('placeholder="Search documents..."', false);
+        $response->assertDontSee('placeholder="' . __('Search documents...') . '"', false);
         $response->assertDontSee('name="filter_division_id"', false);
     }
 
@@ -80,9 +81,9 @@ class DirectorDocumentDashboardTest extends TestCase
         $response->assertOk();
         $response->assertSee('Pusat');
         $response->assertSee('Klinik Manyar');
-        $response->assertSee('Folder Cabang');
+        $response->assertSee(__('Folder Cabang'));
         // Filters must not appear on company level
-        $response->assertDontSee('placeholder="Search documents..."', false);
+        $response->assertDontSee('placeholder="' . __('Search documents...') . '"', false);
         $response->assertDontSee('name="filter_division_id"', false);
     }
 
@@ -105,11 +106,8 @@ class DirectorDocumentDashboardTest extends TestCase
         ]));
 
         $response->assertOk();
-        $response->assertSee('Folder Divisi');
-        $response->assertSee('HRD');
-        // Search & Filter controls are present
-        $response->assertSee('placeholder="Search documents..."', false);
-        $response->assertSee('name="filter_division_id"', false);
+        // Search controls for division folders are present
+        $response->assertSee('placeholder="' . __('Search division...') . '"', false);
         // Documents must NOT be shown by default before search
         $response->assertDontSee('SOP Pelayanan Manyar');
         $response->assertDontSee('001/POL/KMY/2026');
@@ -215,6 +213,7 @@ class DirectorDocumentDashboardTest extends TestCase
         $listResp = $this->actingAs($this->director)->get(route('director.documents.index', [
             'company_id' => $this->company->id,
             'branch_id' => $this->cabangBranch->id,
+            'division_id' => $this->hrdDiv->id,
             'search' => 'Sample',
             'view_mode' => 'list',
         ]));
@@ -226,10 +225,35 @@ class DirectorDocumentDashboardTest extends TestCase
         $gridResp = $this->actingAs($this->director)->get(route('director.documents.index', [
             'company_id' => $this->company->id,
             'branch_id' => $this->cabangBranch->id,
+            'division_id' => $this->hrdDiv->id,
             'search' => 'Sample',
             'view_mode' => 'grid',
         ]));
         $gridResp->assertOk();
         $gridResp->assertSee('Sample View Document');
+    }
+
+    public function test_director_can_switch_folder_view_mode_for_divisions(): void
+    {
+        // 1. Division Folders in List view
+        $listResp = $this->actingAs($this->director)->get(route('director.documents.index', [
+            'company_id' => $this->company->id,
+            'branch_id' => $this->cabangBranch->id,
+            'view_mode' => 'list',
+        ]));
+        $listResp->assertOk();
+        $listResp->assertSee('Nama Divisi');
+        $listResp->assertSee('Human Resources Department');
+        $listResp->assertSee('HRD');
+
+        // 2. Division Folders in Grid view
+        $gridResp = $this->actingAs($this->director)->get(route('director.documents.index', [
+            'company_id' => $this->company->id,
+            'branch_id' => $this->cabangBranch->id,
+            'view_mode' => 'grid',
+        ]));
+        $gridResp->assertOk();
+        $gridResp->assertSee('Human Resources Department');
+        $gridResp->assertSee('HRD');
     }
 }

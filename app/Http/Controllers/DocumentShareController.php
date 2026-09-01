@@ -228,7 +228,7 @@ class DocumentShareController extends Controller
     /**
      * Open a document via its share_token link.
      */
-    public function accessByToken(string $token)
+    public function accessByToken(string $token, \App\Services\OnlyOfficeService $onlyOfficeService)
     {
         $document = Document::where('share_token', $token)->firstOrFail();
 
@@ -245,8 +245,43 @@ class DocumentShareController extends Controller
             $document->owner?->notify(new \App\Notifications\DocumentOpenedViaLink($document, $currentUser->name));
         }
 
-        $document->load('owner', 'division', 'currentVersion', 'versions.author');
+        $document->load('owner', 'division', 'documentType', 'currentVersion', 'versions.author', 'shares.user', 'divisionShares.division');
 
-        return view('documents.show', compact('document'));
+        $divisions = auth()->user()->isAdmin()
+            ? Division::all()
+            : Division::whereIn('id', auth()->user()->allDivisionIds())->get();
+
+        $version = $document->displayVersion();
+        $onlyOfficeConfig = null;
+        if ($version) {
+            $onlyOfficeConfig = $onlyOfficeService->generateEditorConfig(
+                $document,
+                $version,
+                auth()->user(),
+                'view'
+            );
+        }
+        $companies = \App\Models\Company::with('branches')->get();
+
+        $approvedSignatures = \App\Models\SignatureRequest::where('document_id', $document->id)
+            ->where('status', 'approved')
+            ->where('is_used', false)
+            ->with('targetUser.signature')
+            ->get()
+            ->map(function ($req) use ($onlyOfficeService) {
+                if (!$req->targetUser || !$req->targetUser->hasSignature()) {
+                    return null;
+                }
+                return [
+                    'request_id' => $req->id,
+                    'url' => $onlyOfficeService->getSignatureFileUrl($req->targetUser),
+                    'target_user_name' => $req->targetUser->name,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->toArray();
+
+        return view('documents.show', compact('document', 'divisions', 'onlyOfficeConfig', 'version', 'approvedSignatures', 'companies'));
     }
 }

@@ -24,7 +24,7 @@
         <div class="overflow-y-auto px-4 sm:px-6 py-4" x-show="!loading">
             <div x-html="content"></div>
         </div>
-        <div class="px-4 sm:px-6 py-8 text-center text-base-content/60" x-show="loading">Memuat preview...</div>
+        <div class="px-4 sm:px-6 py-8 text-center text-base-content/60" x-show="loading">{{ __('Memuat preview...') }}</div>
     </div>
 </div>
 
@@ -47,7 +47,7 @@
                     if (!res.ok) throw new Error('HTTP ' + res.status);
                     this.content = await res.text();
                 } catch (e) {
-                    this.content = '<p class="text-error">Gagal memuat preview.</p>';
+                    this.content = '<p class="text-error">' + @json(__('Gagal memuat preview.')) + '</p>';
                 } finally {
                     this.loading = false;
                 }

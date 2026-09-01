@@ -32,25 +32,53 @@ class NotificationController extends Controller
         }
 
         $documents = !empty($docIds)
-            ? \App\Models\Document::with('branch', 'distributions.targetBranch')->whereIn('id', array_unique(array_values($docIds)))->get()->keyBy('id')
+            ? \App\Models\Document::withTrashed()->with('branch', 'distributions.targetBranch')->whereIn('id', array_unique(array_values($docIds)))->get()->keyBy('id')
             : collect();
 
-        return $notifications->filter(function ($n) use ($user, $docIds, $documents, $activeBranchId, $activeCompanyId) {
+        $canViewCache = [];
+
+        return $notifications->filter(function ($n) use ($user, $docIds, $documents, $activeBranchId, $activeCompanyId, &$canViewCache) {
+            $type = $n->data['type'] ?? '';
+
+            // 1. Direct personal notifications targeted specifically to this user or revocation alerts:
+            // These must always be visible to the recipient user regardless of branch/company context.
+            if (in_array($type, [
+                'document_shared',
+                'document_access_revoked',
+                'document_added',
+                'signature_request',
+                'signature_request_approved',
+                'signature_request_rejected',
+                'approval_result',
+                'rollback_approved',
+                'rollback_rejected',
+                'rename_approved',
+                'rename_rejected',
+                'document_opened',
+            ], true)) {
+                // If it's not a revocation, and the document exists, ensure user still has view access
+                if ($type !== 'document_access_revoked' && isset($docIds[$n->id])) {
+                    $doc = $documents->get($docIds[$n->id]);
+                    if ($doc) {
+                        $canView = $canViewCache[$doc->id] ??= $user->can('view', $doc);
+                        if (!$canView) {
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            }
+
             if (!isset($docIds[$n->id])) {
-                $type = $n->data['type'] ?? '';
                 if (in_array($type, [
                     'approval_request', 
-                    'approval_result', 
-                    'document_shared', 
                     'document_added_division', 
-                    'signature_request', 
-                    'signature_request_approved',
                     'rollback_request',
+                    'rename_request',
                     'document_expiring_urgent',
                     'document_expiring_warning',
-                    'document_opened',
                     'grouped_document_expiring',
-                ])) {
+                ], true)) {
                     return false; // Hide legacy/unresolved document notifications to prevent leaking
                 }
                 return true;
@@ -61,12 +89,12 @@ class NotificationController extends Controller
                 return false;
             }
 
-            $type = $n->data['type'] ?? '';
-            if ($type !== 'document_access_revoked' && !$user->can('view', $doc)) {
+            $canView = $canViewCache[$doc->id] ??= $user->can('view', $doc);
+            if (!$canView) {
                 return false;
             }
             
-            // Scope notifications to the selected branch and company:
+            // Scope branch-level / broadcast notifications (like approval_request, document_expiring, cross_branch) to the selected branch and company:
             if ($activeBranchId) {
                 if ($doc->branch_id && (int)$doc->branch_id === (int)$activeBranchId) {
                     // ok
@@ -109,6 +137,7 @@ class NotificationController extends Controller
             'icon'     => $n->data['icon'] ?? 'bell',
             'read'     => !is_null($n->read_at),
             'time'     => $n->created_at->diffForHumans(),
+            'reason'   => $n->data['reason'] ?? ($n->data['notes'] ?? null),
         ])->values();
 
         $unreadCount = $filtered->whereNull('read_at')->count();
@@ -154,8 +183,15 @@ class NotificationController extends Controller
      */
     public function unreadCount(Request $request): JsonResponse
     {
+        $user = $request->user();
+        if ($user->isAdmin()) {
+            return response()->json([
+                'unread_count' => $user->unreadNotifications()->count(),
+            ]);
+        }
+
         return response()->json([
-            'unread_count' => $this->getUnreadCount($request->user()),
+            'unread_count' => $this->getUnreadCount($user),
         ]);
     }
 

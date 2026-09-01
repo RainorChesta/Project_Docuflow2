@@ -19,6 +19,16 @@ class Branch extends Model
         'code',
     ];
 
+    public function setNameAttribute($value): void
+    {
+        $this->attributes['name'] = mb_strtoupper(trim((string) $value));
+    }
+
+    public function getNameAttribute($value): string
+    {
+        return mb_strtoupper((string) $value);
+    }
+
     protected function casts(): array
     {
         return [
@@ -39,6 +49,16 @@ class Branch extends Model
     public function documents(): HasMany
     {
         return $this->hasMany(Document::class);
+    }
+
+    public function divisions(): HasMany
+    {
+        return $this->hasMany(Division::class);
+    }
+
+    public function unitKerjas(): HasMany
+    {
+        return $this->hasMany(UnitKerja::class, 'cabang_id');
     }
 
     /**

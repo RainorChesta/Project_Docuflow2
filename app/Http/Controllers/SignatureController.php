@@ -282,6 +282,7 @@ class SignatureController extends Controller
                     'placeholder' => $isMe ? '[ttd.me]' : '[ttd:' . $u->name . ']',
                     'request_id' => $requestId,
                     'request_status' => $requestStatus,
+                    'rejected_reason' => ($latestReq && $latestReq->isRejected()) ? $latestReq->rejected_reason : null,
                     'is_available_to_replace' => $isAvailableToReplace,
                     'available_credits' => $availableCredits,
                 ];
@@ -412,7 +413,7 @@ class SignatureController extends Controller
             );
         }
 
-        return back()->with('success', 'Permintaan tanda tangan telah disetujui.');
+        return back()->with('success', __('Permintaan tanda tangan telah disetujui.'));
     }
 
     /**
@@ -421,15 +422,29 @@ class SignatureController extends Controller
     public function reject(Request $request, SignatureRequest $signatureRequest): RedirectResponse
     {
         if (Auth::id() !== $signatureRequest->target_user_id) {
-            abort(403, 'Anda tidak berhak menolak permintaan ini.');
+            abort(403, __('Anda tidak berhak menolak permintaan ini.'));
         }
+
+        $reason = $request->input('reason', __('Ditolak oleh pemilik tanda tangan.'));
 
         $signatureRequest->update([
             'status' => 'rejected',
-            'rejected_reason' => $request->input('reason', 'Ditolak oleh pemilik tanda tangan.'),
+            'rejected_reason' => $reason,
             'responded_at' => now(),
         ]);
 
-        return back()->with('success', 'Permintaan tanda tangan telah ditolak.');
+        $signatureRequest->loadMissing(['requester', 'document', 'targetUser']);
+        if ($signatureRequest->requester && $signatureRequest->document) {
+            $signatureRequest->requester->notify(
+                new \App\Notifications\SignatureRequestRejectedNotification(
+                    $signatureRequest,
+                    $signatureRequest->document,
+                    $signatureRequest->targetUser?->name ?? Auth::user()->name,
+                    $reason
+                )
+            );
+        }
+
+        return back()->with('success', __('Permintaan tanda tangan telah ditolak.'));
     }
 }

@@ -16,6 +16,26 @@ class Company extends Model
         'code',
     ];
 
+    public function setNameAttribute($value): void
+    {
+        $this->attributes['name'] = mb_strtoupper(trim((string) $value));
+    }
+
+    public function getNameAttribute($value): string
+    {
+        return mb_strtoupper((string) $value);
+    }
+
+    protected static function booted(): void
+    {
+        static::deleting(function (Company $company) {
+            Document::withTrashed()->where('company_id', $company->id)->update([
+                'company_id' => null,
+                'branch_id' => null,
+            ]);
+        });
+    }
+
     public function branches(): HasMany
     {
         return $this->hasMany(Branch::class);

@@ -23,11 +23,11 @@
     .nav-item-new:hover {
         background-color: transparent !important;
         transform: translateY(-2px);
-        filter: drop-shadow(0px 8px 16px rgba(0, 0, 0, 0.5)) drop-shadow(0px 4px 6px rgba(0, 0, 0, 0.4));
+        filter: drop-shadow(0px 8px 16px rgba(0, 0, 0, 1)) drop-shadow(0px 4px 6px rgba(0, 0, 0, 0));
     }
     
     [data-theme='dark'] .nav-item-new:hover {
-        filter: drop-shadow(0px 8px 16px rgba(255, 255, 255, 0.6)) drop-shadow(0px 4px 6px rgba(255, 255, 255, 0.7));
+        filter: drop-shadow(0px 8px 16px rgba(255, 255, 255, 1)) drop-shadow(0px 4px 6px rgba(255, 255, 255, 1));
     }
     
     /* Tactile click effect */
@@ -106,7 +106,7 @@
               fixed inset-y-0 left-0 z-50 -translate-x-full 
               lg:static lg:translate-x-0 lg:my-4 lg:ml-4 lg:rounded-[28px] lg:h-[calc(100vh-2rem)]
               overflow-hidden transition-all duration-300 ease-out"
-       :class="open ? 'translate-x-0 w-[260px] max-w-[85vw]' : '-translate-x-full lg:translate-x-0 lg:w-[92px]'">
+       :class="open ? 'translate-x-0 w-[280px] max-w-[85vw]' : '-translate-x-full lg:translate-x-0 lg:w-[92px]'">
     
     <!-- Logo Header -->
     <div class="h-16 flex items-center shrink-0 overflow-hidden mt-4" :class="open ? 'px-6' : 'justify-center px-0'">
@@ -133,17 +133,17 @@
     <!-- Navigation List -->
     <nav class="flex-1 px-4 mt-2 space-y-1 overflow-y-auto overflow-x-hidden scrollbar-hide">
         
-        <span class="px-2 text-[10px] font-extrabold text-base-content/40 uppercase tracking-[0.2em] whitespace-nowrap" :class="open ? 'block' : 'lg:hidden'">Menu</span>
+        <span class="px-2 text-[10px] font-extrabold text-base-content/40 uppercase tracking-[0.2em] whitespace-nowrap" :class="open ? 'block' : 'lg:hidden'">{{ __('Menu') }}</span>
 
         <a href="{{ route('dashboard') }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('dashboard') ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
-           :title="open ? '' : 'Dashboard'">
+           :title="open ? '' : '{{ __('Dashboard') }}'">
             <div class="icon-wrapper shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">Dashboard</span>
+            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Dashboard') }}</span>
         </a>
 
         @if(auth()->user()->isDirector())
@@ -151,11 +151,11 @@
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('director.documents.*') ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
-           :title="open ? '' : '{{ __('All Document') }}'">
+           :title="open ? '' : '{{ __('Semua Dokumen') }}'">
             <div class="icon-wrapper shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('All Document') }}</span>
+            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Semua Dokumen') }}</span>
         </a>
         @endif
 
@@ -169,7 +169,7 @@
             <div class="icon-wrapper shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Umum') }}</span>
+            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Umum') }}</span>
         </a>
         @endif
 
@@ -181,7 +181,7 @@
             <div class="icon-wrapper shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Saya') }}</span>
+            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Saya') }}</span>
         </a>
 
         @if(!auth()->user()->isDirector())
@@ -189,7 +189,7 @@
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('documents.*') && request('type', '') === 'shared' ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
-           :title="open ? '' : 'Shared Documents'">
+           :title="open ? '' : '{{ __('Dokumen Dibagikan') }}'">
             <div class="icon-wrapper shrink-0 relative">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
                 @php($sharedDocsCount = auth()->user()->sharedDocumentsCount())
@@ -200,10 +200,10 @@
                     </span>
                 @endif
             </div>
-            <span class="text-label whitespace-nowrap flex-1 flex items-center justify-between" :class="open ? '' : 'lg:hidden'">
-                <span>Shared Documents</span>
+            <span class="text-label min-w-0 flex-1 flex items-center justify-between gap-2" :class="open ? '' : 'lg:hidden'">
+                <span class="truncate">{{ __('Dokumen Dibagikan') }}</span>
                 @if($sharedDocsCount > 0)
-                    <span class="badge badge-error badge-sm font-bold text-white px-2 shadow-sm shadow-error/50">{{ $sharedDocsCount }}</span>
+                    <span class="badge badge-error badge-sm font-bold text-white px-1.5 shrink-0 shadow-sm shadow-error/50">{{ $sharedDocsCount }}</span>
                 @endif
             </span>
         </a>
@@ -218,7 +218,7 @@
             <div class="icon-wrapper shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Divisi') }}</span>
+            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Divisi') }}</span>
         </a>
         @endif
 
@@ -226,7 +226,7 @@
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('signatures.requests.*') ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
-           :title="open ? '' : '{{ __('Signature Approvals') }}'">
+           :title="open ? '' : '{{ __('Persetujuan TTD') }}'">
             <div class="icon-wrapper shrink-0 relative">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                 @php($pendingTtdCount = auth()->user()->receivedSignatureRequests()->where('status', 'pending')->count())
@@ -237,10 +237,10 @@
                     </span>
                 @endif
             </div>
-            <span class="text-label whitespace-nowrap flex-1 flex items-center justify-between" :class="open ? '' : 'lg:hidden'">
-                <span>{{ __('Signature Approvals') }}</span>
+            <span class="text-label min-w-0 flex-1 flex items-center justify-between gap-2" :class="open ? '' : 'lg:hidden'">
+                <span class="truncate">{{ __('Persetujuan TTD') }}</span>
                 @if($pendingTtdCount > 0)
-                    <span class="badge badge-error badge-sm font-bold text-white px-2 shadow-sm shadow-error/50">{{ $pendingTtdCount }}</span>
+                    <span class="badge badge-error badge-sm font-bold text-white px-1.5 shrink-0 shadow-sm shadow-error/50">{{ $pendingTtdCount }}</span>
                 @endif
             </span>
         </a>
@@ -262,10 +262,10 @@
                     </span>
                 @endif
             </div>
-            <span class="text-label whitespace-nowrap flex-1 flex items-center justify-between" :class="open ? '' : 'lg:hidden'">
-                <span>{{ __('Persetujuan') }}</span>
+            <span class="text-label min-w-0 flex-1 flex items-center justify-between gap-2" :class="open ? '' : 'lg:hidden'">
+                <span class="truncate">{{ __('Persetujuan') }}</span>
                 @if($pendingApprovalCount > 0)
-                    <span class="badge badge-error badge-sm font-bold text-white px-2 shadow-sm shadow-error/50">{{ $pendingApprovalCount }}</span>
+                    <span class="badge badge-error badge-sm font-bold text-white px-1.5 shrink-0 shadow-sm shadow-error/50">{{ $pendingApprovalCount }}</span>
                 @endif
             </span>
         </a>
@@ -280,9 +280,22 @@
             <div class="icon-wrapper shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Saya') }}</span>
+            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Saya') }}</span>
         </a>
 
+        @endif
+
+        @if(!auth()->user()->isAdmin())
+        <a href="{{ route('trash.index') }}"
+           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+                  {{ request()->routeIs('trash.*') ? 'nav-item-new-active' : '' }}"
+           :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
+           :title="open ? '' : '{{ __('Sampah') }}'">
+            <div class="icon-wrapper shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            </div>
+            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Sampah') }}</span>
+        </a>
         @endif
 
         @can('admin')
@@ -298,7 +311,7 @@
             <div class="icon-wrapper shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Perusahaan') }}</span>
+            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Perusahaan') }}</span>
         </a>
 
         <a href="{{ route('admin.branches.index') }}"
@@ -309,7 +322,18 @@
             <div class="icon-wrapper shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Cabang') }}</span>
+            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Cabang') }}</span>
+        </a>
+
+        <a href="{{ route('admin.unit-kerja.index') }}"
+           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+                  {{ request()->routeIs('admin.unit-kerja.*') ? 'nav-item-new-active' : '' }}"
+           :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
+           :title="open ? '' : '{{ __('Unit Kerja') }}'">
+            <div class="icon-wrapper shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+            </div>
+            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Unit Kerja') }}</span>
         </a>
 
         <a href="{{ route('signatures.requests.index') }}"
@@ -327,10 +351,10 @@
                     </span>
                 @endif
             </div>
-            <span class="text-label whitespace-nowrap flex-1 flex items-center justify-between" :class="open ? '' : 'lg:hidden'">
-                <span>{{ __('Tanda Tangan') }}</span>
+            <span class="text-label min-w-0 flex-1 flex items-center justify-between gap-2" :class="open ? '' : 'lg:hidden'">
+                <span class="truncate">{{ __('Tanda Tangan') }}</span>
                 @if($pendingAdminTtdCount > 0)
-                    <span class="badge badge-error badge-sm font-bold text-white px-2 shadow-sm shadow-error/50">{{ $pendingAdminTtdCount }}</span>
+                    <span class="badge badge-error badge-sm font-bold text-white px-1.5 shrink-0 shadow-sm shadow-error/50">{{ $pendingAdminTtdCount }}</span>
                 @endif
             </span>
         </a>
@@ -343,7 +367,7 @@
             <div class="icon-wrapper shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Divisi') }}</span>
+            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Divisi') }}</span>
         </a>
 
         <a href="{{ route('admin.documents.index') }}"
@@ -354,7 +378,18 @@
             <div class="icon-wrapper shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Semua Dokumen') }}</span>
+            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Semua Dokumen') }}</span>
+        </a>
+
+        <a href="{{ route('trash.index') }}"
+           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+                  {{ request()->routeIs('trash.*') || request()->routeIs('admin.trash.*') ? 'nav-item-new-active' : '' }}"
+           :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
+           :title="open ? '' : '{{ __('Sampah') }}'">
+            <div class="icon-wrapper shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            </div>
+            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Sampah') }}</span>
         </a>
 
         <a href="{{ route('admin.document-types.index') }}"
@@ -365,7 +400,7 @@
             <div class="icon-wrapper shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Jenis Dokumen') }}</span>
+            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Jenis Dokumen') }}</span>
         </a>
 
         <a href="{{ route('admin.templates.index') }}"
@@ -376,7 +411,7 @@
             <div class="icon-wrapper shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Template Dokumen') }}</span>
+            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Template Dokumen') }}</span>
         </a>
 
         <a href="{{ route('admin.users.index') }}"
@@ -387,7 +422,7 @@
             <div class="icon-wrapper shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Pengguna') }}</span>
+            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Pengguna') }}</span>
         </a>
 
         <a href="{{ route('admin.retention.edit') }}"
@@ -398,7 +433,7 @@
             <div class="icon-wrapper shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             </div>
-            <span class="text-label whitespace-nowrap" :class="open ? '' : 'lg:hidden'">{{ __('Retensi') }}</span>
+            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Retensi') }}</span>
         </a>
         @endcan
     </nav>

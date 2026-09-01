@@ -6,58 +6,61 @@
         </div>
     </x-slot>
 
-    <div class="w-full flex-1 flex flex-col min-h-0 bg-base-200">
-        {{-- Top Navigation & Action Bar --}}
-        <div class="bg-base-100 border-b border-base-300 px-3 sm:px-4 py-2.5 flex flex-col md:flex-row md:items-center md:justify-between gap-2.5 sm:gap-3 shrink-0 shadow-xs">
-            <div class="flex items-start sm:items-center gap-2.5 min-w-0 flex-1">
-                <a href="{{ route('admin.templates.index') }}" class="btn btn-ghost btn-sm btn-square shrink-0 text-base-content/70 hover:text-base-content mt-0.5 sm:mt-0" title="{{ __('Kembali') }}">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                    </svg>
-                </a>
-                <div class="min-w-0 flex-1">
-                    <div class="flex items-center gap-2">
-                        <h1 class="text-sm sm:text-base font-bold text-base-content break-words" title="{{ $template->title }}">{{ $template->title }}</h1>
-                    </div>
-                    <p class="text-[10px] sm:text-xs text-base-content/60 mt-0.5">
-                        <span>{{ __('ONLYOFFICE Template Editor') }}</span>
-                    </p>
-                </div>
-            </div>
+    <div class="pb-6">
+        <div class="max-w-7xl mx-auto w-full">
+            <div class="card bg-base-100 border border-base-300 shadow-sm mb-6">
+                <div class="card-body p-0">
+                    <div class="p-3 sm:p-4">
+                        {{-- Top Navigation & Action Bar inside Card Header (Responsive on mobile & tablet) --}}
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 mb-3 px-1 sm:px-2">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <a href="{{ route('admin.templates.index') }}" class="btn btn-ghost btn-xs btn-square shrink-0 text-base-content/70 hover:text-base-content" title="{{ __('Kembali') }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                                    </svg>
+                                </a>
+                                <div class="text-xs sm:text-sm text-base-content/60 flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
+                                    <span class="font-medium text-base-content truncate max-w-[150px] sm:max-w-xs" title="{{ $template->title }}">{{ $template->title }}</span>
+                                    <span class="badge badge-ghost badge-xs shrink-0">{{ __('Template') }}</span>
+                                </div>
+                            </div>
 
-            <div class="flex items-center gap-1 sm:gap-1.5 self-end md:self-center ml-auto shrink-0 w-full md:w-auto justify-end pt-1 md:pt-0 border-t border-base-200/60 md:border-t-0">
-                <button type="button"
-                        id="btn-selesai-edit"
-                        onclick="finishEditingTemplate()"
-                        class="btn btn-primary btn-sm px-3 sm:px-4 gap-1.5 font-medium shadow-xs"
-                        title="{{ __('Selesai Edit') }}"
-                        aria-label="{{ __('Selesai Edit') }}">
-                    <svg id="icon-selesai-edit" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span id="spinner-selesai-edit" class="loading loading-spinner loading-xs hidden"></span>
-                    <span id="text-selesai-edit" class="hidden sm:inline">{{ __('Selesai Edit') }}</span>
-                </button>
-            </div>
-        </div>
+                            <div class="flex items-center gap-1.5 shrink-0 ml-auto sm:ml-0">
+                                <button type="button"
+                                        id="btn-selesai-edit"
+                                        onclick="finishEditingTemplate()"
+                                        class="btn btn-primary btn-xs gap-1 font-medium shadow-xs shrink-0"
+                                        title="{{ __('Selesai Edit') }}">
+                                    <svg id="icon-selesai-edit" xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    <span id="spinner-selesai-edit" class="loading loading-spinner loading-xs hidden"></span>
+                                    <span id="text-selesai-edit">{{ __('Selesai Edit') }}</span>
+                                </button>
+                            </div>
+                        </div>
 
-        {{-- ONLYOFFICE Editor Viewport --}}
-        <div class="flex-1 w-full h-full relative overflow-hidden bg-base-100">
-            <div id="onlyoffice-editor-container" class="w-full h-full"></div>
-            
-            <div id="onlyoffice-fallback" class="hidden absolute inset-0 flex flex-col items-center justify-center p-6 bg-base-100/95 z-20 text-center">
-                <div class="max-w-md p-6 bg-base-200 rounded-2xl border border-base-300 shadow-xl">
-                    <svg class="w-12 h-12 text-warning mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                    </svg>
-                    <h3 class="font-bold text-lg mb-2">{{ __('ONLYOFFICE Server Belum Aktif') }}</h3>
-                    <p class="text-sm text-base-content/70 mb-4">
-                        {{ __('Tidak dapat terhubung ke server ONLYOFFICE di') }} <code class="bg-base-300 px-1 py-0.5 rounded">{{ config('onlyoffice.url') }}</code>.
-                        <br>{{ __('Pastikan container Docker ONLYOFFICE sedang berjalan.') }}
-                    </p>
-                    <div class="flex justify-center gap-2">
-                        <button onclick="window.location.reload()" class="btn btn-primary btn-sm">{{ __('Muat Ulang Halaman') }}</button>
-                        <a href="{{ route('admin.templates.index') }}" class="btn btn-outline btn-sm">{{ __('Kembali') }}</a>
+                        {{-- ONLYOFFICE Editor Viewport (Fluid & Responsive on Mobile/Tablet, 1150px on Desktop) --}}
+                        <div class="w-full border border-base-300 rounded-lg overflow-hidden shadow-xs bg-base-100 h-[72vh] sm:h-[80vh] lg:h-[1150px] min-h-[520px] sm:min-h-[650px] lg:min-h-[1123px]">
+                            <div id="onlyoffice-editor-container" class="w-full h-full"></div>
+                            
+                            <div id="onlyoffice-fallback" class="hidden flex flex-col items-center justify-center p-6 bg-base-100/95 text-center h-full">
+                                <div class="max-w-md p-6 bg-base-200 rounded-2xl border border-base-300 shadow-xl">
+                                    <svg class="w-12 h-12 text-warning mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                    </svg>
+                                    <h3 class="font-bold text-lg mb-2">{{ __('ONLYOFFICE Server Belum Aktif') }}</h3>
+                                    <p class="text-sm text-base-content/70 mb-4">
+                                        {{ __('Tidak dapat terhubung ke server ONLYOFFICE di') }} <code class="bg-base-300 px-1 py-0.5 rounded">{{ config('onlyoffice.url') }}</code>.
+                                        <br>{{ __('Pastikan container Docker ONLYOFFICE sedang berjalan.') }}
+                                    </p>
+                                    <div class="flex justify-center gap-2">
+                                        <button onclick="window.location.reload()" class="btn btn-primary btn-sm">{{ __('Muat Ulang Halaman') }}</button>
+                                        <a href="{{ route('admin.templates.index') }}" class="btn btn-outline btn-sm">{{ __('Kembali') }}</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -76,13 +79,34 @@
 
                 try {
                     const config = @json($onlyOfficeConfig);
+                    const isMobileOrTablet = window.innerWidth < 1024;
+
                     // Always use desktop type to bypass ONLYOFFICE Community Edition mobile license restriction
                     config.type = 'desktop';
                     config.editorConfig = config.editorConfig || {};
                     config.editorConfig.mode = 'edit';
                     config.editorConfig.customization = config.editorConfig.customization || {};
                     config.editorConfig.customization.compactHeader = true;
+                    config.editorConfig.customization.autoFocus = false;
                     config.editorConfig.customization.mobile = { force: false };
+
+                    if (isMobileOrTablet) {
+                        // Responsive mode for small/shrinking viewports:
+                        config.editorConfig.customization.compactToolbar = true;
+                        config.editorConfig.customization.leftMenu = false;
+                        config.editorConfig.customization.rightMenu = false;
+                        config.editorConfig.customization.ruler = false;
+                        config.editorConfig.customization.toolbarHideFileName = true;
+                        config.editorConfig.customization.zoom = -2; // Fit to Width
+                    } else {
+                        // Desktop screen - preserve standard layout intact
+                        config.editorConfig.customization.compactToolbar = false;
+                        config.editorConfig.customization.leftMenu = true;
+                        config.editorConfig.customization.rightMenu = true;
+                        config.editorConfig.customization.ruler = true;
+                        config.editorConfig.customization.toolbarHideFileName = false;
+                        config.editorConfig.customization.zoom = 100;
+                    }
                     
                     config.events = config.events || {};
                     config.events.onAppReady = function() {
