@@ -17,16 +17,21 @@ class BranchController extends Controller
         $this->authorize('admin');
         $companyId = $request->get('company_id');
 
-        $query = Branch::with('company')->withCount('users', 'documents');
+        $companyQuery = Company::with(['branches' => function ($q) {
+            $q->withCount('users', 'documents')
+              ->orderByDesc('is_pusat')
+              ->orderBy('name');
+        }]);
 
         if ($companyId) {
-            $query->where('company_id', $companyId);
+            $companyQuery->where('id', $companyId);
         }
 
-        $branches = $query->orderBy('company_id')->orderBy('is_pusat', 'desc')->paginate(15);
+        $companyGroups = $companyQuery->orderBy('name')->paginate(15);
         $companies = Company::orderBy('name')->get();
+        $branches = $companyGroups; // For backwards compatibility
 
-        return view('admin.branches.index', compact('branches', 'companies', 'companyId'));
+        return view('admin.branches.index', compact('companyGroups', 'branches', 'companies', 'companyId'));
     }
 
     public function create(Request $request): View
@@ -70,6 +75,7 @@ class BranchController extends Controller
             'code.unique' => 'Branch code already exists in this company.',
         ]);
 
+        $validated['name'] = mb_strtoupper(trim($validated['name']));
         $validated['is_pusat'] = $isPusat;
         $validated['code'] = $isPusat ? null : strtoupper(trim($validated['code'] ?? ''));
 
@@ -122,6 +128,7 @@ class BranchController extends Controller
             'code.unique' => __('Kode cabang sudah digunakan di perusahaan ini.'),
         ]);
 
+        $validated['name'] = mb_strtoupper(trim($validated['name']));
         $validated['is_pusat'] = $isPusat;
         $validated['code'] = $isPusat ? null : strtoupper(trim($validated['code'] ?? ''));
 

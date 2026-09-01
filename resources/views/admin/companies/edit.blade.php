@@ -18,7 +18,7 @@
 
                     <div class="form-control w-full mb-4">
                         <label for="name" class="label"><span class="label-text font-medium">{{ __('Nama Perusahaan') }}</span></label>
-                        <input type="text" name="name" id="name" value="{{ old('name', $company->name) }}" class="input input-bordered w-full" required>
+                        <input type="text" name="name" id="name" value="{{ old('name', $company->name) }}" class="input input-bordered w-full uppercase" oninput="this.value = this.value.toUpperCase()" required>
                     </div>
 
                     <div class="form-control w-full mb-4">

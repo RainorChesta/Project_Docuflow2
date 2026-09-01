@@ -16,7 +16,9 @@ class UserController extends Controller
     public function index(): View
     {
         $this->authorize('admin');
-        $users = User::with(['division', 'companies', 'branches'])->paginate(20);
+        $users = User::with(['division', 'companies', 'branches'])
+            ->latest('id')
+            ->paginate(20);
         return view('admin.users.index', compact('users'));
     }
 

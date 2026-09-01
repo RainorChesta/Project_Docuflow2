@@ -75,8 +75,8 @@
             <!-- Right Area -->
             <div class="flex flex-col flex-1 min-h-0 min-w-0 print:block print:h-auto print:overflow-visible">
                 <!-- Topbar -->
-                <header class="glass-panel h-[60px] flex items-center justify-between px-2.5 sm:px-6 shrink-0 z-30 lg:mt-4 lg:mr-4 lg:ml-2 mx-2 sm:mx-4 mt-2 sm:mt-4 rounded-[20px] transition-all duration-300 print:hidden">
-                    <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+                <header class="glass-panel h-[60px] flex items-center justify-between px-2.5 sm:px-6 shrink-0 z-30 lg:mt-4 lg:mr-4 lg:ml-2 mx-2 sm:mx-4 mt-2 sm:mt-4 rounded-[20px] transition-all duration-300 print:hidden gap-2">
+                    <div class="flex items-center gap-2 sm:gap-3 shrink-0">
                         <button type="button"
                                 class="btn btn-ghost btn-circle btn-sm shrink-0 lg:hidden hover:bg-base-200"
                                 aria-label="Toggle sidebar"
@@ -88,27 +88,27 @@
                             {{-- Header title removed per user request, relying on breadcrumbs instead --}}
                         @endisset
                     </div>
-                    <div class="flex items-center gap-1 sm:gap-1.5">
-                        {{-- Company & Branch Switcher: far right on mobile, first on desktop --}}
+                    <div class="flex items-center gap-1 sm:gap-1.5 shrink-0 ml-auto">
+                        {{-- Company & Branch Switcher: far right on mobile/tablet, first on desktop --}}
                         @if(!auth()->user()->isAdmin())
-                        <div class="order-last md:order-first">
+                        <div class="order-last xl:order-first shrink-0">
                             <x-company-branch-switcher />
                         </div>
                         @endif
 
                         {{-- Language Switcher (ID <-> EN) --}}
-                        <div class="hover:bg-base-200 rounded-full transition-colors">
+                        <div class="hover:bg-base-200 rounded-full transition-colors shrink-0">
                             <x-language-toggle />
                         </div>
 
                         {{-- Theme Toggle: follows OS until user picks Light/Dark --}}
-                        <div class="hover:bg-base-200 rounded-full transition-colors">
+                        <div class="hover:bg-base-200 rounded-full transition-colors shrink-0">
                             <x-theme-toggle />
                         </div>
 
                         {{-- Global Search (Desktop Pill + Mobile Icon) --}}
                         <button type="button"
-                                class="hidden sm:inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-base-200/60 hover:bg-base-200 border border-base-300/60 hover:border-base-300 text-xs text-base-content/60 hover:text-base-content transition-all shadow-2xs group cursor-pointer"
+                                class="hidden md:inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-base-200/60 hover:bg-base-200 border border-base-300/60 hover:border-base-300 text-xs text-base-content/60 hover:text-base-content transition-all shadow-2xs group cursor-pointer shrink-0"
                                 title="{{ __('Cari Dokumen (Ctrl+K)') }}"
                                 aria-label="{{ __('Cari Dokumen') }}"
                                 @click="$dispatch('open-search')">
@@ -120,7 +120,7 @@
                         </button>
 
                         <button type="button"
-                                class="sm:hidden btn btn-ghost btn-circle btn-sm hover:bg-base-200 transition-colors"
+                                class="md:hidden btn btn-ghost btn-circle btn-sm hover:bg-base-200 transition-colors shrink-0"
                                 title="{{ __('Cari Dokumen') }}"
                                 aria-label="{{ __('Cari Dokumen') }}"
                                 @click="$dispatch('open-search')">
@@ -130,7 +130,7 @@
                         </button>
 
                         {{-- Notification Bell --}}
-                        <div class="hover:bg-base-200 rounded-full transition-colors ml-0.5 sm:ml-1">
+                        <div class="hover:bg-base-200 rounded-full transition-colors ml-0.5 sm:ml-1 shrink-0">
                             <x-notification-bell />
                         </div>
                     </div>
@@ -168,7 +168,7 @@
 
                             if (str_starts_with($name, 'documents.')) {
                                 if (in_array($name, ['documents.choose', 'documents.create', 'documents.edit', 'documents.show', 'documents.preview', 'documents.preview-version'])) {
-                                    if (!(request('from') === 'approvals' && in_array($name, ['documents.preview', 'documents.preview-version']))) {
+                                    if (!(in_array(request('from'), ['approvals', 'signatures', 'signature_requests']) && in_array($name, ['documents.preview', 'documents.preview-version']))) {
                                         $crumbs[] = ['label' => $docTypeLabel, 'url' => $docTypeRoute];
                                     }
                                 }
@@ -188,6 +188,8 @@
                                 } elseif ($name === 'documents.preview' || $name === 'documents.preview-version') {
                                     if (request('from') === 'approvals') {
                                         $crumbs[] = ['label' => __('Persetujuan'), 'url' => route('approvals.index')];
+                                    } elseif (in_array(request('from'), ['signatures', 'signature_requests'])) {
+                                        $crumbs[] = ['label' => __('Permintaan TTD'), 'url' => route('signatures.requests.index')];
                                     } else {
                                         if ($doc = request()->route('document')) {
                                             $crumbs[] = ['label' => __('Detail Dokumen'), 'url' => route('documents.show', $doc)];
@@ -248,4 +250,5 @@
         <x-toast-notification />
         @stack('scripts')
     </body>
+</html>
 </html>

@@ -13,7 +13,7 @@
                      selectedCompanies: {{ json_encode($userCompanyIds) }}.map(String),
                      selectedBranches: {{ json_encode($userBranchIds) }}.map(String)
                  }">
-                <form method="POST" action="{{ route('admin.users.update', $user) }}">
+                <form method="POST" action="{{ route('admin.users.update', $user) }}" autocomplete="off">
                     @csrf @method('PUT')
                     @if($errors->any())
                         <div class="alert alert-error mb-4">
@@ -27,12 +27,12 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                         <div class="form-control w-full">
-                            <label for="name" class="label"><span class="label-text font-medium">{{ __('Nama Lengkap') }}</span></label>
-                            <input type="text" name="name" id="name" value="{{ old('name', $user->name) }}" class="input input-bordered w-full" required>
+                            <label for="name" class="label"><span class="label-text font-medium">{{ __('Nama Lengkap') }} <span class="text-error">*</span></span></label>
+                            <input type="text" name="name" id="name" value="{{ old('name', $user->name) }}" class="input input-bordered w-full" autocomplete="off" required>
                         </div>
                         <div class="form-control w-full">
-                            <label for="email" class="label"><span class="label-text font-medium">{{ __('Email') }}</span></label>
-                            <input type="email" name="email" id="email" value="{{ old('email', $user->email) }}" class="input input-bordered w-full" required>
+                            <label for="email" class="label"><span class="label-text font-medium">{{ __('Email') }} <span class="text-error">*</span></span></label>
+                            <input type="email" name="email" id="email" value="{{ old('email', $user->email) }}" class="input input-bordered w-full" autocomplete="off" required>
                         </div>
                     </div>
 
@@ -46,22 +46,23 @@
                                    :disabled="role === 'direktur'"
                                    :placeholder="role === 'direktur' ? '—' : 'Contoh: 198501152010121001'"
                                    :class="role === 'direktur' ? 'bg-base-200 cursor-not-allowed opacity-60' : ''"
+                                   autocomplete="off"
                                    class="input input-bordered w-full">
                         </div>
                         <div class="form-control w-full">
                             <label for="phone_number" class="label"><span class="label-text font-medium">{{ __('Nomor Telepon') }}</span></label>
-                            <input type="text" name="phone_number" id="phone_number" value="{{ old('phone_number', $user->phone_number) }}" placeholder="Contoh: 081234567890" class="input input-bordered w-full">
+                            <input type="text" name="phone_number" id="phone_number" value="{{ old('phone_number', $user->phone_number) }}" placeholder="Contoh: 081234567890" autocomplete="off" class="input input-bordered w-full">
                         </div>
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                         <div class="form-control w-full">
                             <label for="password" class="label"><span class="label-text font-medium">{{ __('Password (kosongkan jika tidak diubah)') }}</span></label>
-                            <input type="password" name="password" id="password" class="input input-bordered w-full">
+                            <input type="password" name="password" id="password" class="input input-bordered w-full" autocomplete="new-password">
                         </div>
                         <div class="form-control w-full">
                             <label for="password_confirmation" class="label"><span class="label-text font-medium">{{ __('Konfirmasi Password') }}</span></label>
-                            <input type="password" name="password_confirmation" id="password_confirmation" class="input input-bordered w-full">
+                            <input type="password" name="password_confirmation" id="password_confirmation" class="input input-bordered w-full" autocomplete="new-password">
                         </div>
                     </div>
 
@@ -82,7 +83,7 @@
                             </select>
                         </div>
                         <div class="form-control w-full">
-                            <label for="system_role" class="label"><span class="label-text font-medium">{{ __('Peran Sistem (Role)') }}</span></label>
+                            <label for="system_role" class="label"><span class="label-text font-medium">{{ __('Peran Sistem (Role)') }} <span class="text-error">*</span></span></label>
                             <select name="system_role" id="system_role" x-model="role" class="select select-bordered w-full" required>
                                 <option value="user" {{ old('system_role', $user->system_role) === 'user' ? 'selected' : '' }}>User (Staff)</option>
                                 <option value="head" {{ old('system_role', $user->system_role) === 'head' ? 'selected' : '' }}>Division Head (Kepala Divisi)</option>

@@ -33,7 +33,7 @@
                             @foreach($divisions as $div)
                                 <tr>
                                     <td class="font-mono">{{ $div->code }}</td>
-                                    <td>{{ $div->name }}</td>
+                                    <td class="capitalize">{{ $div->name }}</td>
                                     <td>{{ $div->users_count }}</td>
                                     <td>{{ $div->documents_count }}</td>
                                     <td class="text-right">

@@ -285,6 +285,19 @@
 
         @endif
 
+        @if(!auth()->user()->isAdmin())
+        <a href="{{ route('trash.index') }}"
+           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+                  {{ request()->routeIs('trash.*') ? 'nav-item-new-active' : '' }}"
+           :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
+           :title="open ? '' : '{{ __('Sampah') }}'">
+            <div class="icon-wrapper shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            </div>
+            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Sampah') }}</span>
+        </a>
+        @endif
+
         @can('admin')
         <div class="pt-6 pb-2">
             <span class="px-2 text-[10px] font-extrabold text-base-content/40 uppercase tracking-[0.2em] whitespace-nowrap" :class="open ? 'block' : 'lg:hidden'">{{ __('Administrasi') }}</span>
@@ -310,6 +323,17 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" /></svg>
             </div>
             <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Cabang') }}</span>
+        </a>
+
+        <a href="{{ route('admin.unit-kerja.index') }}"
+           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+                  {{ request()->routeIs('admin.unit-kerja.*') ? 'nav-item-new-active' : '' }}"
+           :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
+           :title="open ? '' : '{{ __('Unit Kerja') }}'">
+            <div class="icon-wrapper shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+            </div>
+            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Unit Kerja') }}</span>
         </a>
 
         <a href="{{ route('signatures.requests.index') }}"
@@ -357,9 +381,9 @@
             <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Semua Dokumen') }}</span>
         </a>
 
-        <a href="{{ route('admin.trash.index') }}"
+        <a href="{{ route('trash.index') }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
-                  {{ request()->routeIs('admin.trash.*') ? 'nav-item-new-active' : '' }}"
+                  {{ request()->routeIs('trash.*') || request()->routeIs('admin.trash.*') ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Sampah') }}'">
             <div class="icon-wrapper shrink-0">

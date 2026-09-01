@@ -31,13 +31,14 @@ class CompanyController extends Controller
             'code' => 'required|string|max:20|unique:companies,code',
         ]);
 
+        $validated['name'] = mb_strtoupper(trim($validated['name']));
         $validated['code'] = strtoupper(trim($validated['code']));
 
         $company = Company::create($validated);
 
         // Auto-create default "Pusat" branch
         $company->branches()->create([
-            'name' => 'Pusat',
+            'name' => 'PUSAT',
             'is_pusat' => true,
             'code' => null,
         ]);
@@ -59,6 +60,7 @@ class CompanyController extends Controller
             'code' => 'required|string|max:20|unique:companies,code,' . $company->id,
         ]);
 
+        $validated['name'] = mb_strtoupper(trim($validated['name']));
         $validated['code'] = strtoupper(trim($validated['code']));
         $company->update($validated);
 

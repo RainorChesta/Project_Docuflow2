@@ -170,13 +170,13 @@
             <input type="hidden" name="branch_id">
         </form>
 
-        {{-- Desktop: inline dropdowns (visible md+) --}}
-        <div class="hidden md:flex items-center gap-1.5 sm:gap-2 mr-2">
+        {{-- Desktop: inline dropdowns (visible xl+) --}}
+        <div class="hidden xl:flex items-center gap-1.5 2xl:gap-2 mr-1 shrink-0">
             {{-- Company Dropdown --}}
             <div class="relative">
                 <select x-model="selectedCompanyId" 
                         @change="onDesktopCompanyChange($event.target.value)" 
-                        class="select select-bordered select-xs sm:select-sm font-semibold bg-base-200/60 w-auto min-w-[150px] sm:min-w-[200px] max-w-[260px] sm:max-w-[340px] focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer"
+                        class="select select-bordered select-xs sm:select-sm font-semibold bg-base-200/60 w-auto min-w-[130px] max-w-[200px] 2xl:max-w-[260px] focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer truncate"
                         title="{{ __('Pilih Perusahaan Aktif') }}">
                     @foreach($companies as $comp)
                         <option value="{{ $comp->id }}">{{ $comp->code }} - {{ $comp->name }}</option>
@@ -189,7 +189,7 @@
                 <div class="relative">
                     <select x-model="selectedBranchId" 
                             @change="onDesktopBranchChange($event.target.value)" 
-                            class="select select-bordered select-xs sm:select-sm text-xs bg-base-200/60 w-auto min-w-[130px] sm:min-w-[170px] max-w-[220px] sm:max-w-[280px] focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer"
+                            class="select select-bordered select-xs sm:select-sm text-xs bg-base-200/60 w-auto min-w-[110px] max-w-[160px] 2xl:max-w-[200px] focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer truncate"
                             title="{{ __('Pilih Cabang Aktif') }}">
                         @foreach($activeBranches as $br)
                             <option value="{{ $br->id }}">{{ $br->name }} @if($br->is_pusat)({{ __('Pusat') }})@else({{ $br->code }})@endif</option>
@@ -199,100 +199,117 @@
             @endif
         </div>
 
-        {{-- Mobile & Shrunk Screen: 3-point icon button (visible below md) --}}
-        <div class="md:hidden">
+        {{-- Tablet / Medium Screen: Compact pill button (visible sm to xl) --}}
+        <div class="hidden sm:flex xl:hidden shrink-0">
+            <button type="button"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-base-200/60 hover:bg-base-200 border border-base-300/60 hover:border-base-300 text-xs text-base-content/80 hover:text-base-content transition-all shadow-2xs group cursor-pointer max-w-[180px] md:max-w-[220px]"
+                    @click="openMobileModal()"
+                    title="{{ __('Ganti Perusahaan & Cabang') }}"
+                    aria-label="{{ __('Pilih Perusahaan & Cabang') }}">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+                <span class="font-semibold truncate text-[11px]">{{ $activeCompany?->code ?? '-' }}</span>
+                <span class="text-base-content/30">•</span>
+                <span class="truncate text-[11px] text-base-content/70">{{ $activeBranch?->name ?? '-' }}</span>
+                <svg class="w-3 h-3 text-base-content/40 group-hover:text-base-content/70 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+            </button>
+        </div>
+
+        {{-- Mobile: Icon button (visible below sm) --}}
+        <div class="sm:hidden shrink-0">
             <button type="button"
                     class="btn btn-ghost btn-circle btn-sm hover:bg-base-200 transition-colors"
                     @click="openMobileModal()"
                     title="{{ __('Pilih Perusahaan & Cabang') }}"
                     aria-label="{{ __('Pilih Perusahaan & Cabang') }}">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-base-content/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
             </button>
+        </div>
 
-            {{-- Mobile Context Picker Modal --}}
-            <dialog id="company-branch-modal" x-ref="mobileModal" class="modal modal-bottom sm:modal-middle" @close="closeMobileModal()">
-                <div class="modal-box w-full sm:max-w-md p-0 overflow-hidden rounded-t-3xl sm:rounded-3xl bg-base-100 shadow-2xl border border-base-200/80 text-left">
-                    <div class="h-1.5 w-full bg-gradient-to-r from-primary via-indigo-500 to-primary/40"></div>
-                    
-                    <div class="p-5 sm:p-6 space-y-4">
-                        {{-- Modal Header --}}
-                        <div class="flex items-center justify-between pb-3 border-b border-base-200/80">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0 border border-primary/20">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <h3 class="font-bold text-base text-base-content">{{ __('Ganti Perusahaan & Cabang') }}</h3>
-                                    <p class="text-xs text-base-content/50">{{ __('Pilih entitas kerja aktif Anda') }}</p>
-                                </div>
+        {{-- Context Picker Modal (accessible on all screen sizes) --}}
+        <dialog id="company-branch-modal" x-ref="mobileModal" class="modal modal-bottom sm:modal-middle" @close="closeMobileModal()">
+            <div class="modal-box w-full sm:max-w-md p-0 overflow-hidden rounded-t-3xl sm:rounded-3xl bg-base-100 shadow-2xl border border-base-200/80 text-left">
+                <div class="h-1.5 w-full bg-gradient-to-r from-primary via-indigo-500 to-primary/40"></div>
+                
+                <div class="p-5 sm:p-6 space-y-4">
+                    {{-- Modal Header --}}
+                    <div class="flex items-center justify-between pb-3 border-b border-base-200/80">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0 border border-primary/20">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                </svg>
                             </div>
-                            <button type="button" class="btn btn-ghost btn-circle btn-sm text-base-content/60 hover:text-base-content" @click="closeMobileModal()" aria-label="{{ __('Tutup') }}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            <div>
+                                <h3 class="font-bold text-base text-base-content">{{ __('Ganti Perusahaan & Cabang') }}</h3>
+                                <p class="text-xs text-base-content/50">{{ __('Pilih entitas kerja aktif Anda') }}</p>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-ghost btn-circle btn-sm text-base-content/60 hover:text-base-content" @click="closeMobileModal()" aria-label="{{ __('Tutup') }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
+
+                    {{-- Active Context Pill --}}
+                    <div class="bg-base-200/50 rounded-2xl p-3.5 flex items-center justify-between text-xs border border-base-300/40">
+                        <div class="flex items-center gap-2">
+                            <span class="text-base-content/50 uppercase tracking-wider font-bold text-[10px]">{{ __('Aktif:') }}</span>
+                            <span class="badge badge-primary badge-sm font-bold">{{ $activeCompany?->code ?? '-' }}</span>
+                            <span class="font-semibold text-base-content truncate">{{ $activeBranch?->name ?? '-' }}</span>
+                        </div>
+                    </div>
+
+                    {{-- Form inputs --}}
+                    <div class="space-y-3.5">
+                        <div class="space-y-1.5">
+                            <label class="text-xs font-semibold text-base-content/80 flex items-center justify-between">
+                                <span>{{ __('Perusahaan') }}</span>
+                                <span class="text-[10px] text-base-content/40 font-normal">{{ count($companies) }} {{ __('tersedia') }}</span>
+                            </label>
+                            <select x-model="selectedCompanyId" 
+                                    @change="onMobileCompanyChange($event.target.value)"
+                                    class="select select-bordered select-sm w-full bg-base-100 text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary rounded-xl">
+                                @foreach($companies as $comp)
+                                    <option value="{{ $comp->id }}">{{ $comp->code }} - {{ $comp->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="space-y-1.5" x-show="availableSelectedBranches.length > 0">
+                            <label class="text-xs font-semibold text-base-content/80 flex items-center justify-between">
+                                <span>{{ __('Cabang') }}</span>
+                                <span class="text-[10px] text-base-content/40 font-normal" x-text="availableSelectedBranches.length + ' {{ __('tersedia') }}'"></span>
+                            </label>
+                            <select x-model="selectedBranchId"
+                                    class="select select-bordered select-sm w-full bg-base-100 text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary rounded-xl">
+                                <template x-for="br in availableSelectedBranches" :key="br.id">
+                                    <option :value="br.id" x-text="br.name"></option>
+                                </template>
+                            </select>
+                        </div>
+
+                        {{-- Actions --}}
+                        <div class="flex items-center justify-end gap-2.5 pt-2 border-t border-base-200/80">
+                            <button type="button" class="btn btn-ghost btn-sm rounded-xl font-medium" @click="closeMobileModal()">
+                                {{ __('Batal') }}
                             </button>
-                        </div>
-
-                        {{-- Active Context Pill --}}
-                        <div class="bg-base-200/50 rounded-2xl p-3.5 flex items-center justify-between text-xs border border-base-300/40">
-                            <div class="flex items-center gap-2">
-                                <span class="text-base-content/50 uppercase tracking-wider font-bold text-[10px]">{{ __('Aktif:') }}</span>
-                                <span class="badge badge-primary badge-sm font-bold">{{ $activeCompany?->code ?? '-' }}</span>
-                                <span class="font-semibold text-base-content truncate">{{ $activeBranch?->name ?? '-' }}</span>
-                            </div>
-                        </div>
-
-                        {{-- Form inputs --}}
-                        <div class="space-y-3.5">
-                            <div class="space-y-1.5">
-                                <label class="text-xs font-semibold text-base-content/80 flex items-center justify-between">
-                                    <span>{{ __('Perusahaan') }}</span>
-                                    <span class="text-[10px] text-base-content/40 font-normal">{{ count($companies) }} {{ __('tersedia') }}</span>
-                                </label>
-                                <select x-model="selectedCompanyId" 
-                                        @change="onMobileCompanyChange($event.target.value)"
-                                        class="select select-bordered select-sm w-full bg-base-100 text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary rounded-xl">
-                                    @foreach($companies as $comp)
-                                        <option value="{{ $comp->id }}">{{ $comp->code }} - {{ $comp->name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-
-                            <div class="space-y-1.5" x-show="availableSelectedBranches.length > 0">
-                                <label class="text-xs font-semibold text-base-content/80 flex items-center justify-between">
-                                    <span>{{ __('Cabang') }}</span>
-                                    <span class="text-[10px] text-base-content/40 font-normal" x-text="availableSelectedBranches.length + ' {{ __('tersedia') }}'"></span>
-                                </label>
-                                <select x-model="selectedBranchId"
-                                        class="select select-bordered select-sm w-full bg-base-100 text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary rounded-xl">
-                                    <template x-for="br in availableSelectedBranches" :key="br.id">
-                                        <option :value="br.id" x-text="br.name"></option>
-                                    </template>
-                                </select>
-                            </div>
-
-                            {{-- Actions --}}
-                            <div class="flex items-center justify-end gap-2.5 pt-2 border-t border-base-200/80">
-                                <button type="button" class="btn btn-ghost btn-sm rounded-xl font-medium" @click="closeMobileModal()">
-                                    {{ __('Batal') }}
-                                </button>
-                                <button type="button" class="btn btn-primary btn-sm px-5 rounded-xl font-bold gap-1.5 shadow-md shadow-primary/20" @click="applyMobileSelection()">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                                    </svg>
-                                    {{ __('Terapkan') }}
-                                </button>
-                            </div>
+                            <button type="button" class="btn btn-primary btn-sm px-5 rounded-xl font-bold gap-1.5 shadow-md shadow-primary/20" @click="applyMobileSelection()">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                </svg>
+                                {{ __('Terapkan') }}
+                            </button>
                         </div>
                     </div>
                 </div>
-                <form method="dialog" class="modal-backdrop bg-black/60 backdrop-blur-sm">
-                    <button @click="closeMobileModal()">{{ __('Tutup') }}</button>
-                </form>
-            </dialog>
-        </div>
+            </div>
+            <form method="dialog" class="modal-backdrop bg-black/60 backdrop-blur-sm">
+                <button @click="closeMobileModal()">{{ __('Tutup') }}</button>
+            </form>
+        </dialog>
 
         {{-- Redesigned Confirmation Modal Dialog --}}
         <dialog id="context-confirm-dialog" x-ref="confirmModal" class="modal modal-bottom sm:modal-middle" @close="closeConfirmModal()">

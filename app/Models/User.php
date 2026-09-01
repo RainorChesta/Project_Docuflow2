@@ -172,6 +172,8 @@ class User extends Authenticatable
                 ->whereNull('discarded_at');
 
             $rollbacksQuery = Document::whereNotNull('pending_rollback_version_id');
+            $renamesQuery = Document::whereNotNull('pending_title')
+                ->where('pending_title', '!=', '');
 
             if (!$this->isAdmin() && !empty($companyIds)) {
                 $companyFilter = function ($q) use ($companyIds) {
@@ -180,9 +182,10 @@ class User extends Authenticatable
                 };
                 $versionsQuery->whereHas('document', $companyFilter);
                 $rollbacksQuery->where($companyFilter);
+                $renamesQuery->where($companyFilter);
             }
 
-            return $versionsQuery->count() + $rollbacksQuery->count();
+            return $versionsQuery->count() + $rollbacksQuery->count() + $renamesQuery->count();
         }
 
         $divisionIds = $this->allDivisionIds();
@@ -200,7 +203,13 @@ class User extends Authenticatable
             ->whereNotNull('pending_rollback_version_id')
             ->count();
 
-        return $versionsCount + $rollbacksCount;
+        $renamesCount = Document::whereIn('division_id', $divisionIds)
+            ->visibleTo($this)
+            ->whereNotNull('pending_title')
+            ->where('pending_title', '!=', '')
+            ->count();
+
+        return $versionsCount + $rollbacksCount + $renamesCount;
     }
 
     /**

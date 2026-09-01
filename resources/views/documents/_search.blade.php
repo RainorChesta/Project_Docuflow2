@@ -9,14 +9,7 @@
                class="input input-bordered input-sm w-full">
     </div>
     
-    <select name="document_type_id" class="select select-bordered select-sm w-full sm:w-auto" onchange="this.form.submit()">
-        <option value="">{{ __('Semua Tipe') }}</option>
-        @foreach($documentTypes as $dt)
-            <option value="{{ $dt->id }}" {{ request('document_type_id') == $dt->id ? 'selected' : '' }}>
-                {{ $dt->code }}
-            </option>
-        @endforeach
-    </select>
+    <x-document-type-filter :documentTypes="$documentTypes" :selected="request('document_type_id')" placeholder="{{ __('Semua Tipe') }}" />
     
     @if(isset($divisions))
     <select name="division_id" class="select select-bordered select-sm w-full sm:w-auto" onchange="this.form.submit()">

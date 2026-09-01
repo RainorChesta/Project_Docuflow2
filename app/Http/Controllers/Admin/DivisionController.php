@@ -31,6 +31,9 @@ class DivisionController extends Controller
             'name' => 'required|string|max:255',
         ]);
 
+        $validated['code'] = strtoupper(trim($validated['code']));
+        $validated['name'] = Division::formatCapitalName($validated['name']);
+
         Division::create($validated);
 
         return redirect()->route('admin.divisions.index')->with('success', __('Divisi berhasil dibuat.'));
@@ -49,6 +52,9 @@ class DivisionController extends Controller
             'code' => 'required|string|max:10|unique:divisions,code,' . $division->id,
             'name' => 'required|string|max:255',
         ]);
+
+        $validated['code'] = strtoupper(trim($validated['code']));
+        $validated['name'] = Division::formatCapitalName($validated['name']);
 
         $division->update($validated);
 

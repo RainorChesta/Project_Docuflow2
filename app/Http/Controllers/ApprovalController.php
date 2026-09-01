@@ -31,6 +31,8 @@ class ApprovalController extends Controller
                 ->whereNull('discarded_at')
                 ->whereHas('document');
             $pendingRollbacksQuery = Document::whereNotNull('pending_rollback_version_id');
+            $pendingRenamesQuery = Document::whereNotNull('pending_title')
+                ->where('pending_title', '!=', '');
 
             if (!$user->isAdmin() && !empty($companyIds)) {
                 $companyFilter = function ($q) use ($companyIds) {
@@ -39,12 +41,14 @@ class ApprovalController extends Controller
                 };
                 $pendingVersionsQuery->whereHas('document', $companyFilter);
                 $pendingRollbacksQuery->where($companyFilter);
+                $pendingRenamesQuery->where($companyFilter);
             }
 
             $pendingVersions = $pendingVersionsQuery->with('document', 'author')->latest()->get();
             $pendingRollbacks = $pendingRollbacksQuery->with('pendingRollbackVersion', 'rollbackRequestedBy')->latest()->get();
+            $pendingRenames = $pendingRenamesQuery->with('renameRequestedBy', 'division')->latest('rename_requested_at')->get();
 
-            return view('approvals.index', compact('pendingVersions', 'pendingRollbacks'));
+            return view('approvals.index', compact('pendingVersions', 'pendingRollbacks', 'pendingRenames'));
         }
         $divisionIds = $user->allDivisionIds();
 
@@ -62,7 +66,15 @@ class ApprovalController extends Controller
             ->latest()
             ->get();
 
-        return view('approvals.index', compact('pendingVersions', 'pendingRollbacks'));
+        $pendingRenames = Document::whereIn('division_id', $divisionIds)
+            ->visibleTo($user)
+            ->whereNotNull('pending_title')
+            ->where('pending_title', '!=', '')
+            ->with('renameRequestedBy', 'division')
+            ->latest('rename_requested_at')
+            ->get();
+
+        return view('approvals.index', compact('pendingVersions', 'pendingRollbacks', 'pendingRenames'));
     }
 
     public function approve(Request $request, Document $document, DocumentVersion $version): RedirectResponse
@@ -226,5 +238,88 @@ class ApprovalController extends Controller
         }
 
         return redirect()->route('documents.show', $document)->with('success', __('Permintaan rollback ditolak.'));
+    }
+
+    public function approveRename(Document $document): RedirectResponse
+    {
+        $this->authorize('approveRename', $document);
+
+        if (!$document->hasPendingRename()) {
+            return back()->with('error', __('Tidak ada permintaan perubahan nama yang menunggu.'));
+        }
+
+        $requester = $document->renameRequestedBy;
+        $oldTitle = $document->title;
+        $newTitle = $document->pending_title;
+        $reviewer = auth()->user();
+
+        $document->update([
+            'title' => $newTitle,
+            'pending_title' => null,
+            'rename_requested_by_id' => null,
+            'rename_requested_at' => null,
+            'rename_request_notes' => null,
+        ]);
+
+        $this->auditService->log($reviewer, 'document.rename_approved', 'document', $document->id, [
+            'old_title' => $oldTitle,
+            'new_title' => $newTitle,
+        ]);
+
+        if ($requester && $requester->id !== $reviewer->id) {
+            $requester->notify(new \App\Notifications\DocumentRenameResult(
+                $document,
+                $oldTitle,
+                $newTitle,
+                'approved',
+                $reviewer->name
+            ));
+        }
+
+        return redirect()->route('approvals.index')->with(
+            'success',
+            __('Perubahan nama dokumen menjadi ":title" telah disetujui.', ['title' => $newTitle])
+        );
+    }
+
+    public function rejectRename(Request $request, Document $document): RedirectResponse
+    {
+        $this->authorize('approveRename', $document);
+
+        if (!$document->hasPendingRename()) {
+            return back()->with('error', __('Tidak ada permintaan perubahan nama yang menunggu.'));
+        }
+
+        $requester = $document->renameRequestedBy;
+        $oldTitle = $document->title;
+        $targetTitle = $document->pending_title;
+        $reviewer = auth()->user();
+        $notes = $request->input('notes') ?? $request->input('reason');
+
+        $document->update([
+            'pending_title' => null,
+            'rename_requested_by_id' => null,
+            'rename_requested_at' => null,
+            'rename_request_notes' => null,
+        ]);
+
+        $this->auditService->log($reviewer, 'document.rename_rejected', 'document', $document->id, [
+            'current_title' => $oldTitle,
+            'rejected_title' => $targetTitle,
+            'notes' => $notes,
+        ]);
+
+        if ($requester && $requester->id !== $reviewer->id) {
+            $requester->notify(new \App\Notifications\DocumentRenameResult(
+                $document,
+                $oldTitle,
+                $targetTitle,
+                'rejected',
+                $reviewer->name,
+                $notes
+            ));
+        }
+
+        return redirect()->route('approvals.index')->with('success', __('Permintaan perubahan nama dokumen ditolak.'));
     }
 }

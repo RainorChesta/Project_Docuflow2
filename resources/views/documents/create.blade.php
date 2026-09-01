@@ -45,9 +45,16 @@
                                     selectedId: '{{ old('document_type_id') }}',
                                     options: [
                                         @foreach($documentTypes as $type)
-                                            { id: '{{ $type->id }}', label: '{{ $type->code }} - {{ $type->name }}' },
+                                            { id: '{{ $type->id }}', code: '{{ strtoupper($type->code) }}', label: '{{ $type->code }} - {{ $type->name }}' },
                                         @endforeach
                                     ],
+                                    init() {
+                                        window.docTypeMap = {
+                                            @foreach($documentTypes as $type)
+                                                '{{ $type->id }}': { code: '{{ strtoupper($type->code) }}' },
+                                            @endforeach
+                                        };
+                                    },
                                     get filteredOptions() {
                                         if (this.search === '') return this.options;
                                         const searchLower = this.search.toLowerCase();
@@ -118,27 +125,161 @@
                             </p>
                         </div>
 
-                        {{-- Branch --}}
-                        <div class="form-control w-full mb-4">
-                            <label for="branch_id" class="label">
-                                <span class="label-text font-medium">{{ __('Cabang (Branch)') }}</span>
-                            </label>
-                            @if(auth()->user()->isAdmin() || auth()->user()->isDirector())
-                                <select name="branch_id" id="branch_id" class="select select-bordered w-full" required>
-                                    @foreach($availableBranches as $branch)
-                                        <option value="{{ $branch->id }}" {{ (old('branch_id', $activeBranch?->id) == $branch->id) ? 'selected' : '' }}>
-                                            {{ $branch->company?->name }} — {{ $branch->name }} @if($branch->is_pusat)(Pusat - {{ $branch->effective_code }})@else({{ $branch->code }})@endif
-                                        </option>
+                        {{-- Company & Branch --}}
+                        @if(auth()->user()->isAdmin() || auth()->user()->isDirector())
+                            @php
+                                $defaultCompanyIds = old('company_ids', ($activeBranch ? [$activeBranch->company_id] : ($companies->first() ? [$companies->first()->id] : [])));
+                                $defaultBranchIds = old('branch_ids', ($activeBranch ? [$activeBranch->id] : []));
+                                if (old('branch_id') && !in_array(old('branch_id'), $defaultBranchIds)) {
+                                    $defaultBranchIds[] = old('branch_id');
+                                }
+                            @endphp
+
+                            <div class="mb-5"
+                                 x-data="{
+                                     selectedCompanies: {{ json_encode($defaultCompanyIds) }}.map(String),
+                                     selectedBranches: {{ json_encode($defaultBranchIds) }}.map(String),
+                                     updateBranch() {
+                                         let el = document.getElementById('branch_id');
+                                         if (el) {
+                                             let primary = this.selectedBranches.length > 0 ? this.selectedBranches[0] : '';
+                                             if (el.value !== primary) {
+                                                 el.value = primary;
+                                                 el.dispatchEvent(new Event('change'));
+                                             }
+                                         }
+                                     },
+                                     init() {
+                                         this.$watch('selectedBranches', () => {
+                                             this.$nextTick(() => this.updateBranch());
+                                         });
+                                     }
+                                 }">
+                                
+                                <p class="text-xs text-base-content/60 mb-3">{{ __('Pilih perusahaan yang dapat diakses user, lalu centang cabang-cabang yang di-assign.') }}</p>
+
+                                <!-- Hidden branch_id field to connect with next-number preview & form submission -->
+                                <input type="hidden" name="branch_id" id="branch_id" :value="selectedBranches.length > 0 ? selectedBranches[0] : ''" value="{{ $defaultBranchIds[0] ?? '' }}">
+
+                                <div x-data="{
+                                    search: '',
+                                    open: false,
+                                    companies: [
+                                        @foreach($companies as $company)
+                                            { id: {{ $company->id }}, name: '{{ addslashes($company->name) }} ({{ addslashes($company->code) }})', branchIds: {{ $company->branches->pluck('id')->toJson() }} },
+                                        @endforeach
+                                    ],
+                                    get filteredCompanies() {
+                                        if (this.search === '') {
+                                            return this.companies.filter(c => !selectedCompanies.includes(String(c.id)));
+                                        }
+                                        return this.companies.filter(c => 
+                                            !selectedCompanies.includes(String(c.id)) && 
+                                            c.name.toLowerCase().includes(this.search.toLowerCase())
+                                        );
+                                    },
+                                    toggleCompany(id) {
+                                        id = String(id);
+                                        if (selectedCompanies.includes(id)) {
+                                            selectedCompanies = selectedCompanies.filter(c => c !== id);
+                                            // Also remove its branches
+                                            let company = this.companies.find(c => String(c.id) === id);
+                                            if(company) {
+                                                selectedBranches = selectedBranches.filter(b => !company.branchIds.map(String).includes(String(b)));
+                                            }
+                                        } else {
+                                            selectedCompanies.push(id);
+                                        }
+                                        this.search = '';
+                                        this.$refs.searchInput.focus();
+                                    }
+                                }" class="relative mb-6">
+                                    
+                                    <div class="border border-base-300 rounded-lg p-2 min-h-[3rem] flex flex-wrap gap-2 items-center bg-base-100 cursor-text"
+                                         @click="open = true; $refs.searchInput.focus()"
+                                         @click.away="open = false">
+                                        
+                                        <template x-for="id in selectedCompanies" :key="id">
+                                            <div class="badge badge-primary gap-1 p-3">
+                                                <span x-text="companies.find(c => String(c.id) === String(id))?.name"></span>
+                                                <button type="button" @click.stop="toggleCompany(id)" class="hover:bg-primary-focus rounded-full p-0.5">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                                </button>
+                                                <input type="hidden" name="company_ids[]" :value="id">
+                                            </div>
+                                        </template>
+                                        
+                                        <input type="text" x-ref="searchInput" x-model="search" @focus="open = true" @keydown.backspace="if(search === '' && selectedCompanies.length > 0) toggleCompany(selectedCompanies[selectedCompanies.length - 1])" class="flex-1 outline-none bg-transparent min-w-[150px] text-sm" placeholder="{{ __('Cari perusahaan...') }}">
+                                    </div>
+                                    
+                                    <div x-show="open" 
+                                         x-transition
+                                         class="absolute z-10 mt-1 w-full bg-base-100 border border-base-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                        <template x-if="filteredCompanies.length === 0">
+                                            <div class="p-3 text-sm text-base-content/60 text-center">{{ __('Tidak ada perusahaan ditemukan') }}</div>
+                                        </template>
+                                        <template x-for="company in filteredCompanies" :key="company.id">
+                                            <div @click="toggleCompany(company.id)" class="p-3 hover:bg-base-200 cursor-pointer text-sm">
+                                                <span x-text="company.name"></span>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+
+                                <div class="space-y-4">
+                                    @foreach($companies as $company)
+                                        <div class="border border-base-300 rounded-lg p-4 bg-base-200/30"
+                                             x-show="selectedCompanies.includes(String({{ $company->id }}))"
+                                             x-data="{ 
+                                                companyId: {{ $company->id }},
+                                                branchIds: {{ $company->branches->pluck('id')->toJson() }}
+                                             }">
+                                            
+                                            <div class="flex items-center justify-between border-b border-base-300 pb-2 mb-3">
+                                                <span class="font-medium text-sm">{{ $company->name }} ({{ $company->code }}) - Cabang</span>
+                                                <label class="flex items-center gap-2 cursor-pointer text-xs">
+                                                    <input type="checkbox" 
+                                                           :checked="branchIds.length > 0 && branchIds.every(b => selectedBranches.includes(String(b)))"
+                                                           @change="
+                                                                if ($el.checked) {
+                                                                    branchIds.forEach(b => { if (!selectedBranches.includes(String(b))) selectedBranches.push(String(b)); });
+                                                                } else {
+                                                                    selectedBranches = selectedBranches.filter(b => !branchIds.map(String).includes(String(b)));
+                                                                }
+                                                           "
+                                                           class="checkbox checkbox-xs checkbox-primary">
+                                                    <span>{{ __('Pilih Semua') }}</span>
+                                                </label>
+                                            </div>
+
+                                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                @foreach($company->branches as $branch)
+                                                    <label class="flex items-center gap-2 cursor-pointer text-xs">
+                                                        <input type="checkbox" name="branch_ids[]" value="{{ $branch->id }}"
+                                                               x-model="selectedBranches"
+                                                               class="checkbox checkbox-xs checkbox-secondary">
+                                                        <span>{{ $branch->name }} @if($branch->is_pusat)<span class="text-primary font-semibold">({{ __('Pusat') }})</span>@else({{ $branch->code }})@endif</span>
+                                                    </label>
+                                                @endforeach
+                                            </div>
+                                        </div>
                                     @endforeach
-                                </select>
-                                <p class="text-xs text-base-content/50 mt-1">{{ __('Kode cabang akan masuk ke struktur penomoran dokumen.') }}</p>
-                            @else
+                                </div>
+                                <p class="text-xs text-base-content/50 mt-2">{{ __('Kode cabang yang dipilih pertama akan menjadi dasar penomoran dokumen.') }}</p>
+                                @error('branch_id') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
+                                @error('branch_ids') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
+                            </div>
+                        @else
+                            <div class="form-control w-full mb-4">
+                                <label for="branch_id" class="label">
+                                    <span class="label-text font-medium">{{ __('Cabang (Branch)') }}</span>
+                                </label>
                                 <input type="text" value="{{ $activeBranch ? $activeBranch->company?->name . ' — ' . $activeBranch->name . ' (' . $activeBranch->effective_code . ')' : '—' }}" class="input input-bordered w-full bg-base-200" disabled>
                                 <input type="hidden" name="branch_id" id="branch_id" value="{{ $activeBranch?->id }}">
                                 <p class="text-xs text-base-content/50 mt-1">{{ __('Sesuai cabang aktif yang dipilih di switcher atas.') }}</p>
-                            @endif
-                            @error('branch_id') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
-                        </div>
+                                @error('branch_id') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
+                            </div>
+                        @endif
 
                         {{-- Title --}}
                         <div class="form-control w-full mb-4">
@@ -150,7 +291,7 @@
                         </div>
 
                         {{-- Division --}}
-                        <div class="form-control w-full mb-4">
+                        <div id="container-division" class="form-control w-full mb-4">
                             <label for="division_id" class="label">
                                 <span class="label-text font-medium">{{ __('Divisi') }}</span>
                             </label>
@@ -171,6 +312,23 @@
                                 <p class="text-xs text-base-content/50 mt-1">{{ __('Otomatis sesuai divisi akun kamu.') }}</p>
                             @endif
                             @error('division_id') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        {{-- Unit Kerja (Khusus SOP) --}}
+                        <div id="container-unit-kerja" class="form-control w-full mb-4" style="display: none;">
+                            <label for="unit_kerja_id" class="label">
+                                <span class="label-text font-medium">{{ __('Unit Kerja') }} <span class="text-error">*</span></span>
+                            </label>
+                            <select name="unit_kerja_id" id="unit_kerja_id" class="select select-bordered w-full">
+                                <option value="">{{ __('Pilih unit kerja...') }}</option>
+                                @foreach($unitKerjas as $uk)
+                                    <option value="{{ $uk->id }}" data-branch-id="{{ $uk->cabang_id }}" {{ old('unit_kerja_id') == $uk->id ? 'selected' : '' }}>
+                                        {{ $uk->kode_unit_kerja }} - {{ $uk->nama_unit_kerja }} ({{ $uk->cabang?->name }})
+                                    </option>
+                                @endforeach
+                            </select>
+                            <p class="text-xs text-base-content/50 mt-1">{{ __('Unit kerja cabang untuk penomoran dokumen SOP.') }}</p>
+                            @error('unit_kerja_id') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                         </div>
 
                         <div class="divider"></div>
@@ -291,6 +449,64 @@
             var lastPreview = numberField.value;
 
             var branchSelect = document.getElementById('branch_id');
+            var divisionSelect = document.getElementById('division_id');
+            var unitKerjaSelect = document.getElementById('unit_kerja_id');
+            var containerUnitKerja = document.getElementById('container-unit-kerja');
+            var containerDivision = document.getElementById('container-division');
+
+            function isCurrentTypeSop() {
+                var typeId = typeSelect.value;
+                if (!typeId) return false;
+                @if($selectedTemplate)
+                    return {{ strtoupper($selectedTemplate->documentType->code) === 'SOP' ? 'true' : 'false' }};
+                @else
+                    if (window.docTypeMap && window.docTypeMap[typeId]) {
+                        return window.docTypeMap[typeId].code === 'SOP';
+                    }
+                    return false;
+                @endif
+            }
+
+            function updateTypeVisibility() {
+                var isSop = isCurrentTypeSop();
+                if (containerUnitKerja && containerDivision) {
+                    if (isSop) {
+                        containerUnitKerja.style.display = 'block';
+                        containerDivision.style.display = 'none';
+                        if (divisionSelect && divisionSelect.tagName === 'SELECT') {
+                            divisionSelect.removeAttribute('required');
+                        }
+                        if (unitKerjaSelect) {
+                            unitKerjaSelect.setAttribute('required', 'required');
+                        }
+                    } else {
+                        containerUnitKerja.style.display = 'none';
+                        containerDivision.style.display = 'block';
+                        if (divisionSelect && divisionSelect.tagName === 'SELECT') {
+                            divisionSelect.setAttribute('required', 'required');
+                        }
+                        if (unitKerjaSelect) {
+                            unitKerjaSelect.removeAttribute('required');
+                        }
+                    }
+                }
+            }
+
+            function filterUnitKerjasByBranch() {
+                if (!unitKerjaSelect) return;
+                var currentBranchId = branchSelect ? branchSelect.value : '';
+
+                var options = unitKerjaSelect.querySelectorAll('option');
+                options.forEach(function(opt) {
+                    if (!opt.value) return; // Skip placeholder
+                    var optBranch = opt.getAttribute('data-branch-id');
+                    var isVisible = !currentBranchId || !optBranch || optBranch === currentBranchId;
+                    opt.hidden = !isVisible;
+                    if (!isVisible && opt.selected) {
+                        unitKerjaSelect.value = '';
+                    }
+                });
+            }
 
             function fetchPreview() {
                 var typeId = typeSelect.value;
@@ -300,15 +516,21 @@
                     return;
                 }
 
+                updateTypeVisibility();
+
                 var branchId = branchSelect ? branchSelect.value : '';
-                var divisionSelect = document.getElementById('division_id');
                 var divisionId = divisionSelect ? divisionSelect.value : '';
+                var unitKerjaId = unitKerjaSelect ? unitKerjaSelect.value : '';
+
                 var url = '{{ route('documents.next-number') }}?document_type_id=' + encodeURIComponent(typeId);
                 if (branchId) {
                     url += '&branch_id=' + encodeURIComponent(branchId);
                 }
                 if (divisionId) {
                     url += '&division_id=' + encodeURIComponent(divisionId);
+                }
+                if (unitKerjaId) {
+                    url += '&unit_kerja_id=' + encodeURIComponent(unitKerjaId);
                 }
 
                 fetch(url, {
@@ -342,14 +564,24 @@
                 }
             }
 
-            typeSelect.addEventListener('change', fetchPreview);
+            typeSelect.addEventListener('change', function () {
+                updateTypeVisibility();
+                fetchPreview();
+            });
             if (branchSelect) {
-                branchSelect.addEventListener('change', fetchPreview);
+                branchSelect.addEventListener('change', function () {
+                    filterUnitKerjasByBranch();
+                    fetchPreview();
+                });
             }
-            var divisionSelect = document.getElementById('division_id');
             if (divisionSelect) {
                 divisionSelect.addEventListener('change', fetchPreview);
             }
+            if (unitKerjaSelect) {
+                unitKerjaSelect.addEventListener('change', fetchPreview);
+            }
+            filterUnitKerjasByBranch();
+            updateTypeVisibility();
 
             if (uploadCheckbox) {
                 uploadCheckbox.addEventListener('change', function () {

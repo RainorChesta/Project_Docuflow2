@@ -236,6 +236,16 @@ class DocumentController extends Controller
         $activeBranch = $activeBranchId ? \App\Models\Branch::with('company')->find($activeBranchId) : null;
         $availableBranches = $contextService->getAvailableBranches($user);
 
+        $companies = ($user->isAdmin() || $user->isDirector())
+            ? ($user->isAdmin()
+                ? \App\Models\Company::with('branches')->orderBy('name')->get()
+                : $user->companies()->with('branches')->orderBy('name')->get())
+            : collect();
+
+        if ($user->isDirector() && $companies->isEmpty()) {
+            $companies = \App\Models\Company::with('branches')->orderBy('name')->get();
+        }
+
         // If a template_id is passed via URL, load the template for auto-fill
         $selectedTemplate = null;
         $initialDocumentNumber = null;
@@ -249,8 +259,10 @@ class DocumentController extends Controller
             }
         }
 
+        $unitKerjas = \App\Models\UnitKerja::with('cabang')->orderBy('kode_unit_kerja')->get();
+
         return view('documents.create', compact(
-            'divisions', 'documentTypes', 'activeBranch', 'availableBranches', 'selectedTemplate', 'initialDocumentNumber'
+            'divisions', 'unitKerjas', 'documentTypes', 'activeBranch', 'availableBranches', 'companies', 'selectedTemplate', 'initialDocumentNumber'
         ));
     }
 
@@ -263,6 +275,7 @@ class DocumentController extends Controller
             'document_type_id' => 'required|exists:document_types,id',
             'branch_id' => 'nullable|exists:branches,id',
             'division_id' => 'nullable|exists:divisions,id',
+            'unit_kerja_id' => 'nullable|exists:unit_kerjas,id',
         ]);
 
         $user = auth()->user();
@@ -270,6 +283,7 @@ class DocumentController extends Controller
             ? ($validated['division_id'] ?? $user->division_id)
             : $user->division_id;
         $division = $divisionId ? Division::find($divisionId) : null;
+        $unitKerja = !empty($validated['unit_kerja_id']) ? \App\Models\UnitKerja::find($validated['unit_kerja_id']) : null;
         $documentType = DocumentType::findOrFail($validated['document_type_id']);
 
         $contextService = app(\App\Services\CompanyContextService::class);
@@ -277,7 +291,7 @@ class DocumentController extends Controller
         $branch = $branchId ? \App\Models\Branch::with('company')->find($branchId) : null;
 
         return response()->json([
-            'number' => $this->documentService->previewNumber($division, $documentType, $branch),
+            'number' => $this->documentService->previewNumber($division, $documentType, $branch, $unitKerja),
         ]);
     }
 
@@ -289,11 +303,23 @@ class DocumentController extends Controller
         $isUpload = $request->boolean('is_upload');
         $templateId = $request->input('template_id');
 
+        $isSop = false;
+        if (!empty($request->input('document_type_id'))) {
+            $dt = DocumentType::find($request->input('document_type_id'));
+            $isSop = ($dt && strtoupper($dt->code) === 'SOP');
+        }
+
         $rules = [
             'title' => 'required|string|max:255',
             'document_type_id' => 'required|exists:document_types,id',
-            'division_id' => ($user->isAdmin() || $user->isDirector()) ? 'required|exists:divisions,id' : 'nullable',
+            'division_id' => ($user->isAdmin() || $user->isDirector())
+                ? ($isSop ? 'nullable|exists:divisions,id' : 'required|exists:divisions,id')
+                : 'nullable',
+            'unit_kerja_id' => $isSop ? 'required|exists:unit_kerjas,id' : 'nullable|exists:unit_kerjas,id',
             'branch_id' => 'nullable|exists:branches,id',
+            'branch_ids' => 'nullable|array',
+            'branch_ids.*' => 'exists:branches,id',
+            'company_ids' => 'nullable|array',
             'expiration_date' => 'nullable|date',
             'template_id' => 'nullable|exists:document_templates,id',
         ];
@@ -305,27 +331,35 @@ class DocumentController extends Controller
                 'string',
                 'max:100',
                 'unique:documents,document_number',
-                // Format resmi: seq/tipe/divisi/pusat/bulan-romawi/tahun (non-SOP) atau seq/SOP/pusat/bulan-romawi/tahun (SOP)
+                // Format resmi: seq/tipe/divisi_atau_unit_kerja/cabang/bulan-romawi/tahun (contoh: 029/S.ED/HRD/JBM/VIII/2026 atau 001/SOP-11/CDC-DIP/I/2023)
                 'regex:/^\d{3}\/[A-Z0-9.\-]+(?:\/[A-Z0-9.\-]+){1,2}\/(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII)\/\d{4}$/',
             ];
         }
 
         $validated = $request->validate($rules, [
-            'document_number.regex' => 'Format nomor tidak sesuai. Contoh: 029/S.ED/HRD/JBM/VIII/2026 atau 001/SOP/JBM/VIII/2026',
+            'document_number.regex' => 'Format nomor tidak sesuai. Contoh: 029/S.ED/HRD/JBM/VIII/2026 atau 001/SOP-11/CDC-DIP/I/2023',
+            'unit_kerja_id.required' => __('Unit kerja wajib dipilih untuk dokumen SOP.'),
         ]);
+
+        $branchIds = (array) $request->input('branch_ids', []);
 
         $validated['division_id'] = ($user->isAdmin() || $user->isDirector())
             ? ($validated['division_id'] ?? null)
             : $user->division_id;
+        $validated['unit_kerja_id'] = $validated['unit_kerja_id'] ?? null;
         $validated['visibility'] = Document::VISIBILITY_DIVISION;
         $validated['expiration_date'] = $validated['expiration_date'] ?? null;
 
         $contextService = app(\App\Services\CompanyContextService::class);
-        $branchId = $validated['branch_id'] ?? $contextService->getActiveBranchId($user);
+        $branchId = $validated['branch_id'] ?? (!empty($branchIds) ? $branchIds[0] : null) ?? $contextService->getActiveBranchId($user);
         if ($branchId) {
             $branch = \App\Models\Branch::find($branchId);
             $validated['branch_id'] = $branchId;
             $validated['company_id'] = $branch?->company_id;
+        }
+
+        if (($user->isAdmin() || $user->isDirector()) && empty($validated['branch_id'])) {
+            return back()->withInput()->withErrors(['branch_ids' => __('Harap pilih minimal satu cabang.')]);
         }
 
         if ($isUpload) {
@@ -338,6 +372,24 @@ class DocumentController extends Controller
         } else {
             $doc = $this->documentService->create($validated, $user->id);
             $message = 'Document created. Fill in the content.';
+        }
+
+        // If multiple branches were assigned on creation, distribute to the additional branches
+        if (!empty($branchIds) && count($branchIds) > 1 && !empty($validated['branch_id'])) {
+            $sourceBranchId = $validated['branch_id'];
+            foreach ($branchIds as $targetBranchId) {
+                if ((int) $targetBranchId !== (int) $sourceBranchId) {
+                    \App\Models\DocumentDistribution::firstOrCreate([
+                        'document_id' => $doc->id,
+                        'source_branch_id' => $sourceBranchId,
+                        'target_branch_id' => $targetBranchId,
+                    ], [
+                        'status' => 'unread',
+                        'sent_at' => now(),
+                        'created_by' => $user->id,
+                    ]);
+                }
+            }
         }
 
         $this->auditService->log($user, 'document.created', 'document', $doc->id, [
@@ -856,7 +908,7 @@ class DocumentController extends Controller
      */
     public function updateVisibility(Request $request, Document $document): RedirectResponse
     {
-        $this->authorize('update', $document);
+        $this->authorize('manageScope', $document);
 
         $validated = $request->validate([
             'visibility' => 'required|in:general,division,personal',
@@ -953,5 +1005,137 @@ class DocumentController extends Controller
         }
 
         return $margin;
+    }
+
+    /**
+     * Rename a document directly (Admin, Direktur, Head of Division, or Owner for drafts).
+     */
+    public function rename(Request $request, Document $document): RedirectResponse
+    {
+        $this->authorize('rename', $document);
+
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+        ]);
+
+        $oldTitle = $document->title;
+        $newTitle = trim($validated['title']);
+
+        $document->update([
+            'title' => $newTitle,
+            'pending_title' => null,
+            'rename_requested_by_id' => null,
+            'rename_requested_at' => null,
+            'rename_request_notes' => null,
+        ]);
+
+        $this->auditService->log(auth()->user(), 'document.renamed', 'document', $document->id, [
+            'old_title' => $oldTitle,
+            'new_title' => $newTitle,
+        ]);
+
+        return back()->with('success', __('Nama dokumen berhasil diubah.'));
+    }
+
+    /**
+     * Request a document rename (sent to Division Head for review).
+     */
+    public function requestRename(Request $request, Document $document): RedirectResponse
+    {
+        $this->authorize('requestRename', $document);
+
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $newTitle = trim($validated['title']);
+
+        if ($newTitle === $document->title) {
+            return back()->with('error', __('Nama baru tidak boleh sama dengan nama dokumen saat ini.'));
+        }
+
+        if ($document->hasPendingRename()) {
+            return back()->with('error', __('Sudah ada permintaan perubahan nama yang menunggu persetujuan.'));
+        }
+
+        $user = auth()->user();
+
+        $document->update([
+            'pending_title' => $newTitle,
+            'rename_requested_by_id' => $user->id,
+            'rename_requested_at' => now(),
+            'rename_request_notes' => $validated['notes'] ?? null,
+        ]);
+
+        $this->auditService->log($user, 'document.rename_requested', 'document', $document->id, [
+            'current_title' => $document->title,
+            'requested_title' => $newTitle,
+            'notes' => $validated['notes'] ?? null,
+        ]);
+
+        // Notify Division Heads about rename request
+        $heads = collect();
+        if ($document->division_id) {
+            $heads = \App\Models\User::where('division_id', $document->division_id)
+                ->where('system_role', 'head')
+                ->where('id', '!=', $user->id)
+                ->where(function ($q) use ($document) {
+                    if ($document->branch_id) {
+                        $q->whereHas('branches', fn($bq) => $bq->where('branches.id', $document->branch_id));
+                    } elseif ($document->company_id) {
+                        $q->whereHas('companies', fn($cq) => $cq->where('companies.id', $document->company_id));
+                    }
+                })
+                ->get();
+
+            foreach ($heads as $head) {
+                $head->notify(new \App\Notifications\DocumentRenameRequested($document, $newTitle, $user->name, $validated['notes'] ?? null));
+            }
+        }
+
+        // If no division heads found (e.g. requester is the head, or no head in division), notify Directors and Admins
+        if ($heads->isEmpty()) {
+            $approvers = \App\Models\User::whereIn('system_role', ['admin', 'direktur'])
+                ->where('id', '!=', $user->id)
+                ->get();
+            foreach ($approvers as $approver) {
+                $approver->notify(new \App\Notifications\DocumentRenameRequested($document, $newTitle, $user->name, $validated['notes'] ?? null));
+            }
+        }
+
+        return back()->with('success', __('Permintaan perubahan nama diajukan. Menunggu persetujuan.'));
+    }
+
+    /**
+     * Cancel a pending document rename request.
+     */
+    public function cancelRenameRequest(Document $document): RedirectResponse
+    {
+        $user = auth()->user();
+
+        if (!$document->hasPendingRename()) {
+            return back()->with('error', __('Tidak ada permintaan perubahan nama yang menunggu.'));
+        }
+
+        // Must be the requester, document owner, or admin/director
+        $isRequester = $document->rename_requested_by_id === $user->id;
+        $isOwner = $document->owner_id === $user->id;
+        if (!$isRequester && !$isOwner && !$user->isAdmin() && !$user->isDirector()) {
+            abort(403, __('Anda tidak berhak membatalkan permintaan ini.'));
+        }
+
+        $document->update([
+            'pending_title' => null,
+            'rename_requested_by_id' => null,
+            'rename_requested_at' => null,
+            'rename_request_notes' => null,
+        ]);
+
+        $this->auditService->log($user, 'document.rename_cancelled', 'document', $document->id, [
+            'title' => $document->title,
+        ]);
+
+        return back()->with('success', __('Permintaan perubahan nama dokumen berhasil dibatalkan.'));
     }
 }
