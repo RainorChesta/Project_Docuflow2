@@ -219,4 +219,29 @@ class DocumentTemplateController extends Controller
 
         return $disk->download($template->file_path, $template->file_original_name);
     }
+
+    /**
+     * Preview the template in view-only mode (standalone page).
+     */
+    public function preview(DocumentTemplate $template, \App\Services\OnlyOfficeService $onlyOfficeService): View
+    {
+        $user = auth()->user();
+        $onlyOfficeConfig = $onlyOfficeService->generateTemplateEditorConfig($template, $user, 'view');
+
+        return view('templates.preview', [
+            'template' => $template,
+            'config' => $onlyOfficeConfig,
+        ]);
+    }
+
+    /**
+     * Return ONLYOFFICE editor config as JSON for AJAX-based preview in modal.
+     */
+    public function previewConfig(DocumentTemplate $template, \App\Services\OnlyOfficeService $onlyOfficeService): \Illuminate\Http\JsonResponse
+    {
+        $user = auth()->user();
+        $config = $onlyOfficeService->generateTemplateEditorConfig($template, $user, 'view');
+
+        return response()->json($config);
+    }
 }

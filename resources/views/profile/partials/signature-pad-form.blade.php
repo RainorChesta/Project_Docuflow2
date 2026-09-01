@@ -40,7 +40,20 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
         {{-- ─── Left panel: Input Options (Canvas / Upload) ─── --}}
-        <div class="space-y-3">
+        <div class="space-y-3 relative" id="signature-input-container">
+            {{-- Disabled Overlay when signature exists --}}
+            <div id="signature-disabled-overlay" class="{{ auth()->user()->hasSignature() ? '' : 'hidden' }} absolute inset-0 bg-base-100/75 backdrop-blur-[1.5px] z-20 rounded-xl flex flex-col items-center justify-center p-6 text-center border border-base-300">
+                <div class="p-3 bg-base-200/80 rounded-full text-base-content/60 mb-2 shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                </div>
+                <h4 class="font-semibold text-sm text-base-content">Tanda Tangan Sudah Tersimpan</h4>
+                <p class="text-xs text-base-content/70 mt-1 max-w-xs leading-relaxed">
+                    Hapus tanda tangan saat ini pada panel sebelah kanan terlebih dahulu jika ingin membuat atau mengunggah tanda tangan baru.
+                </p>
+            </div>
+
             <div class="flex items-center justify-between">
                 <label class="block text-sm font-medium text-base-content">{{ __('Pilih Metode') }}</label>
                 <div class="tabs tabs-boxed p-1" id="signature-tabs">
@@ -235,27 +248,36 @@
 
     function setBadge(hasSignature) {
         const badge = document.getElementById('ttd-status-badge');
-        if (!badge) return;
-        if (hasSignature) {
-            badge.innerHTML = `
-                <span class="badge badge-success gap-1.5 font-medium">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                    </svg>
-                    ${@json(__('TTD Aktif'))}
-                </span>`;
-        } else {
-            badge.innerHTML = `
-                <span class="badge badge-warning gap-1.5 font-medium">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    ${@json(__('Wajib Membuat TTD'))}
-                </span>`;
+        if (badge) {
+            if (hasSignature) {
+                badge.innerHTML = `
+                    <span class="badge badge-success gap-1.5 font-medium">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                        ${@json(__('TTD Aktif'))}
+                    </span>`;
+            } else {
+                badge.innerHTML = `
+                    <span class="badge badge-warning gap-1.5 font-medium">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        ${@json(__('Wajib Membuat TTD'))}
+                    </span>`;
+            }
+        }
+        const overlay = document.getElementById('signature-disabled-overlay');
+        if (overlay) {
+            if (hasSignature) {
+                overlay.classList.remove('hidden');
+            } else {
+                overlay.classList.add('hidden');
+            }
         }
     }
-
+        
     /* ── Main init ── */
     document.addEventListener('DOMContentLoaded', function () {
 
@@ -441,6 +463,12 @@
                     if (data.success) {
                         renderEmptyState(panel);
                         setBadge(false);
+                        signaturePad.clear();
+                        if (hint) hint.style.opacity = '1';
+                        fileInput.value = '';
+                        saveBtn.disabled = true;
+                        saveUploadBtn.disabled = true;
+
                         showFlash(@json(__('Tanda tangan berhasil dihapus.')));
                         window.dispatchEvent(new CustomEvent('close-modal', { detail: 'confirm-delete-ttd' }));
                     } else {

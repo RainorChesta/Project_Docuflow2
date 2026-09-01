@@ -1008,6 +1008,19 @@ class DocumentController extends Controller
     }
 
     /**
+     * View a document template using ONLYOFFICE.
+     */
+    public function previewTemplate(DocumentTemplate $template): View
+    {
+        $user = auth()->user();
+        
+        $config = $this->onlyOfficeService->generateTemplateEditorConfig(
+            $template, 
+            $user, 
+            'view'
+        );
+
+        return view('templates.preview', compact('template', 'config'));
      * Rename a document directly (Admin, Direktur, Head of Division, or Owner for drafts).
      */
     public function rename(Request $request, Document $document): RedirectResponse
