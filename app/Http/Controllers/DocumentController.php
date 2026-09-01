@@ -912,4 +912,20 @@ class DocumentController extends Controller
 
         return $margin;
     }
+
+    /**
+     * View a document template using ONLYOFFICE.
+     */
+    public function previewTemplate(DocumentTemplate $template): View
+    {
+        $user = auth()->user();
+        
+        $config = $this->onlyOfficeService->generateTemplateEditorConfig(
+            $template, 
+            $user, 
+            'view'
+        );
+
+        return view('templates.preview', compact('template', 'config'));
+    }
 }

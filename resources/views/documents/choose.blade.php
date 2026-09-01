@@ -7,6 +7,9 @@
             typeFilter: '',
             selectedModalType: '',
             selectedModalItems: [],
+            previewLoading: false,
+            previewError: '',
+            previewTemplateTitle: '',
             templates: @js($templates->map(fn($t) => [
                 'id' => $t->id,
                 'title' => $t->title,
@@ -31,6 +34,12 @@
                     groups[t.document_type_label].push(t);
                 });
                 return groups;
+            },
+            openPreview(templateId, templateTitle) {
+                window.openTemplatePreview(templateId, templateTitle, this);
+            },
+            closePreview() {
+                window.closeTemplatePreview(this);
             }
         }">
 
@@ -51,9 +60,8 @@
                     {{-- Frequently Used Templates --}}
                     @if(isset($frequentTemplates) && $frequentTemplates->isNotEmpty())
                         @foreach($frequentTemplates as $tmpl)
-                        <a href="{{ route('documents.create') }}?template_id={{ $tmpl->id }}"
-                           class="group w-36 h-48 flex flex-col rounded-xl border-2 border-base-300 bg-base-100 hover:border-primary hover:bg-primary/5 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md overflow-hidden">
-                            <div class="flex-1 bg-gradient-to-br from-base-200/70 to-base-300/30 p-2.5 flex items-center justify-center relative overflow-hidden">
+                        <div class="group w-36 h-48 flex flex-col rounded-xl border-2 border-base-300 bg-base-100 hover:border-primary hover:bg-primary/5 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md overflow-hidden relative">
+                            <div @click="window.location.href = '{{ route('documents.create') }}?template_id={{ $tmpl->id }}'" class="flex-1 bg-gradient-to-br from-base-200/70 to-base-300/30 p-2.5 flex items-center justify-center relative overflow-hidden">
                                 <div class="absolute top-2 left-2 bg-primary/15 text-primary text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide z-10 backdrop-blur-sm">
                                     {{ __('Top') }}
                                 </div>
@@ -80,14 +88,23 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="p-2 flex flex-col justify-center bg-base-100 z-10">
+
+                            {{-- Preview Button Overlay --}}
+                            <button type="button" @click.stop="openPreview({{ $tmpl->id }}, '{{ addslashes($tmpl->title) }}')" class="absolute top-2 right-2 p-1.5 rounded-md bg-base-100/80 backdrop-blur text-base-content/70 opacity-0 group-hover:opacity-100 hover:text-primary hover:bg-base-100 transition-all shadow-sm z-20" title="Preview Template">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                            </button>
+
+                            <div @click="window.location.href = '{{ route('documents.create') }}?template_id={{ $tmpl->id }}'" class="p-2 flex flex-col justify-center bg-base-100 z-10">
                                 <div class="font-medium text-xs truncate group-hover:text-primary transition-colors" title="{{ $tmpl->title }}">{{ $tmpl->title }}</div>
                                 <div class="text-[10px] text-base-content/40 mt-0.5 flex items-center gap-1">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                                     {{ $tmpl->documents_count }} {{ __('penggunaan') }}
                                 </div>
                             </div>
-                        </a>
+                        </div>
                         @endforeach
                     @endif
                 </div>
@@ -126,10 +143,9 @@
                         {{-- Horizontal Scroll Container --}}
                         <div class="flex overflow-x-auto pb-4 gap-4 snap-x">
                             <template x-for="tmpl in items.slice(0, 10)" :key="tmpl.id">
-                                <a :href="'{{ route('documents.create') }}?template_id=' + tmpl.id"
-                                   class="group flex-none w-40 h-48 flex flex-col rounded-xl border-2 border-base-300 bg-base-100 hover:border-primary hover:bg-primary/5 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md overflow-hidden snap-start">
+                                <div class="group flex-none w-40 h-48 flex flex-col rounded-xl border-2 border-base-300 bg-base-100 hover:border-primary hover:bg-primary/5 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md overflow-hidden snap-start relative">
                                     {{-- Preview thumbnail area --}}
-                                    <div class="flex-1 bg-gradient-to-br from-base-200/70 to-base-300/30 p-2.5 flex items-center justify-center relative overflow-hidden">
+                                    <div @click="window.location.href = '{{ route('documents.create') }}?template_id=' + tmpl.id" class="flex-1 bg-gradient-to-br from-base-200/70 to-base-300/30 p-2.5 flex items-center justify-center relative overflow-hidden">
                                         {{-- Stylized Mini Paper Document --}}
                                         <div class="w-22 h-26 bg-base-100 rounded-lg shadow-xs border border-base-300/70 p-2 flex flex-col justify-between group-hover:shadow-sm group-hover:scale-105 transition-all duration-200">
                                             <div>
@@ -153,12 +169,21 @@
                                             </div>
                                         </div>
                                     </div>
+                                    
+                                    {{-- Preview Button Overlay --}}
+                                    <button type="button" @click.stop="openPreview(tmpl.id, tmpl.title)" class="absolute top-2 right-2 p-1.5 rounded-md bg-base-100/80 backdrop-blur text-base-content/70 opacity-0 group-hover:opacity-100 hover:text-primary hover:bg-base-100 transition-all shadow-sm z-20" title="Preview Template">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                    </button>
+
                                     {{-- Info --}}
-                                    <div class="p-2 flex flex-col justify-center bg-base-100 z-10">
+                                    <div @click="window.location.href = '{{ route('documents.create') }}?template_id=' + tmpl.id" class="p-2 flex flex-col justify-center bg-base-100 z-10">
                                         <div class="font-medium text-xs truncate group-hover:text-primary transition-colors" x-text="tmpl.title" :title="tmpl.title"></div>
                                         <div class="text-[10px] text-base-content/40 mt-0.5 truncate" x-text="tmpl.description || tmpl.file_name"></div>
                                     </div>
-                                </a>
+                                </div>
                             </template>
                             
                             {{-- View All Card (shown if items > 10) --}}
@@ -199,9 +224,8 @@
                     </h3>
                     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 max-h-[60vh] overflow-y-auto p-1">
                         <template x-for="tmpl in selectedModalItems" :key="tmpl.id">
-                            <a :href="'{{ route('documents.create') }}?template_id=' + tmpl.id"
-                               class="group flex flex-col h-48 rounded-xl border-2 border-base-300 bg-base-100 hover:border-primary hover:bg-primary/5 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md overflow-hidden">
-                                <div class="flex-1 bg-gradient-to-br from-base-200/70 to-base-300/30 p-2.5 flex items-center justify-center relative overflow-hidden">
+                            <div class="group flex flex-col h-48 rounded-xl border-2 border-base-300 bg-base-100 hover:border-primary hover:bg-primary/5 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md overflow-hidden relative">
+                                <div @click="window.location.href = '{{ route('documents.create') }}?template_id=' + tmpl.id" class="flex-1 bg-gradient-to-br from-base-200/70 to-base-300/30 p-2.5 flex items-center justify-center relative overflow-hidden">
                                     {{-- Stylized Mini Paper Document --}}
                                     <div class="w-22 h-26 bg-base-100 rounded-lg shadow-xs border border-base-300/70 p-2 flex flex-col justify-between group-hover:shadow-sm group-hover:scale-105 transition-all duration-200">
                                         <div>
@@ -225,12 +249,65 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="p-2 flex flex-col justify-center bg-base-100 z-10">
+                                
+                                {{-- Preview Button Overlay --}}
+                                <button type="button" @click.stop="openPreview(tmpl.id, tmpl.title)" class="absolute top-2 right-2 p-1.5 rounded-md bg-base-100/80 backdrop-blur text-base-content/70 opacity-0 group-hover:opacity-100 hover:text-primary hover:bg-base-100 transition-all shadow-sm z-20" title="Preview Template">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                </button>
+
+                                <div @click="window.location.href = '{{ route('documents.create') }}?template_id=' + tmpl.id" class="p-2 flex flex-col justify-center bg-base-100 z-10">
                                     <div class="font-medium text-xs truncate group-hover:text-primary transition-colors" x-text="tmpl.title" :title="tmpl.title"></div>
                                     <div class="text-[10px] text-base-content/40 mt-0.5 truncate" x-text="tmpl.description || tmpl.file_name"></div>
                                 </div>
-                            </a>
+                            </div>
                         </template>
+                    </div>
+                </div>
+                <form method="dialog" class="modal-backdrop">
+                    <button>close</button>
+                </form>
+            </dialog>
+            {{-- Template Preview Modal (Direct ONLYOFFICE, no iframe) --}}
+            <dialog x-ref="previewModal" class="modal" @close="closePreview()">
+                <div class="modal-box w-11/12 max-w-5xl h-[85vh] p-0 flex flex-col overflow-hidden relative rounded-xl border border-base-300">
+                    {{-- Modal Header --}}
+                    <div class="flex items-center justify-between p-4 bg-base-100 border-b border-base-200 z-20 shrink-0 shadow-sm relative">
+                        <h3 class="font-bold text-lg flex items-center gap-2 text-base-content">
+                            <div class="w-8 h-8 rounded bg-primary/10 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                            </div>
+                            <span>{{ __('Preview Template') }}<span x-show="previewTemplateTitle" class="font-normal text-base-content/60"> — <span x-text="previewTemplateTitle"></span></span></span>
+                        </h3>
+                        <form method="dialog">
+                            <button class="btn btn-sm btn-circle btn-ghost bg-base-200 hover:bg-base-300 text-base-content/70">✕</button>
+                        </form>
+                    </div>
+
+                    {{-- Loading Indicator --}}
+                    <div x-show="previewLoading" class="absolute inset-0 flex flex-col items-center justify-center bg-base-100 z-10 mt-16">
+                        <span class="loading loading-spinner text-primary w-10 h-10 mb-4"></span>
+                        <p class="text-sm font-medium text-base-content/60 animate-pulse">{{ __('Memuat Preview Dokumen...') }}</p>
+                    </div>
+
+                    {{-- Error State --}}
+                    <div x-show="previewError" x-cloak class="absolute inset-0 flex flex-col items-center justify-center bg-base-100 z-10 mt-16 px-8">
+                        <div class="max-w-md text-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 text-error mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            <p class="text-sm text-error font-medium" x-text="previewError"></p>
+                        </div>
+                    </div>
+
+                    {{-- ONLYOFFICE Preview Container --}}
+                    <div class="flex-1 w-full h-full relative overflow-hidden bg-base-100">
+                        <div id="template-preview-editor" class="w-full h-full"></div>
                     </div>
                 </div>
                 <form method="dialog" class="modal-backdrop">
@@ -239,4 +316,89 @@
             </dialog>
         </div>
     </div>
+
+    @push('scripts')
+        <script src="{{ rtrim(config('onlyoffice.url'), '/') }}/web-apps/apps/api/documents/api.js"></script>
+        <script>
+            window.openTemplatePreview = function(templateId, templateTitle, alpineContext) {
+                alpineContext.previewLoading = true;
+                alpineContext.previewError = '';
+                alpineContext.previewTemplateTitle = templateTitle || 'Template';
+                alpineContext.$refs.previewModal.showModal();
+
+                const container = document.getElementById('template-preview-editor');
+                if (container) container.innerHTML = '';
+
+                // Ambil konfigurasi ONLYOFFICE untuk template
+                const configUrl = '{{ url("/documents/templates") }}/' + templateId + '/preview-config';
+                
+                fetch(configUrl, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin'
+                })
+                .then(res => {
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    return res.json();
+                })
+                .then(config => {
+                    if (typeof DocsAPI === 'undefined') {
+                        alpineContext.previewError = 'ONLYOFFICE server tidak dapat diakses.';
+                        alpineContext.previewLoading = false;
+                        return;
+                    }
+
+                    config.type = 'desktop';
+                    config.editorConfig = config.editorConfig || {};
+                    config.editorConfig.mode = 'view';
+                    config.editorConfig.customization = config.editorConfig.customization || {};
+                    config.editorConfig.customization.compactHeader = false;
+                    config.editorConfig.customization.toolbarNoTabs = false;
+                    config.editorConfig.customization.mobile = { force: false };
+
+                    config.events = config.events || {};
+                    config.events.onAppReady = function() {
+                        alpineContext.previewLoading = false;
+                    };
+                    config.events.onDocumentReady = function() {
+                        alpineContext.previewLoading = false;
+                    };
+                    config.events.onError = function(e) {
+                        console.error('ONLYOFFICE error:', e);
+                        alpineContext.previewLoading = false;
+                    };
+
+                    if (window._templateDocEditor) {
+                        try { window._templateDocEditor.destroyEditor(); } catch(e) {}
+                        window._templateDocEditor = null;
+                    }
+
+                    window._templateDocEditor = new DocsAPI.DocEditor("template-preview-editor", config);
+                    
+                    // Langsung hilangkan loading spinner begitu editor ONLYOFFICE dimuat ke DOM
+                    setTimeout(() => {
+                        alpineContext.previewLoading = false;
+                    }, 500);
+                })
+                .catch(err => {
+                    console.error('Preview error:', err);
+                    alpineContext.previewLoading = false;
+                    alpineContext.previewError = 'Gagal memuat pratinjau ONLYOFFICE: ' + err.message;
+                });
+            };
+
+            window.closeTemplatePreview = function(alpineContext) {
+                if (window._templateDocEditor) {
+                    try { window._templateDocEditor.destroyEditor(); } catch(e) {}
+                    window._templateDocEditor = null;
+                }
+                const container = document.getElementById('template-preview-editor');
+                if (container) container.innerHTML = '';
+                if (alpineContext) {
+                    alpineContext.previewLoading = false;
+                    alpineContext.previewError = '';
+                    alpineContext.previewTemplateTitle = '';
+                }
+            };
+        </script>
+    @endpush
 </x-app-layout>

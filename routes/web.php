@@ -62,6 +62,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/documents/{document}/edit', [DocumentController::class, 'edit'])->name('documents.edit');
     Route::get('/documents/{document}/download', [DocumentController::class, 'download'])->name('documents.download');
     Route::get('/documents/{document}/preview', [DocumentController::class, 'preview'])->name('documents.preview');
+    Route::get('/documents/templates/{template}/preview', [DocumentTemplateController::class, 'preview'])->name('templates.preview');
+    Route::get('/documents/templates/{template}/preview-config', [DocumentTemplateController::class, 'previewConfig'])->name('templates.preview-config');
     Route::post('/documents/{document}/summarize', [DocumentController::class, 'summarize'])->name('documents.summarize');
     Route::get('/documents/{document}/summary-status', [DocumentController::class, 'summaryStatus'])->name('documents.summary-status');
     Route::get('/documents/{document}/onlyoffice-status', [DocumentController::class, 'onlyofficeStatus'])->name('documents.onlyoffice-status');
