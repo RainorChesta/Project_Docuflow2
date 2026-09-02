@@ -1021,8 +1021,8 @@ class DocumentController extends Controller
         );
 
         return view('templates.preview', compact('template', 'config'));
-     * Rename a document directly (Admin, Direktur, Head of Division, or Owner for drafts).
-     */
+    }
+
     public function rename(Request $request, Document $document): RedirectResponse
     {
         $this->authorize('rename', $document);

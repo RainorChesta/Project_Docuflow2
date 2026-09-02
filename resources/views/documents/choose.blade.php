@@ -41,6 +41,7 @@
             },
             closePreview() {
                 window.closeTemplatePreview(this);
+            },
             get filteredModalItems() {
                 if (!this.modalSearch.trim()) return this.selectedModalItems;
                 const q = this.modalSearch.toLowerCase();
