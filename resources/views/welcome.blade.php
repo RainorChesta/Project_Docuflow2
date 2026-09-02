@@ -31,12 +31,6 @@
             background-image: linear-gradient(to right, rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.08) 1px, transparent 1px);
         }
         
-        /* Fade effect for the mockup */
-        .mask-fade-bottom {
-            mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
-            -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
-        }
-        
         /* Typing Animation */
         .typing-wrapper {
             display: inline-grid;
@@ -96,7 +90,7 @@
     @endif
 
     <!-- Hero Section -->
-    <main class="flex-1 relative flex flex-col items-center justify-center md:justify-start pt-12 sm:pt-16 md:pt-24 pb-12 md:pb-0 px-4 sm:px-6 lg:px-8 overflow-hidden bg-grid-pattern">
+    <main class="flex-1 relative flex flex-col items-center justify-center py-16 sm:py-24 px-4 sm:px-6 lg:px-8 overflow-hidden bg-grid-pattern">
         <!-- Radial gradient to highlight the center and fade the grid -->
         <div class="absolute inset-0 bg-base-100 [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black_70%)] pointer-events-none"></div>
         
@@ -132,89 +126,6 @@
                         {{ __('Sign in') }}
                     </a>
                 @endauth
-            </div>
-        </div>
-        
-        <!-- Large UI Mockup (Centered - Hidden when screen shrinks on mobile/tablet) -->
-        <div class="hidden md:block relative z-10 w-full max-w-5xl mx-auto mt-12 md:mt-20 mask-fade-bottom px-4 sm:px-0">
-            <div class="rounded-t-2xl border border-base-300 bg-base-100 shadow-2xl overflow-hidden ring-1 ring-base-content/5">
-                <!-- Mac-like Window Header -->
-                <div class="bg-base-200/50 border-b border-base-300 px-4 py-3 flex items-center justify-between">
-                    <div class="flex gap-2">
-                        <div class="w-3 h-3 rounded-full bg-error/50"></div>
-                        <div class="w-3 h-3 rounded-full bg-warning/50"></div>
-                        <div class="w-3 h-3 rounded-full bg-success/50"></div>
-                    </div>
-                    <div class="text-xs font-mono text-base-content/40 bg-base-200 px-3 py-1 rounded border border-base-300">
-                        dokuflow.app
-                    </div>
-                    <div class="w-12"></div> <!-- Spacer for centering -->
-                </div>
-                
-                <!-- App content mockup -->
-                <div class="p-6 md:p-10 grid grid-cols-1 md:grid-cols-4 gap-8 h-[450px]">
-                    <!-- Sidebar mock -->
-                    <div class="hidden md:flex flex-col gap-6 border-r border-base-200 pr-8">
-                        <div class="flex items-center gap-3 mb-4">
-                            <div class="w-8 h-8 rounded bg-primary/20"></div>
-                            <div class="h-4 bg-base-content/80 rounded w-24"></div>
-                        </div>
-                        <div class="space-y-4">
-                            <div class="h-4 bg-base-content/20 rounded w-full"></div>
-                            <div class="h-4 bg-base-content/20 rounded w-3/4"></div>
-                            <div class="h-4 bg-base-content/20 rounded w-5/6"></div>
-                            <div class="h-4 bg-base-content/20 rounded w-2/3"></div>
-                        </div>
-                    </div>
-                    
-                    <!-- Main content mock -->
-                    <div class="col-span-1 md:col-span-3 flex flex-col gap-6">
-                        <div class="flex justify-between items-center mb-4">
-                            <div class="h-8 bg-base-content/80 rounded w-1/3"></div>
-                            <div class="h-10 bg-primary rounded-lg w-32"></div>
-                        </div>
-                        
-                        <!-- List Items -->
-                        <div class="border border-base-200 rounded-xl p-5 flex justify-between items-center bg-base-100">
-                            <div class="flex gap-5 items-center">
-                                <div class="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
-                                    <div class="w-6 h-6 bg-primary/40 rounded-sm"></div>
-                                </div>
-                                <div class="space-y-2.5">
-                                    <div class="h-4 bg-base-content/80 rounded w-48"></div>
-                                    <div class="h-3 bg-base-content/40 rounded w-32"></div>
-                                </div>
-                            </div>
-                            <div class="h-7 bg-warning/20 rounded-full w-24"></div>
-                        </div>
-                        
-                        <div class="border border-base-200 rounded-xl p-5 flex justify-between items-center bg-base-100">
-                            <div class="flex gap-5 items-center">
-                                <div class="w-12 h-12 bg-success/10 rounded-xl flex items-center justify-center">
-                                    <div class="w-6 h-6 bg-success/40 rounded-sm"></div>
-                                </div>
-                                <div class="space-y-2.5">
-                                    <div class="h-4 bg-base-content/80 rounded w-56"></div>
-                                    <div class="h-3 bg-base-content/40 rounded w-24"></div>
-                                </div>
-                            </div>
-                            <div class="h-7 bg-success/20 rounded-full w-24"></div>
-                        </div>
-                        
-                        <div class="border border-base-200 rounded-xl p-5 flex justify-between items-center bg-base-100">
-                            <div class="flex gap-5 items-center">
-                                <div class="w-12 h-12 bg-base-200 rounded-xl flex items-center justify-center">
-                                    <div class="w-6 h-6 bg-base-content/20 rounded-sm"></div>
-                                </div>
-                                <div class="space-y-2.5">
-                                    <div class="h-4 bg-base-content/80 rounded w-40"></div>
-                                    <div class="h-3 bg-base-content/40 rounded w-28"></div>
-                                </div>
-                            </div>
-                            <div class="h-7 bg-base-200 rounded-full w-20"></div>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
     </main>
