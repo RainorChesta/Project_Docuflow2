@@ -271,12 +271,17 @@
             </div>
 
             {{-- Signature Search Input --}}
-            <div class="relative mb-3">
-                <input type="text" id="signature-search-input" oninput="filterSignatureUsers(this.value)" placeholder="{{ __('Cari tanda tangan (nama, peran, divisi)...') }}" class="input input-bordered input-sm w-full pl-9 pr-8 bg-base-100 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary text-xs sm:text-sm">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                <button type="button" id="signature-search-clear" onclick="clearSignatureSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content text-xs p-1">✕</button>
+            <div class="flex gap-2 mb-3">
+                <div class="relative flex-1">
+                    <input type="text" id="signature-search-input" oninput="filterSignatureUsers(this.value)" onkeypress="if(event.key === 'Enter') filterSignatureUsers(this.value)" placeholder="{{ __('Cari tanda tangan (nama, peran, divisi)...') }}" class="input input-bordered input-sm w-full pl-9 pr-8 bg-base-100 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary text-xs sm:text-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <button type="button" id="signature-search-clear" onclick="clearSignatureSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content text-xs p-1">✕</button>
+                </div>
+                <button type="button" onclick="filterSignatureUsers(document.getElementById('signature-search-input').value)" class="btn btn-primary btn-sm px-4 rounded-xl">
+                    {{ __('Cari') }}
+                </button>
             </div>
 
             {{-- User List --}}
@@ -346,24 +351,24 @@
                         {{-- Interactive Signature Overlay Layer --}}
                         <div id="pdf-interactive-overlay" class="absolute inset-0 z-10 pointer-events-auto">
                             <div id="pdf-signature-drag-box"
-                                 class="absolute border-2 border-primary bg-primary/15 rounded-xl cursor-move shadow-xl flex flex-col justify-between p-2 select-none touch-none transition-shadow group hover:shadow-2xl hover:border-primary-focus"
-                                 style="left: 40px; top: 40px; width: 140px; height: 80px;">
+                                 class="absolute border-2 border-primary/90 bg-primary/5 cursor-move shadow-lg select-none touch-none transition-shadow group hover:shadow-2xl hover:border-primary p-0 m-0"
+                                 style="left: 40px; top: 40px; width: 140px; height: 85px;">
                                 
-                                {{-- Header Handle --}}
-                                <div class="flex items-center justify-between pointer-events-none">
-                                    <span id="pdf-box-signer-tag" class="badge badge-primary badge-xs font-bold uppercase tracking-wider scale-90 -ml-1 flex items-center gap-1 shadow-xs truncate max-w-[140px]">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                {{-- Floating Header Tag positioned outside so it doesn't compress or offset image --}}
+                                <div class="absolute -top-6 left-0 flex items-center gap-1.5 pointer-events-none z-20 whitespace-nowrap">
+                                    <span id="pdf-box-signer-tag" class="badge badge-primary badge-xs font-bold uppercase tracking-wider flex items-center gap-1 shadow-xs px-2 py-0.5 text-[10px]">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
                                         </svg>
                                         <span id="pdf-box-signer-tag-text">{{ __('Geser TTD') }}</span>
                                     </span>
-                                    <span class="text-[10px] font-mono text-primary font-bold opacity-80 shrink-0" id="pdf-box-dim-preview">40x25</span>
+                                    <span class="badge badge-neutral badge-xs font-mono font-bold text-[10px] shadow-xs px-2 py-0.5 opacity-90" id="pdf-box-dim-preview">40×25mm</span>
                                 </div>
 
-                                {{-- Preview Image / Signer Name --}}
-                                <div id="pdf-box-preview-container" class="flex-1 flex items-center justify-center p-1 pointer-events-none overflow-hidden">
-                                    @if($userSignatureDataUri || $userSignatureUrl)
-                                        <img id="pdf-box-preview-img" src="{{ $userSignatureDataUri ?: $userSignatureUrl }}" alt="Signature" class="max-h-full max-w-full object-contain filter drop-shadow-xs" />
+                                {{-- Exact Image Surface (Fills the entire boundary flush to borders with zero padding) --}}
+                                <div id="pdf-box-preview-container" class="w-full h-full flex items-center justify-center pointer-events-none overflow-hidden p-0 m-0">
+                                    @if($userSignatureClientUrl || $userSignatureDataUri)
+                                        <img id="pdf-box-preview-img" src="{{ $userSignatureClientUrl ?: $userSignatureDataUri }}" alt="Signature" class="w-full h-full object-fill block m-0 p-0 pointer-events-none" />
                                     @else
                                         <span id="pdf-box-preview-text" class="text-xs font-bold text-primary/80 uppercase italic tracking-wide">[ {{ __('Tanda Tangan') }} ]</span>
                                     @endif
@@ -371,10 +376,10 @@
 
                                 {{-- Bottom Resizer Handle (Bottom-Right corner) --}}
                                 <div id="pdf-sig-resize-handle"
-                                     class="absolute -right-2 -bottom-2 w-5 h-5 bg-primary text-primary-content rounded-full flex items-center justify-center cursor-nwse-resize shadow-md hover:scale-110 active:scale-95 transition-transform z-30"
+                                     class="absolute -right-3 -bottom-3 w-6 h-6 bg-primary text-primary-content rounded-full flex items-center justify-center cursor-nwse-resize shadow-lg hover:scale-110 active:scale-95 transition-transform z-30 ring-2 ring-white"
                                      title="{{ __('Tarik untuk mengubah ukuran') }}">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                                     </svg>
                                 </div>
                             </div>
@@ -435,6 +440,7 @@
             const qrCodeToken = @json($qrCodeToken ?? null);
             const mySignatureUrl = @json($userSignatureUrl ?? null);
             const mySignatureToken = @json($userSignatureToken ?? null);
+            const mySignatureClientUrl = @json($userSignatureClientUrl ?? ($userSignatureDataUri ?? null));
             const isPdfDocument = @json($isPdf);
             const pdfFileSourceUrl = @json(($isPdf && $version) ? route('documents.file', [$document, $version]) : null);
 
@@ -681,8 +687,9 @@
             let activeVisualType = 'signature'; // 'signature' | 'qrcode'
             let activeVisualTargetUserId = null;
             let activeVisualTargetUserName = null;
+            let activeVisualSignatureId = null;
 
-            function openPdfVisualPlacementModal(targetUserId = null, targetUserName = null, visualType = 'signature') {
+            function openPdfVisualPlacementModal(targetUserId = null, targetUserName = null, visualType = 'signature', signatureId = null) {
                 const selectorModal = document.getElementById('signature-users-modal');
                 if (selectorModal && selectorModal.open) {
                     selectorModal.close();
@@ -691,6 +698,7 @@
                 activeVisualType = visualType;
                 activeVisualTargetUserId = targetUserId;
                 activeVisualTargetUserName = targetUserName;
+                activeVisualSignatureId = signatureId;
 
                 const titleEl = document.getElementById('pdf-visual-modal-title');
                 const subTitleEl = document.getElementById('pdf-visual-modal-subtitle');
@@ -705,7 +713,7 @@
                     if (previewContainer) {
                         const qrSrc = @json($qrCodeDataUri ?? null) || qrCodeUrl;
                         if (qrSrc) {
-                            previewContainer.innerHTML = `<img src="${qrSrc}" alt="QR Code" class="max-h-full max-w-full object-contain filter drop-shadow-xs" />`;
+                            previewContainer.innerHTML = `<img src="${qrSrc}" alt="QR Code" class="w-full h-full object-fill block m-0 p-0 pointer-events-none" />`;
                         } else {
                             previewContainer.innerHTML = `<span class="text-xs font-bold text-primary uppercase">[ QR Code ]</span>`;
                         }
@@ -718,17 +726,32 @@
                     if (previewContainer) previewContainer.innerHTML = `<span class="text-xs font-bold text-primary uppercase tracking-wide">[ TTD: ${targetUserName} ]</span>`;
                     if (actionBtnText) actionBtnText.textContent = '{{ __("Kirim Permintaan Tanda Tangan") }}';
                 } else {
-                    if (titleEl) titleEl.textContent = 'Atur Posisi & Ukuran Tanda Tangan Saya';
+                    if (titleEl) titleEl.textContent = signatureId ? 'Atur Posisi & Ukuran Stempel / TTD' : 'Atur Posisi & Ukuran Tanda Tangan Saya';
                     if (subTitleEl) subTitleEl.textContent = 'Geser kotak TTD ke posisi yang diinginkan dan tarik sudut kanan bawah untuk mengubah ukuran.';
-                    if (tagTextEl) tagTextEl.textContent = 'Geser TTD';
+                    if (tagTextEl) tagTextEl.textContent = signatureId ? 'Geser Stempel/TTD' : 'Geser TTD';
                     if (previewContainer) {
-                        if (mySignatureUrl) {
-                            previewContainer.innerHTML = `<img src="${mySignatureUrl}" alt="Signature" class="max-h-full max-w-full object-contain filter drop-shadow-xs" />`;
+                        if (signatureId) {
+                            previewContainer.innerHTML = `<span class="loading loading-spinner loading-xs text-primary"></span>`;
+                            fetch(`/profile/signature?signature_id=${signatureId}`)
+                                .then(res => res.json())
+                                .then(data => {
+                                    const src = data.client_url || data.data_uri || data.url;
+                                    if (src) {
+                                        previewContainer.innerHTML = `<img src="${src}" alt="Signature" class="w-full h-full object-fill block m-0 p-0 pointer-events-none" />`;
+                                    } else {
+                                        previewContainer.innerHTML = `<span class="text-xs font-bold text-primary/80 uppercase italic tracking-wide">[ {{ __("Tanda Tangan") }} ]</span>`;
+                                    }
+                                })
+                                .catch(() => {
+                                    previewContainer.innerHTML = `<span class="text-xs font-bold text-primary/80 uppercase italic tracking-wide">[ {{ __("Tanda Tangan") }} ]</span>`;
+                                });
+                        } else if (mySignatureClientUrl) {
+                            previewContainer.innerHTML = `<img src="${mySignatureClientUrl}" alt="Signature" class="w-full h-full object-fill block m-0 p-0 pointer-events-none" />`;
                         } else {
                             previewContainer.innerHTML = `<span class="text-xs font-bold text-primary/80 uppercase italic tracking-wide">[ {{ __("Tanda Tangan") }} ]</span>`;
                         }
                     }
-                    if (actionBtnText) actionBtnText.textContent = '{{ __("Bubuhkan TTD Saya Di Sini") }}';
+                    if (actionBtnText) actionBtnText.textContent = signatureId ? '{{ __("Bubuhkan Stempel / TTD Di Sini") }}' : '{{ __("Bubuhkan TTD Saya Di Sini") }}';
                 }
 
                 const visualModal = document.getElementById('pdf-visual-signature-modal');
@@ -748,6 +771,7 @@
                 activeVisualType = 'signature';
                 activeVisualTargetUserId = null;
                 activeVisualTargetUserName = null;
+                activeVisualSignatureId = null;
             }
 
             function loadVisualPdfDocument(url) {
@@ -816,10 +840,20 @@
                         
                         const dragBox = document.getElementById('pdf-signature-drag-box');
                         if (dragBox && (!dragBox.dataset.positioned || dragBox.dataset.page != currentVisualPdfPage)) {
-                            const boxW = Math.min(150, pdfViewport.width * 0.35);
-                            const boxH = Math.min(85, pdfViewport.height * 0.18);
-                            const initLeft = pdfViewport.width - boxW - 35;
-                            const initTop = pdfViewport.height - boxH - 45;
+                            const mmPerPt = 25.4 / 72;
+                            const unscaledW = pdfViewport.width / pdfPageScale;
+                            const unscaledH = pdfViewport.height / pdfPageScale;
+                            const pdfWidthMm = unscaledW * mmPerPt;
+                            const pdfHeightMm = unscaledH * mmPerPt;
+                            const pxPerMmX = canvas.width / pdfWidthMm;
+                            const pxPerMmY = canvas.height / pdfHeightMm;
+
+                            const defaultWMm = activeVisualType === 'qrcode' ? 30 : 40;
+                            const defaultHMm = activeVisualType === 'qrcode' ? 30 : 25;
+                            const boxW = Math.round(defaultWMm * pxPerMmX);
+                            const boxH = Math.round(defaultHMm * pxPerMmY);
+                            const initLeft = pdfViewport.width - boxW - Math.round(15 * pxPerMmX);
+                            const initTop = pdfViewport.height - boxH - Math.round(20 * pxPerMmY);
 
                             dragBox.style.width = boxW + 'px';
                             dragBox.style.height = boxH + 'px';
@@ -951,8 +985,8 @@
                         const boxLeft = parseFloat(dragBox.style.left) || 0;
                         const boxTop = parseFloat(dragBox.style.top) || 0;
 
-                        let newW = Math.max(70, startWidth + dx);
-                        let newH = Math.max(45, startHeight + dy);
+                        let newW = Math.max(30, startWidth + dx);
+                        let newH = Math.max(20, startHeight + dy);
 
                         newW = Math.min(newW, overlayW - boxLeft);
                         newH = Math.min(newH, overlayH - boxTop);
@@ -1055,7 +1089,8 @@
                     btn.innerHTML = '<span class="loading loading-spinner loading-xs mr-1"></span> {{ __("Mengirim...") }}';
                 }
 
-                const queryStr = `&page_number=${visualPlacementCoords.page}&preset_position=custom&pos_x=${visualPlacementCoords.xMm}&pos_y=${visualPlacementCoords.yMm}&width=${visualPlacementCoords.wMm}&height=${visualPlacementCoords.hMm}`;
+                const sigParam = activeVisualSignatureId ? `&signature_id=${activeVisualSignatureId}` : '';
+                const queryStr = `&page_number=${visualPlacementCoords.page}&preset_position=custom&pos_x=${visualPlacementCoords.xMm}&pos_y=${visualPlacementCoords.yMm}&width=${visualPlacementCoords.wMm}&height=${visualPlacementCoords.hMm}${sigParam}`;
 
                 fetch(`/profile/signature?user_id=${userId}&document_id={{ $document->id }}${queryStr}`)
                     .then(res => res.json().then(data => ({ status: res.status, data: data })))
@@ -1096,7 +1131,8 @@
                     pos_y: visualPlacementCoords.yMm,
                     width: visualPlacementCoords.wMm,
                     height: visualPlacementCoords.hMm,
-                    preset_position: 'custom'
+                    preset_position: 'custom',
+                    signature_id: activeVisualSignatureId
                 };
 
                 const btn = document.getElementById('pdf-visual-action-btn');
@@ -1165,9 +1201,14 @@
                 });
             }
 
-            function insertMySignature() {
+            function insertMySignature(signatureId = null) {
                 if (isPdfDocument) {
-                    openPdfVisualPlacementModal(null, null);
+                    openPdfVisualPlacementModal(null, null, 'signature', signatureId);
+                    return;
+                }
+
+                if (signatureId) {
+                    fetchUserSignatureAndInsert({{ auth()->id() }}, 'SAYA', signatureId);
                     return;
                 }
 
@@ -1239,7 +1280,7 @@
                             }
                         }
 
-                        renderSignatureUsersList(allSignatureUsersData);
+                        filterSignatureUsers('');
                     })
                     .catch(err => {
                         list.innerHTML = '<p class="text-sm text-error text-center py-4 uppercase">{{ __("GAGAL MEMUAT PENGGUNA.") }}</p>';
@@ -1253,7 +1294,8 @@
                 }
                 const q = (query || '').toLowerCase().trim();
                 const filtered = allSignatureUsersData.filter(u => {
-                    if (!q) return true;
+                    if (!q) return u.is_me || (u.request_status && u.request_status !== 'none');
+                    
                     return (u.name && u.name.toLowerCase().includes(q)) ||
                            (u.email && u.email.toLowerCase().includes(q)) ||
                            (u.role && u.role.toLowerCase().includes(q)) ||
@@ -1344,6 +1386,25 @@
                            </div>`
                         : '';
 
+                    const signaturesHtml = (u.signatures && u.signatures.length > 0)
+                        ? '<div class="border-t border-base-200 pt-2 mt-2 space-y-2">' +
+                            u.signatures.map(sig => {
+                                let sigActionHtml = '';
+                                if (u.is_me) {
+                                    sigActionHtml = '<button type="button" onclick="insertMySignature(' + sig.id + ')" class="btn btn-xs btn-primary gap-1 uppercase font-bold">SISIPKAN</button>';
+                                } else {
+                                    sigActionHtml = '<button type="button" onclick="' + (isPdfDocument ? `openPdfVisualPlacementModal(${u.id}, '${u.name}', 'signature', ${sig.id})` : `fetchUserSignatureAndInsert(${u.id}, &quot;${u.name}&quot;, ${sig.id})`) + '" class="btn btn-xs btn-outline btn-primary gap-1 uppercase font-bold">MINTA TTD</button>';
+                                }
+                                
+                                const typeLabel = sig.type === 'original' ? 'ORIGINAL' : 'STEMPEL: ' + (sig.company_name || 'PERUSAHAAN');
+                                return '<div class="flex items-center justify-between text-xs bg-base-100 p-2 rounded-lg border border-base-200">' +
+                                    '<div><span class="font-bold">' + typeLabel + '</span></div>' +
+                                    '<div>' + sigActionHtml + '</div>' +
+                                '</div>';
+                            }).join('') +
+                          '</div>'
+                        : '';
+
                     return `
                         <div class="flex flex-col p-2.5 rounded-xl border border-base-200 hover:bg-base-200/40 transition-all ${u.is_available_to_replace ? 'bg-success/5 border-success/30' : (u.request_status === 'rejected' ? 'bg-error/5 border-error/20' : '')}">
                             <div class="flex items-center justify-between">
@@ -1359,6 +1420,7 @@
                                 </div>
                             </div>
                             ${reasonHtml}
+                            ${signaturesHtml}
                         </div>
                     `;
                 }).join('');
@@ -1453,18 +1515,23 @@
                 });
             }
 
-            function fetchUserSignatureAndInsert(userId, userName) {
+            function fetchUserSignatureAndInsert(userId, userName, signatureId = null) {
                 document.getElementById('signature-users-modal').close();
-                const params = isPdfDocument ? getPdfPlacementParams() : {};
-                let queryStr = '';
-                if (isPdfDocument) {
-                    queryStr = `&page_number=${params.page_number}&preset_position=${params.preset_position}`;
-                    if (params.pos_x !== undefined) {
-                        queryStr += `&pos_x=${params.pos_x}&pos_y=${params.pos_y}&width=${params.width}&height=${params.height}`;
+                let url = `/profile/signature?user_id=${userId}&document_id={{ $document->id }}`;
+                if (signatureId) {
+                    url += `&signature_id=${signatureId}`;
+                }
+                if (isPdfDocument && typeof getPdfPlacementParams === 'function') {
+                    const params = getPdfPlacementParams();
+                    if (params && params.page_number) {
+                        url += `&page_number=${params.page_number}&preset_position=${params.preset_position || 'bottom-right'}`;
+                    }
+                    if (params && params.pos_x !== undefined) {
+                        url += `&pos_x=${params.pos_x}&pos_y=${params.pos_y}&width=${params.width}&height=${params.height}`;
                     }
                 }
 
-                fetch(`/profile/signature?user_id=${userId}&document_id={{ $document->id }}${queryStr}`)
+                fetch(url)
                     .then(res => res.json().then(data => ({ status: res.status, data: data })))
                     .then(response => {
                         const data = response.data;

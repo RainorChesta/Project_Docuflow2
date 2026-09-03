@@ -121,9 +121,14 @@ class User extends Authenticatable
         return $this->hasMany(DocumentShare::class);
     }
 
+    public function signatures(): HasMany
+    {
+        return $this->hasMany(Signature::class);
+    }
+
     public function signature(): HasOne
     {
-        return $this->hasOne(Signature::class);
+        return $this->hasOne(Signature::class)->where('type', 'original');
     }
 
     public function requestedSignatures(): HasMany
@@ -138,7 +143,7 @@ class User extends Authenticatable
 
     public function hasSignature(): bool
     {
-        return $this->signature !== null && file_exists($this->signature->absolute_path);
+        return $this->signatures()->where('type', 'original')->exists();
     }
 
     public function isAdmin(): bool

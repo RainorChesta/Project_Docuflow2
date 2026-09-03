@@ -67,6 +67,21 @@ class OnlyOfficeService
     }
 
     /**
+     * Get the URL ONLYOFFICE uses to fetch a specific signature image.
+     */
+    public function getSignatureFileUrlForSignature(\App\Models\Signature $signature): ?string
+    {
+        $internalBase = rtrim(config('onlyoffice.internal_url'), '/');
+
+        // We can pass signature_id to a new or existing route. 
+        // For now, let's assume we update the route to optionally take signature_id
+        return $internalBase . route('onlyoffice.signature', [
+            'user' => $signature->user_id,
+            'signature_id' => $signature->id,
+        ], false);
+    }
+
+    /**
      * Get the URL ONLYOFFICE uses to fetch the document's QR code PNG image.
      */
     public function getQrCodeFileUrl(Document $document): string

@@ -32,6 +32,7 @@ class SignatureController extends Controller
                 return response()->json(['success' => false, 'message' => 'ID DOKUMEN DIPERLUKAN UNTUK MEMERIKSA IZIN.'], 403);
             }
 
+            $signatureId = $request->query('signature_id') ?? $request->input('signature_id');
             $pageNumber = (int) $request->input('page_number', 1);
             $posX = ($request->filled('pos_x') || $request->has('pos_x')) && $request->input('pos_x') !== null && $request->input('pos_x') !== '' ? (float) $request->input('pos_x') : null;
             $posY = ($request->filled('pos_y') || $request->has('pos_y')) && $request->input('pos_y') !== null && $request->input('pos_y') !== '' ? (float) $request->input('pos_y') : null;
@@ -43,6 +44,7 @@ class SignatureController extends Controller
             $requestRecord = SignatureRequest::where('requester_id', Auth::id())
                 ->where('target_user_id', $user->id)
                 ->where('document_id', $documentId)
+                ->where('requested_signature_id', $signatureId)
                 ->where('is_used', false)
                 ->whereIn('status', ['pending', 'approved'])
                 ->latest()
@@ -53,6 +55,7 @@ class SignatureController extends Controller
                     'requester_id' => Auth::id(),
                     'target_user_id' => $user->id,
                     'document_id' => $documentId,
+                    'requested_signature_id' => $signatureId,
                     'status' => 'pending',
                     'is_used' => false,
                     'page_number' => $pageNumber,
@@ -92,11 +95,20 @@ class SignatureController extends Controller
             }
         }
 
+        $signatureId = $request->query('signature_id');
+
         if ($user->hasSignature()) {
-            $sig = $user->signature;
+            $sig = $signatureId ? $user->signatures()->find($signatureId) : $user->signature;
+            
+            if (!$sig) {
+                 return response()->json(['success' => false, 'message' => 'TANDA TANGAN TIDAK DITEMUKAN.'], 404);
+            }
+
             $onlyOfficeService = app(\App\Services\OnlyOfficeService::class);
-            $onlyOfficeUrl = $onlyOfficeService->getSignatureFileUrl($user);
+            $onlyOfficeUrl = $onlyOfficeService->getSignatureFileUrlForSignature($sig);
             $token = $onlyOfficeUrl ? $onlyOfficeService->generateInsertImageToken($onlyOfficeUrl) : null;
+            $rawBytes = Storage::disk('public')->get($sig->file_path);
+            $trimmedBytes = $onlyOfficeService->trimSignatureImage($rawBytes);
 
             return response()->json([
                 'success'    => true,
@@ -104,7 +116,7 @@ class SignatureController extends Controller
                 'url'        => $onlyOfficeUrl,
                 'token'      => $token,
                 'client_url' => asset('storage/' . $sig->file_path),
-                'data_uri'   => 'data:image/png;base64,' . base64_encode(Storage::disk('public')->get($sig->file_path)),
+                'data_uri'   => 'data:image/png;base64,' . base64_encode($trimmedBytes),
                 'updated_at' => $sig->updated_at->toISOString(),
             ]);
         }
@@ -117,77 +129,103 @@ class SignatureController extends Controller
      */
     public function store(Request $request): JsonResponse|RedirectResponse
     {
-        $request->validate([
-            'signature_data' => ['nullable', 'string'], // base64 data url
-            'signature_image' => ['nullable', 'image', 'mimes:png,jpg,jpeg', 'max:2048'], // image file
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+            'signature_data' => ['nullable', 'string'],
+            'signature_image' => ['nullable', 'image', 'mimes:png,jpg,jpeg', 'max:2048'],
+            'type' => ['nullable', 'string', 'in:original,company_stamp'],
+            'company_id' => ['nullable', 'exists:companies,id'],
+        ], [
+            'signature_image.max' => __('Ukuran file tanda tangan tidak boleh lebih dari 2MB.'),
+            'signature_image.image' => __('File harus berupa gambar.'),
+            'signature_image.mimes' => __('Format file harus berupa PNG, JPG, atau JPEG.'),
         ]);
 
+        if ($validator->fails()) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $validator->errors()->first(),
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+            return back()->withErrors($validator)->withInput();
+        }
+
         $user = Auth::user();
+        $type = $request->input('type', 'original');
+        $companyId = $request->input('company_id');
+
+        if ($type === 'company_stamp') {
+            if (!$user->hasSignature()) {
+                if ($request->wantsJson()) return response()->json(['success' => false, 'message' => 'HARUS MEMBUAT TANDA TANGAN ORIGINAL TERLEBIH DAHULU.'], 422);
+                return back()->with('error', 'HARUS MEMBUAT TANDA TANGAN ORIGINAL TERLEBIH DAHULU.');
+            }
+            if (!$request->hasFile('signature_image')) {
+                if ($request->wantsJson()) return response()->json(['success' => false, 'message' => 'TANDA TANGAN PERUSAHAAN HARUS BERUPA UNGGAHAN GAMBAR.'], 422);
+                return back()->with('error', 'TANDA TANGAN PERUSAHAAN HARUS BERUPA UNGGAHAN GAMBAR.');
+            }
+            if (!$companyId || !$user->companies->contains('id', $companyId)) {
+                if ($request->wantsJson()) return response()->json(['success' => false, 'message' => 'PERUSAHAAN TIDAK VALID ATAU ANDA TIDAK MEMILIKI AKSES.'], 422);
+                return back()->with('error', 'PERUSAHAAN TIDAK VALID ATAU ANDA TIDAK MEMILIKI AKSES.');
+            }
+        } else {
+            $companyId = null;
+        }
 
         if (!$request->filled('signature_data') && !$request->hasFile('signature_image')) {
-            if ($request->wantsJson()) {
-                return response()->json(['success' => false, 'message' => 'SILAKAN GAMBAR ATAU UNGGAH TANDA TANGAN.'], 422);
-            }
+            if ($request->wantsJson()) return response()->json(['success' => false, 'message' => 'SILAKAN GAMBAR ATAU UNGGAH TANDA TANGAN.'], 422);
             return back()->with('error', 'SILAKAN GAMBAR ATAU UNGGAH TANDA TANGAN.');
         }
 
         $onlyOfficeService = app(\App\Services\OnlyOfficeService::class);
         $imageData = null;
-        $signatureType = 'canvas';
+        $createdVia = 'canvas';
 
         if ($request->hasFile('signature_image')) {
             $file = $request->file('signature_image');
             $imageData = file_get_contents($file->getRealPath());
             if ($imageData === false) {
-                if ($request->wantsJson()) {
-                    return response()->json(['success' => false, 'message' => 'GAGAL MEMBACA FILE GAMBAR.'], 422);
-                }
+                if ($request->wantsJson()) return response()->json(['success' => false, 'message' => 'GAGAL MEMBACA FILE GAMBAR.'], 422);
                 return back()->with('error', 'GAGAL MEMBACA FILE GAMBAR.');
             }
-            $signatureType = 'upload';
+            $createdVia = 'upload';
         } else {
             $dataUrl = $request->input('signature_data');
-
-            if (!preg_match('/^data:image\/(\w+);base64,/', $dataUrl, $type)) {
-                if ($request->wantsJson()) {
-                    return response()->json(['success' => false, 'message' => 'FORMAT GAMBAR TANDA TANGAN TIDAK VALID.'], 422);
-                }
+            if (!preg_match('/^data:image\/(\w+);base64,/', $dataUrl, $matches)) {
+                if ($request->wantsJson()) return response()->json(['success' => false, 'message' => 'FORMAT GAMBAR TANDA TANGAN TIDAK VALID.'], 422);
                 return back()->with('error', 'FORMAT GAMBAR TANDA TANGAN TIDAK VALID.');
             }
-
             $imageData = substr($dataUrl, strpos($dataUrl, ',') + 1);
             $imageData = base64_decode($imageData);
-
             if ($imageData === false) {
-                if ($request->wantsJson()) {
-                    return response()->json(['success' => false, 'message' => 'GAGAL MEMPROSES GAMBAR TANDA TANGAN.'], 422);
-                }
+                if ($request->wantsJson()) return response()->json(['success' => false, 'message' => 'GAGAL MEMPROSES GAMBAR TANDA TANGAN.'], 422);
                 return back()->with('error', 'GAGAL MEMPROSES GAMBAR TANDA TANGAN.');
             }
         }
 
-        // Format to square and add transparency handling if needed (OnlyOfficeService handles it)
-        $imageData = $onlyOfficeService->formatSquareSignature($imageData, 400, 24);
+        $imageData = $onlyOfficeService->trimSignatureImage($imageData);
+        $filename = 'signatures/sig_' . $user->id . '_' . time() . '_' . uniqid() . '.png';
 
-        $filename = 'signatures/sig_' . $user->id . '_' . time() . '.png';
-
-        // Delete existing signature file if exists
-        if ($user->signature && Storage::disk('public')->exists($user->signature->file_path)) {
-            Storage::disk('public')->delete($user->signature->file_path);
-        }
-
-        Storage::disk('public')->put($filename, $imageData);
-
-        $signature = Signature::updateOrCreate(
-            ['user_id' => $user->id],
-            [
+        if ($type === 'original') {
+            $existing = $user->signature;
+            if ($existing && Storage::disk('public')->exists($existing->file_path)) {
+                Storage::disk('public')->delete($existing->file_path);
+            }
+            $signature = Signature::updateOrCreate(
+                ['user_id' => $user->id, 'type' => 'original'],
+                ['file_path' => $filename, 'created_via' => $createdVia, 'company_id' => null]
+            );
+        } else {
+            $signature = Signature::create([
+                'user_id' => $user->id,
                 'file_path' => $filename,
-                'signature_type' => $signatureType,
-            ]
-        );
-
-        // updateOrCreate doesn't always bump updated_at when values are identical;
-        // refresh to get the final DB state.
+                'type' => 'company_stamp',
+                'company_id' => $companyId,
+                'created_via' => $createdVia,
+            ]);
+        }
+        
+        Storage::disk('public')->put($filename, $imageData);
         $signature->refresh();
 
         if ($request->wantsJson()) {
@@ -201,6 +239,7 @@ class SignatureController extends Controller
                 'onlyoffice_url' => $onlyOfficeUrl,
                 'token'          => $token,
                 'updated_at'     => $signature->updated_at->toISOString(),
+                'signature'      => $signature,
             ]);
         }
 
@@ -208,17 +247,46 @@ class SignatureController extends Controller
     }
 
     /**
-     * Delete current user's signature.
+     * Get all signatures for a user.
      */
-    public function destroy(Request $request): JsonResponse|RedirectResponse
+    public function index(Request $request): JsonResponse
+    {
+        $userId = $request->query('user_id');
+        $user = $userId ? User::find($userId) : Auth::user();
+
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Pengguna tidak ditemukan.'], 404);
+        }
+
+        // Only return companies the user still has access to
+        $companyIds = $user->allCompanyIds();
+        $signatures = $user->signatures()->with('company')->get()->filter(function ($sig) use ($companyIds) {
+            if ($sig->type === 'original') return true;
+            return in_array($sig->company_id, $companyIds);
+        })->values();
+
+        return response()->json([
+            'success' => true,
+            'signatures' => $signatures,
+        ]);
+    }
+
+    /**
+     * Delete user's signature.
+     */
+    public function destroy(Request $request, ?Signature $signature = null): JsonResponse|RedirectResponse
     {
         $user = Auth::user();
 
-        if ($user->signature) {
-            if (Storage::disk('public')->exists($user->signature->file_path)) {
-                Storage::disk('public')->delete($user->signature->file_path);
+        if (!$signature) {
+            $signature = $user->signature;
+        }
+
+        if ($signature && $signature->user_id === $user->id) {
+            if (Storage::disk('public')->exists($signature->file_path)) {
+                Storage::disk('public')->delete($signature->file_path);
             }
-            $user->signature->delete();
+            $signature->delete();
         }
 
         if ($request->wantsJson()) {
@@ -301,6 +369,13 @@ class SignatureController extends Controller
                     'division' => $u->division ? $u->division->name : 'Umum',
                     'is_me' => $isMe,
                     'has_signature' => $u->hasSignature(),
+                    'signatures' => $u->signatures()->with('company')->get()->map(function($sig) {
+                        return [
+                            'id' => $sig->id,
+                            'type' => $sig->type,
+                            'company_name' => $sig->company ? $sig->company->name : null,
+                        ];
+                    }),
                     'placeholder' => $isMe ? '[ttd.me]' : '[ttd:' . $u->name . ']',
                     'request_id' => $requestId,
                     'request_status' => $requestStatus,
@@ -358,9 +433,17 @@ class SignatureController extends Controller
         ]);
 
         $onlyOfficeService = app(\App\Services\OnlyOfficeService::class);
-        $onlyOfficeUrl = $onlyOfficeService->getSignatureFileUrl($targetUser);
+        $sig = $signatureRequest->requestedSignature ?? $targetUser->signature;
+
+        if (!$sig) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tanda tangan pengguna tidak ditemukan.',
+            ], 404);
+        }
+
+        $onlyOfficeUrl = $onlyOfficeService->getSignatureFileUrlForSignature($sig);
         $token = $onlyOfficeUrl ? $onlyOfficeService->generateInsertImageToken($onlyOfficeUrl) : null;
-        $sig = $targetUser->signature;
 
         $document = $signatureRequest->document;
         $version = $document?->displayVersion();
@@ -395,10 +478,20 @@ class SignatureController extends Controller
         $this->authorize('update', $document);
 
         $currentUser = Auth::user();
-        if (!$currentUser->hasSignature() || !$currentUser->signature?->file_path) {
+        if (!$currentUser->hasSignature()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Anda belum memiliki tanda tangan digital tersimpan.',
+            ], 422);
+        }
+
+        $signatureId = $request->input('signature_id');
+        $sig = $signatureId ? $currentUser->signatures()->find($signatureId) : $currentUser->signature;
+
+        if (!$sig || !$sig->file_path || !Storage::disk('public')->exists($sig->file_path)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tanda tangan / stempel digital tidak ditemukan.',
             ], 422);
         }
 
@@ -427,7 +520,7 @@ class SignatureController extends Controller
         $width = (float) $request->input('width', 40.0);
         $height = (float) $request->input('height', 25.0);
 
-        $signaturePath = Storage::disk('public')->path($currentUser->signature->file_path);
+        $signaturePath = Storage::disk('public')->path($sig->file_path);
         $pdfProcessor = app(\App\Services\PdfSignatureProcessorService::class);
 
         $result = $pdfProcessor->processPdfSignature(
@@ -445,7 +538,7 @@ class SignatureController extends Controller
         if ($result) {
             return response()->json([
                 'success' => true,
-                'message' => 'Tanda tangan Anda berhasil dibubuhkan pada dokumen PDF.',
+                'message' => $sig->type === 'company_stamp' ? 'Stempel perusahaan berhasil dibubuhkan pada dokumen PDF.' : 'Tanda tangan Anda berhasil dibubuhkan pada dokumen PDF.',
             ]);
         }
 

@@ -13,13 +13,37 @@ use Illuminate\View\View;
 
 class UserController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
         $this->authorize('admin');
-        $users = User::with(['division', 'companies', 'branches'])
-            ->latest('id')
-            ->paginate(20);
-        return view('admin.users.index', compact('users'));
+
+        $query = User::with(['division', 'companies', 'branches']);
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('nip', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('division')) {
+            $query->where('division_id', $request->division);
+        }
+
+        if ($request->filled('role')) {
+            $query->where('system_role', $request->role);
+        }
+
+        if ($request->filled('status')) {
+            $query->where('is_active', $request->status);
+        }
+
+        $users = $query->latest('id')->paginate(20)->appends($request->query());
+        $divisions = Division::all();
+
+        return view('admin.users.index', compact('users', 'divisions'));
     }
 
     public function create(): View
