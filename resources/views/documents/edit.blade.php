@@ -175,44 +175,16 @@
                                 </button>
 
                                 {{-- Quick Actions: Sisip TTD --}}
-                                <div class="dropdown dropdown-end shrink-0">
-                                    <label tabindex="0" class="btn btn-xs btn-outline btn-secondary gap-1 font-medium cursor-pointer" title="{{ __('Sisipkan Tanda Tangan Digital') }}">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                        </svg>
-                                        <span class="hidden sm:inline">{{ __('Sisip TTD') }}</span>
-                                        <span class="sm:hidden">{{ __('TTD') }}</span>
-                                    </label>
-                                    <ul tabindex="0" class="dropdown-content z-[100] menu p-2 shadow-2xl bg-base-100 rounded-2xl w-64 border border-base-300 mt-1">
-                                        <li class="menu-title text-xs font-semibold px-2 py-1 text-base-content/60">{{ __('Pilih Tanda Tangan') }}</li>
-                                        @if($userSignatureUrl || $userSignatureDataUri)
-                                            <li>
-                                                <button type="button" onclick="insertMySignature()" class="flex items-center justify-between text-sm py-2">
-                                                    <span class="font-medium text-primary">{{ __('Tanda Tangan Saya') }}</span>
-                                                    <span class="badge badge-primary badge-xs">{{ __('Tersimpan') }}</span>
-                                                </button>
-                                            </li>
-                                        @else
-                                            <li>
-                                                <a href="{{ route('profile.signature.show') }}" class="text-xs text-warning flex items-center gap-1.5 py-2">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                                    </svg>
-                                                    <span>{{ __('Buat TTD Saya di Profil') }}</span>
-                                                </a>
-                                            </li>
-                                        @endif
-                                        <div class="divider my-1"></div>
-                                        <li>
-                                            <button type="button" onclick="openSignatureSelectorModal()" class="text-xs text-base-content/80 flex items-center gap-1.5">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                                                </svg>
-                                                <span>{{ __('Pilih Pengguna Lain...') }}</span>
-                                            </button>
-                                        </li>
-                                    </ul>
-                                </div>
+                                <button type="button"
+                                        onclick="openSignatureSelectorModal()"
+                                        class="btn btn-xs btn-outline btn-secondary gap-1 font-medium shrink-0"
+                                        title="{{ __('Sisipkan Tanda Tangan Digital') }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                    </svg>
+                                    <span class="hidden sm:inline">{{ __('Sisip TTD') }}</span>
+                                    <span class="sm:hidden">{{ __('TTD') }}</span>
+                                </button>
                             </div>
                         </div>
 
@@ -258,12 +230,17 @@
             </div>
 
             {{-- Signature Search Input --}}
-            <div class="relative mb-3">
-                <input type="text" id="signature-search-input" oninput="filterSignatureUsers(this.value)" placeholder="{{ __('Cari tanda tangan (nama, peran, divisi)...') }}" class="input input-bordered input-sm w-full pl-9 pr-8 bg-base-100 focus:border-primary focus:ring-1 focus:ring-primary text-xs sm:text-sm">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                <button type="button" id="signature-search-clear" onclick="clearSignatureSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content text-xs p-1">✕</button>
+            <div class="flex gap-2 mb-3">
+                <div class="relative flex-1">
+                    <input type="text" id="signature-search-input" onkeypress="if(event.key === 'Enter') filterSignatureUsers(this.value)" placeholder="{{ __('Cari tanda tangan (nama, peran, divisi)...') }}" class="input input-bordered input-sm w-full pl-9 pr-8 bg-base-100 focus:border-primary focus:ring-1 focus:ring-primary text-xs sm:text-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <button type="button" id="signature-search-clear" onclick="clearSignatureSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content text-xs p-1">✕</button>
+                </div>
+                <button type="button" onclick="filterSignatureUsers(document.getElementById('signature-search-input').value)" class="btn btn-primary btn-sm px-4">
+                    {{ __('Cari') }}
+                </button>
             </div>
 
             <div id="signature-users-list" class="space-y-2.5 max-h-80 overflow-y-auto pr-1">
@@ -527,7 +504,11 @@
                 insertImageIntoOnlyOffice(qrCodeUrl, 140, 140, qrCodeToken);
             }
 
-            function insertMySignature() {
+            function insertMySignature(signatureId = null) {
+                if (signatureId) {
+                    fetchUserSignatureAndInsert({{ auth()->id() }}, 'SAYA', signatureId);
+                    return;
+                }
                 if (!mySignatureUrl) {
                     showSignatureScreenAlert('PERINGATAN', 'ANDA BELUM MEMILIKI TANDA TANGAN TERSIMPAN.', false);
                     return;
@@ -595,7 +576,7 @@
                             }
                         }
 
-                        renderSignatureUsersList(allSignatureUsersData);
+                        filterSignatureUsers('');
                     })
                     .catch(err => {
                         list.innerHTML = '<p class="text-sm text-error text-center py-4 uppercase">{{ __("GAGAL MEMUAT PENGGUNA.") }}</p>';
@@ -609,7 +590,8 @@
                 }
                 const q = (query || '').toLowerCase().trim();
                 const filtered = allSignatureUsersData.filter(u => {
-                    if (!q) return true;
+                    if (!q) return u.is_me || (u.request_status && u.request_status !== 'none');
+                    
                     return (u.name && u.name.toLowerCase().includes(q)) ||
                            (u.email && u.email.toLowerCase().includes(q)) ||
                            (u.role && u.role.toLowerCase().includes(q)) ||
@@ -700,6 +682,25 @@
                            </div>`
                         : '';
 
+                    const signaturesHtml = (u.signatures && u.signatures.length > 0)
+                        ? '<div class="border-t border-base-200 pt-2 mt-2 space-y-2">' +
+                            u.signatures.map(sig => {
+                                let sigActionHtml = '';
+                                if (u.is_me) {
+                                    sigActionHtml = '<button type="button" onclick="insertMySignature(' + sig.id + ')" class="btn btn-xs btn-primary gap-1 uppercase font-bold">SISIPKAN</button>';
+                                } else {
+                                    sigActionHtml = '<button type="button" onclick="fetchUserSignatureAndInsert(' + u.id + ', &quot;' + u.name + '&quot;, ' + sig.id + ')" class="btn btn-xs btn-outline btn-primary gap-1 uppercase font-bold">MINTA TTD</button>';
+                                }
+                                
+                                const typeLabel = sig.type === 'original' ? 'ORIGINAL' : 'STEMPEL: ' + (sig.company_name || 'PERUSAHAAN');
+                                return '<div class="flex items-center justify-between text-xs bg-base-100 p-2 rounded-lg border border-base-200">' +
+                                    '<div><span class="font-bold">' + typeLabel + '</span></div>' +
+                                    '<div>' + sigActionHtml + '</div>' +
+                                '</div>';
+                            }).join('') +
+                          '</div>'
+                        : '';
+
                     return `
                         <div class="flex flex-col p-2.5 rounded-xl border border-base-200 hover:bg-base-200/40 transition-all ${u.is_available_to_replace ? 'bg-success/5 border-success/30' : (u.request_status === 'rejected' ? 'bg-error/5 border-error/20' : '')}">
                             <div class="flex items-center justify-between">
@@ -715,6 +716,7 @@
                                 </div>
                             </div>
                             ${reasonHtml}
+                            ${signaturesHtml}
                         </div>
                     `;
                 }).join('');
@@ -800,9 +802,13 @@
                 });
             }
 
-            function fetchUserSignatureAndInsert(userId, userName) {
+            function fetchUserSignatureAndInsert(userId, userName, signatureId = null) {
                 document.getElementById('signature-users-modal').close();
-                fetch(`/profile/signature?user_id=${userId}&document_id={{ $document->id }}`)
+                let url = `/profile/signature?user_id=${userId}&document_id={{ $document->id }}`;
+                if (signatureId) {
+                    url += `&signature_id=${signatureId}`;
+                }
+                fetch(url)
                     .then(res => res.json().then(data => ({ status: res.status, data: data })))
                     .then(response => {
                         const data = response.data;

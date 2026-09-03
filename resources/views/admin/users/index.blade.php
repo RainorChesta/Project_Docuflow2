@@ -3,11 +3,45 @@
 
     <div class="py-6">
         <div class="max-w-7xl mx-auto w-full">
-            <div class="mb-4">
-                <a href="{{ route('admin.users.create') }}" class="btn btn-primary btn-sm">
+            <div class="mb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <a href="{{ route('admin.users.create') }}" class="btn btn-primary btn-sm shrink-0">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                     {{ __('Pengguna Baru') }}
                 </a>
+
+                <form method="GET" action="{{ route('admin.users.index') }}" class="flex flex-col sm:flex-row flex-wrap gap-2 w-full md:w-auto justify-end">
+                    <input type="text" name="search" value="{{ request('search') }}" placeholder="{{ __('Cari Nama, Email, NIP...') }}" class="input input-bordered input-sm w-full sm:w-auto" />
+                    
+                    <select name="division" class="select select-bordered select-sm w-full sm:w-auto">
+                        <option value="">{{ __('Semua Divisi') }}</option>
+                        @foreach($divisions as $division)
+                            <option value="{{ $division->id }}" {{ request('division') == $division->id ? 'selected' : '' }}>
+                                {{ $division->name ?? $division->code }}
+                            </option>
+                        @endforeach
+                    </select>
+
+                    <select name="role" class="select select-bordered select-sm w-full sm:w-auto">
+                        <option value="">{{ __('Semua Peran') }}</option>
+                        <option value="admin" {{ request('role') === 'admin' ? 'selected' : '' }}>Admin</option>
+                        <option value="direktur" {{ request('role') === 'direktur' ? 'selected' : '' }}>Direktur</option>
+                        <option value="head" {{ request('role') === 'head' ? 'selected' : '' }}>Head</option>
+                        <option value="user" {{ request('role') === 'user' ? 'selected' : '' }}>User</option>
+                    </select>
+
+                    <select name="status" class="select select-bordered select-sm w-full sm:w-auto">
+                        <option value="">{{ __('Semua Status') }}</option>
+                        <option value="1" {{ request('status') === '1' ? 'selected' : '' }}>Aktif</option>
+                        <option value="0" {{ request('status') === '0' ? 'selected' : '' }}>Non-Aktif</option>
+                    </select>
+
+                    <div class="flex gap-2">
+                        <button type="submit" class="btn btn-primary btn-sm">{{ __('Filter') }}</button>
+                        @if(request()->anyFilled(['search', 'division', 'role', 'status']))
+                            <a href="{{ route('admin.users.index') }}" class="btn btn-ghost btn-sm">{{ __('Reset') }}</a>
+                        @endif
+                    </div>
+                </form>
             </div>
 
             @if(session('success'))

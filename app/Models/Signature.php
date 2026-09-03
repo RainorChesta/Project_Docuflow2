@@ -14,12 +14,19 @@ class Signature extends Model
     protected $fillable = [
         'user_id',
         'file_path',
-        'signature_type',
+        'type',
+        'company_id',
+        'created_via',
     ];
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
     }
 
     public function getUrlAttribute(): string

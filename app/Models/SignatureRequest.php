@@ -13,6 +13,7 @@ class SignatureRequest extends Model
     protected $fillable = [
         'requester_id',
         'target_user_id',
+        'requested_signature_id',
         'document_id',
         'status',
         'is_used',
@@ -35,6 +36,11 @@ class SignatureRequest extends Model
     public function requester(): BelongsTo
     {
         return $this->belongsTo(User::class, 'requester_id');
+    }
+
+    public function requestedSignature(): BelongsTo
+    {
+        return $this->belongsTo(Signature::class, 'requested_signature_id');
     }
 
     public function targetUser(): BelongsTo

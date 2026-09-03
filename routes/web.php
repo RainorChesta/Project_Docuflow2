@@ -48,7 +48,7 @@ Route::middleware('auth')->group(function () {
     // Signatures
     Route::get('/profile/signature', [SignatureController::class, 'show'])->name('profile.signature.show');
     Route::post('/profile/signature', [SignatureController::class, 'store'])->name('profile.signature.store');
-    Route::delete('/profile/signature', [SignatureController::class, 'destroy'])->name('profile.signature.destroy');
+    Route::delete('/profile/signature/{signature?}', [SignatureController::class, 'destroy'])->name('profile.signature.destroy');
     Route::get('/signatures/users', [SignatureController::class, 'availableUsers'])->name('signatures.users');
     Route::get('/signature-requests', [SignatureController::class, 'requestsIndex'])->name('signatures.requests.index');
     Route::post('/signature-requests/{signatureRequest}/approve', [SignatureController::class, 'approve'])->name('signatures.requests.approve');

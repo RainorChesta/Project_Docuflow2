@@ -49,23 +49,32 @@ class OnlyOfficeController extends Controller
     /**
      * Serve user's signature image to ONLYOFFICE Docs Document Server.
      */
-    public function signature(User $user): \Illuminate\Http\Response
+    public function signature(Request $request, User $user): \Illuminate\Http\Response
     {
-        if (!$user->hasSignature() || !$user->signature?->file_path) {
+        $signatureId = $request->query('signature_id');
+        $signature = null;
+
+        if ($signatureId) {
+            $signature = $user->signatures()->find($signatureId);
+        } else {
+            $signature = $user->signature;
+        }
+
+        if (!$signature || !$signature->file_path) {
             abort(404, 'Signature not found.');
         }
 
         $disk = Storage::disk('public');
-        if (!$disk->exists($user->signature->file_path)) {
+        if (!$disk->exists($signature->file_path)) {
             abort(404, 'Signature file not found in storage.');
         }
 
-        $rawBytes = $disk->get($user->signature->file_path);
+        $rawBytes = $disk->get($signature->file_path);
         $squaredBytes = $this->onlyOfficeService->formatSquareSignature($rawBytes, 400, 24);
 
         return response($squaredBytes, 200, [
             'Content-Type' => 'image/png',
-            'Content-Disposition' => 'inline; filename="signature_' . $user->id . '.png"',
+            'Content-Disposition' => 'inline; filename="signature_' . $user->id . '_' . $signature->id . '.png"',
             'Cache-Control' => 'no-cache, private',
         ]);
     }

@@ -8,20 +8,19 @@
                 {{ __('Tanda Tangan Digital (TTD)') }}
             </h2>
             <p class="mt-1 text-sm text-base-content/60">
-                {{ __('Gambar dan simpan tanda tangan digital Anda untuk menandatangani dokumen di DokuFlow.') }}
+                {{ __('Kelola tanda tangan original dan stempel perusahaan Anda.') }}
             </p>
         </div>
-        {{-- Status badge: updated dynamically by JS after save/delete --}}
         <div id="ttd-status-badge">
             @if(auth()->user()->hasSignature())
                 <span class="badge badge-success gap-1.5 font-medium">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                    {{ __('TTD Aktif') }}
+                    {{ __('TTD Original Aktif') }}
                 </span>
             @else
                 <span class="badge badge-warning gap-1.5 font-medium">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                    {{ __('Wajib Membuat TTD') }}
+                    {{ __('Wajib Membuat TTD Original') }}
                 </span>
             @endif
         </div>
@@ -34,36 +33,41 @@
         </div>
     @endif
 
-    {{-- Flash notification area --}}
     <div id="ttd-flash" class="hidden"></div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-
-        {{-- ─── Left panel: Input Options (Canvas / Upload) ─── --}}
-        <div class="space-y-3 relative" id="signature-input-container">
-            {{-- Disabled Overlay when signature exists --}}
-            <div id="signature-disabled-overlay" class="{{ auth()->user()->hasSignature() ? '' : 'hidden' }} absolute inset-0 bg-base-100/75 backdrop-blur-[1.5px] z-20 rounded-xl flex flex-col items-center justify-center p-6 text-center border border-base-300">
-                <div class="p-3 bg-base-200/80 rounded-full text-base-content/60 mb-2 shadow-sm">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                </div>
-                <h4 class="font-semibold text-sm text-base-content">Tanda Tangan Sudah Tersimpan</h4>
-                <p class="text-xs text-base-content/70 mt-1 max-w-xs leading-relaxed">
-                    Hapus tanda tangan saat ini pada panel sebelah kanan terlebih dahulu jika ingin membuat atau mengunggah tanda tangan baru.
-                </p>
+        <div class="space-y-4 bg-base-100 p-5 rounded-xl border border-base-300 shadow-sm relative">
+            <h3 class="font-semibold text-base-content">{{ __('Tambah Tanda Tangan Baru') }}</h3>
+            
+            <div class="form-control w-full">
+                <label class="label"><span class="label-text">{{ __('Jenis Tanda Tangan') }}</span></label>
+                <select id="signature-type-select" class="select select-bordered select-sm w-full">
+                    <option value="original">{{ __('Tanda Tangan Original') }}</option>
+                    @if(auth()->user()->hasSignature())
+                        <option value="company_stamp">{{ __('Tanda Tangan + Stempel Perusahaan') }}</option>
+                    @endif
+                </select>
             </div>
 
-            <div class="flex items-center justify-between">
+            <div class="form-control w-full hidden" id="company-select-container">
+                <label class="label"><span class="label-text">{{ __('Pilih Perusahaan') }}</span></label>
+                <select id="signature-company-select" class="select select-bordered select-sm w-full">
+                    <option value="" disabled selected>{{ __('Pilih Perusahaan...') }}</option>
+                    @foreach(auth()->user()->companies as $company)
+                        <option value="{{ $company->id }}">{{ $company->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="flex items-center justify-between mt-4">
                 <label class="block text-sm font-medium text-base-content">{{ __('Pilih Metode') }}</label>
                 <div class="tabs tabs-boxed p-1" id="signature-tabs">
-                    <a class="tab tab-active tab-sm font-medium" data-target="draw">{{ __('Gambar') }}</a>
-                    <a class="tab tab-sm font-medium" data-target="upload">{{ __('Unggah') }}</a>
+                    <a class="tab tab-active tab-sm font-medium" data-target="draw" id="tab-draw">{{ __('Gambar') }}</a>
+                    <a class="tab tab-sm font-medium" data-target="upload" id="tab-upload">{{ __('Unggah') }}</a>
                 </div>
             </div>
 
-            {{-- Draw Mode --}}
-            <div id="signature-mode-draw" class="space-y-3">
+            <div id="signature-mode-draw" class="space-y-3 mt-2">
                 <div class="relative border-2 border-dashed border-base-300 rounded-xl bg-base-100 p-2 shadow-inner hover:border-primary/50 transition-colors">
                     <canvas id="signature-canvas" class="w-full h-52 touch-none cursor-crosshair rounded-lg bg-white"></canvas>
                     <div id="canvas-hint" class="absolute inset-0 pointer-events-none flex flex-col items-center justify-center text-base-content/30 transition-opacity duration-200">
@@ -86,8 +90,7 @@
                 </div>
             </div>
 
-            {{-- Upload Mode --}}
-            <div id="signature-mode-upload" class="space-y-3 hidden">
+            <div id="signature-mode-upload" class="space-y-3 mt-2 hidden">
                 <div class="relative border-2 border-dashed border-base-300 rounded-xl bg-base-100 p-6 flex flex-col items-center justify-center hover:border-primary/50 transition-colors h-[230px]">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-base-content/30 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -105,54 +108,47 @@
             </div>
         </div>
 
-        {{-- ─── Right panel: Saved signature preview ─── --}}
         <div class="space-y-3">
-            <label class="block text-sm font-medium text-base-content">{{ __('TTD Tersimpan Saat Ini') }}</label>
+            <h3 class="font-semibold text-base-content">{{ __('TTD Tersimpan Saat Ini') }}</h3>
 
-            {{-- Container is pre-rendered by Blade; JS enriches it after load if needed --}}
             <div id="ttd-preview-panel"
-                 class="border border-base-300 rounded-xl bg-base-200/50 p-4 min-h-[220px] flex flex-col items-center justify-center text-center relative"
+                 class="grid grid-cols-1 gap-4"
                  data-store-url="{{ route('profile.signature.store') }}"
-                 data-destroy-url="{{ route('profile.signature.destroy') }}"
-                 data-show-url="{{ route('profile.signature.show') }}"
+                 data-destroy-url="{{ url('profile/signature') }}"
                  data-csrf="{{ csrf_token() }}">
-
-                @if(auth()->user()->hasSignature())
-                    {{-- Server-rendered on initial page load --}}
-                    <div class="bg-white p-4 rounded-lg shadow-sm border border-base-300 w-full">
-                        <img src="{{ asset('storage/' . auth()->user()->signature->file_path) }}"
-
-                             alt="{{ __('Tanda tangan :name', ['name' => auth()->user()->name]) }}"
-                             class="max-h-36 max-w-full object-contain mx-auto">
+                
+                @foreach(auth()->user()->signatures()->with('company')->get() as $sig)
+                    <div class="border border-base-300 rounded-xl bg-base-200/50 p-4 relative flex flex-col items-center">
+                        <div class="absolute top-2 right-2">
+                            <span class="badge badge-sm badge-outline {{ $sig->type === 'original' ? 'badge-primary' : 'badge-secondary' }}">
+                                {{ $sig->type === 'original' ? 'Original' : $sig->company?->name }}
+                            </span>
+                        </div>
+                        <div class="bg-white p-3 rounded-lg shadow-sm border border-base-300 w-full mt-4">
+                            <img src="{{ asset('storage/' . $sig->file_path) }}" alt="TTD" class="max-h-24 max-w-full object-contain mx-auto">
+                        </div>
+                        <div class="flex justify-between items-center w-full mt-3">
+                            <p class="text-xs text-base-content/50">{{ $sig->updated_at->format('d M Y, H:i') }}</p>
+                            <button type="button" class="btn btn-outline btn-error btn-xs btn-delete-sig" data-id="{{ $sig->id }}">
+                                {{ __('Hapus') }}
+                            </button>
+                        </div>
                     </div>
-                    <p class="text-xs text-base-content/50 mt-3">
-                        {{ __('Disimpan pada:') }} {{ auth()->user()->signature->updated_at->format('d M Y, H:i') }}
-                    </p>
-                    <form method="POST"
-                          action="{{ route('profile.signature.destroy') }}"
-                          class="mt-4 ttd-delete-form"
-                          data-confirm="{{ __('Apakah Anda yakin ingin menghapus tanda tangan ini?') }}">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" class="btn btn-outline btn-error btn-xs">
-                            {{ __('Hapus TTD Saat Ini') }}
-                        </button>
-                    </form>
-                @else
-                    {{-- Empty state: server-rendered when no signature exists yet --}}
-                    <div id="ttd-empty-state" class="text-base-content/40 space-y-2">
+                @endforeach
+
+                @if(auth()->user()->signatures()->count() === 0)
+                    <div id="ttd-empty-state" class="text-base-content/40 space-y-2 border border-base-300 rounded-xl bg-base-200/50 p-8 flex flex-col items-center justify-center text-center">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto stroke-current" fill="none" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                         </svg>
                         <p class="text-sm font-medium">{{ __('Belum Ada Tanda Tangan') }}</p>
-                        <p class="text-xs">{{ __('Gunakan canvas di sebelah kiri untuk menggambar tanda tangan Anda.') }}</p>
+                        <p class="text-xs">{{ __('Gunakan panel sebelah kiri untuk membuat tanda tangan Anda.') }}</p>
                     </div>
                 @endif
             </div>
         </div>
     </div>
 
-    {{-- Confirm Delete Modal --}}
     <x-modal name="confirm-delete-ttd" :show="false" maxWidth="sm">
         <div class="p-4 sm:p-6">
             <h3 class="text-lg font-semibold text-base-content">{{ __('Confirm Signature Deletion') }}</h3>
@@ -173,24 +169,11 @@
     </x-modal>
 </section>
 
-{{-- Signature pad library (CDN) --}}
 <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
 
 <script>
 (function () {
     'use strict';
-
-    /* ── Helpers ── */
-    function formatDate(isoStr) {
-        const d = new Date(isoStr);
-        const dd  = String(d.getDate()).padStart(2, '0');
-        // Use English short month names for consistency with requirement
-        const mon = d.toLocaleString('en-US', { month: 'short' });
-        const yr  = d.getFullYear();
-        const hh  = String(d.getHours()).padStart(2, '0');
-        const mm  = String(d.getMinutes()).padStart(2, '0');
-        return `${dd} ${mon} ${yr}, ${hh}:${mm}`;
-    }
 
     function showFlash(message, type = 'success') {
         const el = document.getElementById('ttd-flash');
@@ -210,100 +193,52 @@
         el._timer = setTimeout(() => { el.classList.add('hidden'); el.innerHTML = ''; }, 4000);
     }
 
-    /* ── Render helpers for the right panel ── */
-    function renderSavedSignature(panel, url, updatedAtISO) {
-        const destroyUrl = panel.dataset.destroyUrl;
-        const csrf       = panel.dataset.csrf;
-        const dateStr    = formatDate(updatedAtISO);
-
-        panel.innerHTML = `
-            <div class="bg-white p-4 rounded-lg shadow-sm border border-base-300 w-full">
-                <img src="${url}?cb=${Date.now()}"
-                     alt="${@json(__('Tanda tangan tersimpan'))}"
-                     class="max-h-36 max-w-full object-contain mx-auto">
-            </div>
-            <p class="text-xs text-base-content/50 mt-3">${@json(__('Disimpan pada:'))} ${dateStr}</p>
-            <form method="POST" action="${destroyUrl}"
-                  class="mt-4 ttd-delete-form"
-                  data-confirm="${@json(__('Apakah Anda yakin ingin menghapus tanda tangan ini?'))}">
-                <input type="hidden" name="_token"  value="${csrf}">
-                <input type="hidden" name="_method" value="DELETE">
-                <button type="submit" class="btn btn-outline btn-error btn-xs">
-                    ${@json(__('Hapus TTD Saat Ini'))}
-                </button>
-            </form>`;
-    }
-
-    function renderEmptyState(panel) {
-        panel.innerHTML = `
-            <div class="text-base-content/40 space-y-2">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto stroke-current" fill="none" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <p class="text-sm font-medium">${@json(__('Belum Ada Tanda Tangan'))}</p>
-                <p class="text-xs">${@json(__('Gunakan canvas di sebelah kiri untuk menggambar tanda tangan Anda.'))}</p>
-            </div>`;
-    }
-
-    function setBadge(hasSignature) {
-        const badge = document.getElementById('ttd-status-badge');
-        if (badge) {
-            if (hasSignature) {
-                badge.innerHTML = `
-                    <span class="badge badge-success gap-1.5 font-medium">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                        </svg>
-                        ${@json(__('TTD Aktif'))}
-                    </span>`;
-            } else {
-                badge.innerHTML = `
-                    <span class="badge badge-warning gap-1.5 font-medium">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                        ${@json(__('Wajib Membuat TTD'))}
-                    </span>`;
-            }
-        }
-        const overlay = document.getElementById('signature-disabled-overlay');
-        if (overlay) {
-            if (hasSignature) {
-                overlay.classList.remove('hidden');
-            } else {
-                overlay.classList.add('hidden');
-            }
-        }
-    }
-        
-    /* ── Main init ── */
     document.addEventListener('DOMContentLoaded', function () {
-
-        const canvas  = document.getElementById('signature-canvas');
+        const canvas = document.getElementById('signature-canvas');
         if (!canvas) return;
 
-        const hint       = document.getElementById('canvas-hint');
-        const clearBtn   = document.getElementById('btn-clear-canvas');
-        const saveBtn    = document.getElementById('btn-save-signature');
-        const panel      = document.getElementById('ttd-preview-panel');
+        const hint = document.getElementById('canvas-hint');
+        const clearBtn = document.getElementById('btn-clear-canvas');
+        const saveBtn = document.getElementById('btn-save-signature');
+        const panel = document.getElementById('ttd-preview-panel');
 
-        const STORE_URL  = panel.dataset.storeUrl;
-        const SHOW_URL   = panel.dataset.showUrl;
-        const CSRF       = panel.dataset.csrf;
+        const STORE_URL = panel.dataset.storeUrl;
+        const DESTROY_URL = panel.dataset.destroyUrl;
+        const CSRF = panel.dataset.csrf;
 
-        const fileInput      = document.getElementById('signature-file-input');
-        const saveUploadBtn  = document.getElementById('btn-save-upload-signature');
-        let currentMode      = 'draw'; // 'draw' or 'upload'
+        const fileInput = document.getElementById('signature-file-input');
+        const saveUploadBtn = document.getElementById('btn-save-upload-signature');
+        
+        const typeSelect = document.getElementById('signature-type-select');
+        const companyContainer = document.getElementById('company-select-container');
+        const companySelect = document.getElementById('signature-company-select');
+        
+        let currentMode = 'draw';
 
-        /* ── Tabs logic ── */
         const tabs = document.querySelectorAll('#signature-tabs .tab');
         const modeDraw = document.getElementById('signature-mode-draw');
         const modeUpload = document.getElementById('signature-mode-upload');
+        const tabDraw = document.getElementById('tab-draw');
+        const tabUpload = document.getElementById('tab-upload');
+
+        function updateFormUI() {
+            if (typeSelect.value === 'company_stamp') {
+                companyContainer.classList.remove('hidden');
+                // Force upload mode
+                tabUpload.click();
+                tabDraw.classList.add('opacity-50', 'pointer-events-none');
+            } else {
+                companyContainer.classList.add('hidden');
+                tabDraw.classList.remove('opacity-50', 'pointer-events-none');
+            }
+        }
+
+        typeSelect.addEventListener('change', updateFormUI);
+        updateFormUI();
 
         tabs.forEach(tab => {
             tab.addEventListener('click', (e) => {
+                if (e.target.classList.contains('pointer-events-none')) return;
                 tabs.forEach(t => t.classList.remove('tab-active'));
                 e.target.classList.add('tab-active');
                 currentMode = e.target.dataset.target;
@@ -318,12 +253,10 @@
             });
         });
 
-        /* ── Upload Input Logic ── */
         fileInput.addEventListener('change', () => {
             saveUploadBtn.disabled = !fileInput.files.length;
         });
 
-        /* ── Canvas / SignaturePad setup ── */
         function resizeCanvas() {
             const ratio = Math.max(window.devicePixelRatio || 1, 1);
             canvas.width  = canvas.offsetWidth  * ratio;
@@ -356,10 +289,18 @@
             saveBtn.disabled = true;
         });
 
-        /* ── Save signature via AJAX ── */
         async function saveSignature(isUpload) {
             const body = new FormData();
             body.append('_token', CSRF);
+            body.append('type', typeSelect.value);
+
+            if (typeSelect.value === 'company_stamp') {
+                if (!companySelect.value) {
+                    showFlash(@json(__('Silakan pilih perusahaan.')), 'warning');
+                    return;
+                }
+                body.append('company_id', companySelect.value);
+            }
 
             if (isUpload) {
                 if (!fileInput.files.length) {
@@ -390,16 +331,8 @@
                 const data = await res.json();
 
                 if (data.success) {
-                    renderSavedSignature(panel, data.url, data.updated_at);
-                    setBadge(true);
-                    if (!isUpload) {
-                        signaturePad.clear();
-                        if (hint) hint.style.opacity = '1';
-                    } else {
-                        fileInput.value = ''; // clear input
-                    }
-                    activeBtn.disabled = true;
                     showFlash(@json(__('Tanda tangan berhasil disimpan!')));
+                    setTimeout(() => window.location.reload(), 1000); // Reload to reflect new list & state
                 } else {
                     showFlash(data.message || @json(__('Gagal menyimpan tanda tangan.')), 'error');
                     activeBtn.disabled = false;
@@ -416,33 +349,25 @@
         saveBtn.addEventListener('click', () => saveSignature(false));
         saveUploadBtn.addEventListener('click', () => saveSignature(true));
 
-        /* ── Delete signature via AJAX (with Custom Modal) ── */
-        let formToSubmit = null;
+        let currentDeleteId = null;
 
-        document.addEventListener('submit', function (e) {
-            const form = e.target;
-            if (!form.classList.contains('ttd-delete-form')) return;
-            e.preventDefault();
-
-            formToSubmit = form;
-            
-            // Hide any previous errors
-            const errorEl = document.getElementById('delete-modal-error');
-            if (errorEl) {
-                errorEl.classList.add('hidden');
-                errorEl.innerHTML = '';
-            }
-
-            // Open the custom modal
-            window.dispatchEvent(new CustomEvent('open-modal', { detail: 'confirm-delete-ttd' }));
+        document.querySelectorAll('.btn-delete-sig').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                currentDeleteId = e.target.dataset.id;
+                const errorEl = document.getElementById('delete-modal-error');
+                if (errorEl) {
+                    errorEl.classList.add('hidden');
+                    errorEl.innerHTML = '';
+                }
+                window.dispatchEvent(new CustomEvent('open-modal', { detail: 'confirm-delete-ttd' }));
+            });
         });
 
         const confirmDeleteBtn = document.getElementById('btn-confirm-delete-ttd');
         if (confirmDeleteBtn) {
             confirmDeleteBtn.addEventListener('click', async function() {
-                if (!formToSubmit) return;
+                if (!currentDeleteId) return;
                 
-                const form = formToSubmit;
                 const errorEl = document.getElementById('delete-modal-error');
                 const origBtnHtml = confirmDeleteBtn.innerHTML;
                 
@@ -450,10 +375,12 @@
                 confirmDeleteBtn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> ' + @json(__('Deleting...'));
                 if (errorEl) errorEl.classList.add('hidden');
                 
-                const body = new FormData(form);
+                const body = new FormData();
+                body.append('_token', CSRF);
+                body.append('_method', 'DELETE');
                 
                 try {
-                    const res = await fetch(form.action, {
+                    const res = await fetch(DESTROY_URL + '/' + currentDeleteId, {
                         method: 'POST',
                         headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                         body,
@@ -461,16 +388,8 @@
                     const data = await res.json();
                     
                     if (data.success) {
-                        renderEmptyState(panel);
-                        setBadge(false);
-                        signaturePad.clear();
-                        if (hint) hint.style.opacity = '1';
-                        fileInput.value = '';
-                        saveBtn.disabled = true;
-                        saveUploadBtn.disabled = true;
-
                         showFlash(@json(__('Tanda tangan berhasil dihapus.')));
-                        window.dispatchEvent(new CustomEvent('close-modal', { detail: 'confirm-delete-ttd' }));
+                        setTimeout(() => window.location.reload(), 1000);
                     } else {
                         if (errorEl) {
                             errorEl.innerHTML = data.message || @json(__('Gagal menghapus tanda tangan.'));
@@ -492,20 +411,6 @@
                     confirmDeleteBtn.innerHTML = origBtnHtml;
                 }
             });
-        }
-
-        /* ── On page load: if the server already rendered a signature, nothing extra needed.
-               But if the panel shows empty state, we still do a quick AJAX fetch to confirm. ── */
-        if (panel.querySelector('#ttd-empty-state')) {
-            fetch(SHOW_URL, { headers: { 'Accept': 'application/json' } })
-                .then(r => r.ok ? r.json() : null)
-                .then(data => {
-                    if (data && data.success && data.url) {
-                        renderSavedSignature(panel, data.url, data.updated_at);
-                        setBadge(true);
-                    }
-                })
-                .catch(() => { /* silent — server-rendered state is the fallback */ });
         }
     });
 }());
