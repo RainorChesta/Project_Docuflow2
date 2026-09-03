@@ -32,6 +32,13 @@ class SignatureController extends Controller
                 return response()->json(['success' => false, 'message' => 'ID DOKUMEN DIPERLUKAN UNTUK MEMERIKSA IZIN.'], 403);
             }
 
+            $pageNumber = (int) $request->input('page_number', 1);
+            $posX = ($request->filled('pos_x') || $request->has('pos_x')) && $request->input('pos_x') !== null && $request->input('pos_x') !== '' ? (float) $request->input('pos_x') : null;
+            $posY = ($request->filled('pos_y') || $request->has('pos_y')) && $request->input('pos_y') !== null && $request->input('pos_y') !== '' ? (float) $request->input('pos_y') : null;
+            $width = (float) $request->input('width', 40.0);
+            $height = (float) $request->input('height', 25.0);
+            $preset = $request->input('preset_position', 'bottom-right');
+
             // Find an active (non-used, non-rejected) signature request, or create a new pending request
             $requestRecord = SignatureRequest::where('requester_id', Auth::id())
                 ->where('target_user_id', $user->id)
@@ -48,7 +55,22 @@ class SignatureController extends Controller
                     'document_id' => $documentId,
                     'status' => 'pending',
                     'is_used' => false,
+                    'page_number' => $pageNumber,
+                    'pos_x' => $posX,
+                    'pos_y' => $posY,
+                    'width' => $width,
+                    'height' => $height,
+                    'preset_position' => $preset,
                     'requested_at' => now(),
+                ]);
+            } else {
+                $requestRecord->update([
+                    'page_number' => $pageNumber,
+                    'pos_x' => $posX,
+                    'pos_y' => $posY,
+                    'width' => $width,
+                    'height' => $height,
+                    'preset_position' => $preset,
                 ]);
             }
 
@@ -65,7 +87,7 @@ class SignatureController extends Controller
                     'request_id' => $requestRecord->id,
                     'url' => $placeholderUrl,
                     'token' => $token,
-                    'message' => 'PERMINTAAN PENGGUNAAN TANDA TANGAN TELAH DIKIRIM KE PENGGUNA TERKAIT. TANDA TANGAN DISISIPKAN SEBAGAI PLACEHOLDER SEMENTARA.',
+                    'message' => 'PERMINTAAN PENGGUNAAN TANDA TANGAN TELAH DIKIRIM KE PENGGUNA TERKAIT.',
                 ]);
             }
         }
@@ -340,16 +362,203 @@ class SignatureController extends Controller
         $token = $onlyOfficeUrl ? $onlyOfficeService->generateInsertImageToken($onlyOfficeUrl) : null;
         $sig = $targetUser->signature;
 
+        $document = $signatureRequest->document;
+        $version = $document?->displayVersion();
+        $isPdf = false;
+        if ($version && (($version->file_path && str_ends_with(strtolower($version->file_path), '.pdf')) || ($version->file_mime && str_contains(strtolower($version->file_mime), 'pdf')))) {
+            $isPdf = true;
+            if ($sig && $sig->file_path) {
+                $signaturePath = Storage::disk('public')->path($sig->file_path);
+                $processor = app(\App\Services\DocumentProcessorService::class);
+                $processor->processSignature($document, $version, $signatureRequest->id, $signaturePath, $signatureRequest);
+            }
+        }
+
         return response()->json([
             'success'        => true,
-            'message'        => 'Tanda tangan resmi berhasil dimuat.',
+            'message'        => $isPdf ? 'Tanda tangan resmi berhasil dibubuhkan pada dokumen PDF.' : 'Tanda tangan resmi berhasil dimuat.',
             'url'            => $onlyOfficeUrl,
             'token'          => $token,
+            'is_pdf'         => $isPdf,
             'client_url'     => asset('storage/' . $sig->file_path),
             'request_id'     => $signatureRequest->id,
             'target_user_id' => $targetUser->id,
             'target_user_name' => $targetUser->name,
         ]);
+    }
+
+    /**
+     * Direct stamping of current user's own signature onto a PDF document.
+     */
+    public function stampPdfSignature(Request $request, \App\Models\Document $document): JsonResponse
+    {
+        $this->authorize('update', $document);
+
+        $currentUser = Auth::user();
+        if (!$currentUser->hasSignature() || !$currentUser->signature?->file_path) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda belum memiliki tanda tangan digital tersimpan.',
+            ], 422);
+        }
+
+        $version = $document->displayVersion();
+        if (!$version) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Versi dokumen tidak ditemukan.',
+            ], 404);
+        }
+
+        $isPdf = ($version->file_path && str_ends_with(strtolower($version->file_path), '.pdf')) ||
+                 ($version->file_mime && str_contains(strtolower($version->file_mime), 'pdf'));
+
+        if (!$isPdf) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Fitur ini khusus untuk dokumen format PDF.',
+            ], 422);
+        }
+
+        $pageNumber = (int) $request->input('page_number', 1);
+        $preset = $request->input('preset_position', 'bottom-right');
+        $posX = ($request->filled('pos_x') || $request->has('pos_x')) && $request->input('pos_x') !== null && $request->input('pos_x') !== '' ? (float) $request->input('pos_x') : null;
+        $posY = ($request->filled('pos_y') || $request->has('pos_y')) && $request->input('pos_y') !== null && $request->input('pos_y') !== '' ? (float) $request->input('pos_y') : null;
+        $width = (float) $request->input('width', 40.0);
+        $height = (float) $request->input('height', 25.0);
+
+        $signaturePath = Storage::disk('public')->path($currentUser->signature->file_path);
+        $pdfProcessor = app(\App\Services\PdfSignatureProcessorService::class);
+
+        $result = $pdfProcessor->processPdfSignature(
+            $document,
+            $version,
+            $signaturePath,
+            $pageNumber,
+            $posX,
+            $posY,
+            $width,
+            $height,
+            $preset
+        );
+
+        if ($result) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Tanda tangan Anda berhasil dibubuhkan pada dokumen PDF.',
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Gagal membubuhkan tanda tangan pada PDF.',
+        ], 500);
+    }
+
+    /**
+     * Direct stamping of document verification QR Code onto a PDF document.
+     */
+    public function stampPdfQrCode(Request $request, \App\Models\Document $document): JsonResponse
+    {
+        $this->authorize('update', $document);
+
+        $version = $document->displayVersion();
+        if (!$version) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Versi dokumen tidak ditemukan.',
+            ], 404);
+        }
+
+        $isPdf = ($version->file_path && str_ends_with(strtolower($version->file_path), '.pdf')) ||
+                 ($version->file_mime && str_contains(strtolower($version->file_mime), 'pdf'));
+
+        if (!$isPdf) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Fitur ini khusus untuk dokumen format PDF.',
+            ], 422);
+        }
+
+        $pageNumber = (int) $request->input('page_number', 1);
+        $preset = $request->input('preset_position', 'bottom-right');
+        $posX = ($request->filled('pos_x') || $request->has('pos_x')) && $request->input('pos_x') !== null && $request->input('pos_x') !== '' ? (float) $request->input('pos_x') : null;
+        $posY = ($request->filled('pos_y') || $request->has('pos_y')) && $request->input('pos_y') !== null && $request->input('pos_y') !== '' ? (float) $request->input('pos_y') : null;
+        $width = (float) $request->input('width', 30.0);
+        $height = (float) $request->input('height', 30.0);
+
+        $qrCodeService = app(\App\Services\QrCodeService::class);
+        $qrPngBytes = $qrCodeService->pngBytes($qrCodeService->qrcodeUrl($document));
+
+        $tempQrPath = storage_path('app/temp_qr_' . uniqid() . '.png');
+        file_put_contents($tempQrPath, $qrPngBytes);
+
+        $pdfProcessor = app(\App\Services\PdfSignatureProcessorService::class);
+
+        $result = $pdfProcessor->processPdfSignature(
+            $document,
+            $version,
+            $tempQrPath,
+            $pageNumber,
+            $posX,
+            $posY,
+            $width,
+            $height,
+            $preset
+        );
+
+        @unlink($tempQrPath);
+
+        if ($result) {
+            return response()->json([
+                'success' => true,
+                'message' => 'QR Code verifikasi berhasil dibubuhkan pada dokumen PDF.',
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Gagal membubuhkan QR Code pada PDF.',
+        ], 500);
+    }
+
+    /**
+     * Revert / Undo a stamped signature on a PDF document back to its original state.
+     */
+    public function revertPdfSignature(Request $request, \App\Models\Document $document): JsonResponse
+    {
+        $this->authorize('update', $document);
+
+        $version = $document->displayVersion();
+        if (!$version) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Versi dokumen tidak ditemukan.',
+            ], 404);
+        }
+
+        $pdfProcessor = app(\App\Services\PdfSignatureProcessorService::class);
+
+        if (!$pdfProcessor->hasOriginalBackup($version)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak ditemukan salinan asli dokumen sebelum tanda tangan dibubuhkan.',
+            ], 422);
+        }
+
+        $result = $pdfProcessor->revertPdfSignature($document, $version);
+
+        if ($result) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Tanda tangan berhasil dihapus dan dokumen PDF dikembalikan ke versi semula.',
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Gagal mengembalikan dokumen PDF ke versi semula.',
+        ], 500);
     }
 
     /**
@@ -396,9 +605,9 @@ class SignatureController extends Controller
             if ($targetUser->signature) {
                 $signaturePath = Storage::disk('public')->path($targetUser->signature->file_path);
                 
-                // Process the signature synchronously using PHPWord
+                // Process the signature synchronously using PHPWord or FPDI
                 $processor = app(\App\Services\DocumentProcessorService::class);
-                $processor->processSignature($document, $version, $requestId, $signaturePath);
+                $processor->processSignature($document, $version, $requestId, $signaturePath, $signatureRequest);
             }
         }
 

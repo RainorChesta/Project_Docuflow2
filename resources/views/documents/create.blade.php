@@ -110,6 +110,52 @@
                             @error('document_type_id') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                         </div>
 
+                        {{-- Format Choice / Format Dokumen --}}
+                        @php $currentFormatChoice = old('format_choice', 'baru'); @endphp
+                        <div class="form-control w-full mb-5" x-data="{ format: '{{ $currentFormatChoice }}' }">
+                            <label class="label">
+                                <span class="label-text font-medium">{{ __('Format Penomoran Dokumen') }}</span>
+                            </label>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <!-- Option 1: Format Baru (Default) -->
+                                <label class="border rounded-xl p-3.5 flex items-start gap-3 cursor-pointer transition-all hover:bg-base-200/60"
+                                       :class="format === 'baru' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-base-300 bg-base-100'">
+                                    <input type="radio" name="format_choice" value="baru" x-model="format"
+                                           class="radio radio-primary radio-sm mt-0.5"
+                                           @change="$nextTick(() => window.onFormatChoiceChange('baru'))">
+                                    <div class="flex-1">
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-semibold text-sm">{{ __('Format Baru') }}</span>
+                                            <span class="badge badge-primary badge-sm">{{ __('Otomatis') }}</span>
+                                        </div>
+                                        <p class="text-xs text-base-content/60 mt-1">
+                                            {{ __('Penomoran standar baru terpadu dengan kode divisi.') }}
+                                        </p>
+                                    </div>
+                                </label>
+
+                                <!-- Option 2: Format Lama -->
+                                <label class="border rounded-xl p-3.5 flex items-start gap-3 cursor-pointer transition-all hover:bg-base-200/60"
+                                       :class="format === 'lama' ? 'border-secondary bg-secondary/5 ring-1 ring-secondary' : 'border-base-300 bg-base-100'">
+                                    <input type="radio" name="format_choice" value="lama" x-model="format"
+                                           class="radio radio-secondary radio-sm mt-0.5"
+                                           @change="$nextTick(() => window.onFormatChoiceChange('lama'))">
+                                    <div class="flex-1">
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-semibold text-sm">{{ __('Format Lama') }}</span>
+                                            <span class="badge badge-ghost badge-sm">{{ __('Format Lama') }}</span>
+                                        </div>
+                                        <p class="text-xs text-base-content/60 mt-1">
+                                            {{ __('Penomoran menggunakan format terdahulu (khusus SOP menggunakan unit kerja).') }}
+                                        </p>
+                                    </div>
+                                </label>
+                            </div>
+
+                            @error('format_choice') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
+                        </div>
+
                         {{-- Document Number --}}
                         <div class="form-control w-full mb-4">
                             <label for="document_number_field" class="label">
@@ -467,27 +513,63 @@
                 @endif
             }
 
+            function getFormatChoice() {
+                var checkedRadio = document.querySelector('input[name="format_choice"]:checked');
+                return checkedRadio ? checkedRadio.value : 'baru';
+            }
+
+            window.onFormatChoiceChange = function (val) {
+                updateTypeVisibility();
+                fetchPreview();
+            };
+
             function updateTypeVisibility() {
                 var isSop = isCurrentTypeSop();
+                var format = getFormatChoice();
+                
                 if (containerUnitKerja && containerDivision) {
-                    if (isSop) {
-                        containerUnitKerja.style.display = 'block';
+                    if (format === 'lama') {
                         containerDivision.style.display = 'none';
                         if (divisionSelect && divisionSelect.tagName === 'SELECT') {
                             divisionSelect.removeAttribute('required');
                         }
-                        if (unitKerjaSelect) {
-                            unitKerjaSelect.setAttribute('required', 'required');
+
+                        if (isSop) {
+                            containerUnitKerja.style.display = 'block';
+                            if (unitKerjaSelect) {
+                                unitKerjaSelect.setAttribute('required', 'required');
+                            }
+                        } else {
+                            containerUnitKerja.style.display = 'none';
+                            if (unitKerjaSelect) {
+                                unitKerjaSelect.removeAttribute('required');
+                            }
                         }
                     } else {
+                        // Format Baru
                         containerUnitKerja.style.display = 'none';
+                        if (unitKerjaSelect) {
+                            unitKerjaSelect.removeAttribute('required');
+                        }
+
                         containerDivision.style.display = 'block';
                         if (divisionSelect && divisionSelect.tagName === 'SELECT') {
                             divisionSelect.setAttribute('required', 'required');
                         }
-                        if (unitKerjaSelect) {
-                            unitKerjaSelect.removeAttribute('required');
-                        }
+                    }
+                    
+                    if (!uploadCheckbox || !uploadCheckbox.checked) {
+                        numberField.disabled = true;
+                        numberField.removeAttribute('name');
+                        numberField.classList.add('bg-base-200');
+                        numberField.value = lastPreview || @json(__('Pilih tipe dokumen dahulu...'));
+                        numberHint.textContent = @json(__('Preview otomatis'));
+                    } else {
+                        numberField.disabled = false;
+                        numberField.name = 'document_number';
+                        numberField.classList.remove('bg-base-200');
+                        numberField.value = lastPreview || '';
+                        numberHint.textContent = @json(__('Manual input based on file'));
                     }
                 }
             }
@@ -511,7 +593,9 @@
             function fetchPreview() {
                 var typeId = typeSelect.value;
                 if (!typeId) {
-                    numberField.value = @json(__('Pilih tipe dokumen dahulu...'));
+                    if (getFormatChoice() === 'baru') {
+                        numberField.value = @json(__('Pilih tipe dokumen dahulu...'));
+                    }
                     lastPreview = '';
                     return;
                 }
@@ -521,8 +605,9 @@
                 var branchId = branchSelect ? branchSelect.value : '';
                 var divisionId = divisionSelect ? divisionSelect.value : '';
                 var unitKerjaId = unitKerjaSelect ? unitKerjaSelect.value : '';
+                var format = getFormatChoice();
 
-                var url = '{{ route('documents.next-number') }}?document_type_id=' + encodeURIComponent(typeId);
+                var url = '{{ route('documents.next-number') }}?document_type_id=' + encodeURIComponent(typeId) + '&format_choice=' + encodeURIComponent(format);
                 if (branchId) {
                     url += '&branch_id=' + encodeURIComponent(branchId);
                 }
@@ -544,7 +629,9 @@
                         }
                     })
                     .catch(function () {
-                        numberField.value = @json(__('Failed to load preview'));
+                        if (numberField.disabled) {
+                            numberField.value = @json(__('Failed to load preview'));
+                        }
                     });
             }
 
@@ -567,6 +654,12 @@
             typeSelect.addEventListener('change', function () {
                 updateTypeVisibility();
                 fetchPreview();
+            });
+            document.querySelectorAll('input[name="format_choice"]').forEach(function (radio) {
+                radio.addEventListener('change', function () {
+                    updateTypeVisibility();
+                    fetchPreview();
+                });
             });
             if (branchSelect) {
                 branchSelect.addEventListener('change', function () {

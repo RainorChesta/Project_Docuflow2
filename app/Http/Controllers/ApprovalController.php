@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Document;
 use App\Models\DocumentVersion;
+use App\Services\ApprovalRoutingService;
 use App\Services\AuditService;
 use App\Services\VersionService;
 use Illuminate\Http\RedirectResponse;
@@ -15,6 +16,7 @@ class ApprovalController extends Controller
     public function __construct(
         protected VersionService $versionService,
         protected AuditService $auditService,
+        protected ApprovalRoutingService $approvalRoutingService,
     ) {}
 
     public function index(): \Illuminate\View\View|\Illuminate\Http\RedirectResponse
@@ -100,6 +102,9 @@ class ApprovalController extends Controller
             ));
         }
 
+        // Notify sibling approvers (other Admins/Direkturs) that approval is done
+        $this->notifySiblingApprovers($document, $reviewer, 'approved');
+
         return redirect()->route('approvals.index')->with('success', __('Versi disetujui dan diaktifkan.'));
     }
 
@@ -128,6 +133,9 @@ class ApprovalController extends Controller
             ));
         }
 
+        // Notify sibling approvers (other Admins/Direkturs) that rejection is done
+        $this->notifySiblingApprovers($document, $reviewer, 'rejected');
+
         return redirect()->route('approvals.index')->with('success', __('Versi ditolak.'));
     }
 
@@ -151,23 +159,11 @@ class ApprovalController extends Controller
             'target_version' => $version->version_number,
         ]);
 
-        // Notify Division Heads about rollback request
-        if ($document->division_id) {
-            $heads = \App\Models\User::where('division_id', $document->division_id)
-                ->where('system_role', 'head')
-                ->where('id', '!=', $user->id)
-                ->where(function ($q) use ($document) {
-                    if ($document->branch_id) {
-                        $q->whereHas('branches', fn($bq) => $bq->where('branches.id', $document->branch_id));
-                    } elseif ($document->company_id) {
-                        $q->whereHas('companies', fn($cq) => $cq->where('companies.id', $document->company_id));
-                    }
-                })
-                ->get();
+        // Dynamic approval routing for rollback notifications
+        $resolution = $this->approvalRoutingService->resolveApprover($document, $user);
 
-            foreach ($heads as $head) {
-                $head->notify(new \App\Notifications\DocumentRollbackRequested($document, $version, $user->name));
-            }
+        foreach ($resolution['approvers'] as $approver) {
+            $approver->notify(new \App\Notifications\DocumentRollbackRequested($document, $version, $user->name));
         }
 
         return redirect()->route('documents.show', $document)->with('success', __('Permintaan rollback diajukan. Menunggu persetujuan kepala divisi.'));
@@ -321,5 +317,36 @@ class ApprovalController extends Controller
         }
 
         return redirect()->route('approvals.index')->with('success', __('Permintaan perubahan nama dokumen ditolak.'));
+    }
+
+    /**
+     * Notify other approvers (sibling Admins/Direkturs) that the document
+     * has already been handled, so they don't need to take action.
+     */
+    private function notifySiblingApprovers(Document $document, $reviewer, string $action): void
+    {
+        // Only relevant when the approver_role is 'admin' (multi-approver scenario)
+        if ($document->approver_role !== 'admin') {
+            return;
+        }
+
+        $companyId = $document->company_id ?? $document->branch?->company_id;
+        if (!$companyId) {
+            return;
+        }
+
+        $siblingAdmins = \App\Models\User::where('system_role', 'admin')
+            ->where('is_active', true)
+            ->where('id', '!=', $reviewer->id)
+            ->whereHas('companies', fn($cq) => $cq->where('companies.id', $companyId))
+            ->get();
+
+        foreach ($siblingAdmins as $admin) {
+            $admin->notify(new \App\Notifications\ApprovalAlreadyHandled(
+                $document,
+                $reviewer->name,
+                $action,
+            ));
+        }
     }
 }

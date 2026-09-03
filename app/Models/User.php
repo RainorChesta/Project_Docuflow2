@@ -168,12 +168,21 @@ class User extends Authenticatable
         if ($this->isAdmin() || $this->isDirector()) {
             $companyIds = $this->companies()->pluck('companies.id')->all();
 
-            $versionsQuery = DocumentVersion::where('status', 'pending')
-                ->whereNull('discarded_at');
+            $roleFilter = function ($q) {
+                $q->where('approver_role', $this->system_role)
+                  ->orWhereNull('approver_role');
+            };
 
-            $rollbacksQuery = Document::whereNotNull('pending_rollback_version_id');
+            $versionsQuery = DocumentVersion::where('status', 'pending')
+                ->whereNull('discarded_at')
+                ->whereHas('document', $roleFilter);
+
+            $rollbacksQuery = Document::whereNotNull('pending_rollback_version_id')
+                ->where($roleFilter);
+
             $renamesQuery = Document::whereNotNull('pending_title')
-                ->where('pending_title', '!=', '');
+                ->where('pending_title', '!=', '')
+                ->where($roleFilter);
 
             if (!$this->isAdmin() && !empty($companyIds)) {
                 $companyFilter = function ($q) use ($companyIds) {
@@ -193,20 +202,27 @@ class User extends Authenticatable
             return 0;
         }
 
+        $roleFilter = function ($q) {
+            $q->where('approver_role', 'head')
+              ->orWhereNull('approver_role');
+        };
+
         $versionsCount = DocumentVersion::where('status', 'pending')
             ->whereNull('discarded_at')
-            ->whereHas('document', fn($q) => $q->whereIn('division_id', $divisionIds)->visibleTo($this))
+            ->whereHas('document', fn($q) => $q->whereIn('division_id', $divisionIds)->visibleTo($this)->where($roleFilter))
             ->count();
 
         $rollbacksCount = Document::whereIn('division_id', $divisionIds)
             ->visibleTo($this)
             ->whereNotNull('pending_rollback_version_id')
+            ->where($roleFilter)
             ->count();
 
         $renamesCount = Document::whereIn('division_id', $divisionIds)
             ->visibleTo($this)
             ->whereNotNull('pending_title')
             ->where('pending_title', '!=', '')
+            ->where($roleFilter)
             ->count();
 
         return $versionsCount + $rollbacksCount + $renamesCount;

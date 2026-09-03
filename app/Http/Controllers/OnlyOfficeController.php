@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\AuditService;
 use App\Services\OnlyOfficeService;
 use App\Services\VersionService;
+use App\Services\ApprovalRoutingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -22,6 +23,7 @@ class OnlyOfficeController extends Controller
         protected OnlyOfficeService $onlyOfficeService,
         protected VersionService $versionService,
         protected AuditService $auditService,
+        protected ApprovalRoutingService $approvalRoutingService,
     ) {}
 
     /**
@@ -216,6 +218,26 @@ class OnlyOfficeController extends Controller
                     'version_number' => $version->version_number,
                     'status' => $status,
                 ]);
+
+                // Trigger approval routing and notifications if the version is pending
+                if ($version->status === 'pending') {
+                    $resolution = $this->approvalRoutingService->resolveApprover($document, $author);
+                    $this->approvalRoutingService->applyToDocument($document, $resolution);
+
+                    foreach ($resolution['approvers'] as $approver) {
+                        $approver->notify(new \App\Notifications\DocumentApprovalRequested($document, $version, $author->name));
+                    }
+
+                    if ($resolution['role'] !== null) {
+                        $author->notify(new \App\Notifications\ApprovalRouteResolved(
+                            $document,
+                            $resolution['role'],
+                            $resolution['approvers']->pluck('name')->join(', '),
+                            $resolution['message'],
+                            $resolution['isFallback'],
+                        ));
+                    }
+                }
 
                 Log::info("Document {$document->id} saved successfully from ONLYOFFICE to v{$version->version_number}.");
             } catch (\Throwable $e) {

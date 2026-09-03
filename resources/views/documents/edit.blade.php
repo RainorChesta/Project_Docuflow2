@@ -24,6 +24,7 @@
     @php
         $pending = $document->versions->first(fn($v) => $v->status === 'pending' && !$v->discarded_at);
         $hasDraftOnly = !$pending && !$document->currentVersion;
+        $isPdf = ($version && ($version->file_path && str_ends_with(strtolower($version->file_path), '.pdf'))) || ($version && $version->file_mime && str_contains(strtolower($version->file_mime), 'pdf'));
     @endphp
 
     <div class="pb-6">
@@ -204,13 +205,24 @@
                                         @endif
                                         <div class="divider my-1"></div>
                                         <li>
-                                            <button type="button" onclick="openSignatureSelectorModal()" class="text-xs text-base-content/80 flex items-center gap-1.5">
+                                            <button type="button" onclick="openSignatureSelectorModal()" class="text-xs text-base-content/80 flex items-center gap-1.5 py-2">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                                                 </svg>
                                                 <span>{{ __('Pilih Pengguna Lain...') }}</span>
                                             </button>
                                         </li>
+                                        @if($isPdf)
+                                            <div class="divider my-1"></div>
+                                            <li>
+                                                <button type="button" onclick="confirmRevertPdfSignature()" class="text-xs text-error font-semibold flex items-center gap-1.5 py-2 hover:bg-error/10 rounded-xl transition-colors">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-error shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                                    </svg>
+                                                    <span>{{ __('Batalkan TTD Terakhir') }}</span>
+                                                </button>
+                                            </li>
+                                        @endif
                                     </ul>
                                 </div>
                             </div>
@@ -245,40 +257,149 @@
     </div>
 
     {{-- Signature User Selector Modal --}}
-    <dialog id="signature-users-modal" class="modal">
-        <div class="modal-box max-w-lg">
-            <div class="flex items-center justify-between border-b border-base-200 pb-3 mb-3">
+    <dialog id="signature-users-modal" class="modal modal-bottom sm:modal-middle backdrop-blur-xs">
+        <div class="modal-box p-6 rounded-3xl border border-base-300/80 shadow-2xl bg-base-100 max-w-xl w-full">
+            {{-- Header --}}
+            <div class="flex items-start justify-between border-b border-base-200 pb-4 mb-4">
                 <div>
-                    <h3 class="font-bold text-base text-base-content">{{ __('PILIH & GANTI TANDA TANGAN') }}</h3>
-                    <p class="text-xs text-base-content/60">{{ __('KELOLA PERMINTAAN DAN PENGGANTIAN TANDA TANGAN PENGGUNA PADA DOKUMEN INI.') }}</p>
+                    <h3 class="font-bold text-lg text-base-content leading-tight">{{ __('PILIH & GANTI TANDA TANGAN') }}</h3>
+                    <p class="text-xs text-base-content/60 mt-0.5">{{ __('Kelola permintaan dan pembubuhan tanda tangan digital pada dokumen ini.') }}</p>
                 </div>
-                <div id="signature-available-count-badge" class="badge badge-success badge-sm gap-1 hidden font-bold">
+                <div id="signature-available-count-badge" class="badge badge-success badge-sm gap-1 hidden font-bold shrink-0">
                     <span id="signature-available-count-text">0</span> {{ __('TERSEDIA') }}
                 </div>
             </div>
 
             {{-- Signature Search Input --}}
             <div class="relative mb-3">
-                <input type="text" id="signature-search-input" oninput="filterSignatureUsers(this.value)" placeholder="{{ __('Cari tanda tangan (nama, peran, divisi)...') }}" class="input input-bordered input-sm w-full pl-9 pr-8 bg-base-100 focus:border-primary focus:ring-1 focus:ring-primary text-xs sm:text-sm">
+                <input type="text" id="signature-search-input" oninput="filterSignatureUsers(this.value)" placeholder="{{ __('Cari tanda tangan (nama, peran, divisi)...') }}" class="input input-bordered input-sm w-full pl-9 pr-8 bg-base-100 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary text-xs sm:text-sm">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
                 <button type="button" id="signature-search-clear" onclick="clearSignatureSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content text-xs p-1">✕</button>
             </div>
 
-            <div id="signature-users-list" class="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+            {{-- User List --}}
+            <div id="signature-users-list" class="space-y-2.5 max-h-72 overflow-y-auto pr-1">
                 <div class="flex justify-center py-6 text-sm text-base-content/60">
                     <span class="loading loading-spinner loading-sm mr-2"></span> {{ __('MEMUAT PENGGUNA...') }}
                 </div>
             </div>
 
-            <div class="modal-action border-t border-base-200 pt-3 mt-3">
+            {{-- Footer Action --}}
+            <div class="modal-action border-t border-base-200 pt-3 mt-4 flex justify-end">
                 <form method="dialog">
-                    <button class="btn btn-ghost btn-sm">{{ __('TUTUP') }}</button>
+                    <button class="btn btn-ghost btn-sm rounded-xl">{{ __('TUTUP') }}</button>
                 </form>
             </div>
         </div>
     </dialog>
+
+    @if($isPdf)
+        {{-- Interactive Visual PDF Signature Placement Modal --}}
+        <dialog id="pdf-visual-signature-modal" class="modal backdrop-blur-sm">
+            <div class="modal-box p-0 rounded-2xl border border-base-300 shadow-2xl bg-base-100 max-w-5xl w-11/12 h-[92vh] max-h-[920px] flex flex-col overflow-hidden">
+                {{-- Modal Header & Controls --}}
+                <div class="px-5 py-3 border-b border-base-200 bg-base-100 rounded-t-2xl flex items-center justify-between gap-3 shrink-0">
+                    <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold shadow-xs shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <h3 id="pdf-visual-modal-title" class="font-bold text-sm sm:text-base text-base-content leading-tight truncate">Atur Posisi &amp; Ukuran Tanda Tangan</h3>
+                            <p id="pdf-visual-modal-subtitle" class="text-xs text-base-content/60 truncate hidden sm:block">Geser kotak TTD dan tarik sudut kanan bawah untuk mengatur ukuran.</p>
+                        </div>
+                    </div>
+
+                    {{-- Page Navigation & Metrics --}}
+                    <div class="flex items-center gap-2 shrink-0">
+                        <div class="join border border-base-300 rounded-lg overflow-hidden shadow-xs">
+                            <button type="button" id="pdf-visual-prev-page" onclick="changeVisualPdfPage(-1)" class="btn btn-xs join-item btn-ghost font-bold px-2">◀</button>
+                            <span class="btn btn-xs join-item btn-ghost no-animation text-xs font-semibold px-2.5 pointer-events-none">
+                                <span id="pdf-visual-current-page-num">1</span> / <span id="pdf-visual-total-page-num">1</span>
+                            </span>
+                            <button type="button" id="pdf-visual-next-page" onclick="changeVisualPdfPage(1)" class="btn btn-xs join-item btn-ghost font-bold px-2">▶</button>
+                        </div>
+
+                        <div class="badge badge-neutral badge-sm font-mono text-[11px] gap-1.5 py-2.5 px-3 rounded-lg shadow-xs hidden md:inline-flex" id="pdf-visual-coord-badge">
+                            X: <span id="pdf-coord-x">0</span>mm | Y: <span id="pdf-coord-y">0</span>mm | <span id="pdf-coord-w">40</span>×<span id="pdf-coord-h">25</span>mm
+                        </div>
+
+                        <button type="button" onclick="closePdfVisualPlacementModal()" class="btn btn-ghost btn-sm btn-circle text-base-content/50 hover:text-base-content ml-1">
+                            ✕
+                        </button>
+                    </div>
+                </div>
+
+                {{-- PDF Canvas Workspace Viewport --}}
+                <div id="pdf-workspace-viewport" class="flex-1 overflow-auto bg-base-300/60 p-4 sm:p-6 flex items-start justify-center relative min-h-[350px]">
+                    <div id="pdf-visual-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-base-100/80 z-20">
+                        <span class="loading loading-spinner loading-lg text-primary mb-2"></span>
+                        <p class="text-xs font-semibold text-base-content/70 uppercase tracking-wider">{{ __('Memuat Dokumen PDF...') }}</p>
+                    </div>
+
+                    <div id="pdf-page-wrapper" class="relative shadow-2xl rounded-lg overflow-hidden bg-white border border-base-content/10 select-none my-auto transition-all">
+                        <canvas id="pdf-render-canvas" class="block"></canvas>
+                        
+                        {{-- Interactive Signature Overlay Layer --}}
+                        <div id="pdf-interactive-overlay" class="absolute inset-0 z-10 pointer-events-auto">
+                            <div id="pdf-signature-drag-box"
+                                 class="absolute border-2 border-primary bg-primary/15 rounded-xl cursor-move shadow-xl flex flex-col justify-between p-2 select-none touch-none transition-shadow group hover:shadow-2xl hover:border-primary-focus"
+                                 style="left: 40px; top: 40px; width: 140px; height: 80px;">
+                                
+                                {{-- Header Handle --}}
+                                <div class="flex items-center justify-between pointer-events-none">
+                                    <span id="pdf-box-signer-tag" class="badge badge-primary badge-xs font-bold uppercase tracking-wider scale-90 -ml-1 flex items-center gap-1 shadow-xs truncate max-w-[140px]">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                                        </svg>
+                                        <span id="pdf-box-signer-tag-text">{{ __('Geser TTD') }}</span>
+                                    </span>
+                                    <span class="text-[10px] font-mono text-primary font-bold opacity-80 shrink-0" id="pdf-box-dim-preview">40x25</span>
+                                </div>
+
+                                {{-- Preview Image / Signer Name --}}
+                                <div id="pdf-box-preview-container" class="flex-1 flex items-center justify-center p-1 pointer-events-none overflow-hidden">
+                                    @if($userSignatureDataUri || $userSignatureUrl)
+                                        <img id="pdf-box-preview-img" src="{{ $userSignatureDataUri ?: $userSignatureUrl }}" alt="Signature" class="max-h-full max-w-full object-contain filter drop-shadow-xs" />
+                                    @else
+                                        <span id="pdf-box-preview-text" class="text-xs font-bold text-primary/80 uppercase italic tracking-wide">[ {{ __('Tanda Tangan') }} ]</span>
+                                    @endif
+                                </div>
+
+                                {{-- Bottom Resizer Handle (Bottom-Right corner) --}}
+                                <div id="pdf-sig-resize-handle"
+                                     class="absolute -right-2 -bottom-2 w-5 h-5 bg-primary text-primary-content rounded-full flex items-center justify-center cursor-nwse-resize shadow-md hover:scale-110 active:scale-95 transition-transform z-30"
+                                     title="{{ __('Tarik untuk mengubah ukuran') }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Modal Footer Actions --}}
+                <div class="px-6 py-4 border-t border-base-200 bg-base-100 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                    <div class="text-xs text-base-content/60 hidden sm:block">
+                        💡 <span class="font-medium">{{ __('Tips:') }}</span> {{ __('Posisikan kotak di atas garis tanda tangan pada dokumen.') }}
+                    </div>
+                    <div class="flex items-center gap-2 ml-auto">
+                        <button type="button" onclick="closePdfVisualPlacementModal()" class="btn btn-ghost btn-sm rounded-xl">{{ __('Batal') }}</button>
+                        <button type="button" id="pdf-visual-action-btn" onclick="submitActiveVisualAction()" class="btn btn-primary btn-sm gap-1.5 rounded-xl font-bold shadow-xs">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span id="pdf-visual-action-btn-text">{{ __('Bubuhkan TTD Saya Di Sini') }}</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </dialog>
+    @endif
 
     {{-- On-Screen Custom Notification Modal for Signature Approval & Alerts --}}
     <dialog id="signature-alert-modal" class="modal">
@@ -299,6 +420,14 @@
     </dialog>
 
     @push('scripts')
+        @if($isPdf)
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+            <script>
+                if (typeof pdfjsLib !== 'undefined') {
+                    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                }
+            </script>
+        @endif
         <script src="{{ rtrim(config('onlyoffice.url'), '/') }}/web-apps/apps/api/documents/api.js"
                 onerror="document.getElementById('onlyoffice-fallback').classList.remove('hidden');"></script>
         <script>
@@ -306,6 +435,22 @@
             const qrCodeToken = @json($qrCodeToken ?? null);
             const mySignatureUrl = @json($userSignatureUrl ?? null);
             const mySignatureToken = @json($userSignatureToken ?? null);
+            const isPdfDocument = @json($isPdf);
+            const pdfFileSourceUrl = @json(($isPdf && $version) ? route('documents.file', [$document, $version]) : null);
+
+            let pdfDocInstance = null;
+            let currentVisualPdfPage = 1;
+            let totalVisualPdfPages = 1;
+            let pdfPageScale = 1.0;
+            let pdfViewport = null;
+            let visualPlacementCoords = {
+                page: 1,
+                xMm: 20,
+                yMm: 20,
+                wMm: 40,
+                hMm: 25,
+                isCustom: false
+            };
 
             document.addEventListener('DOMContentLoaded', function() {
                 if (typeof DocsAPI === 'undefined') {
@@ -520,6 +665,11 @@
             }
 
             function insertQrCodeToEditor() {
+                if (isPdfDocument) {
+                    openPdfVisualPlacementModal(null, null, 'qrcode');
+                    return;
+                }
+
                 if (!qrCodeUrl) {
                     showSignatureScreenAlert('PERINGATAN', 'QR CODE DOKUMEN TIDAK TERSEDIA.', false);
                     return;
@@ -527,11 +677,505 @@
                 insertImageIntoOnlyOffice(qrCodeUrl, 140, 140, qrCodeToken);
             }
 
+            // --- PDF Visual Interactive Drag & Drop / Resizing Placement Tool ---
+            let activeVisualType = 'signature'; // 'signature' | 'qrcode'
+            let activeVisualTargetUserId = null;
+            let activeVisualTargetUserName = null;
+
+            function openPdfVisualPlacementModal(targetUserId = null, targetUserName = null, visualType = 'signature') {
+                const selectorModal = document.getElementById('signature-users-modal');
+                if (selectorModal && selectorModal.open) {
+                    selectorModal.close();
+                }
+
+                activeVisualType = visualType;
+                activeVisualTargetUserId = targetUserId;
+                activeVisualTargetUserName = targetUserName;
+
+                const titleEl = document.getElementById('pdf-visual-modal-title');
+                const subTitleEl = document.getElementById('pdf-visual-modal-subtitle');
+                const tagTextEl = document.getElementById('pdf-box-signer-tag-text');
+                const previewContainer = document.getElementById('pdf-box-preview-container');
+                const actionBtnText = document.getElementById('pdf-visual-action-btn-text');
+
+                if (activeVisualType === 'qrcode') {
+                    if (titleEl) titleEl.textContent = 'Atur Posisi & Ukuran QR Code';
+                    if (subTitleEl) subTitleEl.textContent = 'Geser kotak QR Code ke posisi yang diinginkan dan tarik sudut kanan bawah untuk mengatur ukuran.';
+                    if (tagTextEl) tagTextEl.textContent = 'QR Code';
+                    if (previewContainer) {
+                        const qrSrc = @json($qrCodeDataUri ?? null) || qrCodeUrl;
+                        if (qrSrc) {
+                            previewContainer.innerHTML = `<img src="${qrSrc}" alt="QR Code" class="max-h-full max-w-full object-contain filter drop-shadow-xs" />`;
+                        } else {
+                            previewContainer.innerHTML = `<span class="text-xs font-bold text-primary uppercase">[ QR Code ]</span>`;
+                        }
+                    }
+                    if (actionBtnText) actionBtnText.textContent = '{{ __("Bubuhkan QR Code Di Sini") }}';
+                } else if (targetUserId && targetUserName) {
+                    if (titleEl) titleEl.textContent = 'Atur Posisi & Ukuran TTD: ' + targetUserName.toUpperCase();
+                    if (subTitleEl) subTitleEl.textContent = 'Posisikan dan atur ukuran kotak tanda tangan untuk ' + targetUserName.toUpperCase() + ' pada halaman dokumen.';
+                    if (tagTextEl) tagTextEl.textContent = 'TTD: ' + targetUserName.toUpperCase();
+                    if (previewContainer) previewContainer.innerHTML = `<span class="text-xs font-bold text-primary uppercase tracking-wide">[ TTD: ${targetUserName} ]</span>`;
+                    if (actionBtnText) actionBtnText.textContent = '{{ __("Kirim Permintaan Tanda Tangan") }}';
+                } else {
+                    if (titleEl) titleEl.textContent = 'Atur Posisi & Ukuran Tanda Tangan Saya';
+                    if (subTitleEl) subTitleEl.textContent = 'Geser kotak TTD ke posisi yang diinginkan dan tarik sudut kanan bawah untuk mengubah ukuran.';
+                    if (tagTextEl) tagTextEl.textContent = 'Geser TTD';
+                    if (previewContainer) {
+                        if (mySignatureUrl) {
+                            previewContainer.innerHTML = `<img src="${mySignatureUrl}" alt="Signature" class="max-h-full max-w-full object-contain filter drop-shadow-xs" />`;
+                        } else {
+                            previewContainer.innerHTML = `<span class="text-xs font-bold text-primary/80 uppercase italic tracking-wide">[ {{ __("Tanda Tangan") }} ]</span>`;
+                        }
+                    }
+                    if (actionBtnText) actionBtnText.textContent = '{{ __("Bubuhkan TTD Saya Di Sini") }}';
+                }
+
+                const visualModal = document.getElementById('pdf-visual-signature-modal');
+                if (!visualModal) return;
+                visualModal.showModal();
+
+                if (!pdfDocInstance && pdfFileSourceUrl) {
+                    loadVisualPdfDocument(pdfFileSourceUrl);
+                } else if (pdfDocInstance) {
+                    setTimeout(() => renderVisualPdfPage(currentVisualPdfPage), 50);
+                }
+            }
+
+            function closePdfVisualPlacementModal() {
+                const visualModal = document.getElementById('pdf-visual-signature-modal');
+                if (visualModal) visualModal.close();
+                activeVisualType = 'signature';
+                activeVisualTargetUserId = null;
+                activeVisualTargetUserName = null;
+            }
+
+            function loadVisualPdfDocument(url) {
+                const loadingEl = document.getElementById('pdf-visual-loading');
+                if (loadingEl) loadingEl.classList.remove('hidden');
+
+                if (typeof pdfjsLib === 'undefined') {
+                    alert('Library PDF.js belum selesai dimuat. Silakan muat ulang halaman.');
+                    return;
+                }
+
+                pdfjsLib.getDocument(url).promise.then(doc => {
+                    pdfDocInstance = doc;
+                    totalVisualPdfPages = doc.numPages;
+                    currentVisualPdfPage = totalVisualPdfPages; // Default to last page
+                    
+                    const totalEl = document.getElementById('pdf-visual-total-page-num');
+                    if (totalEl) totalEl.textContent = totalVisualPdfPages;
+                    
+                    setTimeout(() => {
+                        renderVisualPdfPage(currentVisualPdfPage);
+                        initInteractiveBoxDragAndResize();
+                    }, 50);
+                }).catch(err => {
+                    console.error('Error loading PDF in visual tool:', err);
+                    if (loadingEl) {
+                        loadingEl.innerHTML = '<p class="text-xs text-error font-bold uppercase">{{ __("Gagal memuat pratinjau PDF.") }}</p>';
+                    }
+                });
+            }
+
+            function renderVisualPdfPage(pageNumber) {
+                if (!pdfDocInstance) return;
+                const loadingEl = document.getElementById('pdf-visual-loading');
+                if (loadingEl) loadingEl.classList.remove('hidden');
+
+                currentVisualPdfPage = Math.max(1, Math.min(pageNumber, totalVisualPdfPages));
+                const currentEl = document.getElementById('pdf-visual-current-page-num');
+                if (currentEl) currentEl.textContent = currentVisualPdfPage;
+                visualPlacementCoords.page = currentVisualPdfPage;
+
+                pdfDocInstance.getPage(currentVisualPdfPage).then(page => {
+                    const canvas = document.getElementById('pdf-render-canvas');
+                    const wrapper = document.getElementById('pdf-page-wrapper');
+                    const workspace = document.getElementById('pdf-workspace-viewport');
+                    const context = canvas.getContext('2d');
+
+                    const availWidth = workspace ? (workspace.clientWidth - 48) : (window.innerWidth - 60);
+                    const unscaledViewport = page.getViewport({ scale: 1.0 });
+                    const targetWidth = Math.min(Math.max(280, availWidth), 800);
+                    pdfPageScale = targetWidth / unscaledViewport.width;
+                    pdfViewport = page.getViewport({ scale: pdfPageScale });
+
+                    canvas.width = pdfViewport.width;
+                    canvas.height = pdfViewport.height;
+                    wrapper.style.width = pdfViewport.width + 'px';
+                    wrapper.style.height = pdfViewport.height + 'px';
+
+                    const renderContext = {
+                        canvasContext: context,
+                        viewport: pdfViewport
+                    };
+
+                    page.render(renderContext).promise.then(() => {
+                        if (loadingEl) loadingEl.classList.add('hidden');
+                        
+                        const dragBox = document.getElementById('pdf-signature-drag-box');
+                        if (dragBox && (!dragBox.dataset.positioned || dragBox.dataset.page != currentVisualPdfPage)) {
+                            const boxW = Math.min(150, pdfViewport.width * 0.35);
+                            const boxH = Math.min(85, pdfViewport.height * 0.18);
+                            const initLeft = pdfViewport.width - boxW - 35;
+                            const initTop = pdfViewport.height - boxH - 45;
+
+                            dragBox.style.width = boxW + 'px';
+                            dragBox.style.height = boxH + 'px';
+                            dragBox.style.left = Math.max(15, initLeft) + 'px';
+                            dragBox.style.top = Math.max(15, initTop) + 'px';
+                            dragBox.dataset.positioned = "true";
+                            dragBox.dataset.page = currentVisualPdfPage;
+                        }
+                        updateCoordinateMetrics();
+                    });
+                });
+            }
+
+            function changeVisualPdfPage(delta) {
+                if (!pdfDocInstance) return;
+                const next = currentVisualPdfPage + delta;
+                if (next >= 1 && next <= totalVisualPdfPages) {
+                    renderVisualPdfPage(next);
+                }
+            }
+
+            function updateCoordinateMetrics() {
+                const dragBox = document.getElementById('pdf-signature-drag-box');
+                const canvas = document.getElementById('pdf-render-canvas');
+                if (!dragBox || !canvas || !pdfViewport) return;
+
+                const boxLeft = parseFloat(dragBox.style.left) || 0;
+                const boxTop = parseFloat(dragBox.style.top) || 0;
+                const boxWidth = parseFloat(dragBox.style.width) || 120;
+                const boxHeight = parseFloat(dragBox.style.height) || 70;
+
+                const mmPerPt = 25.4 / 72;
+                const unscaledW = pdfViewport.width / pdfPageScale;
+                const unscaledH = pdfViewport.height / pdfPageScale;
+                const pdfWidthMm = unscaledW * mmPerPt;
+                const pdfHeightMm = unscaledH * mmPerPt;
+
+                const mmPerPxX = pdfWidthMm / canvas.width;
+                const mmPerPxY = pdfHeightMm / canvas.height;
+
+                const finalXMm = Math.round(boxLeft * mmPerPxX * 10) / 10;
+                const finalYMm = Math.round(boxTop * mmPerPxY * 10) / 10;
+                const finalWMm = Math.round(boxWidth * mmPerPxX * 10) / 10;
+                const finalHMm = Math.round(boxHeight * mmPerPxY * 10) / 10;
+
+                visualPlacementCoords = {
+                    page: currentVisualPdfPage,
+                    xMm: finalXMm,
+                    yMm: finalYMm,
+                    wMm: finalWMm,
+                    hMm: finalHMm,
+                    isCustom: true
+                };
+
+                const elX = document.getElementById('pdf-coord-x');
+                const elY = document.getElementById('pdf-coord-y');
+                const elW = document.getElementById('pdf-coord-w');
+                const elH = document.getElementById('pdf-coord-h');
+                if (elX) elX.textContent = finalXMm;
+                if (elY) elY.textContent = finalYMm;
+                if (elW) elW.textContent = finalWMm;
+                if (elH) elH.textContent = finalHMm;
+                
+                const dimPreview = document.getElementById('pdf-box-dim-preview');
+                if (dimPreview) dimPreview.textContent = `${finalWMm}×${finalHMm}mm`;
+            }
+
+            function initInteractiveBoxDragAndResize() {
+                const dragBox = document.getElementById('pdf-signature-drag-box');
+                const resizeHandle = document.getElementById('pdf-sig-resize-handle');
+                const overlay = document.getElementById('pdf-interactive-overlay');
+                if (!dragBox || !resizeHandle || !overlay) return;
+
+                let isDragging = false;
+                let isResizing = false;
+                let startX = 0;
+                let startY = 0;
+                let startLeft = 0;
+                let startTop = 0;
+                let startWidth = 0;
+                let startHeight = 0;
+
+                dragBox.addEventListener('pointerdown', function(e) {
+                    if (e.target === resizeHandle || resizeHandle.contains(e.target)) return;
+                    isDragging = true;
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    startLeft = parseFloat(dragBox.style.left) || 0;
+                    startTop = parseFloat(dragBox.style.top) || 0;
+                    dragBox.setPointerCapture(e.pointerId);
+                    dragBox.classList.add('ring-2', 'ring-primary', 'shadow-2xl');
+                    e.preventDefault();
+                });
+
+                resizeHandle.addEventListener('pointerdown', function(e) {
+                    isResizing = true;
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    startWidth = parseFloat(dragBox.style.width) || 120;
+                    startHeight = parseFloat(dragBox.style.height) || 70;
+                    resizeHandle.setPointerCapture(e.pointerId);
+                    e.stopPropagation();
+                    e.preventDefault();
+                });
+
+                window.addEventListener('pointermove', function(e) {
+                    if (isDragging) {
+                        const dx = e.clientX - startX;
+                        const dy = e.clientY - startY;
+                        const overlayW = overlay.clientWidth;
+                        const overlayH = overlay.clientHeight;
+                        const boxW = dragBox.offsetWidth;
+                        const boxH = dragBox.offsetHeight;
+
+                        let newLeft = startLeft + dx;
+                        let newTop = startTop + dy;
+
+                        newLeft = Math.max(0, Math.min(newLeft, overlayW - boxW));
+                        newTop = Math.max(0, Math.min(newTop, overlayH - boxH));
+
+                        dragBox.style.left = newLeft + 'px';
+                        dragBox.style.top = newTop + 'px';
+                        updateCoordinateMetrics();
+                    } else if (isResizing) {
+                        const dx = e.clientX - startX;
+                        const dy = e.clientY - startY;
+                        const overlayW = overlay.clientWidth;
+                        const overlayH = overlay.clientHeight;
+                        const boxLeft = parseFloat(dragBox.style.left) || 0;
+                        const boxTop = parseFloat(dragBox.style.top) || 0;
+
+                        let newW = Math.max(70, startWidth + dx);
+                        let newH = Math.max(45, startHeight + dy);
+
+                        newW = Math.min(newW, overlayW - boxLeft);
+                        newH = Math.min(newH, overlayH - boxTop);
+
+                        dragBox.style.width = newW + 'px';
+                        dragBox.style.height = newH + 'px';
+                        updateCoordinateMetrics();
+                    }
+                });
+
+                window.addEventListener('pointerup', function(e) {
+                    if (isDragging) {
+                        isDragging = false;
+                        dragBox.classList.remove('ring-2', 'ring-primary', 'shadow-2xl');
+                    }
+                    if (isResizing) {
+                        isResizing = false;
+                    }
+                });
+
+                let resizeDebounceTimer = null;
+                window.addEventListener('resize', function() {
+                    const visualModal = document.getElementById('pdf-visual-signature-modal');
+                    if (visualModal && visualModal.open && pdfDocInstance) {
+                        clearTimeout(resizeDebounceTimer);
+                        resizeDebounceTimer = setTimeout(() => {
+                            renderVisualPdfPage(currentVisualPdfPage);
+                        }, 150);
+                    }
+                });
+            }
+
+            function submitActiveVisualAction() {
+                if (!visualPlacementCoords.isCustom) {
+                    updateCoordinateMetrics();
+                }
+
+                if (activeVisualType === 'qrcode') {
+                    stampMyVisualQrCode();
+                } else if (activeVisualTargetUserId) {
+                    submitVisualSignatureRequest(activeVisualTargetUserId, activeVisualTargetUserName);
+                } else {
+                    stampMyVisualSignature();
+                }
+            }
+
+            function stampMyVisualQrCode() {
+                const payload = {
+                    page_number: visualPlacementCoords.page,
+                    pos_x: visualPlacementCoords.xMm,
+                    pos_y: visualPlacementCoords.yMm,
+                    width: visualPlacementCoords.wMm,
+                    height: visualPlacementCoords.hMm,
+                    preset_position: 'custom'
+                };
+
+                const btn = document.getElementById('pdf-visual-action-btn');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="loading loading-spinner loading-xs mr-1"></span> {{ __("Memproses...") }}';
+                }
+
+                fetch('{{ route("documents.stamp-qrcode", $document) }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                })
+                .then(res => res.json().then(data => ({ status: res.status, data: data })))
+                .then(response => {
+                    closePdfVisualPlacementModal();
+                    if (response.status === 200 && response.data.success) {
+                        showSignatureScreenAlert('BERHASIL', response.data.message || 'QR CODE VERIFIKASI BERHASIL DIBUBUHKAN SESUAI POSISI & UKURAN VISUAL.', true);
+                        setTimeout(() => window.location.reload(), 1200);
+                    } else {
+                        showSignatureScreenAlert('GAGAL MEMBUBUHKAN QR CODE', response.data.message || 'GAGAL MEMPROSES QR CODE.', false);
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.textContent = '{{ __("Bubuhkan QR Code Di Sini") }}';
+                        }
+                    }
+                })
+                .catch(() => {
+                    closePdfVisualPlacementModal();
+                    showSignatureScreenAlert('KESALAHAN SISTEM', 'GAGAL MENGHUBUNGI SERVER.', false);
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.textContent = '{{ __("Bubuhkan QR Code Di Sini") }}';
+                    }
+                });
+            }
+
+            function submitVisualSignatureRequest(userId, userName) {
+                const btn = document.getElementById('pdf-visual-action-btn');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="loading loading-spinner loading-xs mr-1"></span> {{ __("Mengirim...") }}';
+                }
+
+                const queryStr = `&page_number=${visualPlacementCoords.page}&preset_position=custom&pos_x=${visualPlacementCoords.xMm}&pos_y=${visualPlacementCoords.yMm}&width=${visualPlacementCoords.wMm}&height=${visualPlacementCoords.hMm}`;
+
+                fetch(`/profile/signature?user_id=${userId}&document_id={{ $document->id }}${queryStr}`)
+                    .then(res => res.json().then(data => ({ status: res.status, data: data })))
+                    .then(response => {
+                        closePdfVisualPlacementModal();
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.textContent = '{{ __("Kirim Permintaan Tanda Tangan") }}';
+                        }
+                        if (response.status === 200 && response.data.success) {
+                            showSignatureScreenAlert(
+                                'PERMINTAAN TANDA TANGAN DIKIRIM',
+                                (response.data.message || 'PERMINTAAN TANDA TANGAN BERHASIL DIKIRIM.') + ' KETIKA DISETUJUI, TANDA TANGAN AKAN OTOMATIS DIBUBUHKAN PADA DOKUMEN PDF SESUAI POSISI & UKURAN YANG TELAH DIATUR.',
+                                true
+                            );
+                        } else {
+                            showSignatureScreenAlert('GAGAL MENGIRIM PERMINTAAN', response.data.message || 'GAGAL MENGIRIM PERMINTAAN TANDA TANGAN.', false);
+                        }
+                    })
+                    .catch(() => {
+                        closePdfVisualPlacementModal();
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.textContent = '{{ __("Kirim Permintaan Tanda Tangan") }}';
+                        }
+                        showSignatureScreenAlert('KESALAHAN SISTEM', 'GAGAL MENGHUBUNGI SERVER.', false);
+                    });
+            }
+
+            function stampMyVisualSignature() {
+                if (!visualPlacementCoords.isCustom) {
+                    updateCoordinateMetrics();
+                }
+
+                const payload = {
+                    page_number: visualPlacementCoords.page,
+                    pos_x: visualPlacementCoords.xMm,
+                    pos_y: visualPlacementCoords.yMm,
+                    width: visualPlacementCoords.wMm,
+                    height: visualPlacementCoords.hMm,
+                    preset_position: 'custom'
+                };
+
+                const btn = document.getElementById('pdf-visual-action-btn');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="loading loading-spinner loading-xs mr-1"></span> {{ __("Memproses...") }}';
+                }
+
+                fetch('{{ route("documents.stamp-signature", $document) }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                })
+                .then(res => res.json().then(data => ({ status: res.status, data: data })))
+                .then(response => {
+                    closePdfVisualPlacementModal();
+                    if (response.status === 200 && response.data.success) {
+                        showSignatureScreenAlert('BERHASIL', 'TANDA TANGAN SAYA BERHASIL DIBUBUHKAN SESUAI POSISI & UKURAN VISUAL.', true);
+                        setTimeout(() => window.location.reload(), 1200);
+                    } else {
+                        showSignatureScreenAlert('GAGAL MEMBUBUHKAN TTD', response.data.message || 'GAGAL MEMPROSES TANDA TANGAN.', false);
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.textContent = '{{ __("Bubuhkan TTD Saya Di Sini") }}';
+                        }
+                    }
+                })
+                .catch(() => {
+                    closePdfVisualPlacementModal();
+                    showSignatureScreenAlert('KESALAHAN SISTEM', 'GAGAL MENGHUBUNGI SERVER.', false);
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.textContent = '{{ __("Bubuhkan TTD Saya Di Sini") }}';
+                    }
+                });
+            }
+
+            function confirmRevertPdfSignature() {
+                if (!confirm('{{ __("Apakah Anda yakin ingin membatalkan tanda tangan yang paling terakhir ditambahkan pada dokumen PDF ini?") }}')) {
+                    return;
+                }
+
+                fetch('{{ route("documents.revert-pdf-signature", $document) }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(res => res.json().then(data => ({ status: res.status, data: data })))
+                .then(response => {
+                    if (response.status === 200 && response.data.success) {
+                        showSignatureScreenAlert('BERHASIL', response.data.message || 'TANDA TANGAN BERHASIL DIHAPUS.', true);
+                        setTimeout(() => window.location.reload(), 1200);
+                    } else {
+                        showSignatureScreenAlert('GAGAL MENGHAPUS TTD', response.data.message || 'TIDAK DAPAT MENGHAPUS TANDA TANGAN.', false);
+                    }
+                })
+                .catch(() => {
+                    showSignatureScreenAlert('KESALAHAN SISTEM', 'GAGAL MENGHUBUNGI SERVER.', false);
+                });
+            }
+
             function insertMySignature() {
+                if (isPdfDocument) {
+                    openPdfVisualPlacementModal(null, null);
+                    return;
+                }
+
                 if (!mySignatureUrl) {
                     showSignatureScreenAlert('PERINGATAN', 'ANDA BELUM MEMILIKI TANDA TANGAN TERSIMPAN.', false);
                     return;
                 }
+
                 insertImageIntoOnlyOffice(mySignatureUrl, 140, 140, mySignatureToken);
                 showSignatureScreenAlert('BERHASIL', 'TANDA TANGAN SAYA BERHASIL DISISIPKAN KE DALAM DOKUMEN.', true);
             }
@@ -666,7 +1310,7 @@
                                 <span class="badge badge-error badge-xs gap-1 py-1 px-2 font-bold uppercase text-white">
                                     ✕ {{ __('Ditolak') }}
                                 </span>
-                                <button type="button" onclick="fetchUserSignatureAndInsert(${u.id}, '${u.name}')" class="btn btn-xs btn-outline btn-error gap-1 uppercase font-bold">
+                                <button type="button" onclick="${isPdfDocument ? `openPdfVisualPlacementModal(${u.id}, '${u.name}')` : `fetchUserSignatureAndInsert(${u.id}, '${u.name}')`}" class="btn btn-xs btn-outline btn-error gap-1 uppercase font-bold">
                                     {{ __('MINTA LAGI') }}
                                 </button>
                             </div>
@@ -677,14 +1321,14 @@
                                 <span class="badge badge-ghost badge-xs text-base-content/60 gap-1 py-2 px-2 font-bold uppercase">
                                     ✓ {{ __('SUDAH DIGUNAKAN') }}
                                 </span>
-                                <button type="button" onclick="fetchUserSignatureAndInsert(${u.id}, '${u.name}')" class="btn btn-xs btn-outline btn-primary gap-1 uppercase font-bold">
+                                <button type="button" onclick="${isPdfDocument ? `openPdfVisualPlacementModal(${u.id}, '${u.name}')` : `fetchUserSignatureAndInsert(${u.id}, '${u.name}')`}" class="btn btn-xs btn-outline btn-primary gap-1 uppercase font-bold">
                                     {{ __('MINTA LAGI') }}
                                 </button>
                             </div>
                         `;
                     } else {
                         actionHtml = `
-                            <button type="button" onclick="fetchUserSignatureAndInsert(${u.id}, '${u.name}')" class="btn btn-xs btn-outline btn-primary gap-1 uppercase font-bold">
+                            <button type="button" onclick="${isPdfDocument ? `openPdfVisualPlacementModal(${u.id}, '${u.name}')` : `fetchUserSignatureAndInsert(${u.id}, '${u.name}')`}" class="btn btn-xs btn-outline btn-primary gap-1 uppercase font-bold">
                                 {{ __('MINTA TTD') }}
                             </button>
                         `;
@@ -736,6 +1380,15 @@
                 .then(response => {
                     const data = response.data;
                     if (response.status === 200 && data.success && data.url) {
+                        if (data.is_pdf || isPdfDocument) {
+                            showSignatureScreenAlert(
+                                'TANDA TANGAN DIBUBUHKAN PADA PDF',
+                                'TANDA TANGAN RESMI DARI ' + userName.toUpperCase() + ' TELAH BERHASIL DIBUBUHKAN PADA DOKUMEN PDF.',
+                                true
+                            );
+                            setTimeout(() => window.location.reload(), 1200);
+                            return;
+                        }
                         
                         if (window.docEditor && window.docEditor.createConnector) {
                             try {
@@ -802,17 +1455,28 @@
 
             function fetchUserSignatureAndInsert(userId, userName) {
                 document.getElementById('signature-users-modal').close();
-                fetch(`/profile/signature?user_id=${userId}&document_id={{ $document->id }}`)
+                const params = isPdfDocument ? getPdfPlacementParams() : {};
+                let queryStr = '';
+                if (isPdfDocument) {
+                    queryStr = `&page_number=${params.page_number}&preset_position=${params.preset_position}`;
+                    if (params.pos_x !== undefined) {
+                        queryStr += `&pos_x=${params.pos_x}&pos_y=${params.pos_y}&width=${params.width}&height=${params.height}`;
+                    }
+                }
+
+                fetch(`/profile/signature?user_id=${userId}&document_id={{ $document->id }}${queryStr}`)
                     .then(res => res.json().then(data => ({ status: res.status, data: data })))
                     .then(response => {
                         const data = response.data;
                         if (response.status === 200 && data.success && data.url) {
-                            insertSignatureImage(data.url, userName, data.token || null, data.is_pending || false, data.request_id || null);
+                            if (!isPdfDocument) {
+                                insertSignatureImage(data.url, userName, data.token || null, data.is_pending || false, data.request_id || null);
+                            }
                             if (data.message) {
                                 setTimeout(() => {
                                     showSignatureScreenAlert(
                                         'PERMINTAAN TANDA TANGAN DIKIRIM',
-                                        data.message,
+                                        data.message + (isPdfDocument ? ' KETIKA DISETUJUI, TANDA TANGAN AKAN OTOMATIS DIBUBUHKAN PADA DOKUMEN PDF.' : ''),
                                         true
                                     );
                                 }, 400);

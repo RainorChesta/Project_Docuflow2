@@ -12,7 +12,7 @@ class Document extends Model
 {
     use SoftDeletes;
     protected $fillable = [
-        'document_number', 'title', 'summary', 'summary_status', 'summary_error',
+        'document_number', 'format_choice', 'numbering_scheme', 'title', 'summary', 'summary_status', 'summary_error',
         'summary_started_at', 'summary_completed_at', 'visibility', 'division_id', 'unit_kerja_id', 'company_id', 'branch_id', 'owner_id',
         'document_type_id', 'template_id', 'is_public', 'current_version_id',
         'pending_rollback_version_id', 'rollback_requested_by_id', 'rollback_requested_at',
@@ -20,6 +20,7 @@ class Document extends Model
         'paper_size', 'paper_margin',
         'general_access', 'link_role', 'share_token',
         'expiration_date', 'is_expired', 'is_expiration_notified', 'expiration_notif_status',
+        'approver_id', 'approver_role',
     ];
 
     protected function casts(): array
@@ -116,6 +117,16 @@ class Document extends Model
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_id');
+    }
+
+    public function approverUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approver_id');
+    }
+
+    public function approvalLogs(): HasMany
+    {
+        return $this->hasMany(DocumentApprovalLog::class);
     }
 
     public function currentVersion(): BelongsTo

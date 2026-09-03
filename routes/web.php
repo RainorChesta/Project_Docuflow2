@@ -54,6 +54,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/signature-requests/{signatureRequest}/approve', [SignatureController::class, 'approve'])->name('signatures.requests.approve');
     Route::post('/signature-requests/{signatureRequest}/reject', [SignatureController::class, 'reject'])->name('signatures.requests.reject');
     Route::post('/signature-requests/{signatureRequest}/consume', [SignatureController::class, 'consume'])->name('signatures.requests.consume');
+    Route::post('/documents/{document}/stamp-signature', [SignatureController::class, 'stampPdfSignature'])->name('documents.stamp-signature');
+    Route::post('/documents/{document}/stamp-qrcode', [SignatureController::class, 'stampPdfQrCode'])->name('documents.stamp-qrcode');
+    Route::post('/documents/{document}/revert-pdf-signature', [SignatureController::class, 'revertPdfSignature'])->name('documents.revert-pdf-signature');
 
     // Documents
     Route::get('/documents/choose', [DocumentController::class, 'choose'])->name('documents.choose');

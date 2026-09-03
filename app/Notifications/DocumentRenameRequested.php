@@ -35,7 +35,7 @@ class DocumentRenameRequested extends Notification
                 'old'       => $this->document->title,
                 'new'       => $this->requestedTitle,
             ]),
-            'url'             => route('approvals.index'),
+            'url'             => route('documents.show', $this->document->id),
             'icon'            => 'approval',
             'document_id'     => $this->document->id,
             'requested_title' => $this->requestedTitle,

@@ -35,7 +35,7 @@ class DocumentRollbackRequested extends Notification
                 'doc'       => $this->document->title,
                 'ver'       => $this->targetVersion->version_number,
             ]),
-            'url'     => route('approvals.index'),
+            'url'     => route('documents.show', $this->document->id),
             'icon'    => 'approval',
             'document_id' => $this->document->id
         ];

@@ -7,6 +7,7 @@ use App\Models\DocumentTemplate;
 use App\Models\DocumentType;
 use App\Models\Division;
 use App\Models\DocumentVersion;
+use App\Services\ApprovalRoutingService;
 use App\Services\AuditService;
 use App\Services\DocumentService;
 use App\Services\QrCodeService;
@@ -26,6 +27,7 @@ class DocumentController extends Controller
         protected AuditService $auditService,
         protected QrCodeService $qrCodeService,
         protected \App\Services\OnlyOfficeService $onlyOfficeService,
+        protected ApprovalRoutingService $approvalRoutingService,
     ) {}
 
     private function getApprovedSignatures(Document $document): array
@@ -276,7 +278,10 @@ class DocumentController extends Controller
             'branch_id' => 'nullable|exists:branches,id',
             'division_id' => 'nullable|exists:divisions,id',
             'unit_kerja_id' => 'nullable|exists:unit_kerjas,id',
+            'format_choice' => 'nullable|in:lama,baru',
         ]);
+
+        $formatChoice = $validated['format_choice'] ?? 'baru';
 
         $user = auth()->user();
         $divisionId = ($user->isAdmin() || $user->isDirector())
@@ -291,7 +296,7 @@ class DocumentController extends Controller
         $branch = $branchId ? \App\Models\Branch::with('company')->find($branchId) : null;
 
         return response()->json([
-            'number' => $this->documentService->previewNumber($division, $documentType, $branch, $unitKerja),
+            'number' => $this->documentService->previewNumber($formatChoice, $division, $documentType, $branch, $unitKerja),
         ]);
     }
 
@@ -308,14 +313,13 @@ class DocumentController extends Controller
             $dt = DocumentType::find($request->input('document_type_id'));
             $isSop = ($dt && strtoupper($dt->code) === 'SOP');
         }
+        
+        $formatChoice = $request->input('format_choice', 'baru');
 
         $rules = [
             'title' => 'required|string|max:255',
+            'format_choice' => 'required|in:lama,baru',
             'document_type_id' => 'required|exists:document_types,id',
-            'division_id' => ($user->isAdmin() || $user->isDirector())
-                ? ($isSop ? 'nullable|exists:divisions,id' : 'required|exists:divisions,id')
-                : 'nullable',
-            'unit_kerja_id' => $isSop ? 'required|exists:unit_kerjas,id' : 'nullable|exists:unit_kerjas,id',
             'branch_id' => 'nullable|exists:branches,id',
             'branch_ids' => 'nullable|array',
             'branch_ids.*' => 'exists:branches,id',
@@ -323,23 +327,27 @@ class DocumentController extends Controller
             'expiration_date' => 'nullable|date',
             'template_id' => 'nullable|exists:document_templates,id',
         ];
+        
+        if ($formatChoice === 'lama') {
+            $rules['division_id'] = 'nullable|exists:divisions,id';
+            $rules['unit_kerja_id'] = $isSop ? 'required|exists:unit_kerjas,id' : 'nullable|exists:unit_kerjas,id';
+        } else {
+            $rules['division_id'] = ($user->isAdmin() || $user->isDirector()) ? 'required|exists:divisions,id' : 'nullable';
+            $rules['unit_kerja_id'] = 'nullable|exists:unit_kerjas,id';
+        }
 
         if ($isUpload) {
             $rules['file'] = 'required|file|mimes:pdf,docx|max:10240';
-            $rules['document_number'] = [
-                'required',
-                'string',
-                'max:100',
-                'unique:documents,document_number',
-                // Format resmi: seq/tipe/divisi_atau_unit_kerja/cabang/bulan-romawi/tahun (contoh: 029/S.ED/HRD/JBM/VIII/2026 atau 001/SOP-11/CDC-DIP/I/2023)
-                'regex:/^\d{3}\/[A-Z0-9.\-]+(?:\/[A-Z0-9.\-]+){1,2}\/(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII)\/\d{4}$/',
-            ];
+            $rules['document_number'] = 'required|string|max:100|unique:documents,document_number';
         }
 
         $validated = $request->validate($rules, [
-            'document_number.regex' => 'Format nomor tidak sesuai. Contoh: 029/S.ED/HRD/JBM/VIII/2026 atau 001/SOP-11/CDC-DIP/I/2023',
-            'unit_kerja_id.required' => __('Unit kerja wajib dipilih untuk dokumen SOP.'),
+            'document_number.unique' => __('Nomor dokumen sudah digunakan.'),
+            'document_number.required' => __('Nomor dokumen wajib diisi saat mengunggah dokumen fisik.'),
+            'unit_kerja_id.required' => __('Unit kerja wajib dipilih untuk dokumen SOP dengan format lama.'),
         ]);
+        
+        $validated['numbering_scheme'] = $formatChoice === 'baru' ? 'new_format' : ($isSop ? 'legacy_sop' : 'legacy_general');
 
         $branchIds = (array) $request->input('branch_ids', []);
 
@@ -705,23 +713,24 @@ class DocumentController extends Controller
             'version_number' => $version->version_number,
         ]);
 
-        // Notify Division Heads about pending approval
-        if ($document->division_id) {
-            $heads = \App\Models\User::where('division_id', $document->division_id)
-                ->where('system_role', 'head')
-                ->where('id', '!=', $user->id)
-                ->where(function ($q) use ($document) {
-                    if ($document->branch_id) {
-                        $q->whereHas('branches', fn($bq) => $bq->where('branches.id', $document->branch_id));
-                    } elseif ($document->company_id) {
-                        $q->whereHas('companies', fn($cq) => $cq->where('companies.id', $document->company_id));
-                    }
-                })
-                ->get();
+        // Dynamic approval routing: Head → Admin → Direktur fallback
+        $resolution = $this->approvalRoutingService->resolveApprover($document, $user);
+        $this->approvalRoutingService->applyToDocument($document, $resolution);
 
-            foreach ($heads as $head) {
-                $head->notify(new \App\Notifications\DocumentApprovalRequested($document, $version, $user->name));
-            }
+        // Notify the resolved approver(s)
+        foreach ($resolution['approvers'] as $approver) {
+            $approver->notify(new \App\Notifications\DocumentApprovalRequested($document, $version, $user->name));
+        }
+
+        // Notify the requester about who will approve
+        if ($resolution['role'] !== null) {
+            $user->notify(new \App\Notifications\ApprovalRouteResolved(
+                $document,
+                $resolution['role'],
+                $resolution['approvers']->pluck('name')->join(', '),
+                $resolution['message'],
+                $resolution['isFallback'],
+            ));
         }
 
         $message = $version->wasRecentlyCreated
@@ -800,23 +809,24 @@ class DocumentController extends Controller
             'version_number' => $version->version_number,
         ]);
 
-        // Notify Division Heads about pending approval
-        if ($document->division_id) {
-            $heads = \App\Models\User::where('division_id', $document->division_id)
-                ->where('system_role', 'head')
-                ->where('id', '!=', $user->id)
-                ->where(function ($q) use ($document) {
-                    if ($document->branch_id) {
-                        $q->whereHas('branches', fn($bq) => $bq->where('branches.id', $document->branch_id));
-                    } elseif ($document->company_id) {
-                        $q->whereHas('companies', fn($cq) => $cq->where('companies.id', $document->company_id));
-                    }
-                })
-                ->get();
+        // Dynamic approval routing: Head → Admin → Direktur fallback
+        $resolution = $this->approvalRoutingService->resolveApprover($document, $user);
+        $this->approvalRoutingService->applyToDocument($document, $resolution);
 
-            foreach ($heads as $head) {
-                $head->notify(new \App\Notifications\DocumentApprovalRequested($document, $version, $user->name));
-            }
+        // Notify the resolved approver(s)
+        foreach ($resolution['approvers'] as $approver) {
+            $approver->notify(new \App\Notifications\DocumentApprovalRequested($document, $version, $user->name));
+        }
+
+        // Notify the requester about who will approve
+        if ($resolution['role'] !== null) {
+            $user->notify(new \App\Notifications\ApprovalRouteResolved(
+                $document,
+                $resolution['role'],
+                $resolution['approvers']->pluck('name')->join(', '),
+                $resolution['message'],
+                $resolution['isFallback'],
+            ));
         }
 
         return redirect()->route('documents.show', $document)->with('success', __('Versi baru diunggah. Menunggu persetujuan.'));

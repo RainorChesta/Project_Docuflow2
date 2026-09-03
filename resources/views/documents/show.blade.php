@@ -502,6 +502,28 @@
                             @if($isCrossBranch)
                                 <span class="badge badge-secondary badge-sm shrink-0" title="Dokumen Lintas Cabang">↗ Lintas Cabang</span>
                             @endif
+                            @if($document->approver_role && $pendingVersion)
+                                @php
+                                    $roleColors = [
+                                        'head' => 'badge-primary badge-outline',
+                                        'admin' => 'badge-warning badge-outline',
+                                        'direktur' => 'badge-error badge-outline'
+                                    ];
+                                    $roleLabels = [
+                                        'head' => 'Head',
+                                        'admin' => 'Admin (Fallback)',
+                                        'direktur' => 'Direktur (Fallback)'
+                                    ];
+                                    $badgeColor = $roleColors[$document->approver_role] ?? 'badge-ghost';
+                                    $badgeLabel = $roleLabels[$document->approver_role] ?? ucfirst($document->approver_role);
+                                @endphp
+                                <span class="badge {{ $badgeColor }} badge-sm shrink-0" title="{{ __('Jalur Persetujuan Saat Ini') }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    {{ __('Route: :role', ['role' => $badgeLabel]) }}
+                                </span>
+                            @endif
                         </div>
                         @if($document->document_number)
                             <div class="shrink-0 self-start sm:self-center">
