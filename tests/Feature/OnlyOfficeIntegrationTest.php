@@ -185,6 +185,25 @@ class OnlyOfficeIntegrationTest extends TestCase
         $response->assertHeader('Content-Type', 'image/png');
     }
 
+    public function test_onlyoffice_signature_image_endpoint_serves_specific_stamp_png_binary()
+    {
+        Storage::fake('public');
+        $stampPath = 'signatures/stamp_test.png';
+        Storage::disk('public')->put($stampPath, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='));
+
+        $stamp = \App\Models\Signature::create([
+            'user_id' => $this->user->id,
+            'file_path' => $stampPath,
+            'type' => 'company_stamp',
+            'created_via' => 'upload',
+        ]);
+
+        $response = $this->get(route('onlyoffice.signature.image', ['signature' => $stamp->id]));
+
+        $response->assertStatus(200);
+        $response->assertHeader('Content-Type', 'image/png');
+    }
+
     public function test_onlyoffice_qrcode_endpoint_serves_png_binary()
     {
         $response = $this->get(route('onlyoffice.qrcode', ['document' => $this->document->id]));
@@ -242,8 +261,8 @@ class OnlyOfficeIntegrationTest extends TestCase
         ]);
         $response->assertJson([
             'success' => true,
-            'url' => 'http://host.docker.internal:8000/onlyoffice/users/' . $this->user->id . '/signature.png',
         ]);
+        $this->assertStringContainsString('/onlyoffice/signatures/', $response->json('url'));
     }
 
     public function test_onlyoffice_keys_are_isolated_per_document_version()

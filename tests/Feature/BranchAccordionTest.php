@@ -31,12 +31,12 @@ class BranchAccordionTest extends TestCase
         $response->assertViewHas('companies');
 
         // Check column header
-        $response->assertSee('Jumlah Cabang');
+        $response->assertSee(__('Jumlah Cabang'));
 
         // Check Company A and its Pusat
         $response->assertSee('PT ALFA HARMONI');
         $response->assertSee('PUSAT ALFA');
-        $response->assertSee('2 Cabang');
+        $response->assertSee('2 ' . __('Cabang'));
         $response->assertSee('CABANG BANDUNG');
         $response->assertSee('CABANG SURABAYA');
         $response->assertSee('BDG');
@@ -45,7 +45,7 @@ class BranchAccordionTest extends TestCase
         // Check Company B and its Pusat
         $response->assertSee('PT BETA MANDIRI');
         $response->assertSee('PUSAT BETA');
-        $response->assertSee('Hanya Pusat');
+        $response->assertSee(__('Hanya Pusat'));
     }
 
     public function test_admin_can_filter_branches_by_company(): void

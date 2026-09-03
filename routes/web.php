@@ -62,6 +62,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/documents/choose', [DocumentController::class, 'choose'])->name('documents.choose');
     Route::resource('documents', DocumentController::class)->except(['edit', 'update']);
     Route::get('/document-numbers/preview', [DocumentController::class, 'nextNumber'])->name('documents.next-number');
+    Route::get('/document-numbers/check', [DocumentController::class, 'checkNumber'])->name('documents.check-number');
     Route::get('/documents/{document}/edit', [DocumentController::class, 'edit'])->name('documents.edit');
     Route::get('/documents/{document}/download', [DocumentController::class, 'download'])->name('documents.download');
     Route::get('/documents/{document}/preview', [DocumentController::class, 'preview'])->name('documents.preview');
@@ -164,6 +165,7 @@ Route::middleware('auth')->group(function () {
 // ONLYOFFICE Routes (Accessed server-to-server by ONLYOFFICE Document Server)
 Route::get('/onlyoffice/documents/{document}/versions/{version}/file', [\App\Http\Controllers\OnlyOfficeController::class, 'file'])->name('onlyoffice.file');
 Route::get('/onlyoffice/users/{user}/signature.png', [\App\Http\Controllers\OnlyOfficeController::class, 'signature'])->name('onlyoffice.signature');
+Route::get('/onlyoffice/signatures/{signature}/image.png', [\App\Http\Controllers\OnlyOfficeController::class, 'signatureImage'])->name('onlyoffice.signature.image');
 Route::get('/onlyoffice/signature-placeholder.png', [\App\Http\Controllers\OnlyOfficeController::class, 'signaturePlaceholder'])->name('onlyoffice.signature.placeholder');
 Route::get('/onlyoffice/documents/{document}/qrcode', [\App\Http\Controllers\OnlyOfficeController::class, 'qrcode'])->name('onlyoffice.qrcode');
 Route::match(['get', 'post'], '/onlyoffice/documents/{document}/callback', [\App\Http\Controllers\OnlyOfficeController::class, 'callback'])->name('onlyoffice.callback')->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class]);

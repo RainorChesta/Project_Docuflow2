@@ -160,6 +160,58 @@ class PdfSignatureFpdiTest extends TestCase
             ->assertJson(['success' => true]);
     }
 
+    public function test_user_can_stamp_their_company_stamp_on_pdf(): void
+    {
+        $user = User::factory()->create();
+        $this->createValidSignaturePng('signatures/sig_' . $user->id . '.png');
+        $this->createValidSignaturePng('signatures/stamp_' . $user->id . '.png');
+
+        Signature::create([
+            'user_id' => $user->id,
+            'file_path' => 'signatures/sig_' . $user->id . '.png',
+            'type' => 'original',
+        ]);
+
+        $stamp = Signature::create([
+            'user_id' => $user->id,
+            'file_path' => 'signatures/stamp_' . $user->id . '.png',
+            'type' => 'company_stamp',
+        ]);
+
+        $docType = DocumentType::create(['name' => 'Surat Edaran', 'code' => 'S.ED']);
+        $document = Document::create([
+            'document_number' => '003/S.ED/IT/2026',
+            'title' => 'My PDF Stamp Doc',
+            'document_type_id' => $docType->id,
+            'owner_id' => $user->id,
+            'visibility' => 'division',
+        ]);
+
+        $pdfPath = 'documents/' . $document->id . '/v1.pdf';
+        $this->createValidPdf($pdfPath);
+
+        DocumentVersion::create([
+            'document_id' => $document->id,
+            'version_number' => 1,
+            'content' => '',
+            'author_id' => $user->id,
+            'author_name' => $user->name,
+            'status' => 'draft',
+            'file_path' => $pdfPath,
+            'file_mime' => 'application/pdf',
+            'file_original_name' => 'test.pdf',
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('documents.stamp-signature', $document), [
+            'signature_id' => $stamp->id,
+            'page_number' => 1,
+            'preset_position' => 'bottom-right',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson(['success' => true]);
+    }
+
     public function test_signature_request_with_placement_stamps_pdf_upon_approval(): void
     {
         $requester = User::factory()->create(['name' => 'Requester']);

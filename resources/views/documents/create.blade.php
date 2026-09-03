@@ -162,11 +162,25 @@
                                 <span class="label-text font-medium">{{ __('Nomor Dokumen') }}</span>
                                 <span id="document-number-hint" class="label-text-alt text-base-content/50">{{ __('Preview otomatis') }}</span>
                             </label>
-                            <input type="text" id="document_number_field"
-                                   value="{{ old('document_number', $initialDocumentNumber ?? __('Pilih tipe dokumen dahulu...')) }}"
-                                   class="input input-bordered w-full font-mono bg-base-200" disabled>
+                            <div class="relative">
+                                <input type="text" id="document_number_field"
+                                       value="{{ old('document_number', $initialDocumentNumber ?? __('Pilih tipe dokumen dahulu...')) }}"
+                                       class="input input-bordered w-full font-mono bg-base-200 transition-colors pr-10" disabled>
+                                <div id="document-number-checking-spinner" class="absolute right-3 top-1/2 -translate-y-1/2 hidden">
+                                    <span class="loading loading-spinner loading-xs text-primary"></span>
+                                </div>
+                            </div>
+
+                            {{-- Dynamic availability warning/status container --}}
+                            <div id="document-number-status-container" class="mt-2 hidden">
+                                <div id="document-number-status-alert" class="alert py-2 px-3 text-xs flex items-center gap-2 rounded-xl transition-all shadow-xs">
+                                    <span id="document-number-status-icon" class="shrink-0 text-base"></span>
+                                    <span id="document-number-status-text" class="flex-1 font-medium leading-tight"></span>
+                                </div>
+                            </div>
+
                             @error('document_number') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
-                            <p class="text-xs text-base-content/50 mt-1">
+                            <p id="document-number-disclaimer" class="text-xs text-base-content/50 mt-1">
                                 {{ __('Nomor final dihitung ulang saat disimpan — preview ini hanya perkiraan.') }}
                             </p>
                         </div>
@@ -513,66 +527,149 @@
                 @endif
             }
 
-            function getFormatChoice() {
+            function getFormatChoice(overrideFormat) {
+                if (overrideFormat) return overrideFormat;
                 var checkedRadio = document.querySelector('input[name="format_choice"]:checked');
                 return checkedRadio ? checkedRadio.value : 'baru';
             }
 
             window.onFormatChoiceChange = function (val) {
-                updateTypeVisibility();
-                fetchPreview();
+                updateTypeVisibility(val);
+                fetchPreview(val);
             };
 
-            function updateTypeVisibility() {
+            function updateTypeVisibility(formatVal) {
                 var isSop = isCurrentTypeSop();
-                var format = getFormatChoice();
+                var format = getFormatChoice(formatVal);
                 
-                if (containerUnitKerja && containerDivision) {
+                if (containerDivision) {
                     if (format === 'lama') {
                         containerDivision.style.display = 'none';
                         if (divisionSelect && divisionSelect.tagName === 'SELECT') {
                             divisionSelect.removeAttribute('required');
                         }
-
-                        if (isSop) {
-                            containerUnitKerja.style.display = 'block';
-                            if (unitKerjaSelect) {
-                                unitKerjaSelect.setAttribute('required', 'required');
-                            }
-                        } else {
-                            containerUnitKerja.style.display = 'none';
-                            if (unitKerjaSelect) {
-                                unitKerjaSelect.removeAttribute('required');
-                            }
-                        }
                     } else {
-                        // Format Baru
-                        containerUnitKerja.style.display = 'none';
-                        if (unitKerjaSelect) {
-                            unitKerjaSelect.removeAttribute('required');
-                        }
-
                         containerDivision.style.display = 'block';
                         if (divisionSelect && divisionSelect.tagName === 'SELECT') {
                             divisionSelect.setAttribute('required', 'required');
                         }
                     }
-                    
-                    if (!uploadCheckbox || !uploadCheckbox.checked) {
-                        numberField.disabled = true;
-                        numberField.removeAttribute('name');
-                        numberField.classList.add('bg-base-200');
-                        numberField.value = lastPreview || @json(__('Pilih tipe dokumen dahulu...'));
-                        numberHint.textContent = @json(__('Preview otomatis'));
+                }
+
+                if (containerUnitKerja) {
+                    if (format === 'lama' && isSop) {
+                        containerUnitKerja.style.display = 'block';
+                        if (unitKerjaSelect) {
+                            unitKerjaSelect.setAttribute('required', 'required');
+                        }
                     } else {
-                        numberField.disabled = false;
-                        numberField.name = 'document_number';
-                        numberField.classList.remove('bg-base-200');
-                        numberField.value = lastPreview || '';
-                        numberHint.textContent = @json(__('Manual input based on file'));
+                        containerUnitKerja.style.display = 'none';
+                        if (unitKerjaSelect) {
+                            unitKerjaSelect.removeAttribute('required');
+                        }
                     }
                 }
+                
+                syncUploadMode();
             }
+
+            var statusContainer = document.getElementById('document-number-status-container');
+            var statusAlert = document.getElementById('document-number-status-alert');
+            var statusIcon = document.getElementById('document-number-status-icon');
+            var statusText = document.getElementById('document-number-status-text');
+            var checkingSpinner = document.getElementById('document-number-checking-spinner');
+            var disclaimerEl = document.getElementById('document-number-disclaimer');
+            var checkNumberTimeout = null;
+
+            function isManualUploadModeActive() {
+                return (uploadCheckbox && uploadCheckbox.checked);
+            }
+
+            function syncUploadMode() {
+                if (isManualUploadModeActive()) {
+                    numberField.disabled = false;
+                    numberField.name = 'document_number';
+                    numberField.classList.remove('bg-base-200');
+                    if (disclaimerEl) disclaimerEl.classList.add('hidden');
+                    numberHint.textContent = @json(__('Manual input based on file'));
+                } else {
+                    numberField.disabled = true;
+                    numberField.removeAttribute('name');
+                    numberField.classList.add('bg-base-200');
+                    if (disclaimerEl) disclaimerEl.classList.remove('hidden');
+                    numberHint.textContent = @json(__('Preview otomatis'));
+                    if (lastPreview) {
+                        numberField.value = lastPreview;
+                    }
+                }
+                if (numberField.value && numberField.value !== @json(__('Pilih tipe dokumen dahulu...'))) {
+                    checkDocumentNumberAvailability(numberField.value);
+                }
+            }
+
+            function checkDocumentNumberAvailability(val) {
+                if (!val || val.trim() === '' || val === @json(__('Pilih tipe dokumen dahulu...')) || val === @json(__('Failed to load preview'))) {
+                    hideDocumentNumberStatus();
+                    return;
+                }
+
+                var trimmed = val.trim();
+                var firstSegment = trimmed.split('/')[0];
+                // Jangan tampilkan status jika nomor urut masih berupa angka kurang dari 3 digit (misal: "0", "00", "01")
+                if (/^\d+$/.test(firstSegment) && firstSegment.length < 3) {
+                    hideDocumentNumberStatus();
+                    return;
+                }
+
+                clearTimeout(checkNumberTimeout);
+                if (checkingSpinner) checkingSpinner.classList.remove('hidden');
+
+                checkNumberTimeout = setTimeout(function () {
+                    fetch('{{ route('documents.check-number') }}?document_number=' + encodeURIComponent(trimmed), {
+                        headers: { 'Accept': 'application/json' }
+                    })
+                    .then(function (res) { return res.json(); })
+                    .then(function (data) {
+                        if (checkingSpinner) checkingSpinner.classList.add('hidden');
+                        if (!data.checked) {
+                            hideDocumentNumberStatus();
+                            return;
+                        }
+
+                        if (statusContainer) statusContainer.classList.remove('hidden');
+                        numberField.classList.remove('input-error', 'border-error', 'input-success', 'border-success', 'input-warning', 'border-warning', 'border-emerald-500', 'focus:border-emerald-500', 'border-amber-500', 'focus:border-amber-500');
+
+                        if (data.exists) {
+                            // WARNING: Already used in a document!
+                            if (statusAlert) statusAlert.className = 'py-2.5 px-3.5 text-xs flex items-center gap-2.5 rounded-xl border border-amber-500/30 bg-amber-50/90 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 shadow-xs transition-all';
+                            if (statusIcon) statusIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>`;
+                            if (statusText) statusText.innerHTML = `<span class="font-medium text-amber-900 dark:text-amber-200">${data.message}</span>`;
+                            numberField.classList.add('border-amber-500');
+                        } else {
+                            // NOTICE / AVAILABLE: Not used in any document yet!
+                            if (statusAlert) statusAlert.className = 'py-2.5 px-3.5 text-xs flex items-center gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-50/90 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 shadow-xs transition-all';
+                            if (statusIcon) statusIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
+                            if (statusText) statusText.innerHTML = `<span class="font-medium text-emerald-900 dark:text-emerald-200">${data.message}</span>`;
+                            numberField.classList.add('border-emerald-500');
+                        }
+                    })
+                    .catch(function () {
+                        if (checkingSpinner) checkingSpinner.classList.add('hidden');
+                    });
+                }, 250);
+            }
+
+            function hideDocumentNumberStatus() {
+                if (checkingSpinner) checkingSpinner.classList.add('hidden');
+                if (statusContainer) statusContainer.classList.add('hidden');
+                if (numberField) {
+                    numberField.classList.remove('input-error', 'border-error', 'input-success', 'border-success', 'input-warning', 'border-warning', 'border-emerald-500', 'focus:border-emerald-500', 'border-amber-500', 'focus:border-amber-500');
+                }
+            }
+
+            numberField.addEventListener('input', function () {
+                checkDocumentNumberAvailability(numberField.value);
+            });
 
             function filterUnitKerjasByBranch() {
                 if (!unitKerjaSelect) return;
@@ -590,22 +687,22 @@
                 });
             }
 
-            function fetchPreview() {
+            function fetchPreview(formatVal) {
                 var typeId = typeSelect.value;
                 if (!typeId) {
-                    if (getFormatChoice() === 'baru') {
+                    if (getFormatChoice(formatVal) === 'baru') {
                         numberField.value = @json(__('Pilih tipe dokumen dahulu...'));
                     }
                     lastPreview = '';
                     return;
                 }
 
-                updateTypeVisibility();
+                updateTypeVisibility(formatVal);
 
                 var branchId = branchSelect ? branchSelect.value : '';
                 var divisionId = divisionSelect ? divisionSelect.value : '';
                 var unitKerjaId = unitKerjaSelect ? unitKerjaSelect.value : '';
-                var format = getFormatChoice();
+                var format = getFormatChoice(formatVal);
 
                 var url = '{{ route('documents.next-number') }}?document_type_id=' + encodeURIComponent(typeId) + '&format_choice=' + encodeURIComponent(format);
                 if (branchId) {
@@ -624,8 +721,10 @@
                     .then(function (res) { return res.json(); })
                     .then(function (data) {
                         lastPreview = data.number;
-                        if (numberField.disabled) {
-                            numberField.value = data.number;
+                        numberField.value = data.number;
+
+                        if (numberField.value) {
+                            checkDocumentNumberAvailability(numberField.value);
                         }
                     })
                     .catch(function () {
@@ -635,30 +734,15 @@
                     });
             }
 
-            function setUploadMode(isFileChosen) {
-                if (isFileChosen) {
-                    numberField.disabled = false;
-                    numberField.name = 'document_number';
-                    numberField.classList.remove('bg-base-200');
-                    numberField.value = lastPreview || '';
-                    numberHint.textContent = @json(__('Manual input based on file'));
-                } else {
-                    numberField.disabled = true;
-                    numberField.removeAttribute('name');
-                    numberField.classList.add('bg-base-200');
-                    numberField.value = lastPreview || @json(__('Pilih tipe dokumen dahulu...'));
-                    numberHint.textContent = @json(__('Preview otomatis'));
-                }
-            }
-
             typeSelect.addEventListener('change', function () {
                 updateTypeVisibility();
                 fetchPreview();
             });
             document.querySelectorAll('input[name="format_choice"]').forEach(function (radio) {
                 radio.addEventListener('change', function () {
-                    updateTypeVisibility();
-                    fetchPreview();
+                    var val = radio.value;
+                    updateTypeVisibility(val);
+                    fetchPreview(val);
                 });
             });
             if (branchSelect) {
@@ -682,15 +766,15 @@
                         uploadField.classList.remove('hidden');
                     } else {
                         uploadField.classList.add('hidden');
-                        fileInput.value = '';
-                        setUploadMode(false);
+                        if (fileInput) fileInput.value = '';
                     }
+                    syncUploadMode();
                 });
             }
 
             if (fileInput) {
                 fileInput.addEventListener('change', function () {
-                    setUploadMode(fileInput.files.length > 0);
+                    syncUploadMode();
                 });
             }
 

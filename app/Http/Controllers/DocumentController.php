@@ -281,7 +281,7 @@ class DocumentController extends Controller
             'format_choice' => 'nullable|in:lama,baru',
         ]);
 
-        $formatChoice = $validated['format_choice'] ?? 'baru';
+        $formatChoice = $validated['format_choice'] ?? (!empty($validated['unit_kerja_id']) ? 'lama' : 'baru');
 
         $user = auth()->user();
         $divisionId = ($user->isAdmin() || $user->isDirector())
@@ -300,12 +300,71 @@ class DocumentController extends Controller
         ]);
     }
 
+    /**
+     * Check if a document number is already used in the database.
+     */
+    public function checkNumber(Request $request): JsonResponse
+    {
+        $number = trim((string) $request->input('document_number'));
+
+        if (empty($number) || $number === __('Pilih tipe dokumen dahulu...')) {
+            return response()->json([
+                'checked' => false,
+                'message' => 'Nomor dokumen kosong.',
+            ]);
+        }
+
+        $firstSegment = explode('/', $number)[0] ?? '';
+        if (ctype_digit($firstSegment) && strlen($firstSegment) < 3) {
+            return response()->json([
+                'checked' => false,
+                'message' => 'Nomor urut dokumen belum lengkap (minimal 3 digit).',
+            ]);
+        }
+
+        $existingDoc = Document::withTrashed()
+            ->where('document_number', $number)
+            ->with(['owner', 'documentType'])
+            ->first();
+
+        if ($existingDoc) {
+            $deletedNotice = $existingDoc->trashed() ? ' (' . __('di Tempat Sampah') . ')' : '';
+            return response()->json([
+                'checked' => true,
+                'exists' => true,
+                'message' => __('Nomor dokumen ":number" SUDAH DIGUNAKAN:deleted pada dokumen ":title" (:owner).', [
+                    'number' => $number,
+                    'deleted' => $deletedNotice,
+                    'title' => $existingDoc->title,
+                    'owner' => $existingDoc->owner?->name ?? 'User',
+                ]),
+                'document' => [
+                    'id' => $existingDoc->id,
+                    'title' => $existingDoc->title,
+                    'document_number' => $existingDoc->document_number,
+                    'is_trashed' => $existingDoc->trashed(),
+                    'owner' => $existingDoc->owner?->name,
+                    'created_at' => $existingDoc->created_at?->format('d/m/Y'),
+                ],
+            ]);
+        }
+
+        return response()->json([
+            'checked' => true,
+            'exists' => false,
+            'message' => __('Nomor dokumen ":number" BELUM DIGUNAKAN pada dokumen manapun (Tersedia).', [
+                'number' => $number,
+            ]),
+        ]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $this->authorize('create', Document::class);
 
         $user = auth()->user();
         $isUpload = $request->boolean('is_upload');
+        $isManualNumber = $request->boolean('is_manual_number') || ($isUpload && $request->filled('document_number'));
         $templateId = $request->input('template_id');
 
         $isSop = false;
@@ -339,11 +398,13 @@ class DocumentController extends Controller
         if ($isUpload) {
             $rules['file'] = 'required|file|mimes:pdf,docx|max:10240';
             $rules['document_number'] = 'required|string|max:100|unique:documents,document_number';
+        } elseif ($isManualNumber && $request->filled('document_number')) {
+            $rules['document_number'] = 'required|string|max:100|unique:documents,document_number';
         }
 
         $validated = $request->validate($rules, [
             'document_number.unique' => __('Nomor dokumen sudah digunakan.'),
-            'document_number.required' => __('Nomor dokumen wajib diisi saat mengunggah dokumen fisik.'),
+            'document_number.required' => __('Nomor dokumen wajib diisi saat mode manual/unggah.'),
             'unit_kerja_id.required' => __('Unit kerja wajib dipilih untuk dokumen SOP dengan format lama.'),
         ]);
         
@@ -598,9 +659,15 @@ class DocumentController extends Controller
         $currentUser = auth()->user();
         $userSignatureUrl = $this->onlyOfficeService->getSignatureFileUrl($currentUser);
         $userSignatureToken = $userSignatureUrl ? $this->onlyOfficeService->generateInsertImageToken($userSignatureUrl) : null;
-        $userSignatureDataUri = ($currentUser->hasSignature() && $currentUser->signature?->file_path && Storage::disk('public')->exists($currentUser->signature->file_path))
-            ? 'data:image/png;base64,' . base64_encode(Storage::disk('public')->get($currentUser->signature->file_path))
+        $userSignatureClientUrl = ($currentUser->hasSignature() && $currentUser->signature?->file_path)
+            ? asset('storage/' . $currentUser->signature->file_path)
             : null;
+        $userSignatureDataUri = null;
+        if ($currentUser->hasSignature() && $currentUser->signature?->file_path && Storage::disk('public')->exists($currentUser->signature->file_path)) {
+            $rawBytes = Storage::disk('public')->get($currentUser->signature->file_path);
+            $trimmedBytes = $this->onlyOfficeService->trimSignatureImage($rawBytes);
+            $userSignatureDataUri = 'data:image/png;base64,' . base64_encode($trimmedBytes);
+        }
 
         $qrCodeUrl = $this->onlyOfficeService->getQrCodeFileUrl($document);
         $qrCodeToken = $this->onlyOfficeService->generateInsertImageToken($qrCodeUrl);
@@ -629,6 +696,7 @@ class DocumentController extends Controller
             'qrCodeDataUri',
             'userSignatureUrl',
             'userSignatureToken',
+            'userSignatureClientUrl',
             'userSignatureDataUri',
             'approvedSignatures',
             'pendingApprovalBanner'

@@ -41,7 +41,8 @@ class SearchController extends Controller
             'owner:id,name',
             'division:id,name,code',
             'documentType:id,name,code',
-            'branch:id,name,code',
+            'branch:id,name,code,company_id',
+            'company:id,name,code',
             'currentVersion:id,document_id,version_number,status'
         ])->visibleTo($user);
 
@@ -60,14 +61,26 @@ class SearchController extends Controller
         if (strlen($q) >= 2) {
             $query->where(function ($sub) use ($q, $lang) {
                 $sub->where('title', 'like', "%{$q}%")
-                    ->orWhere('document_number', 'like', "%{$q}%");
-
-                // Language-aware search: check version content and document summaries if available
-                $sub->orWhereHas('currentVersion', function ($vQuery) use ($q) {
-                    $vQuery->where('content', 'like', "%{$q}%");
-                });
-
-                $sub->orWhere('summary', 'like', "%{$q}%");
+                    ->orWhere('document_number', 'like', "%{$q}%")
+                    ->orWhere('summary', 'like', "%{$q}%")
+                    ->orWhereHas('division', function ($dQuery) use ($q) {
+                        $dQuery->where('name', 'like', "%{$q}%")->orWhere('code', 'like', "%{$q}%");
+                    })
+                    ->orWhereHas('branch', function ($bQuery) use ($q) {
+                        $bQuery->where('name', 'like', "%{$q}%")->orWhere('code', 'like', "%{$q}%");
+                    })
+                    ->orWhereHas('company', function ($cQuery) use ($q) {
+                        $cQuery->where('name', 'like', "%{$q}%")->orWhere('code', 'like', "%{$q}%");
+                    })
+                    ->orWhereHas('documentType', function ($dtQuery) use ($q) {
+                        $dtQuery->where('name', 'like', "%{$q}%")->orWhere('code', 'like', "%{$q}%");
+                    })
+                    ->orWhereHas('owner', function ($uQuery) use ($q) {
+                        $uQuery->where('name', 'like', "%{$q}%");
+                    })
+                    ->orWhereHas('currentVersion', function ($vQuery) use ($q) {
+                        $vQuery->where('content', 'like', "%{$q}%");
+                    });
             });
         }
 
@@ -85,6 +98,7 @@ class SearchController extends Controller
             'type_code'       => $doc->documentType?->code,
             'branch'          => $doc->branch?->name,
             'branch_code'     => $doc->branch?->code,
+            'company'         => $doc->company?->name ?? $doc->branch?->company?->name,
             'version'         => $doc->currentVersion?->version_number ?? 1,
             'is_expired'      => (bool) $doc->is_expired,
             'updated_at'      => $doc->updated_at?->diffForHumans() ?? '',

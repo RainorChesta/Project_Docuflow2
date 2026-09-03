@@ -82,6 +82,30 @@ class OnlyOfficeController extends Controller
     }
 
     /**
+     * Serve a specific signature/stamp image to ONLYOFFICE Docs Document Server.
+     */
+    public function signatureImage(Request $request, \App\Models\Signature $signature): \Illuminate\Http\Response
+    {
+        if (!$signature || !$signature->file_path) {
+            abort(404, 'Signature not found.');
+        }
+
+        $disk = Storage::disk('public');
+        if (!$disk->exists($signature->file_path)) {
+            abort(404, 'Signature file not found in storage.');
+        }
+
+        $rawBytes = $disk->get($signature->file_path);
+        $squaredBytes = $this->onlyOfficeService->formatSquareSignature($rawBytes, 400, 24);
+
+        return response($squaredBytes, 200, [
+            'Content-Type' => 'image/png',
+            'Content-Disposition' => 'inline; filename="signature_' . $signature->user_id . '_' . $signature->id . '.png"',
+            'Cache-Control' => 'no-cache, private',
+        ]);
+    }
+
+    /**
      * Serve a placeholder image for pending signatures.
      */
     public function signaturePlaceholder(Request $request): \Illuminate\Http\Response
@@ -210,15 +234,16 @@ class OnlyOfficeController extends Controller
                 // Automatically process any approved signatures that were just saved into the document
                 $approvedRequests = \App\Models\SignatureRequest::where('document_id', $document->id)
                     ->where('status', 'approved')
-                    ->with('targetUser.signature')
+                    ->with(['targetUser', 'requestedSignature'])
                     ->get();
 
                 if ($approvedRequests->isNotEmpty()) {
                     $processor = app(\App\Services\DocumentProcessorService::class);
                     foreach ($approvedRequests as $req) {
-                        if ($req->targetUser && $req->targetUser->signature) {
-                            $signaturePath = Storage::disk('public')->path($req->targetUser->signature->file_path);
-                            $processor->processSignature($document, $version, $req->id, $signaturePath);
+                        $sig = $req->requestedSignature ?? $req->targetUser?->signature;
+                        if ($sig && $sig->file_path && Storage::disk('public')->exists($sig->file_path)) {
+                            $signaturePath = Storage::disk('public')->path($sig->file_path);
+                            $processor->processSignature($document, $version, $req->id, $signaturePath, $req);
                         }
                     }
                 }

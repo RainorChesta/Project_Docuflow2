@@ -73,11 +73,8 @@ class OnlyOfficeService
     {
         $internalBase = rtrim(config('onlyoffice.internal_url'), '/');
 
-        // We can pass signature_id to a new or existing route. 
-        // For now, let's assume we update the route to optionally take signature_id
-        return $internalBase . route('onlyoffice.signature', [
-            'user' => $signature->user_id,
-            'signature_id' => $signature->id,
+        return $internalBase . route('onlyoffice.signature.image', [
+            'signature' => $signature->id,
         ], false);
     }
 
@@ -118,12 +115,12 @@ class OnlyOfficeService
     }
 
     /**
-     * Convert/trim any signature PNG into a crisp, centered 1:1 square PNG
-     * with transparent background, matching the square QR code dimensions.
+     * Crop/trim any signature or stamp PNG tightly to its ink strokes / content bounding box
+     * with transparent background, eliminating artificial canvas padding/whitespace.
      */
-    public function formatSquareSignature(string $rawPngBytes, int $targetSize = 400, int $padding = 24): string
+    public function trimSignatureImage(string $rawPngBytes, int $padding = 2): string
     {
-        if (!extension_loaded('gd')) {
+        if (!extension_loaded('gd') || empty($rawPngBytes)) {
             return $rawPngBytes;
         }
 
@@ -135,7 +132,7 @@ class OnlyOfficeService
         $srcW = imagesx($src);
         $srcH = imagesy($src);
 
-        // Find bounding box of signature ink strokes
+        // Find bounding box of signature / stamp content
         $minX = $srcW;
         $minY = $srcH;
         $maxX = 0;
@@ -150,7 +147,7 @@ class OnlyOfficeService
                 $g = ($rgba >> 8) & 0xFF;
                 $b = $rgba & 0xFF;
 
-                // Pixel is considered part of ink stroke if not transparent and not white background
+                // Pixel is considered ink stroke / stamp content if not transparent and not white background
                 $isNotTransparent = ($alpha < 110);
                 $isNotWhite = ($r < 240 || $g < 240 || $b < 240);
 
@@ -171,38 +168,42 @@ class OnlyOfficeService
             $maxY = $srcH - 1;
         }
 
+        // Apply slight padding if desired
+        $minX = max(0, $minX - $padding);
+        $minY = max(0, $minY - $padding);
+        $maxX = min($srcW - 1, $maxX + $padding);
+        $maxY = min($srcH - 1, $maxY + $padding);
+
         $cropW = max(1, $maxX - $minX + 1);
         $cropH = max(1, $maxY - $minY + 1);
 
-        // Create square destination image with transparent background
-        $dest = imagecreatetruecolor($targetSize, $targetSize);
+        // Create destination image with the EXACT cropped dimensions
+        $dest = imagecreatetruecolor($cropW, $cropH);
         imagealphablending($dest, false);
         imagesavealpha($dest, true);
         $transparent = imagecolorallocatealpha($dest, 255, 255, 255, 127);
-        imagefilledrectangle($dest, 0, 0, $targetSize, $targetSize, $transparent);
+        imagefilledrectangle($dest, 0, 0, $cropW, $cropH, $transparent);
         imagealphablending($dest, true);
 
-        // Scale cropped signature to fill available square area proportionally
-        $availSize = max(1, $targetSize - (2 * $padding));
-        $scale = min($availSize / $cropW, $availSize / $cropH);
-
-        $newW = (int) round($cropW * $scale);
-        $newH = (int) round($cropH * $scale);
-
-        // Center within square canvas
-        $destX = (int) round(($targetSize - $newW) / 2);
-        $destY = (int) round(($targetSize - $newH) / 2);
-
-        imagecopyresampled($dest, $src, $destX, $destY, $minX, $minY, $newW, $newH, $cropW, $cropH);
+        // Copy exact cropped region
+        imagecopy($dest, $src, 0, 0, $minX, $minY, $cropW, $cropH);
 
         ob_start();
         imagepng($dest);
-        $output = ob_get_clean();
+        $result = ob_get_clean();
 
         imagedestroy($src);
         imagedestroy($dest);
 
-        return $output ?: $rawPngBytes;
+        return $result ?: $rawPngBytes;
+    }
+
+    /**
+     * Backward-compatible alias for trimSignatureImage.
+     */
+    public function formatSquareSignature(string $rawPngBytes, int $targetSize = 400, int $padding = 2): string
+    {
+        return $this->trimSignatureImage($rawPngBytes, $padding);
     }
 
     /**

@@ -252,9 +252,9 @@ class Document extends Model
 
     /**
      * Documents the given user is allowed to see (row-level visibility).
-     * Admin sees everything. Regular users see: general docs, own docs
-     * (any scope), division docs of any division they belong to, and
-     * docs where they have a personal share or a division share.
+     * Admin sees everything. Regular users see: general docs within their accessible
+     * company/branch scope, own docs, division docs of any division they belong to,
+     * and docs where they have a personal share, division share, or branch distribution.
      */
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
@@ -262,21 +262,33 @@ class Document extends Model
             return $query;
         }
 
-        $branchIds = $user->allBranchIds();
-        $companyIds = $user->allCompanyIds();
+        $directCompanyIds = $user->allCompanyIds();
+        $directBranchIds = $user->allBranchIds();
         $divisionIds = $user->allDivisionIds();
 
+        // Include company IDs inferred from assigned branches
+        $branchCompanyIds = !empty($directBranchIds)
+            ? Branch::whereIn('id', $directBranchIds)->pluck('company_id')->filter()->all()
+            : [];
+        $companyIds = array_values(array_unique(array_merge($directCompanyIds, $branchCompanyIds)));
+
+        // Include branch IDs belonging to assigned companies
+        $allCompanyBranchIds = !empty($companyIds)
+            ? Branch::whereIn('company_id', $companyIds)->pluck('id')->filter()->all()
+            : [];
+        $branchIds = array_values(array_unique(array_merge($directBranchIds, $allCompanyBranchIds)));
+
         if ($user->isDirector()) {
-            if (!empty($branchIds)) {
+            if (!empty($branchIds) || !empty($companyIds)) {
                 $query->where(function ($q) use ($branchIds, $companyIds) {
-                    $q->whereIn('branch_id', $branchIds)
-                      ->orWhere(function ($sub) use ($companyIds) {
-                          $sub->whereNull('branch_id')
-                              ->whereIn('company_id', $companyIds);
-                      });
+                    if (!empty($branchIds)) {
+                        $q->whereIn('branch_id', $branchIds);
+                    }
+                    if (!empty($companyIds)) {
+                        $q->orWhereIn('company_id', $companyIds)
+                          ->orWhereHas('branch', fn($b) => $b->whereIn('company_id', $companyIds));
+                    }
                 });
-            } elseif (!empty($companyIds)) {
-                $query->whereIn('company_id', $companyIds);
             }
             return $query;
         }
@@ -289,28 +301,35 @@ class Document extends Model
                 $q->orWhereHas('divisionShares', fn(Builder $ds) => $ds->whereIn('division_id', $divisionIds));
             }
 
-            // Documents within the user's active branch/company scope
+            // Documents within the user's accessible branch/company scope
             $q->orWhere(function (Builder $inScope) use ($user, $divisionIds, $branchIds, $companyIds) {
-                if (!empty($branchIds)) {
-                    $inScope->where(function ($b) use ($branchIds, $companyIds) {
-                        $b->whereIn('branch_id', $branchIds)
-                          ->orWhere(function ($sub) use ($companyIds) {
-                              $sub->whereNull('branch_id')
-                                  ->whereIn('company_id', $companyIds);
-                          });
+                if (!empty($branchIds) || !empty($companyIds)) {
+                    $inScope->where(function (Builder $b) use ($branchIds, $companyIds) {
+                        if (!empty($branchIds)) {
+                            $b->whereIn('branch_id', $branchIds);
+                        }
+                        if (!empty($companyIds)) {
+                            $b->orWhereIn('company_id', $companyIds)
+                              ->orWhereHas('branch', fn($br) => $br->whereIn('company_id', $companyIds));
+                        }
                     });
-                } elseif (!empty($companyIds)) {
-                    $inScope->whereIn('company_id', $companyIds);
                 }
 
-                $inScope->where(function (Builder $sub) use ($user, $divisionIds, $branchIds) {
+                $inScope->where(function (Builder $sub) use ($user, $divisionIds, $branchIds, $companyIds) {
                     $sub->where('visibility', self::VISIBILITY_GENERAL)
                         ->orWhere('owner_id', $user->id)
                         ->orWhere(function (Builder $d) use ($divisionIds) {
                             $d->where('visibility', self::VISIBILITY_DIVISION)
                               ->whereIn('division_id', $divisionIds);
                         })
-                        ->orWhereHas('distributions', fn(Builder $dist) => $dist->whereIn('target_branch_id', $branchIds));
+                        ->orWhereHas('distributions', fn(Builder $dist) => $dist->where(function ($dq) use ($branchIds, $companyIds) {
+                            if (!empty($branchIds)) {
+                                $dq->whereIn('target_branch_id', $branchIds);
+                            }
+                            if (!empty($companyIds)) {
+                                $dq->orWhereHas('targetBranch', fn($tb) => $tb->whereIn('company_id', $companyIds));
+                            }
+                        }));
                 });
             });
         });

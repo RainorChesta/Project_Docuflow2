@@ -3,26 +3,12 @@
     $fileUrl = route('documents.file', [$document, $version]);
 @endphp
 
-<div class="p-4">
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-3 px-2">
-        <div class="text-sm text-base-content/60">
-            <span class="font-medium text-base-content">{{ $version->file_original_name ?? ($document->title . '.docx') }}</span>
-        </div>
-        <div class="flex items-center gap-2">
-            <a href="{{ route('documents.download', [$document, 'version_id' => $version->id]) }}" class="btn btn-primary btn-xs">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                {{ __('Unduh DOCX') }}
-            </a>
-        </div>
-    </div>
-
+<div class="w-full">
     @if($isPdf)
-        <iframe src="{{ $fileUrl }}" class="w-full border-0 rounded-lg h-[72vh] sm:h-[80vh] lg:h-[1123px] min-h-[520px] sm:min-h-[650px] lg:min-h-[1123px]" title="{{ __('Pratinjau dokumen') }}"></iframe>
+        <iframe src="{{ $fileUrl }}" class="w-full border-0 h-[72vh] sm:h-[80vh] lg:h-[1123px] min-h-[520px] sm:min-h-[650px] lg:min-h-[1123px] block" title="{{ __('Pratinjau dokumen') }}"></iframe>
     @else
         @if(isset($onlyOfficeConfig))
-            <div class="w-full border border-base-300 rounded-lg overflow-hidden shadow-xs bg-base-100 h-[72vh] sm:h-[80vh] lg:h-[1150px] min-h-[520px] sm:min-h-[650px] lg:min-h-[1123px]">
+            <div class="w-full bg-base-100 h-[72vh] sm:h-[80vh] lg:h-[1150px] min-h-[520px] sm:min-h-[650px] lg:min-h-[1123px]">
                 <div id="docx-preview-{{ $version->id }}" class="w-full h-full"></div>
             </div>
 
@@ -148,7 +134,7 @@
                 });
             </script>
         @else
-            <div id="docx-preview-{{ $version->id }}" class="prose max-w-none px-6 py-8 border border-base-300 rounded-lg bg-base-100 shadow-xs" style="min-height: 1123px;">
+            <div id="docx-preview-{{ $version->id }}" class="prose max-w-none p-6 sm:p-8 bg-base-100" style="min-height: 1123px;">
                 <p class="text-base-content/50 text-sm">{{ __('Memuat isi dokumen...') }}</p>
             </div>
 

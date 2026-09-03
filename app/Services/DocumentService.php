@@ -56,8 +56,17 @@ class DocumentService
      * Generate the final, authoritative document number. Locks the row
      * range to avoid duplicate sequences under concurrent submissions.
      */
-    public function generateId(string $formatChoice, ?Division $division, ?DocumentType $documentType, ?\App\Models\Branch $branch = null, ?\App\Models\UnitKerja $unitKerja = null): string
+    public function generateId($formatChoice = null, $division = null, $documentType = null, $branch = null, $unitKerja = null): string
     {
+        if ($division instanceof DocumentType) {
+            $unitKerja = $branch instanceof \App\Models\UnitKerja ? $branch : $unitKerja;
+            $branch = $documentType instanceof \App\Models\Branch ? $documentType : null;
+            $documentType = $division;
+            $division = null;
+        }
+
+        $formatChoice = is_string($formatChoice) ? $formatChoice : (!empty($unitKerja) ? 'lama' : 'baru');
+
         return DB::transaction(function () use ($formatChoice, $division, $documentType, $branch, $unitKerja) {
             $year = now()->year;
             $branchId = $branch?->id;
@@ -86,7 +95,16 @@ class DocumentService
 
                 $lastDoc = $query->lockForUpdate()->orderByDesc('id')->first();
                 $seq = $this->nextSequenceFrom($lastDoc);
-                return $this->formatNumber('lama', $division, $documentType, $seq, $branch, $unitKerja);
+
+                do {
+                    $formattedNumber = $this->formatNumber('lama', $division, $documentType, $seq, $branch, $unitKerja);
+                    $alreadyExists = Document::withTrashed()->where('document_number', $formattedNumber)->exists();
+                    if ($alreadyExists) {
+                        $seq++;
+                    }
+                } while ($alreadyExists);
+
+                return $formattedNumber;
             }
 
             $counter = DB::table('document_number_counters')
@@ -96,13 +114,21 @@ class DocumentService
                 ->lockForUpdate()
                 ->first();
 
+            $seq = $counter ? $counter->last_sequence + 1 : 1;
+
+            do {
+                $formattedNumber = $this->formatNumber('baru', $division, $documentType, $seq, $branch, null);
+                $alreadyExists = Document::withTrashed()->where('document_number', $formattedNumber)->exists();
+                if ($alreadyExists) {
+                    $seq++;
+                }
+            } while ($alreadyExists);
+
             if ($counter) {
-                $seq = $counter->last_sequence + 1;
                 DB::table('document_number_counters')
                     ->where('id', $counter->id)
                     ->update(['last_sequence' => $seq, 'updated_at' => now()]);
             } else {
-                $seq = 1;
                 DB::table('document_number_counters')->insert([
                     'year' => $year,
                     'branch_id' => $branchId,
@@ -113,7 +139,7 @@ class DocumentService
                 ]);
             }
 
-            return $this->formatNumber('baru', $division, $documentType, $seq, $branch, null);
+            return $formattedNumber;
         });
     }
 
@@ -121,8 +147,16 @@ class DocumentService
      * Non-locking preview of the next number, purely indicative for the
      * create form.
      */
-    public function previewNumber(string $formatChoice, ?Division $division, ?DocumentType $documentType, ?\App\Models\Branch $branch = null, ?\App\Models\UnitKerja $unitKerja = null): string
+    public function previewNumber($formatChoice = null, $division = null, $documentType = null, $branch = null, $unitKerja = null): string
     {
+        if ($division instanceof DocumentType) {
+            $unitKerja = $branch instanceof \App\Models\UnitKerja ? $branch : $unitKerja;
+            $branch = $documentType instanceof \App\Models\Branch ? $documentType : null;
+            $documentType = $division;
+            $division = null;
+        }
+
+        $formatChoice = is_string($formatChoice) ? $formatChoice : (!empty($unitKerja) ? 'lama' : 'baru');
         $year = now()->year;
         $branchId = $branch?->id;
         $typeId = $documentType?->id;
@@ -150,7 +184,16 @@ class DocumentService
 
             $lastDoc = $query->orderByDesc('id')->first();
             $seq = $this->nextSequenceFrom($lastDoc);
-            return $this->formatNumber('lama', $division, $documentType, $seq, $branch, $unitKerja);
+
+            do {
+                $formattedNumber = $this->formatNumber('lama', $division, $documentType, $seq, $branch, $unitKerja);
+                $alreadyExists = Document::withTrashed()->where('document_number', $formattedNumber)->exists();
+                if ($alreadyExists) {
+                    $seq++;
+                }
+            } while ($alreadyExists);
+
+            return $formattedNumber;
         }
 
         $counter = DB::table('document_number_counters')
@@ -161,7 +204,15 @@ class DocumentService
 
         $seq = $counter ? $counter->last_sequence + 1 : 1;
 
-        return $this->formatNumber('baru', $division, $documentType, $seq, $branch, null);
+        do {
+            $formattedNumber = $this->formatNumber('baru', $division, $documentType, $seq, $branch, null);
+            $alreadyExists = Document::withTrashed()->where('document_number', $formattedNumber)->exists();
+            if ($alreadyExists) {
+                $seq++;
+            }
+        } while ($alreadyExists);
+
+        return $formattedNumber;
     }
 
     private function nextSequenceFrom(?Document $lastDoc): int
@@ -236,8 +287,10 @@ class DocumentService
             $data['company_id'] = $branch->company_id;
         }
 
-        if ($formatChoice === 'baru' || $formatChoice === 'lama') {
-            $data['document_number'] = $this->generateId($formatChoice, $division, $documentType, $branch, $unitKerja);
+        if (empty($data['document_number'])) {
+            if ($formatChoice === 'baru' || $formatChoice === 'lama') {
+                $data['document_number'] = $this->generateId($formatChoice, $division, $documentType, $branch, $unitKerja);
+            }
         }
         $data['visibility'] ??= Document::VISIBILITY_DIVISION;
         $data['owner_id'] = $ownerId;
@@ -314,8 +367,10 @@ class DocumentService
             $data['company_id'] = $branch->company_id;
         }
 
-        if ($formatChoice === 'baru' || $formatChoice === 'lama') {
-            $data['document_number'] = $this->generateId($formatChoice, $division, $documentType, $branch);
+        if (empty($data['document_number'])) {
+            if ($formatChoice === 'baru' || $formatChoice === 'lama') {
+                $data['document_number'] = $this->generateId($formatChoice, $division, $documentType, $branch);
+            }
         }
         $data['visibility'] ??= Document::VISIBILITY_DIVISION;
         $data['owner_id'] = $ownerId;

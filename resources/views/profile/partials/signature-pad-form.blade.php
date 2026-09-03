@@ -167,6 +167,28 @@
             </div>
         </div>
     </x-modal>
+
+    {{-- Signature Size Alert Modal --}}
+    <x-modal name="signature-size-modal" :show="false" maxWidth="sm">
+        <div class="p-5 sm:p-6 text-center space-y-4">
+            <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-error/10 text-error border border-error/20">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+            </div>
+            <div>
+                <h3 class="text-lg font-bold text-base-content">{{ __('Ukuran Tanda Tangan Terlalu Besar') }}</h3>
+                <p class="mt-2 text-sm text-base-content/70 leading-relaxed" id="signature-size-modal-msg">
+                    {{ __('Ukuran file tanda tangan melebihi batas maksimal 2MB. Silakan pilih atau unggah file dengan ukuran yang lebih kecil (maks. 2MB).') }}
+                </p>
+            </div>
+            <div class="pt-2 flex justify-center">
+                <button type="button" class="btn btn-primary btn-sm px-6 rounded-xl" x-on:click="$dispatch('close-modal', 'signature-size-modal')">
+                    {{ __('Mengerti') }}
+                </button>
+            </div>
+        </div>
+    </x-modal>
 </section>
 
 <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
@@ -193,6 +215,14 @@
         el._timer = setTimeout(() => { el.classList.add('hidden'); el.innerHTML = ''; }, 4000);
     }
 
+    function showSizeAlertModal(msg) {
+        const msgEl = document.getElementById('signature-size-modal-msg');
+        if (msgEl && msg) {
+            msgEl.textContent = msg;
+        }
+        window.dispatchEvent(new CustomEvent('open-modal', { detail: 'signature-size-modal' }));
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         const canvas = document.getElementById('signature-canvas');
         if (!canvas) return;
@@ -213,6 +243,8 @@
         const companyContainer = document.getElementById('company-select-container');
         const companySelect = document.getElementById('signature-company-select');
         
+        const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+
         let currentMode = 'draw';
 
         const tabs = document.querySelectorAll('#signature-tabs .tab');
@@ -254,7 +286,18 @@
         });
 
         fileInput.addEventListener('change', () => {
-            saveUploadBtn.disabled = !fileInput.files.length;
+            if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                if (file.size > MAX_FILE_SIZE) {
+                    fileInput.value = '';
+                    saveUploadBtn.disabled = true;
+                    showSizeAlertModal(@json(__('Ukuran file tanda tangan melebihi batas maksimal 2MB. Silakan pilih atau unggah file dengan ukuran yang lebih kecil (maks. 2MB).')));
+                    return;
+                }
+                saveUploadBtn.disabled = false;
+            } else {
+                saveUploadBtn.disabled = true;
+            }
         });
 
         function resizeCanvas() {
@@ -307,7 +350,14 @@
                     showFlash(@json(__('Silakan pilih file gambar terlebih dahulu.')), 'warning');
                     return;
                 }
-                body.append('signature_image', fileInput.files[0]);
+                const file = fileInput.files[0];
+                if (file.size > MAX_FILE_SIZE) {
+                    fileInput.value = '';
+                    saveUploadBtn.disabled = true;
+                    showSizeAlertModal(@json(__('Ukuran file tanda tangan melebihi batas maksimal 2MB. Silakan pilih atau unggah file dengan ukuran yang lebih kecil (maks. 2MB).')));
+                    return;
+                }
+                body.append('signature_image', file);
             } else {
                 if (signaturePad.isEmpty()) {
                     showFlash(@json(__('Canvas tanda tangan masih kosong.')), 'warning');
@@ -328,13 +378,34 @@
                     headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                     body,
                 });
+
+                if (res.status === 413) {
+                    showSizeAlertModal(@json(__('Ukuran file tanda tangan melebihi batas maksimal yang diizinkan server.')));
+                    activeBtn.disabled = false;
+                    return;
+                }
+
                 const data = await res.json();
 
                 if (data.success) {
                     showFlash(@json(__('Tanda tangan berhasil disimpan!')));
                     setTimeout(() => window.location.reload(), 1000); // Reload to reflect new list & state
                 } else {
-                    showFlash(data.message || @json(__('Gagal menyimpan tanda tangan.')), 'error');
+                    const isSizeError = data.errors?.signature_image || 
+                        (data.message && (
+                            data.message.toLowerCase().includes('2048') || 
+                            data.message.toLowerCase().includes('2mb') || 
+                            data.message.toLowerCase().includes('terlalu besar') || 
+                            data.message.toLowerCase().includes('lebih dari 2mb') || 
+                            data.message.toLowerCase().includes('greater than') || 
+                            data.message.toLowerCase().includes('too large')
+                        ));
+
+                    if (isSizeError) {
+                        showSizeAlertModal(data.message || @json(__('Ukuran file tanda tangan melebihi batas maksimal 2MB. Silakan pilih atau unggah file dengan ukuran yang lebih kecil (maks. 2MB).')));
+                    } else {
+                        showFlash(data.message || @json(__('Gagal menyimpan tanda tangan.')), 'error');
+                    }
                     activeBtn.disabled = false;
                 }
             } catch (err) {

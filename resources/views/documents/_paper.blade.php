@@ -129,9 +129,8 @@
         overflow-y: auto;
         overflow-x: auto;
         background: #f8f9fa;
-        padding: 20px;
+        padding: 16px;
         box-sizing: border-box;
-        border-radius: 8px;
     }
 
     .doku-paper-scope .doku-paper {

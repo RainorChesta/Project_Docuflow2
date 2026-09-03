@@ -64,8 +64,14 @@ class PdfSignatureProcessorService
             // Create temp paths
             $tempSourcePdf = storage_path('app/temp_src_' . uniqid() . '.pdf');
             $tempOutputPdf = storage_path('app/temp_out_' . uniqid() . '.pdf');
+            $tempSigFile   = storage_path('app/temp_sig_' . uniqid() . '.png');
 
             file_put_contents($tempSourcePdf, $disk->get($filePath));
+
+            // Trim signature image tightly to ink strokes so it fits the bounding box with zero padding
+            $rawSigBytes = file_get_contents($signaturePath);
+            $trimmedSigBytes = app(\App\Services\OnlyOfficeService::class)->trimSignatureImage($rawSigBytes);
+            file_put_contents($tempSigFile, $trimmedSigBytes);
 
             $pdf = new Fpdi();
             $pdf->SetAutoPageBreak(false);
@@ -74,6 +80,7 @@ class PdfSignatureProcessorService
             if ($pageCount < 1) {
                 Log::error("PdfSignatureProcessorService: PDF has no pages.");
                 @unlink($tempSourcePdf);
+                @unlink($tempSigFile);
                 return false;
             }
 
@@ -106,7 +113,7 @@ class PdfSignatureProcessorService
                     );
 
                     // Overlay signature image only (do not print signer name)
-                    $pdf->Image($signaturePath, $finalX, $finalY, $width, $height, 'PNG');
+                    $pdf->Image($tempSigFile, $finalX, $finalY, $width, $height, 'PNG');
                 }
             }
 
@@ -132,6 +139,7 @@ class PdfSignatureProcessorService
             // Cleanup temp files
             @unlink($tempSourcePdf);
             @unlink($tempOutputPdf);
+            @unlink($tempSigFile);
 
             // Invalidate caches and touch timestamps
             $version->touch();
@@ -151,6 +159,9 @@ class PdfSignatureProcessorService
             }
             if (isset($tempOutputPdf) && file_exists($tempOutputPdf)) {
                 @unlink($tempOutputPdf);
+            }
+            if (isset($tempSigFile) && file_exists($tempSigFile)) {
+                @unlink($tempSigFile);
             }
 
             return false;

@@ -66,7 +66,7 @@
 
             <!-- Pending Rollback Approval Banner -->
             @if($document->hasPendingRollback())
-                <div class="alert alert-warning mb-6 rounded-2xl shadow-xs print:hidden">
+                <div class="alert alert-warning mb-3 sm:mb-4 rounded-2xl shadow-xs print:hidden">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
                         <div class="flex items-start sm:items-center gap-3 min-w-0">
                             <svg class="w-5 h-5 shrink-0 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -192,7 +192,7 @@
             <!-- Pending Banner (paling atas) -->
             @php $pendingVersion = $document->versions->firstWhere('status', 'pending'); @endphp
             @if($pendingVersion)
-                <div class="alert alert-warning mb-6 rounded-2xl shadow-xs print:hidden">
+                <div class="alert alert-warning mb-3 sm:mb-4 rounded-2xl shadow-xs print:hidden">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
                         <div class="flex items-start sm:items-center gap-3 min-w-0">
                             <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -316,7 +316,7 @@
                 $latestRejectedVersion = $document->versions->where('status', 'rejected')->sortByDesc('updated_at')->first();
             @endphp
             @if($latestRejectedVersion && (!$document->currentVersion || $latestRejectedVersion->version_number >= $document->currentVersion->version_number))
-                <div id="rejection-notice-banner" class="mb-6 rounded-2xl border border-error/30 bg-error/10 p-4 sm:p-5 shadow-xs print:hidden">
+                <div id="rejection-notice-banner" class="mb-3 sm:mb-4 rounded-2xl border border-error/30 bg-error/10 p-4 sm:p-5 shadow-xs print:hidden">
                     <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
                         <div class="flex items-start gap-3 min-w-0 flex-1">
                             <div class="p-2 rounded-xl bg-error/20 text-error shrink-0 mt-0.5">
@@ -358,7 +358,7 @@
 
             <!-- Pending Rename Approval Banner (Executive Blue Palette) -->
             @if($document->hasPendingRename())
-                <div class="mb-6 rounded-2xl border border-primary/30 dark:border-primary/40 bg-primary/10 dark:bg-primary/15 p-4 sm:p-4.5 shadow-sm print:hidden transition-all">
+                <div class="mb-3 sm:mb-4 rounded-2xl border border-primary/30 dark:border-primary/40 bg-primary/10 dark:bg-primary/15 p-4 sm:p-4.5 shadow-sm print:hidden transition-all">
                     <div class="flex flex-col md:flex-row md:items-center justify-between gap-3.5">
                         {{-- Left: Icon, Proposed Title & Metadata --}}
                         <div class="flex items-start gap-3.5 min-w-0 flex-1">
@@ -478,13 +478,21 @@
                 </div>
             @endif
 
-            <!-- Metadata -->
+            <!-- Unified Document Detail & Editor Container -->
             @php
                 $hasDraft = $document->versions->contains('status', 'draft');
+                $hasSummary = !empty($document->summary) && $document->summary_status === \App\Models\Document::SUMMARY_COMPLETED;
+                $isProcessing = $document->summary_status === \App\Models\Document::SUMMARY_PROCESSING;
+                $isFailed = $document->summary_status === \App\Models\Document::SUMMARY_FAILED;
+                $display = $document->displayVersion();
+                $isFileBased = $display?->file_path;
             @endphp
-            <div class="card bg-base-100 border border-base-300 shadow-sm mb-6 print:hidden">
-                <div class="card-body">
-                    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4 border-b border-base-200 pb-4">
+
+            <div class="card bg-base-100 border border-base-300 shadow-sm rounded-2xl mb-6 overflow-hidden print:border-none print:shadow-none print:bg-transparent print:mb-0 print:rounded-none">
+                {{-- Document Details & Action Bar (Top Section) --}}
+                <div class="p-4 sm:px-5 sm:pt-4 sm:pb-3.5 print:hidden">
+                    {{-- Title Row --}}
+                    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4 border-b border-base-200 pb-2.5 sm:pb-3">
                         <div class="flex items-center flex-wrap gap-2 min-w-0 flex-1">
                             <h1 class="text-lg sm:text-xl font-bold text-base-content break-words">{{ $document->title }}</h1>
                             @if(auth()->user()->can('rename', $document) || auth()->user()->can('requestRename', $document))
@@ -532,25 +540,26 @@
                         @endif
                     </div>
 
-                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-4 gap-y-5 pt-4 text-sm">
+                    {{-- Metadata Grid --}}
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-4 gap-y-2.5 pt-2.5 text-xs sm:text-sm">
                         <div>
                             <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Perusahaan / Cabang') }}</span>
-                            <p class="font-medium mt-1">
+                            <p class="font-medium mt-0.5">
                                 {{ $document->company?->code ?? ($document->branch?->company?->code ?? '—') }} / 
                                 {{ $document->branch?->name ?? '—' }}
                             </p>
                         </div>
                         <div>
                             <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Divisi') }}</span>
-                            <p class="font-medium mt-1">{{ $document->division?->code ?? '—' }}</p>
+                            <p class="font-medium mt-0.5">{{ $document->division?->code ?? '—' }}</p>
                         </div>
                         <div>
                             <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Pengguna') }}</span>
-                            <p class="font-medium mt-1">{{ $document->owner->name }}</p>
+                            <p class="font-medium mt-0.5">{{ $document->owner->name }}</p>
                         </div>
                         <div>
                             <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Status') }}</span>
-                            <p class="font-medium mt-1">
+                            <p class="font-medium mt-0.5">
                                 @if($document->is_expired)
                                     <span class="badge badge-error badge-sm mb-1">{{ __('Kedaluwarsa') }}</span><br>
                                 @endif
@@ -567,7 +576,7 @@
                         </div>
                         <div>
                             <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Visibilitas') }}</span>
-                            <p class="font-medium mt-1">
+                            <p class="font-medium mt-0.5">
                                 @if($document->isGeneral())
                                     <span class="badge badge-success badge-sm">{{ __('Umum') }}</span>
                                 @elseif($document->isPersonal())
@@ -579,7 +588,7 @@
                         </div>
                         <div>
                             <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Kedaluwarsa') }}</span>
-                            <p class="font-medium mt-1">
+                            <p class="font-medium mt-0.5">
                                 @if($document->expires_at)
                                     <span class="{{ $document->is_expired ? 'text-error font-semibold' : '' }}">
                                         {{ $document->expires_at->format('d M Y') }}
@@ -591,10 +600,10 @@
                         </div>
                     </div>
 
-                    {{-- Actions (di bawah keterangan, sejajar menyamping dalam satu baris, scrollable jika layar sempit) --}}
+                    {{-- Actions Bar --}}
                     @php $isFileBased = $document->displayVersion()?->file_path; @endphp
-                    <div class="mt-5 pt-4 border-t border-base-200 w-full overflow-x-auto scrollbar-hide touch-pan-x">
-                        <div class="flex items-center justify-center sm:justify-start gap-2 flex-nowrap min-w-max py-1 px-1">
+                    <div class="mt-3 pt-2.5 border-t border-base-200 w-full overflow-x-auto scrollbar-hide touch-pan-x">
+                        <div class="flex items-center justify-center sm:justify-start gap-2 flex-nowrap min-w-max py-0.5 px-0.5">
                             @can('update', $document)
                                 @if(request('saving') == 1)
                                     <a href="{{ route('documents.edit', $document) }}" id="btn-edit-document" class="btn btn-primary btn-sm pointer-events-none opacity-50 gap-1.5 shrink-0" title="{{ __('Edit Dokumen') }}">
@@ -670,6 +679,13 @@
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                                 <span class="hidden sm:inline">{{ __('Summarize Document') }}</span>
                             </button>
+
+                            <a href="{{ route('documents.choose') }}" class="btn btn-ghost btn-sm border border-base-300 gap-1.5 shrink-0" title="{{ __('Buat Dokumen') }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                                </svg>
+                                <span class="hidden sm:inline">{{ __('Buat Dokumen') }}</span>
+                            </a>
                         </div>
                     </div>
 
@@ -684,17 +700,9 @@
                         </div>
                     @endif
                 </div>
-            </div>
 
-            <!-- Content -->
-            {{-- Ringkasan Dokumen (card, bukan modal) --}}
-            @php
-                $hasSummary = !empty($document->summary) && $document->summary_status === \App\Models\Document::SUMMARY_COMPLETED;
-                $isProcessing = $document->summary_status === \App\Models\Document::SUMMARY_PROCESSING;
-                $isFailed = $document->summary_status === \App\Models\Document::SUMMARY_FAILED;
-            @endphp
-            <div id="summary-card" class="card bg-base-100 border border-primary/20 shadow-md mb-6 print:hidden {{ (!$hasSummary && !$isProcessing && !$isFailed) ? 'hidden' : '' }}">
-                <div class="card-body p-5 sm:p-6">
+                {{-- AI Document Summary (Integrated panel) --}}
+                <div id="summary-card" class="border-t border-base-200 bg-base-200/20 p-4 sm:p-5 print:hidden {{ (!$hasSummary && !$isProcessing && !$isFailed) ? 'hidden' : '' }}">
                     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-base-200 pb-3 mb-4">
                         <div class="flex items-center gap-2.5">
                             <span class="p-2 rounded-xl bg-primary/10 text-primary">
@@ -752,12 +760,12 @@
                     </div>
 
                     <div id="summary-body-wrapper" class="{{ !$hasSummary || $isProcessing ? 'hidden' : '' }}">
-                        <div id="summary-body" class="bg-base-200/50 p-4 sm:p-5 rounded-xl border border-base-300/80 text-sm sm:text-base font-normal text-base-content leading-relaxed space-y-2">
+                        <div id="summary-body" class="bg-base-100 p-4 sm:p-5 rounded-xl border border-base-300 text-sm sm:text-base font-normal text-base-content leading-relaxed space-y-2">
                             @if($hasSummary)
                                 {!! nl2br(e($document->summary)) !!}
                             @endif
                         </div>
-                        <div class="mt-3 text-xs text-base-content/60 italic flex gap-2 p-3 bg-base-200/30 rounded-lg border border-base-200">
+                        <div class="mt-3 text-xs text-base-content/60 italic flex gap-2 p-3 bg-base-100/50 rounded-lg border border-base-200">
                             <svg class="w-4 h-4 shrink-0 text-primary mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
@@ -773,11 +781,9 @@
                         <span>{{ $document->summary_error ?? __('Failed to create summary. Please try again.') }}</span>
                     </div>
                 </div>
-            </div>
 
-            <div class="card bg-base-100 border border-base-300 shadow-sm mb-6 print:border-none print:shadow-none print:bg-transparent print:mb-0 print:rounded-none">
-                <div class="card-body p-0">
-                    @php $display = $document->displayVersion(); @endphp
+                {{-- Editor / Document Preview Area (Bottom Section - Flush without gap) --}}
+                <div class="border-t border-base-200 w-full p-0">
                     @if($display && $display->file_path)
                         @include('documents._file-preview', ['document' => $document, 'version' => $display])
                     @elseif($display)
