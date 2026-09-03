@@ -4,14 +4,16 @@
     <div class="py-6">
         <div class="max-w-2xl mx-auto w-full px-0">
             @php
-                $userCompanyIds = old('company_ids', $user->companies->pluck('id')->toArray());
-                $userBranchIds = old('branch_ids', $user->branches->pluck('id')->toArray());
+                $userCompanyIds = old('company_ids', $user->companies->pluck('id')->toArray()) ?: [];
+                $userBranchIds = old('branch_ids', $user->branches->pluck('id')->toArray()) ?: [];
+                $userDivisionIds = old('division_ids', $user->divisions->pluck('id')->toArray()) ?: [];
             @endphp
             <div class="card bg-base-100 border border-base-300 shadow-sm p-4 sm:p-6"
                  x-data="{
                      role: '{{ old('system_role', $user->system_role) }}',
-                     selectedCompanies: {{ json_encode($userCompanyIds) }}.map(String),
-                     selectedBranches: {{ json_encode($userBranchIds) }}.map(String)
+                     selectedCompanies: ({{ json_encode($userCompanyIds) }} || []).map(String),
+                     selectedBranches: ({{ json_encode($userBranchIds) }} || []).map(String),
+                     selectedDivisions: ({{ json_encode($userDivisionIds) }} || []).map(String)
                  }">
                 <form method="POST" action="{{ route('admin.users.update', $user) }}" autocomplete="off">
                     @csrf @method('PUT')
@@ -68,19 +70,76 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                         <div class="form-control w-full">
-                            <label for="division_id" class="label">
-                                <span class="label-text font-medium">{{ __('Divisi Utama') }}</span>
+                            <label class="label">
+                                <span class="label-text font-medium">{{ __('Divisi') }}</span>
                                 <span class="label-text-alt text-base-content/50" x-show="role === 'direktur'">{{ __('(N/A)') }}</span>
                             </label>
-                            <select name="division_id" id="division_id"
-                                    :disabled="role === 'direktur'"
-                                    :class="role === 'direktur' ? 'bg-base-200 cursor-not-allowed opacity-60' : ''"
-                                    class="select select-bordered w-full">
-                                <option value="">{{ __('Tanpa Divisi') }}</option>
-                                @foreach($divisions as $div)
-                                    <option value="{{ $div->id }}" {{ old('division_id', $user->division_id) == $div->id ? 'selected' : '' }}>{{ $div->code }} - {{ $div->name }}</option>
-                                @endforeach
-                            </select>
+                            
+                            <div class="relative" 
+                                 x-data="{
+                                     selectedDivisions: {{ Js::from(old('division_ids', $user->divisions->pluck('id')->map(fn($id) => (string) $id)->toArray())) }},
+                                     searchDiv: '',
+                                     openDiv: false,
+                                     allDivisions: [
+                                         @foreach($divisions as $div)
+                                             { id: '{{ $div->id }}', name: '{{ addslashes($div->code) }} - {{ addslashes($div->name) }}' },
+                                         @endforeach
+                                     ],
+                                     get filteredDivisions() {
+                                         if (this.searchDiv === '') return this.allDivisions;
+                                         return this.allDivisions.filter(d => d.name.toLowerCase().includes(this.searchDiv.toLowerCase()));
+                                     },
+                                     toggleDiv(id) {
+                                         id = String(id);
+                                         if (selectedDivisions.includes(id)) {
+                                             selectedDivisions = selectedDivisions.filter(d => d !== id);
+                                         } else {
+                                             selectedDivisions.push(id);
+                                         }
+                                         this.searchDiv = '';
+                                         this.$refs.searchDivInput.focus();
+                                     }
+                                 }"
+                                 x-init="$watch('openDiv', value => { if(value) setTimeout(() => $refs.searchDivInput.focus(), 50) })"
+                                 x-show="role !== 'direktur'"
+                                 @click.away="openDiv = false">
+                                
+                                <div class="select select-bordered w-full flex items-center justify-between cursor-pointer"
+                                     @click="openDiv = !openDiv">
+                                     
+                                    <template x-for="id in selectedDivisions" :key="id">
+                                        <input type="hidden" name="division_ids[]" :value="id">
+                                    </template>
+                                    
+                                    <span x-text="selectedDivisions.length > 0 ? selectedDivisions.length + ' {{ __('Divisi Terpilih') }}' : '{{ __('-- Pilih Divisi --') }}'" class="truncate"></span>
+                                    
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                </div>
+                                
+                                <div x-show="openDiv" 
+                                     x-transition
+                                     class="absolute z-10 mt-1 w-full bg-base-100 border border-base-300 rounded-lg shadow-lg flex flex-col">
+                                    <div class="p-2 border-b border-base-200">
+                                        <input type="text" x-ref="searchDivInput" x-model="searchDiv" class="input input-sm input-bordered w-full" placeholder="{{ __('Cari divisi...') }}">
+                                    </div>
+                                    
+                                    <div class="max-h-60 overflow-y-auto">
+                                        <template x-if="filteredDivisions.length === 0">
+                                            <div class="p-3 text-sm text-base-content/60 text-center">{{ __('Tidak ada divisi ditemukan') }}</div>
+                                        </template>
+                                        <template x-for="div in filteredDivisions" :key="div.id">
+                                            <label class="p-3 hover:bg-base-200 cursor-pointer text-sm flex items-center gap-3 border-b border-base-200/50 last:border-0">
+                                                <input type="checkbox" :value="String(div.id)" x-model="selectedDivisions" class="checkbox checkbox-sm checkbox-accent">
+                                                <span x-text="div.name"></span>
+                                            </label>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div x-show="role === 'direktur'" class="border border-base-300 rounded-lg p-3 bg-base-200 opacity-60 cursor-not-allowed">
+                                <span class="text-sm">{{ __('Tanpa Divisi') }}</span>
+                            </div>
                         </div>
                         <div class="form-control w-full">
                             <label for="system_role" class="label"><span class="label-text font-medium">{{ __('Peran Sistem (Role)') }} <span class="text-error">*</span></span></label>
@@ -130,7 +189,7 @@
                                     id = String(id);
                                     if (selectedCompanies.includes(id)) {
                                         selectedCompanies = selectedCompanies.filter(c => c !== id);
-                                        // Also remove its branches
+                                        // Also remove its branches and divisions
                                         let company = this.companies.find(c => String(c.id) === id);
                                         if(company) {
                                             selectedBranches = selectedBranches.filter(b => !company.branchIds.map(String).includes(String(b)));
@@ -215,6 +274,8 @@
                             </div>
                         </div>
                     </div>
+
+
 
                     <div class="form-control mb-4">
                         <label class="label cursor-pointer justify-start gap-3 px-0">

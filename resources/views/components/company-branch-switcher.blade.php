@@ -4,6 +4,7 @@
     $companies = $contextService->getAvailableCompanies($user);
     $activeCompanyId = (string) $contextService->getActiveCompanyId($user);
     $activeBranchId = (string) $contextService->getActiveBranchId($user);
+    $activeDivisionId = (string) $contextService->getActiveDivisionId($user);
     
     $companiesData = $companies->map(function ($c) use ($contextService, $user) {
         $cBranches = $contextService->getAvailableBranches($user, $c->id);
@@ -11,29 +12,38 @@
             'id' => (string) $c->id,
             'name' => $c->name,
             'code' => $c->code,
-            'branches' => $cBranches->map(fn($b) => [
-                'id' => (string) $b->id,
-                'name' => $b->name . ($b->is_pusat ? ' (' . __('Pusat') . ')' : ($b->code ? ' (' . $b->code . ')' : '')),
-                'raw_name' => $b->name,
-                'is_pusat' => (bool) $b->is_pusat,
-            ])->values()->all(),
+            'branches' => $cBranches->map(function ($b) {
+                return [
+                    'id' => (string) $b->id,
+                    'name' => $b->name . ($b->is_pusat ? ' (' . __('Pusat') . ')' : ($b->code ? ' (' . $b->code . ')' : '')),
+                    'raw_name' => $b->name,
+                    'is_pusat' => (bool) $b->is_pusat,
+                ];
+            })->values()->all(),
         ];
     })->values()->all();
 
     $activeCompany = $companies->firstWhere('id', (int) $activeCompanyId);
     $activeBranches = $contextService->getAvailableBranches($user, (int) $activeCompanyId);
     $activeBranch = $activeBranches->firstWhere('id', (int) $activeBranchId);
+    
+    $globalDivisions = $contextService->getAvailableDivisions($user);
+    $activeDivision = $globalDivisions->firstWhere('id', (int) $activeDivisionId);
 @endphp
 
 @if(!$user?->isDirector() && $companies->isNotEmpty())
     <div x-data="{
         activeCompanyId: '{{ $activeCompanyId }}',
         activeBranchId: '{{ $activeBranchId }}',
+        activeDivisionId: '{{ $activeDivisionId }}',
         selectedCompanyId: '{{ $activeCompanyId }}',
         selectedBranchId: '{{ $activeBranchId }}',
+        selectedDivisionId: '{{ $activeDivisionId }}',
         pendingCompanyId: '{{ $activeCompanyId }}',
         pendingBranchId: '{{ $activeBranchId }}',
+        pendingDivisionId: '{{ $activeDivisionId }}',
         companies: {{ Js::from($companiesData) }},
+        divisions: {{ Js::from($globalDivisions->map(fn($d) => ['id' => (string) $d->id, 'name' => $d->name, 'code' => $d->code])->values()->all()) }},
         isSwitching: false,
 
         get currentCompany() {
@@ -56,8 +66,18 @@
             const comp = this.companies.find(c => c.id === this.selectedCompanyId);
             return comp ? comp.branches : [];
         },
+        get availableSelectedDivisions() {
+            return this.divisions;
+        },
+        get availablePendingDivisions() {
+            return this.divisions;
+        },
+        get targetDivision() {
+            return this.divisions.find(d => d.id === this.pendingDivisionId) 
+                || this.divisions[0] 
+                || null;
+        },
 
-        // Triggered from desktop inline dropdowns
         onDesktopCompanyChange(newCompanyId) {
             if (newCompanyId === this.activeCompanyId) return;
             this.pendingCompanyId = newCompanyId;
@@ -67,6 +87,7 @@
             } else {
                 this.pendingBranchId = '';
             }
+            this.pendingDivisionId = this.divisions.length > 0 ? this.divisions[0].id : '';
             this.openConfirmModal();
         },
 
@@ -74,10 +95,18 @@
             if (newBranchId === this.activeBranchId) return;
             this.pendingCompanyId = this.activeCompanyId;
             this.pendingBranchId = newBranchId;
+            this.pendingDivisionId = this.divisions.length > 0 ? this.divisions[0].id : '';
             this.openConfirmModal();
         },
 
-        // Triggered from mobile picker modal
+        onDesktopDivisionChange(newDivisionId) {
+            if (newDivisionId === this.activeDivisionId) return;
+            this.pendingCompanyId = this.activeCompanyId;
+            this.pendingBranchId = this.activeBranchId;
+            this.pendingDivisionId = newDivisionId;
+            this.openConfirmModal();
+        },
+
         onMobileCompanyChange(newCompanyId) {
             this.selectedCompanyId = newCompanyId;
             const comp = this.companies.find(c => c.id === newCompanyId);
@@ -86,15 +115,21 @@
             } else {
                 this.selectedBranchId = '';
             }
+            this.selectedDivisionId = this.divisions.length > 0 ? this.divisions[0].id : '';
+        },
+
+        onMobileBranchChange(newBranchId) {
+            this.selectedBranchId = newBranchId;
         },
 
         applyMobileSelection() {
-            if (this.selectedCompanyId === this.activeCompanyId && this.selectedBranchId === this.activeBranchId) {
+            if (this.selectedCompanyId === this.activeCompanyId && this.selectedBranchId === this.activeBranchId && this.selectedDivisionId === this.activeDivisionId) {
                 this.closeMobileModal();
                 return;
             }
             this.pendingCompanyId = this.selectedCompanyId;
             this.pendingBranchId = this.selectedBranchId;
+            this.pendingDivisionId = this.selectedDivisionId;
             this.closeMobileModal();
             this.openConfirmModal();
         },
@@ -121,13 +156,16 @@
             // Revert state to current active values
             this.selectedCompanyId = this.activeCompanyId;
             this.selectedBranchId = this.activeBranchId;
+            this.selectedDivisionId = this.activeDivisionId;
             this.pendingCompanyId = this.activeCompanyId;
             this.pendingBranchId = this.activeBranchId;
+            this.pendingDivisionId = this.activeDivisionId;
         },
 
         openMobileModal() {
             this.selectedCompanyId = this.activeCompanyId;
             this.selectedBranchId = this.activeBranchId;
+            this.selectedDivisionId = this.activeDivisionId;
             if (this.$refs.mobileModal) {
                 this.$refs.mobileModal.showModal();
             }
@@ -145,13 +183,16 @@
 
             const finalCompany = this.pendingCompanyId;
             const finalBranch = this.targetBranch ? this.targetBranch.id : (this.pendingBranchId || '');
+            const finalDivision = this.targetDivision ? this.targetDivision.id : (this.pendingDivisionId || '');
 
             const form = this.$refs.contextSwitchForm;
             if (form) {
                 const compInput = form.querySelector('input[name=company_id]');
                 const branchInput = form.querySelector('input[name=branch_id]');
+                const divInput = form.querySelector('input[name=division_id]');
                 if (compInput) compInput.value = finalCompany;
                 if (branchInput) branchInput.value = finalBranch;
+                if (divInput) divInput.value = finalDivision;
 
                 // Safety timeout to prevent permanent stuck state on network failure
                 setTimeout(() => {
@@ -168,6 +209,7 @@
             @csrf
             <input type="hidden" name="company_id">
             <input type="hidden" name="branch_id">
+            <input type="hidden" name="division_id">
         </form>
 
         {{-- Desktop: inline dropdowns (visible xl+) --}}
@@ -197,6 +239,20 @@
                     </select>
                 </div>
             @endif
+
+            {{-- Division Dropdown --}}
+            @if($globalDivisions->count() > 1)
+                <div class="relative" x-show="availableSelectedDivisions.length > 1">
+                    <select x-model="selectedDivisionId" 
+                            @change="onDesktopDivisionChange($event.target.value)" 
+                            class="select select-bordered select-xs sm:select-sm text-xs bg-base-200/60 w-auto min-w-[100px] max-w-[140px] 2xl:max-w-[180px] focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer truncate"
+                            title="{{ __('Pilih Divisi Aktif') }}">
+                        <template x-for="div in availableSelectedDivisions" :key="div.id">
+                            <option :value="div.id" x-text="div.code + ' - ' + div.name"></option>
+                        </template>
+                    </select>
+                </div>
+            @endif
         </div>
 
         {{-- Tablet / Medium Screen: Compact pill button (visible sm to xl) --}}
@@ -212,6 +268,10 @@
                 <span class="font-semibold truncate text-[11px]">{{ $activeCompany?->code ?? '-' }}</span>
                 <span class="text-base-content/30">•</span>
                 <span class="truncate text-[11px] text-base-content/70">{{ $activeBranch?->name ?? '-' }}</span>
+                @if($globalDivisions->count() > 1)
+                    <span class="text-base-content/30">•</span>
+                    <span class="truncate text-[11px] text-base-content/70">{{ $activeDivision?->code ?? '-' }}</span>
+                @endif
                 <svg class="w-3 h-3 text-base-content/40 group-hover:text-base-content/70 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
             </button>
         </div>
@@ -284,9 +344,23 @@
                                 <span class="text-[10px] text-base-content/40 font-normal" x-text="availableSelectedBranches.length + ' {{ __('tersedia') }}'"></span>
                             </label>
                             <select x-model="selectedBranchId"
+                                    @change="onMobileBranchChange($event.target.value)"
                                     class="select select-bordered select-sm w-full bg-base-100 text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary rounded-xl">
                                 <template x-for="br in availableSelectedBranches" :key="br.id">
                                     <option :value="br.id" x-text="br.name"></option>
+                                </template>
+                            </select>
+                        </div>
+
+                        <div class="space-y-1.5" x-show="availableSelectedDivisions.length > 1">
+                            <label class="text-xs font-semibold text-base-content/80 flex items-center justify-between">
+                                <span>{{ __('Divisi') }}</span>
+                                <span class="text-[10px] text-base-content/40 font-normal" x-text="availableSelectedDivisions.length + ' {{ __('tersedia') }}'"></span>
+                            </label>
+                            <select x-model="selectedDivisionId"
+                                    class="select select-bordered select-sm w-full bg-base-100 text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary rounded-xl">
+                                <template x-for="div in availableSelectedDivisions" :key="div.id">
+                                    <option :value="div.id" x-text="div.code + ' - ' + div.name"></option>
                                 </template>
                             </select>
                         </div>
@@ -383,7 +457,12 @@
                                     </svg>
                                     <span x-text="targetCompany?.name || '-'"></span>
                                 </div>
-                                <span class="badge badge-sm badge-primary font-semibold shrink-0" x-text="targetBranch?.raw_name || targetBranch?.name || '-'"></span>
+                                <div class="flex items-center gap-1 shrink-0">
+                                    <span class="badge badge-sm badge-primary font-semibold" x-text="targetBranch?.raw_name || targetBranch?.name || '-'"></span>
+                                    <template x-if="availablePendingDivisions.length > 1">
+                                        <span class="badge badge-sm badge-outline text-primary font-semibold" x-text="targetDivision?.code || targetDivision?.name || '-'"></span>
+                                    </template>
+                                </div>
                             </div>
                         </div>
                     </div>

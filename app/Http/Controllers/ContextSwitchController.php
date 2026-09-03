@@ -47,14 +47,18 @@ class ContextSwitchController extends Controller
         session(['active_company_id' => $companyId]);
 
         $branchId = $validated['branch_id'] ?? null;
+        $activeBranchId = null;
+
         if (!empty($branchId) && is_numeric($branchId)) {
             $branch = Branch::where('id', (int) $branchId)->where('company_id', $companyId)->first();
             if ($branch && ($user->isAdmin() || $user->branches()->where('branches.id', $branch->id)->exists())) {
                 session(['active_branch_id' => $branch->id]);
+                $activeBranchId = $branch->id;
             } else {
                 $defaultBranch = $this->contextService->getAvailableBranches($user, $companyId)->first();
                 if ($defaultBranch) {
                     session(['active_branch_id' => $defaultBranch->id]);
+                    $activeBranchId = $defaultBranch->id;
                 } else {
                     session()->forget('active_branch_id');
                 }
@@ -64,9 +68,44 @@ class ContextSwitchController extends Controller
             $defaultBranch = $this->contextService->getAvailableBranches($user, $companyId)->first();
             if ($defaultBranch) {
                 session(['active_branch_id' => $defaultBranch->id]);
+                $activeBranchId = $defaultBranch->id;
             } else {
                 session()->forget('active_branch_id');
             }
+        }
+
+        // Division Logic
+        $divisionId = $request->input('division_id');
+        if ($activeBranchId) {
+            $availableDivisions = $this->contextService->getAvailableDivisions($user, $activeBranchId);
+            
+            if ($availableDivisions->isEmpty()) {
+                session()->forget('active_division_id');
+            } elseif ($availableDivisions->count() === 1) {
+                // Auto-select if only 1 division exists
+                session(['active_division_id' => $availableDivisions->first()->id]);
+            } else {
+                // More than 1 division exists
+                if (!empty($divisionId) && is_numeric($divisionId)) {
+                    $division = $availableDivisions->firstWhere('id', (int) $divisionId);
+                    if ($division) {
+                        session(['active_division_id' => $division->id]);
+                    } else {
+                        // Fallback to first if invalid
+                        session(['active_division_id' => $availableDivisions->first()->id]);
+                    }
+                } else {
+                    // Check if current session division is still valid in this branch
+                    $currentDivisionId = session('active_division_id');
+                    if ($currentDivisionId && $availableDivisions->firstWhere('id', $currentDivisionId)) {
+                        // keep it
+                    } else {
+                        session(['active_division_id' => $availableDivisions->first()->id]);
+                    }
+                }
+            }
+        } else {
+            session()->forget('active_division_id');
         }
 
         session()->save();

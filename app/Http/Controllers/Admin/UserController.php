@@ -16,8 +16,7 @@ class UserController extends Controller
     public function index(Request $request): View
     {
         $this->authorize('admin');
-
-        $query = User::with(['division', 'companies', 'branches']);
+        $query = User::with(['divisions', 'companies', 'branches']);
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -29,7 +28,9 @@ class UserController extends Controller
         }
 
         if ($request->filled('division')) {
-            $query->where('division_id', $request->division);
+            $query->whereHas('divisions', function($q) use ($request) {
+                $q->where('divisions.id', $request->division);
+            });
         }
 
         if ($request->filled('role')) {
@@ -64,6 +65,8 @@ class UserController extends Controller
             'phone_number' => 'nullable|string|max:50',
             'password' => 'required|string|min:8|confirmed',
             'division_id' => 'nullable|exists:divisions,id',
+            'division_ids' => 'nullable|array',
+            'division_ids.*' => 'exists:divisions,id',
             'system_role' => 'required|in:admin,direktur,head,user',
             'is_active' => 'boolean',
             'company_ids' => 'nullable|array',
@@ -75,7 +78,8 @@ class UserController extends Controller
         unset($validated['password_confirmation']);
         $companyIds = $validated['company_ids'] ?? [];
         $branchIds = $validated['branch_ids'] ?? [];
-        unset($validated['company_ids'], $validated['branch_ids']);
+        $divisionIds = $validated['division_ids'] ?? [];
+        unset($validated['company_ids'], $validated['branch_ids'], $validated['division_ids']);
 
         if ($validated['system_role'] === 'admin') {
             $companyIds = Company::pluck('id')->all();
@@ -95,6 +99,9 @@ class UserController extends Controller
         if (!empty($branchIds)) {
             $user->branches()->sync($branchIds);
         }
+        if (!empty($divisionIds)) {
+            $user->divisions()->sync($divisionIds);
+        }
 
         return redirect()->route('admin.users.index')->with('success', __('Pengguna berhasil dibuat.'));
     }
@@ -104,7 +111,7 @@ class UserController extends Controller
         $this->authorize('admin');
         $divisions = Division::all();
         $companies = Company::with('branches')->get();
-        $user->load(['companies', 'branches']);
+        $user->load(['companies', 'branches', 'divisions']);
         return view('admin.users.edit', compact('user', 'divisions', 'companies'));
     }
 
@@ -122,6 +129,8 @@ class UserController extends Controller
             'phone_number' => 'nullable|string|max:50',
             'password' => 'nullable|string|min:8|confirmed',
             'division_id' => 'nullable|exists:divisions,id',
+            'division_ids' => 'nullable|array',
+            'division_ids.*' => 'exists:divisions,id',
             'system_role' => 'required|in:' . $allowedRoles,
             'is_active' => 'boolean',
             'company_ids' => 'nullable|array',
@@ -137,7 +146,8 @@ class UserController extends Controller
 
         $companyIds = $validated['company_ids'] ?? [];
         $branchIds = $validated['branch_ids'] ?? [];
-        unset($validated['company_ids'], $validated['branch_ids']);
+        $divisionIds = $validated['division_ids'] ?? [];
+        unset($validated['company_ids'], $validated['branch_ids'], $validated['division_ids']);
 
         if ($validated['system_role'] === 'admin') {
             $companyIds = Company::pluck('id')->all();
@@ -153,6 +163,7 @@ class UserController extends Controller
 
         $user->companies()->sync($companyIds);
         $user->branches()->sync($branchIds);
+        $user->divisions()->sync($divisionIds);
 
         return redirect()->route('admin.users.index')->with('success', __('Pengguna berhasil diperbarui.'));
     }

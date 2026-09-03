@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Branch;
 use App\Models\Company;
+use App\Models\Division;
 use App\Models\User;
 
 class CompanyContextService
@@ -68,6 +69,36 @@ class CompanyContextService
     }
 
     /**
+     * Get active division ID from session, or resolve default.
+     */
+    public function getActiveDivisionId(?User $user = null): ?int
+    {
+        $user = $user ?? auth()->user();
+        if (!$user) {
+            return null;
+        }
+
+        $sessionDivisionId = session('active_division_id');
+        
+        if ($sessionDivisionId) {
+            $division = Division::find($sessionDivisionId);
+            if ($division) {
+                if ($user->isAdmin() || in_array($sessionDivisionId, $user->allDivisionIds())) {
+                    return (int) $sessionDivisionId;
+                }
+            }
+        }
+
+        $division = $this->getDefaultDivision($user);
+        if ($division) {
+            session(['active_division_id' => $division->id]);
+            return $division->id;
+        }
+
+        return null;
+    }
+
+    /**
      * Get available companies for user.
      */
     public function getAvailableCompanies(?User $user = null)
@@ -106,6 +137,24 @@ class CompanyContextService
         return $user->branches()->where('company_id', $companyId)->orderBy('is_pusat', 'desc')->orderBy('name')->get();
     }
 
+    /**
+     * Get all available divisions globally for user.
+     */
+    public function getAvailableDivisions(?User $user = null)
+    {
+        $user = $user ?? auth()->user();
+        if (!$user) {
+            return collect();
+        }
+
+        if ($user->isAdmin()) {
+            return Division::orderBy('name')->get();
+        }
+
+        $divisionIds = $user->allDivisionIds();
+        return Division::whereIn('id', $divisionIds)->orderBy('name')->get();
+    }
+
     private function getDefaultCompany(User $user): ?Company
     {
         if ($user->isAdmin()) {
@@ -126,5 +175,15 @@ class CompanyContextService
         }
 
         return $user->branches()->where('company_id', $companyId)->orderBy('is_pusat', 'desc')->orderBy('name')->first();
+    }
+
+    private function getDefaultDivision(User $user): ?Division
+    {
+        if ($user->isAdmin()) {
+            return Division::orderBy('name')->first();
+        }
+
+        $divisionIds = $user->allDivisionIds();
+        return Division::whereIn('id', $divisionIds)->orderBy('name')->first();
     }
 }
