@@ -16,13 +16,14 @@ class SearchController extends Controller
      */
     public function search(Request $request): JsonResponse
     {
-        $q = trim($request->get('q', ''));
+        $q = trim((string) $request->get('q'));
         $documentTypeId = $request->get('document_type_id');
         $documentType = $request->get('document_type'); // accept either id or code
         $visibility = $request->get('visibility');
+        $formatChoice = $request->get('format_choice');
         $lang = $request->get('lang', app()->getLocale());
 
-        if (strlen($q) < 2 && !$documentTypeId && !$documentType && !$visibility) {
+        if (strlen($q) < 2 && !$documentTypeId && !$documentType && !$visibility && !$formatChoice) {
             return response()->json([
                 'results' => [],
                 'pagination' => [
@@ -48,6 +49,10 @@ class SearchController extends Controller
 
         if ($visibility && in_array($visibility, ['general', 'division', 'personal'], true)) {
             $query->where('visibility', $visibility);
+        }
+
+        if ($formatChoice && in_array($formatChoice, ['baru', 'lama'], true)) {
+            $query->where('format_choice', $formatChoice);
         }
 
         if ($documentTypeId) {
@@ -90,6 +95,7 @@ class SearchController extends Controller
             'id'              => $doc->id,
             'title'           => $doc->title,
             'document_number' => $doc->document_number,
+            'format_choice'   => $doc->format_choice ?? 'baru',
             'visibility'      => $doc->visibility,
             'owner'           => $doc->owner?->name,
             'division'        => $doc->division?->name,

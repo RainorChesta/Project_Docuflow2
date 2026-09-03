@@ -311,8 +311,8 @@
             {{-- Results Viewport --}}
             <div class="max-h-[380px] overflow-y-auto overscroll-contain p-2 space-y-1 divide-y divide-base-200/40">
                 
-                {{-- Zero-State: Recent Searches & Quick Links (when query is empty and no filters) --}}
-                <div x-show="query.length < 2 && !documentTypeId && !visibility && !loading" class="p-3 space-y-4">
+                {{-- Zero-State: Recent Searches & Idle State (when query is empty and no filters) --}}
+                <div x-show="query.length < 2 && !documentTypeId && !visibility && !loading" class="p-3 space-y-3">
                     {{-- Recent Searches --}}
                     <template x-if="recentSearches.length > 0">
                         <div>
@@ -340,57 +340,18 @@
                         </div>
                     </template>
 
-                    {{-- Quick Action Shortcuts --}}
-                    <div>
-                        <div class="text-[11px] font-semibold text-base-content/50 uppercase tracking-wider mb-2">
-                            {{ __('Akses Cepat Dokumen') }}
+                    {{-- Empty/Idle Guidance when no recent searches --}}
+                    <template x-if="recentSearches.length === 0">
+                        <div class="flex flex-col items-center justify-center py-8 text-center text-base-content/40 space-y-2">
+                            <div class="w-10 h-10 rounded-2xl bg-base-200/70 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                            </div>
+                            <div class="text-xs font-medium text-base-content/60">{{ __('Cari dokumen di seluruh cabang dan perusahaan Anda') }}</div>
+                            <div class="text-[11px] text-base-content/40">{{ __('Ketik judul dokumen, nomor surat, nama divisi, atau kata kunci.') }}</div>
                         </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            <a href="{{ route('documents.index', ['type' => 'general']) }}"
-                               class="flex items-center gap-3 p-2.5 rounded-xl bg-base-200/40 hover:bg-success/10 border border-base-200 hover:border-success/30 transition-all group cursor-pointer">
-                                <div class="w-8 h-8 rounded-lg bg-success/10 text-success flex items-center justify-center group-hover:scale-105 transition-transform">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                </div>
-                                <div class="min-w-0">
-                                    <div class="text-xs font-bold text-base-content group-hover:text-success transition-colors">{{ __('Dokumen Umum') }}</div>
-                                    <div class="text-[11px] text-base-content/50 truncate">{{ __('Arsip dokumen publik & regulasi') }}</div>
-                                </div>
-                            </a>
-
-                            <a href="{{ route('documents.index', ['type' => 'division']) }}"
-                               class="flex items-center gap-3 p-2.5 rounded-xl bg-base-200/40 hover:bg-warning/10 border border-base-200 hover:border-warning/30 transition-all group cursor-pointer">
-                                <div class="w-8 h-8 rounded-lg bg-warning/10 text-warning flex items-center justify-center group-hover:scale-105 transition-transform">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                                </div>
-                                <div class="min-w-0">
-                                    <div class="text-xs font-bold text-base-content group-hover:text-warning transition-colors">{{ __('Dokumen Divisi') }}</div>
-                                    <div class="text-[11px] text-base-content/50 truncate">{{ __('Dokumen internal divisi Anda') }}</div>
-                                </div>
-                            </a>
-
-                            <a href="{{ route('documents.index', ['type' => 'mine']) }}"
-                               class="flex items-center gap-3 p-2.5 rounded-xl bg-base-200/40 hover:bg-info/10 border border-base-200 hover:border-info/30 transition-all group cursor-pointer">
-                                <div class="w-8 h-8 rounded-lg bg-info/10 text-info flex items-center justify-center group-hover:scale-105 transition-transform">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
-                                </div>
-                                <div class="min-w-0">
-                                    <div class="text-xs font-bold text-base-content group-hover:text-info transition-colors">{{ __('Draf Dokumen Saya') }}</div>
-                                    <div class="text-[11px] text-base-content/50 truncate">{{ __('Lanjutkan pengeditan dokumen Anda') }}</div>
-                                </div>
-                            </a>
-
-                            <a href="{{ route('signatures.requests.index') }}"
-                               class="flex items-center gap-3 p-2.5 rounded-xl bg-base-200/40 hover:bg-primary/10 border border-base-200 hover:border-primary/30 transition-all group cursor-pointer">
-                                <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center group-hover:scale-105 transition-transform">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                </div>
-                                <div class="min-w-0">
-                                    <div class="text-xs font-bold text-base-content group-hover:text-primary transition-colors">{{ __('Persetujuan Tanda Tangan') }}</div>
-                                    <div class="text-[11px] text-base-content/50 truncate">{{ __('Permintaan & riwayat tanda tangan digital') }}</div>
-                                </div>
-                            </a>
-                        </div>
-                    </div>
+                    </template>
                 </div>
 
                 {{-- Loading State --}}
@@ -443,6 +404,14 @@
                                         {{-- Number badge --}}
                                         <template x-if="item.document_number">
                                             <span class="font-mono text-[11px] px-1.5 py-0.5 rounded bg-base-200/80 text-base-content/70 border border-base-300/50" x-text="item.document_number"></span>
+                                        </template>
+
+                                        {{-- Format badge --}}
+                                        <template x-if="item.format_choice === 'lama'">
+                                            <span class="badge badge-secondary badge-outline badge-xs">{{ __('Format Lama') }}</span>
+                                        </template>
+                                        <template x-if="item.format_choice === 'baru'">
+                                            <span class="badge badge-primary badge-outline badge-xs">{{ __('Format Baru') }}</span>
                                         </template>
 
                                         {{-- Type & Division --}}

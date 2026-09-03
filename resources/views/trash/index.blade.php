@@ -132,6 +132,11 @@
                                         <div class="font-bold text-base-content">{{ $doc->title }}</div>
                                         <div class="flex items-center gap-2 mt-0.5">
                                             <span class="text-xs font-mono text-base-content/60">{{ $doc->document_number }}</span>
+                                            @if($doc->format_choice === 'lama')
+                                                <span class="badge badge-secondary badge-outline badge-xs">{{ __('Format Lama') }}</span>
+                                            @else
+                                                <span class="badge badge-primary badge-outline badge-xs">{{ __('Format Baru') }}</span>
+                                            @endif
                                             @if($doc->documentType)
                                                 <span class="badge badge-xs badge-outline max-w-[150px] inline-flex items-center" title="{{ $doc->documentType->name }}">
                                                     <span class="truncate">{{ $doc->documentType->name }}</span>

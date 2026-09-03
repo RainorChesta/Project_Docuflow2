@@ -148,4 +148,103 @@ class DocumentApprovalRejectionTest extends TestCase
                 $notification->notes === 'Rollback not allowed without management consensus.';
         });
     }
+
+    public function test_approvals_index_filters_by_search_and_tab(): void
+    {
+        $company = Company::create(['name' => 'PT Test', 'code' => 'TEST']);
+        $branch = Branch::create(['company_id' => $company->id, 'name' => 'Pusat', 'is_pusat' => true]);
+        $division = Division::create(['name' => 'Operations', 'code' => 'OPS']);
+
+        $reviewer = User::factory()->create([
+            'division_id' => $division->id,
+            'name' => 'Ops Head',
+            'system_role' => 'head',
+        ]);
+        $reviewer->companies()->attach($company->id);
+        $reviewer->branches()->attach($branch->id);
+
+        $author = User::factory()->create(['division_id' => $division->id, 'name' => 'Staff Alice']);
+        $author->companies()->attach($company->id);
+        $author->branches()->attach($branch->id);
+
+        $docType = DocumentType::create(['name' => 'Manual', 'code' => 'MNL']);
+        $doc1 = Document::create([
+            'document_number' => '001/OPS/2026',
+            'title' => 'Operating Standard Manual',
+            'document_type_id' => $docType->id,
+            'owner_id' => $author->id,
+            'division_id' => $division->id,
+            'company_id' => $company->id,
+            'branch_id' => $branch->id,
+            'visibility' => 'general',
+        ]);
+        $v1 = DocumentVersion::create([
+            'document_id' => $doc1->id,
+            'version_number' => 1,
+            'author_id' => $author->id,
+            'author_name' => $author->name,
+            'status' => 'pending',
+            'content' => '<p>Manual content</p>',
+        ]);
+
+        // 1. Visit approvals index with search
+        $responseSearch = $this->actingAs($reviewer)->get(route('approvals.index', ['search' => 'Operating Standard']));
+        $responseSearch->assertStatus(200);
+        $responseSearch->assertSee('Operating Standard Manual');
+
+        // 2. Visit approvals index with tab 'versions'
+        $responseTab = $this->actingAs($reviewer)->get(route('approvals.index', ['tab' => 'versions']));
+        $responseTab->assertStatus(200);
+        $responseTab->assertSee('Operating Standard Manual');
+    }
+
+    public function test_bulk_approve_and_bulk_reject_document_versions(): void
+    {
+        Notification::fake();
+
+        $company = Company::create(['name' => 'PT Test', 'code' => 'TEST']);
+        $branch = Branch::create(['company_id' => $company->id, 'name' => 'Pusat', 'is_pusat' => true]);
+        $division = Division::create(['name' => 'Engineering', 'code' => 'ENG']);
+
+        $reviewer = User::factory()->create([
+            'division_id' => $division->id,
+            'name' => 'Lead Engineer',
+            'system_role' => 'head',
+        ]);
+        $reviewer->companies()->attach($company->id);
+        $reviewer->branches()->attach($branch->id);
+
+        $author = User::factory()->create(['division_id' => $division->id, 'name' => 'Junior Dev']);
+        $author->companies()->attach($company->id);
+        $author->branches()->attach($branch->id);
+
+        $docType = DocumentType::create(['name' => 'Architecture Guide', 'code' => 'ARC']);
+        $doc1 = Document::create(['document_number' => '001/ARC/2026', 'title' => 'System Design A', 'document_type_id' => $docType->id, 'owner_id' => $author->id, 'division_id' => $division->id, 'company_id' => $company->id, 'branch_id' => $branch->id, 'visibility' => 'general']);
+        $doc2 = Document::create(['document_number' => '002/ARC/2026', 'title' => 'System Design B', 'document_type_id' => $docType->id, 'owner_id' => $author->id, 'division_id' => $division->id, 'company_id' => $company->id, 'branch_id' => $branch->id, 'visibility' => 'general']);
+
+        $v1 = DocumentVersion::create(['document_id' => $doc1->id, 'version_number' => 1, 'author_id' => $author->id, 'author_name' => $author->name, 'status' => 'pending', 'content' => '<p>A</p>']);
+        $v2 = DocumentVersion::create(['document_id' => $doc2->id, 'version_number' => 1, 'author_id' => $author->id, 'author_name' => $author->name, 'status' => 'pending', 'content' => '<p>B</p>']);
+
+        // Bulk approve
+        $responseApprove = $this->actingAs($reviewer)->post(route('approvals.bulk-approve-versions'), [
+            'version_ids' => [$v1->id, $v2->id],
+        ]);
+        $responseApprove->assertSessionHas('success');
+        $this->assertSame('active', $v1->fresh()->status);
+        $this->assertSame('active', $v2->fresh()->status);
+
+        Notification::assertSentTo($author, DocumentApprovalResult::class);
+
+        // Create 2 more versions to test bulk reject
+        $v3 = DocumentVersion::create(['document_id' => $doc1->id, 'version_number' => 2, 'author_id' => $author->id, 'author_name' => $author->name, 'status' => 'pending', 'content' => '<p>A2</p>']);
+        $v4 = DocumentVersion::create(['document_id' => $doc2->id, 'version_number' => 2, 'author_id' => $author->id, 'author_name' => $author->name, 'status' => 'pending', 'content' => '<p>B2</p>']);
+
+        $responseReject = $this->actingAs($reviewer)->post(route('approvals.bulk-reject-versions'), [
+            'version_ids' => [$v3->id, $v4->id],
+            'notes' => 'Bulk reject reason',
+        ]);
+        $responseReject->assertSessionHas('success');
+        $this->assertSame('rejected', $v3->fresh()->status);
+        $this->assertSame('rejected', $v4->fresh()->status);
+    }
 }

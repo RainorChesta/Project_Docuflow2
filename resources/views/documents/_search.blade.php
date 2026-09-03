@@ -33,11 +33,25 @@
     </select>
     @endif
     
+    <select name="format_choice" class="select select-bordered select-sm w-full sm:w-auto" onchange="this.form.submit()">
+        <option value="">{{ __('Semua Format') }}</option>
+        <option value="baru" {{ request('format_choice') == 'baru' ? 'selected' : '' }}>{{ __('Format Baru') }}</option>
+        <option value="lama" {{ request('format_choice') == 'lama' ? 'selected' : '' }}>{{ __('Format Lama') }}</option>
+    </select>
+    
     <select name="year" class="select select-bordered select-sm w-full sm:w-auto" onchange="this.form.submit()">
         <option value="">{{ __('Semua Tahun') }}</option>
         @for($y = date('Y'); $y >= 2020; $y--)
             <option value="{{ $y }}" {{ request('year') == $y ? 'selected' : '' }}>{{ $y }}</option>
         @endfor
+    </select>
+    
+    <select name="per_page" class="select select-bordered select-sm w-full sm:w-auto" onchange="this.form.submit()">
+        <option value="10" {{ request('per_page', 15) == 10 ? 'selected' : '' }}>10 / hal</option>
+        <option value="15" {{ request('per_page', 15) == 15 ? 'selected' : '' }}>15 / hal</option>
+        <option value="25" {{ request('per_page', 15) == 25 ? 'selected' : '' }}>25 / hal</option>
+        <option value="50" {{ request('per_page', 15) == 50 ? 'selected' : '' }}>50 / hal</option>
+        <option value="100" {{ request('per_page', 15) == 100 ? 'selected' : '' }}>100 / hal</option>
     </select>
     
     <div class="flex flex-wrap gap-2 items-center sm:ml-auto shrink-0 w-full sm:w-auto justify-between sm:justify-end mt-1 sm:mt-0">
@@ -46,7 +60,7 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                 {{ __('Cari') }}
             </button>
-            @if(request('search') || request('status') || request('division_id') || request('document_type_id') || request('filter_branch_id') || request('year'))
+            @if(request('search') || request('status') || request('division_id') || request('document_type_id') || request('filter_branch_id') || request('year') || request('format_choice'))
                 <a href="{{ route('documents.index', ['type' => $type, 'folder' => request('folder')]) }}" class="btn btn-ghost btn-sm">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                     {{ __('Bersihkan') }}

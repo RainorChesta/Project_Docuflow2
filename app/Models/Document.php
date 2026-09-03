@@ -347,4 +347,28 @@ class Document extends Model
     {
         return $query->where('owner_id', $user->id);
     }
+
+    /**
+     * Check if document uses new numbering format.
+     */
+    public function isNewFormat(): bool
+    {
+        return ($this->format_choice ?? 'baru') === 'baru';
+    }
+
+    /**
+     * Check if document uses old numbering format.
+     */
+    public function isOldFormat(): bool
+    {
+        return $this->format_choice === 'lama';
+    }
+
+    /**
+     * Scope query to filter by format choice (baru / lama).
+     */
+    public function scopeFormatChoice(Builder $query, string $format): Builder
+    {
+        return $query->where('format_choice', $format);
+    }
 }

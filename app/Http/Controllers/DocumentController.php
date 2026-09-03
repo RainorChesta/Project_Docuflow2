@@ -173,6 +173,12 @@ class DocumentController extends Controller
             $query->whereYear('created_at', (int) $year);
         }
 
+        if ($formatChoice = $request->get('format_choice')) {
+            if (in_array($formatChoice, ['baru', 'lama'], true)) {
+                $query->where('format_choice', $formatChoice);
+            }
+        }
+
         if ($status = $request->get('status')) {
             if ($status === 'active') {
                 $query->whereHas('currentVersion', fn($q) => $q->where('status', 'active'))
@@ -190,7 +196,12 @@ class DocumentController extends Controller
             $query->where('is_expired', false);
         }
 
-        $documents = $query->latest()->paginate(15)->withQueryString();
+        $perPage = (int) $request->query('per_page', 15);
+        if (!in_array($perPage, [10, 15, 25, 50, 100], true)) {
+            $perPage = 15;
+        }
+
+        $documents = $query->latest()->paginate($perPage)->withQueryString();
         $documentTypes = DocumentType::orderBy('name')->get();
 
         $view = match ($type) {
@@ -377,7 +388,7 @@ class DocumentController extends Controller
 
         $rules = [
             'title' => 'required|string|max:255',
-            'format_choice' => 'required|in:lama,baru',
+            'format_choice' => 'nullable|in:lama,baru',
             'document_type_id' => 'required|exists:document_types,id',
             'branch_id' => 'nullable|exists:branches,id',
             'branch_ids' => 'nullable|array',

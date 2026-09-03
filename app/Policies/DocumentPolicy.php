@@ -120,6 +120,11 @@ class DocumentPolicy
         return $user->isHead() && ($user->division_id === $document->division_id || in_array($document->division_id, $user->allDivisionIds(), true));
     }
 
+    public function reject(User $user, Document $document): bool
+    {
+        return $this->approve($user, $document);
+    }
+
     public function rename(User $user, Document $document): bool
     {
         if (!$this->view($user, $document)) return false;

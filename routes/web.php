@@ -51,6 +51,9 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile/signature/{signature?}', [SignatureController::class, 'destroy'])->name('profile.signature.destroy');
     Route::get('/signatures/users', [SignatureController::class, 'availableUsers'])->name('signatures.users');
     Route::get('/signature-requests', [SignatureController::class, 'requestsIndex'])->name('signatures.requests.index');
+    Route::post('/signature-requests/bulk-approve', [SignatureController::class, 'bulkApprove'])->name('signatures.requests.bulk-approve');
+    Route::post('/signature-requests/bulk-reject', [SignatureController::class, 'bulkReject'])->name('signatures.requests.bulk-reject');
+    Route::post('/signature-requests/approve-all-pending', [SignatureController::class, 'approveAllPending'])->name('signatures.requests.approve-all-pending');
     Route::post('/signature-requests/{signatureRequest}/approve', [SignatureController::class, 'approve'])->name('signatures.requests.approve');
     Route::post('/signature-requests/{signatureRequest}/reject', [SignatureController::class, 'reject'])->name('signatures.requests.reject');
     Route::post('/signature-requests/{signatureRequest}/consume', [SignatureController::class, 'consume'])->name('signatures.requests.consume');
@@ -87,6 +90,8 @@ Route::middleware('auth')->group(function () {
 
     // Approvals
     Route::get('/approvals', [ApprovalController::class, 'index'])->name('approvals.index');
+    Route::post('/approvals/bulk-approve-versions', [ApprovalController::class, 'bulkApproveVersions'])->name('approvals.bulk-approve-versions');
+    Route::post('/approvals/bulk-reject-versions', [ApprovalController::class, 'bulkRejectVersions'])->name('approvals.bulk-reject-versions');
     Route::post('/documents/{document}/versions/{version}/approve', [ApprovalController::class, 'approve'])->name('approvals.approve');
     Route::post('/documents/{document}/versions/{version}/reject', [ApprovalController::class, 'reject'])->name('approvals.reject');
     Route::post('/documents/{document}/versions/{version}/rollback', [ApprovalController::class, 'rollback'])->name('approvals.rollback');

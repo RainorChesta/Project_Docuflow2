@@ -29,6 +29,7 @@ class DirectorDocumentController extends Controller
         $selectedDivisionId = $request->get('division_id');
         $selectedDocTypeId = $request->get('document_type_id');
         $selectedOwnerId = $request->get('owner_id');
+        $selectedFormatChoice = $request->get('format_choice');
         $viewMode = $request->get('view_mode', 'grid');
 
         // Verify company access if specified
@@ -278,8 +279,19 @@ class DirectorDocumentController extends Controller
                 $docQuery->where('owner_id', $selectedOwnerId);
             }
 
+            // Apply format choice filter
+            if ($selectedFormatChoice && in_array($selectedFormatChoice, ['baru', 'lama'], true)) {
+                $docQuery->where('format_choice', $selectedFormatChoice);
+            }
+
             $documents = $docQuery->latest()->paginate(16)->withQueryString();
         }
+
+        $hasSearchOrFilter = $selectedDivisionId 
+            || ($search !== null && trim($search) !== '') 
+            || $selectedDocTypeId 
+            || $selectedOwnerId
+            || $selectedFormatChoice;
 
         return view('director.documents.index', compact(
             'breadcrumbs',
@@ -295,6 +307,7 @@ class DirectorDocumentController extends Controller
             'selectedDivisionId',
             'selectedDocTypeId',
             'selectedOwnerId',
+            'selectedFormatChoice',
             'search',
             'viewMode',
             'availableDivisions',

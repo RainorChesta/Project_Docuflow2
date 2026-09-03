@@ -107,11 +107,18 @@
         </div>
     </div>
 
-    {{-- Document type badge --}}
-    @if($doc->documentType)
-        <span class="badge badge-outline badge-xs opacity-60 max-w-[90%] inline-flex items-center" title="{{ $doc->documentType->name ?? $doc->documentType->code }}">
-            <span class="truncate">{{ $doc->documentType->code }}</span>
-        </span>
-    @endif
+    {{-- Format and Document type badges --}}
+    <div class="flex items-center justify-center gap-1 flex-wrap max-w-[95%]">
+        @if($doc->format_choice === 'lama')
+            <span class="badge badge-secondary badge-outline badge-xs shrink-0" title="{{ __('Format Penomoran Lama') }}">{{ __('Format Lama') }}</span>
+        @else
+            <span class="badge badge-primary badge-outline badge-xs shrink-0" title="{{ __('Format Penomoran Baru') }}">{{ __('Format Baru') }}</span>
+        @endif
+        @if($doc->documentType)
+            <span class="badge badge-outline badge-xs opacity-60 max-w-[90px] inline-flex items-center" title="{{ $doc->documentType->name ?? $doc->documentType->code }}">
+                <span class="truncate">{{ $doc->documentType->code }}</span>
+            </span>
+        @endif
+    </div>
 
 </a>

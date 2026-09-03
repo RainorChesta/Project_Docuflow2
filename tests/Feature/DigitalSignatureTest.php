@@ -303,4 +303,133 @@ class DigitalSignatureTest extends TestCase
         $this->actingAs($signerB)->delete(route('documents.destroy', $document))
             ->assertStatus(403);
     }
+
+    public function test_signature_requests_index_filters_by_status_and_search(): void
+    {
+        $targetUser = User::factory()->create(['name' => 'Approver Person']);
+        $requester1 = User::factory()->create(['name' => 'Alice Request']);
+        $requester2 = User::factory()->create(['name' => 'Bob Request']);
+
+        $docType = DocumentType::create(['name' => 'Standard Letter', 'code' => 'SL']);
+        $doc1 = Document::create([
+            'document_number' => '001/SL/2026',
+            'title' => 'Important Contract Agreement',
+            'document_type_id' => $docType->id,
+            'owner_id' => $requester1->id,
+            'visibility' => 'general',
+        ]);
+        $doc2 = Document::create([
+            'document_number' => '002/SL/2026',
+            'title' => 'Internal Memorandum',
+            'document_type_id' => $docType->id,
+            'owner_id' => $requester2->id,
+            'visibility' => 'general',
+        ]);
+
+        $req1 = SignatureRequest::create([
+            'requester_id' => $requester1->id,
+            'target_user_id' => $targetUser->id,
+            'document_id' => $doc1->id,
+            'status' => 'pending',
+            'requested_at' => now(),
+        ]);
+        $req2 = SignatureRequest::create([
+            'requester_id' => $requester2->id,
+            'target_user_id' => $targetUser->id,
+            'document_id' => $doc2->id,
+            'status' => 'approved',
+            'requested_at' => now()->subDay(),
+            'responded_at' => now(),
+        ]);
+
+        // 1. Filter by status 'pending'
+        $responsePending = $this->actingAs($targetUser)->get(route('signatures.requests.index', ['status' => 'pending']));
+        $responsePending->assertStatus(200);
+        $responsePending->assertSee('Important Contract Agreement');
+        $responsePending->assertDontSee('Internal Memorandum');
+
+        // 2. Filter by status 'approved'
+        $responseApproved = $this->actingAs($targetUser)->get(route('signatures.requests.index', ['status' => 'approved']));
+        $responseApproved->assertStatus(200);
+        $responseApproved->assertSee('Internal Memorandum');
+        $responseApproved->assertDontSee('Important Contract Agreement');
+
+        // 3. Search query
+        $responseSearch = $this->actingAs($targetUser)->get(route('signatures.requests.index', ['search' => 'Contract']));
+        $responseSearch->assertStatus(200);
+        $responseSearch->assertSee('Important Contract Agreement');
+        $responseSearch->assertDontSee('Internal Memorandum');
+    }
+
+    public function test_bulk_approve_signature_requests(): void
+    {
+        \Illuminate\Support\Facades\Notification::fake();
+
+        $targetUser = User::factory()->create(['name' => 'Manager User']);
+        $filePath = 'signatures/sig_mgr.png';
+        Storage::disk('public')->put($filePath, 'fake signature png');
+        Signature::create(['user_id' => $targetUser->id, 'file_path' => $filePath]);
+
+        $requester = User::factory()->create(['name' => 'Staff User']);
+        $docType = DocumentType::create(['name' => 'Memo', 'code' => 'MM']);
+        $doc1 = Document::create(['document_number' => '001/MM/2026', 'title' => 'Doc 1', 'document_type_id' => $docType->id, 'owner_id' => $requester->id, 'visibility' => 'general']);
+        $doc2 = Document::create(['document_number' => '002/MM/2026', 'title' => 'Doc 2', 'document_type_id' => $docType->id, 'owner_id' => $requester->id, 'visibility' => 'general']);
+
+        $req1 = SignatureRequest::create(['requester_id' => $requester->id, 'target_user_id' => $targetUser->id, 'document_id' => $doc1->id, 'status' => 'pending', 'requested_at' => now()]);
+        $req2 = SignatureRequest::create(['requester_id' => $requester->id, 'target_user_id' => $targetUser->id, 'document_id' => $doc2->id, 'status' => 'pending', 'requested_at' => now()]);
+
+        $response = $this->actingAs($targetUser)->post(route('signatures.requests.bulk-approve'), [
+            'request_ids' => [$req1->id, $req2->id],
+        ]);
+
+        $response->assertSessionHas('success');
+        $this->assertSame('approved', $req1->fresh()->status);
+        $this->assertSame('approved', $req2->fresh()->status);
+
+        \Illuminate\Support\Facades\Notification::assertSentTo(
+            $requester,
+            \App\Notifications\SignatureRequestApprovedNotification::class
+        );
+    }
+
+    public function test_approve_all_pending_signature_requests(): void
+    {
+        \Illuminate\Support\Facades\Notification::fake();
+
+        $targetUser = User::factory()->create(['name' => 'Director User']);
+        $requester = User::factory()->create(['name' => 'Staff 2']);
+        $docType = DocumentType::create(['name' => 'Letter', 'code' => 'LTR']);
+        $doc = Document::create(['document_number' => '001/LTR/2026', 'title' => 'Pending Letter', 'document_type_id' => $docType->id, 'owner_id' => $requester->id, 'visibility' => 'general']);
+
+        $req = SignatureRequest::create(['requester_id' => $requester->id, 'target_user_id' => $targetUser->id, 'document_id' => $doc->id, 'status' => 'pending', 'requested_at' => now()]);
+
+        $response = $this->actingAs($targetUser)->post(route('signatures.requests.approve-all-pending'));
+
+        $response->assertSessionHas('success');
+        $this->assertSame('approved', $req->fresh()->status);
+    }
+
+    public function test_bulk_reject_signature_requests(): void
+    {
+        \Illuminate\Support\Facades\Notification::fake();
+
+        $targetUser = User::factory()->create(['name' => 'Rejector User']);
+        $requester = User::factory()->create(['name' => 'Requester']);
+        $docType = DocumentType::create(['name' => 'Contract', 'code' => 'CTR']);
+        $doc1 = Document::create(['document_number' => '001/CTR/2026', 'title' => 'Contract 1', 'document_type_id' => $docType->id, 'owner_id' => $requester->id, 'visibility' => 'general']);
+        $doc2 = Document::create(['document_number' => '002/CTR/2026', 'title' => 'Contract 2', 'document_type_id' => $docType->id, 'owner_id' => $requester->id, 'visibility' => 'general']);
+
+        $req1 = SignatureRequest::create(['requester_id' => $requester->id, 'target_user_id' => $targetUser->id, 'document_id' => $doc1->id, 'status' => 'pending', 'requested_at' => now()]);
+        $req2 = SignatureRequest::create(['requester_id' => $requester->id, 'target_user_id' => $targetUser->id, 'document_id' => $doc2->id, 'status' => 'pending', 'requested_at' => now()]);
+
+        $response = $this->actingAs($targetUser)->post(route('signatures.requests.bulk-reject'), [
+            'request_ids' => [$req1->id, $req2->id],
+            'reason' => 'Bulk reject reason',
+        ]);
+
+        $response->assertSessionHas('success');
+        $this->assertSame('rejected', $req1->fresh()->status);
+        $this->assertSame('rejected', $req2->fresh()->status);
+        $this->assertSame('Bulk reject reason', $req1->fresh()->rejected_reason);
+    }
 }

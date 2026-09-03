@@ -184,6 +184,16 @@
                                     </select>
                                 </div>
 
+                                {{-- Format Choice Filter --}}
+                                <div class="w-full lg:w-44 shrink-0">
+                                    <select name="format_choice" 
+                                            class="select select-bordered select-sm w-full text-xs bg-base-100 shadow-sm focus:shadow-md focus:border-primary transition-all">
+                                        <option value="">{{ __('Semua Format') }}</option>
+                                        <option value="baru" {{ ($selectedFormatChoice ?? '') === 'baru' ? 'selected' : '' }}>{{ __('Format Baru') }}</option>
+                                        <option value="lama" {{ ($selectedFormatChoice ?? '') === 'lama' ? 'selected' : '' }}>{{ __('Format Lama') }}</option>
+                                    </select>
+                                </div>
+
                                 {{-- Action Buttons: Search --}}
                                 <div class="shrink-0 flex items-center gap-2">
                                     <button type="submit" class="btn btn-primary btn-sm w-full lg:w-auto px-6">
@@ -198,7 +208,7 @@
 
                     {{-- Active Filter Badges & Reset Filter button --}}
                     @php
-                        $hasActiveFilters = $search || $selectedDocTypeId || $selectedOwnerId;
+                        $hasActiveFilters = $search || $selectedDocTypeId || $selectedOwnerId || $selectedFormatChoice;
                     @endphp
                     @if($hasActiveFilters || $selectedDivisionId)
                         <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-base-200 text-xs">
@@ -229,6 +239,13 @@
                                         <a href="{{ request()->fullUrlWithQuery(['owner_id' => null]) }}" class="hover:text-error">✕</a>
                                     </span>
                                 @endif
+                            @endif
+
+                            @if($selectedFormatChoice)
+                                <span class="badge badge-sm badge-outline gap-1 bg-base-200/50">
+                                    {{ __('Format: ') }} {{ $selectedFormatChoice === 'lama' ? __('Format Lama') : __('Format Baru') }}
+                                    <a href="{{ request()->fullUrlWithQuery(['format_choice' => null]) }}" class="hover:text-error">✕</a>
+                                </span>
                             @endif
 
                             <a href="{{ route('admin.documents.index', ['company_id' => $selectedCompanyId, 'branch_id' => $selectedBranchId]) }}" 
@@ -283,16 +300,18 @@
                     </div>
 
                     @if($viewMode === 'grid')
-                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3.5 sm:gap-4">
                             @foreach($folders as $folder)
                                 <a href="{{ $folder['url'] }}" 
-                                   class="group bg-base-100 hover:bg-base-200/60 border border-base-300 hover:border-primary/50 rounded-2xl p-4 transition-all duration-200 shadow-xs hover:shadow-md flex flex-col justify-between gap-3 relative overflow-hidden">
+                                   title="{{ $folder['name'] }}"
+                                   class="group bg-base-100 hover:bg-base-200/50 dark:hover:bg-base-200/30 border border-base-300/80 hover:border-primary/50 dark:hover:border-primary/50 rounded-2xl p-4 transition-all duration-200 shadow-xs hover:shadow-lg hover:-translate-y-0.5 flex flex-col justify-between gap-3.5 relative overflow-hidden ring-0 hover:ring-2 hover:ring-primary/10">
                                     
-                                    <div class="flex items-start justify-between gap-3">
+                                    {{-- Top Row: Folder Icon & Entity Badges --}}
+                                    <div class="flex items-start justify-between gap-2.5">
                                         {{-- Folder Icon --}}
                                         <div class="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 
                                             {{ $folder['type'] === 'company' ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : ($folder['type'] === 'branch' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'bg-primary/10 text-primary') }}
-                                            group-hover:scale-110 transition-transform duration-200">
+                                            group-hover:scale-110 transition-transform duration-200 shadow-xs">
                                             @if($folder['type'] === 'company')
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -309,27 +328,40 @@
                                         </div>
 
                                         {{-- Badges --}}
-                                        <div class="flex items-center gap-1 shrink-0 flex-wrap justify-end">
+                                        <div class="flex items-center gap-1.5 shrink-0 flex-wrap justify-end max-w-[55%]">
                                             @if($folder['is_pusat'] ?? false)
-                                                <span class="badge badge-primary badge-xs font-semibold">{{ __('Pusat') }}</span>
+                                                <span class="badge badge-primary badge-sm font-bold shadow-xs">{{ __('Pusat') }}</span>
                                             @endif
                                             @if(!empty($folder['code']))
-                                                <span class="badge badge-ghost badge-xs font-mono font-bold">{{ $folder['code'] }}</span>
+                                                <span class="badge badge-sm font-mono font-bold bg-base-200/80 border border-base-300 text-base-content/80 group-hover:border-primary/40 transition-colors" title="{{ __('Kode: ') . $folder['code'] }}">{{ $folder['code'] }}</span>
                                             @endif
                                         </div>
                                     </div>
 
-                                    <div>
-                                        <h4 class="font-bold text-sm text-base-content group-hover:text-primary transition-colors line-clamp-1">
+                                    {{-- Middle: Entity Name with 2-line clamp and guaranteed uniform height --}}
+                                    <div class="flex-1 flex flex-col justify-start">
+                                        <h4 class="font-bold text-sm text-base-content group-hover:text-primary transition-colors line-clamp-2 leading-snug min-h-[2.6rem] break-words" title="{{ $folder['name'] }}">
                                             {{ $folder['name'] }}
                                         </h4>
-                                        <p class="text-xs text-base-content/50 mt-1 flex items-center gap-2">
+                                    </div>
+
+                                    {{-- Bottom: Metadata & Arrow affordance --}}
+                                    <div class="pt-2.5 border-t border-base-200/70 dark:border-white/5 flex items-center justify-between text-xs text-base-content/60">
+                                        <div class="flex items-center gap-1.5 font-medium truncate">
                                             @if(isset($folder['sub_count']))
                                                 <span>{{ $folder['sub_count'] }} {{ $folder['sub_label'] }}</span>
-                                                <span>·</span>
+                                                <span class="text-base-content/30">•</span>
                                             @endif
-                                            <span>{{ $folder['doc_count'] ?? 0 }} {{ __('Dokumen') }}</span>
-                                        </p>
+                                            <span class="flex items-center gap-1">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-base-content/40 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                                {{ $folder['doc_count'] ?? 0 }} {{ __('Dokumen') }}
+                                            </span>
+                                        </div>
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-base-content/30 group-hover:text-primary group-hover:translate-x-0.5 transition-all duration-200 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                        </svg>
                                     </div>
                                 </a>
                             @endforeach
@@ -529,7 +561,16 @@
                                                             </a>
                                                         </div>
                                                     </td>
-                                                    <td class="font-mono text-base-content/60">{{ $doc->document_number }}</td>
+                                                    <td class="font-mono text-base-content/60">
+                                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                                            <span>{{ $doc->document_number }}</span>
+                                                            @if($doc->format_choice === 'lama')
+                                                                <span class="badge badge-secondary badge-outline badge-xs">{{ __('Format Lama') }}</span>
+                                                            @else
+                                                                <span class="badge badge-primary badge-outline badge-xs">{{ __('Format Baru') }}</span>
+                                                            @endif
+                                                        </div>
+                                                    </td>
                                                     <td>
                                                         @if($doc->branch)
                                                             <span class="font-medium">{{ $doc->branch->name }}</span>

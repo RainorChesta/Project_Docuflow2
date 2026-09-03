@@ -655,23 +655,73 @@ class SignatureController extends Controller
     }
 
     /**
-     * Display signature requests list (incoming & outgoing).
+     * Display signature requests list (incoming & outgoing) with search, filter, and pagination.
      */
-    public function requestsIndex()
+    public function requestsIndex(Request $request)
     {
         $user = Auth::user();
+        $status = $request->query('status', 'all');
+        $search = trim((string) $request->query('search', ''));
+        $perPage = (int) $request->query('per_page', 15);
+        if (!in_array($perPage, [10, 15, 25, 50, 100], true)) {
+            $perPage = 15;
+        }
 
-        $incomingRequests = SignatureRequest::with(['requester', 'document'])
-            ->where('target_user_id', $user->id)
-            ->latest()
-            ->paginate(10, ['*'], 'incoming_page');
+        // Base query for incoming requests
+        $incomingBaseQuery = SignatureRequest::with(['requester', 'document.branch', 'document.company', 'document.division'])
+            ->where('target_user_id', $user->id);
 
+        // Counts for tab badges
+        $counts = [
+            'all'      => (clone $incomingBaseQuery)->count(),
+            'pending'  => (clone $incomingBaseQuery)->where('status', 'pending')->count(),
+            'approved' => (clone $incomingBaseQuery)->where('status', 'approved')->count(),
+            'rejected' => (clone $incomingBaseQuery)->where('status', 'rejected')->count(),
+        ];
+
+        // Apply status filter
+        $incomingQuery = clone $incomingBaseQuery;
+        if (in_array($status, ['pending', 'approved', 'rejected'], true)) {
+            $incomingQuery->where('status', $status);
+        }
+
+        // Apply search
+        if (strlen($search) >= 2) {
+            $incomingQuery->where(function ($sq) use ($search) {
+                $sq->whereHas('document', function ($dq) use ($search) {
+                    $dq->where('title', 'like', "%{$search}%")
+                       ->orWhere('document_number', 'like', "%{$search}%");
+                })->orWhereHas('requester', function ($rq) use ($search) {
+                    $rq->where('name', 'like', "%{$search}%")
+                       ->orWhere('email', 'like', "%{$search}%");
+                });
+            });
+        }
+
+        // Order pending first, then latest
+        $incomingRequests = $incomingQuery
+            ->orderByRaw("CASE WHEN status = 'pending' THEN 0 ELSE 1 END")
+            ->latest('requested_at')
+            ->latest('id')
+            ->paginate($perPage, ['*'], 'incoming_page')
+            ->withQueryString();
+
+        // Outgoing requests
         $outgoingRequests = SignatureRequest::with(['targetUser', 'document'])
             ->where('requester_id', $user->id)
-            ->latest()
-            ->paginate(10, ['*'], 'outgoing_page');
+            ->latest('requested_at')
+            ->latest('id')
+            ->paginate(10, ['*'], 'outgoing_page')
+            ->withQueryString();
 
-        return view('signature_requests.index', compact('incomingRequests', 'outgoingRequests'));
+        return view('signature_requests.index', compact(
+            'incomingRequests',
+            'outgoingRequests',
+            'status',
+            'search',
+            'perPage',
+            'counts'
+        ));
     }
 
     /**
@@ -683,6 +733,131 @@ class SignatureController extends Controller
             abort(403, 'Anda tidak berhak menyetujui permintaan ini.');
         }
 
+        $this->executeApproval($signatureRequest);
+
+        return back()->with('success', __('Permintaan tanda tangan telah disetujui.'));
+    }
+
+    /**
+     * Bulk approve selected signature requests.
+     */
+    public function bulkApprove(Request $request): RedirectResponse
+    {
+        $user = Auth::user();
+        $requestIds = $request->input('request_ids', []);
+
+        if (is_string($requestIds)) {
+            $requestIds = explode(',', $requestIds);
+        }
+
+        $requestIds = array_filter(array_map('intval', (array) $requestIds));
+
+        if (empty($requestIds)) {
+            return back()->with('error', __('Pilih setidaknya satu permintaan tanda tangan untuk disetujui.'));
+        }
+
+        $requests = SignatureRequest::whereIn('id', $requestIds)
+            ->where('target_user_id', $user->id)
+            ->where('status', 'pending')
+            ->get();
+
+        if ($requests->isEmpty()) {
+            return back()->with('error', __('Tidak ada permintaan tertunda yang valid untuk disetujui.'));
+        }
+
+        $count = 0;
+        foreach ($requests as $sigReq) {
+            $this->executeApproval($sigReq, $user);
+            $count++;
+        }
+
+        return back()->with('success', __(':count permintaan tanda tangan berhasil disetujui sekaligus.', ['count' => $count]));
+    }
+
+    /**
+     * Approve all pending signature requests for current user.
+     */
+    public function approveAllPending(Request $request): RedirectResponse
+    {
+        $user = Auth::user();
+
+        $requests = SignatureRequest::where('target_user_id', $user->id)
+            ->where('status', 'pending')
+            ->get();
+
+        if ($requests->isEmpty()) {
+            return back()->with('error', __('Tidak ada permintaan tanda tangan pending yang perlu disetujui.'));
+        }
+
+        $count = 0;
+        foreach ($requests as $sigReq) {
+            $this->executeApproval($sigReq, $user);
+            $count++;
+        }
+
+        return back()->with('success', __('Semua :count permintaan tanda tangan pending berhasil disetujui.', ['count' => $count]));
+    }
+
+    /**
+     * Reject signature usage request.
+     */
+    public function reject(Request $request, SignatureRequest $signatureRequest): RedirectResponse
+    {
+        if (Auth::id() !== $signatureRequest->target_user_id) {
+            abort(403, __('Anda tidak berhak menolak permintaan ini.'));
+        }
+
+        $reason = $request->input('reason', __('Ditolak oleh pemilik tanda tangan.'));
+        $this->executeRejection($signatureRequest, $reason);
+
+        return back()->with('success', __('Permintaan tanda tangan telah ditolak.'));
+    }
+
+    /**
+     * Bulk reject selected signature requests.
+     */
+    public function bulkReject(Request $request): RedirectResponse
+    {
+        $user = Auth::user();
+        $requestIds = $request->input('request_ids', []);
+
+        if (is_string($requestIds)) {
+            $requestIds = explode(',', $requestIds);
+        }
+
+        $requestIds = array_filter(array_map('intval', (array) $requestIds));
+
+        if (empty($requestIds)) {
+            return back()->with('error', __('Pilih setidaknya satu permintaan tanda tangan untuk ditolak.'));
+        }
+
+        $reason = $request->input('reason', __('Ditolak massal oleh pemilik tanda tangan.'));
+
+        $requests = SignatureRequest::whereIn('id', $requestIds)
+            ->where('target_user_id', $user->id)
+            ->where('status', 'pending')
+            ->get();
+
+        if ($requests->isEmpty()) {
+            return back()->with('error', __('Tidak ada permintaan tertunda yang valid untuk ditolak.'));
+        }
+
+        $count = 0;
+        foreach ($requests as $sigReq) {
+            $this->executeRejection($sigReq, $reason, $user);
+            $count++;
+        }
+
+        return back()->with('success', __(':count permintaan tanda tangan berhasil ditolak.', ['count' => $count]));
+    }
+
+    /**
+     * Internal helper to execute a single approval.
+     */
+    protected function executeApproval(SignatureRequest $signatureRequest, ?User $actor = null): void
+    {
+        $actor = $actor ?? Auth::user();
+
         $signatureRequest->update([
             'status' => 'approved',
             'responded_at' => now(),
@@ -690,7 +865,7 @@ class SignatureController extends Controller
         
         $document = $signatureRequest->document;
         $version = $document?->displayVersion();
-        $targetUser = $signatureRequest->targetUser;
+        $targetUser = $signatureRequest->targetUser ?? $actor;
         
         if ($document && $version && $targetUser) {
             $requestId = $signatureRequest->id;
@@ -710,24 +885,19 @@ class SignatureController extends Controller
                 new \App\Notifications\SignatureRequestApprovedNotification(
                     $signatureRequest,
                     $signatureRequest->document,
-                    $signatureRequest->targetUser?->name ?? Auth::user()->name
+                    $signatureRequest->targetUser?->name ?? $actor->name
                 )
             );
         }
-
-        return back()->with('success', __('Permintaan tanda tangan telah disetujui.'));
     }
 
     /**
-     * Reject signature usage request.
+     * Internal helper to execute a single rejection.
      */
-    public function reject(Request $request, SignatureRequest $signatureRequest): RedirectResponse
+    protected function executeRejection(SignatureRequest $signatureRequest, ?string $reason = null, ?User $actor = null): void
     {
-        if (Auth::id() !== $signatureRequest->target_user_id) {
-            abort(403, __('Anda tidak berhak menolak permintaan ini.'));
-        }
-
-        $reason = $request->input('reason', __('Ditolak oleh pemilik tanda tangan.'));
+        $actor = $actor ?? Auth::user();
+        $reason = $reason ?: __('Ditolak oleh pemilik tanda tangan.');
 
         $signatureRequest->update([
             'status' => 'rejected',
@@ -741,12 +911,10 @@ class SignatureController extends Controller
                 new \App\Notifications\SignatureRequestRejectedNotification(
                     $signatureRequest,
                     $signatureRequest->document,
-                    $signatureRequest->targetUser?->name ?? Auth::user()->name,
+                    $signatureRequest->targetUser?->name ?? $actor->name,
                     $reason
                 )
             );
         }
-
-        return back()->with('success', __('Permintaan tanda tangan telah ditolak.'));
     }
 }

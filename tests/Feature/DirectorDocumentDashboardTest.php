@@ -59,7 +59,7 @@ class DirectorDocumentDashboardTest extends TestCase
 
         $response->assertOk();
         $response->assertSee(__('Semua Perusahaan'));
-        $response->assertSee('Cahaya Medika Healthcare');
+        $response->assertSee($this->company->name);
         $response->assertSee('CMH');
         // Filters must not appear on root company folder level
         $response->assertDontSee('placeholder="' . __('Search documents...') . '"', false);
@@ -79,8 +79,8 @@ class DirectorDocumentDashboardTest extends TestCase
         ]));
 
         $response->assertOk();
-        $response->assertSee('Pusat');
-        $response->assertSee('Klinik Manyar');
+        $response->assertSee('PUSAT');
+        $response->assertSee($this->cabangBranch->name);
         $response->assertSee(__('Folder Cabang'));
         // Filters must not appear on company level
         $response->assertDontSee('placeholder="' . __('Search documents...') . '"', false);

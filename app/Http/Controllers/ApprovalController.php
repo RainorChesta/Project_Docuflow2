@@ -19,11 +19,18 @@ class ApprovalController extends Controller
         protected ApprovalRoutingService $approvalRoutingService,
     ) {}
 
-    public function index(): \Illuminate\View\View|\Illuminate\Http\RedirectResponse
+    public function index(Request $request): \Illuminate\View\View|\Illuminate\Http\RedirectResponse
     {
         $user = auth()->user();
         if (!$user) {
             return redirect()->route('login');
+        }
+
+        $search = trim((string) $request->query('search', ''));
+        $tab = $request->query('tab', 'all');
+        $perPage = (int) $request->query('per_page', 15);
+        if (!in_array($perPage, [10, 15, 25, 50, 100], true)) {
+            $perPage = 15;
         }
 
         if ($user->isAdmin() || $user->isDirector()) {
@@ -45,38 +52,208 @@ class ApprovalController extends Controller
                 $pendingRollbacksQuery->where($companyFilter);
                 $pendingRenamesQuery->where($companyFilter);
             }
+        } else {
+            $divisionIds = $user->allDivisionIds();
 
-            $pendingVersions = $pendingVersionsQuery->with('document', 'author')->latest()->get();
-            $pendingRollbacks = $pendingRollbacksQuery->with('pendingRollbackVersion', 'rollbackRequestedBy')->latest()->get();
-            $pendingRenames = $pendingRenamesQuery->with('renameRequestedBy', 'division')->latest('rename_requested_at')->get();
+            $pendingVersionsQuery = DocumentVersion::where('status', 'pending')
+                ->whereNull('discarded_at')
+                ->whereHas('document', fn($q) => $q->whereIn('division_id', $divisionIds)->visibleTo($user));
 
-            return view('approvals.index', compact('pendingVersions', 'pendingRollbacks', 'pendingRenames'));
+            $pendingRollbacksQuery = Document::whereIn('division_id', $divisionIds)
+                ->visibleTo($user)
+                ->whereNotNull('pending_rollback_version_id');
+
+            $pendingRenamesQuery = Document::whereIn('division_id', $divisionIds)
+                ->visibleTo($user)
+                ->whereNotNull('pending_title')
+                ->where('pending_title', '!=', '');
         }
-        $divisionIds = $user->allDivisionIds();
 
-        $pendingVersions = DocumentVersion::where('status', 'pending')
-            ->whereNull('discarded_at')
-            ->whereHas('document', fn($q) => $q->whereIn('division_id', $divisionIds)->visibleTo($user))
-            ->with('document', 'author')
-            ->latest()
-            ->get();
+        // Search filtering
+        if (strlen($search) >= 2) {
+            $pendingVersionsQuery->where(function ($vq) use ($search) {
+                $vq->whereHas('document', function ($dq) use ($search) {
+                    $dq->where('title', 'like', "%{$search}%")
+                       ->orWhere('document_number', 'like', "%{$search}%");
+                })->orWhereHas('author', function ($aq) use ($search) {
+                    $aq->where('name', 'like', "%{$search}%")
+                       ->orWhere('email', 'like', "%{$search}%");
+                });
+            });
 
-        $pendingRollbacks = Document::whereIn('division_id', $divisionIds)
-            ->visibleTo($user)
-            ->whereNotNull('pending_rollback_version_id')
-            ->with('pendingRollbackVersion', 'rollbackRequestedBy')
-            ->latest()
-            ->get();
+            $pendingRollbacksQuery->where(function ($rq) use ($search) {
+                $rq->where('title', 'like', "%{$search}%")
+                   ->orWhere('document_number', 'like', "%{$search}%")
+                   ->orWhereHas('rollbackRequestedBy', function ($uq) use ($search) {
+                       $uq->where('name', 'like', "%{$search}%");
+                   });
+            });
 
-        $pendingRenames = Document::whereIn('division_id', $divisionIds)
-            ->visibleTo($user)
-            ->whereNotNull('pending_title')
-            ->where('pending_title', '!=', '')
-            ->with('renameRequestedBy', 'division')
+            $pendingRenamesQuery->where(function ($rq) use ($search) {
+                $rq->where('title', 'like', "%{$search}%")
+                   ->orWhere('pending_title', 'like', "%{$search}%")
+                   ->orWhere('document_number', 'like', "%{$search}%")
+                   ->orWhereHas('renameRequestedBy', function ($uq) use ($search) {
+                       $uq->where('name', 'like', "%{$search}%");
+                   });
+            });
+        }
+
+        // Counts for tab badges
+        $counts = [
+            'versions'  => (clone $pendingVersionsQuery)->count(),
+            'rollbacks' => (clone $pendingRollbacksQuery)->count(),
+            'renames'   => (clone $pendingRenamesQuery)->count(),
+        ];
+        $counts['total'] = $counts['versions'] + $counts['rollbacks'] + $counts['renames'];
+
+        $pendingVersions = $pendingVersionsQuery
+            ->with(['document.branch', 'document.company', 'document.division', 'author'])
+            ->latest('id')
+            ->paginate($perPage, ['*'], 'version_page')
+            ->withQueryString();
+
+        $pendingRollbacks = $pendingRollbacksQuery
+            ->with(['pendingRollbackVersion', 'rollbackRequestedBy', 'division', 'branch', 'company'])
+            ->latest('id')
+            ->paginate($perPage, ['*'], 'rollback_page')
+            ->withQueryString();
+
+        $pendingRenames = $pendingRenamesQuery
+            ->with(['renameRequestedBy', 'division', 'branch', 'company'])
             ->latest('rename_requested_at')
+            ->latest('id')
+            ->paginate($perPage, ['*'], 'rename_page')
+            ->withQueryString();
+
+        return view('approvals.index', compact(
+            'pendingVersions',
+            'pendingRollbacks',
+            'pendingRenames',
+            'counts',
+            'search',
+            'tab',
+            'perPage'
+        ));
+    }
+
+    /**
+     * Bulk approve selected document versions.
+     */
+    public function bulkApproveVersions(Request $request): RedirectResponse
+    {
+        $reviewer = auth()->user();
+        $versionIds = $request->input('version_ids', []);
+
+        if (is_string($versionIds)) {
+            $versionIds = explode(',', $versionIds);
+        }
+
+        $versionIds = array_filter(array_map('intval', (array) $versionIds));
+
+        if (empty($versionIds)) {
+            return back()->with('error', __('Pilih setidaknya satu versi dokumen untuk disetujui.'));
+        }
+
+        $versions = DocumentVersion::with('document', 'author')
+            ->whereIn('id', $versionIds)
+            ->where('status', 'pending')
             ->get();
 
-        return view('approvals.index', compact('pendingVersions', 'pendingRollbacks', 'pendingRenames'));
+        if ($versions->isEmpty()) {
+            return back()->with('error', __('Tidak ada versi dokumen pending yang valid untuk disetujui.'));
+        }
+
+        $count = 0;
+        foreach ($versions as $version) {
+            $document = $version->document;
+            if (!$document || !$reviewer->can('approve', $document)) {
+                continue;
+            }
+
+            $this->versionService->approve($version, $reviewer);
+
+            $this->auditService->log($reviewer, 'version.approved', 'document_version', $version->id, [
+                'document_id' => $document->id,
+                'version_number' => $version->version_number,
+                'bulk' => true,
+            ]);
+
+            // Notify document author
+            if ($version->author_id && $version->author_id !== $reviewer->id) {
+                $version->author?->notify(new \App\Notifications\DocumentApprovalResult(
+                    $document,
+                    $version,
+                    'approved',
+                    $reviewer->name,
+                ));
+            }
+
+            $count++;
+        }
+
+        return back()->with('success', __(':count versi dokumen berhasil disetujui sekaligus.', ['count' => $count]));
+    }
+
+    /**
+     * Bulk reject selected document versions.
+     */
+    public function bulkRejectVersions(Request $request): RedirectResponse
+    {
+        $reviewer = auth()->user();
+        $versionIds = $request->input('version_ids', []);
+        $notes = $request->input('notes', __('Ditolak secara massal oleh reviewer.'));
+
+        if (is_string($versionIds)) {
+            $versionIds = explode(',', $versionIds);
+        }
+
+        $versionIds = array_filter(array_map('intval', (array) $versionIds));
+
+        if (empty($versionIds)) {
+            return back()->with('error', __('Pilih setidaknya satu versi dokumen untuk ditolak.'));
+        }
+
+        $versions = DocumentVersion::with('document', 'author')
+            ->whereIn('id', $versionIds)
+            ->where('status', 'pending')
+            ->get();
+
+        if ($versions->isEmpty()) {
+            return back()->with('error', __('Tidak ada versi dokumen pending yang valid untuk ditolak.'));
+        }
+
+        $count = 0;
+        foreach ($versions as $version) {
+            $document = $version->document;
+            if (!$document || !$reviewer->can('approve', $document)) {
+                continue;
+            }
+
+            $this->versionService->reject($version, $reviewer, $notes);
+
+            $this->auditService->log($reviewer, 'version.rejected', 'document_version', $version->id, [
+                'document_id' => $document->id,
+                'version_number' => $version->version_number,
+                'notes' => $notes,
+                'bulk' => true,
+            ]);
+
+            // Notify document author
+            if ($version->author_id && $version->author_id !== $reviewer->id) {
+                $version->author?->notify(new \App\Notifications\DocumentApprovalResult(
+                    $document,
+                    $version,
+                    'rejected',
+                    $reviewer->name,
+                    $notes,
+                ));
+            }
+
+            $count++;
+        }
+
+        return back()->with('success', __(':count versi dokumen berhasil ditolak.', ['count' => $count]));
     }
 
     public function approve(Request $request, Document $document, DocumentVersion $version): RedirectResponse

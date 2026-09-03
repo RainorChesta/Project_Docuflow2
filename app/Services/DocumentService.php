@@ -58,7 +58,19 @@ class DocumentService
      */
     public function generateId($formatChoice = null, $division = null, $documentType = null, $branch = null, $unitKerja = null): string
     {
-        if ($division instanceof DocumentType) {
+        if ($formatChoice instanceof Division) {
+            $unitKerja = $branch instanceof \App\Models\UnitKerja ? $branch : ($documentType instanceof \App\Models\UnitKerja ? $documentType : $unitKerja);
+            $branch = $branch instanceof \App\Models\Branch ? $branch : ($documentType instanceof \App\Models\Branch ? $documentType : null);
+            $documentType = $division instanceof \App\Models\DocumentType ? $division : ($documentType instanceof \App\Models\DocumentType ? $documentType : null);
+            $division = $formatChoice;
+            $formatChoice = !empty($unitKerja) ? 'lama' : 'baru';
+        } elseif ($formatChoice instanceof DocumentType) {
+            $unitKerja = $branch instanceof \App\Models\UnitKerja ? $branch : $unitKerja;
+            $branch = $division instanceof \App\Models\Branch ? $division : null;
+            $documentType = $formatChoice;
+            $division = null;
+            $formatChoice = !empty($unitKerja) ? 'lama' : 'baru';
+        } elseif ($division instanceof DocumentType) {
             $unitKerja = $branch instanceof \App\Models\UnitKerja ? $branch : $unitKerja;
             $branch = $documentType instanceof \App\Models\Branch ? $documentType : null;
             $documentType = $division;
@@ -92,51 +104,66 @@ class DocumentService
                         $query->where('division_id', $division->id);
                     }
                 }
+            } else {
+                $divisionId = $division?->id;
+                $query = Document::withTrashed()
+                    ->where('document_type_id', $typeId)
+                    ->whereYear('created_at', $year);
 
-                $lastDoc = $query->lockForUpdate()->orderByDesc('id')->first();
-                $seq = $this->nextSequenceFrom($lastDoc);
-
-                do {
-                    $formattedNumber = $this->formatNumber('lama', $division, $documentType, $seq, $branch, $unitKerja);
-                    $alreadyExists = Document::withTrashed()->where('document_number', $formattedNumber)->exists();
-                    if ($alreadyExists) {
-                        $seq++;
-                    }
-                } while ($alreadyExists);
-
-                return $formattedNumber;
+                if ($divisionId) {
+                    $query->where('division_id', $divisionId);
+                }
+                if ($branchId) {
+                    $query->where('branch_id', $branchId);
+                }
             }
 
-            $counter = DB::table('document_number_counters')
-                ->where('year', $year)
-                ->where('branch_id', $branchId)
-                ->where('document_type_id', $typeId)
-                ->lockForUpdate()
-                ->first();
+            // Lock the highest sequence row to serialize increments safely
+            $maxDoc = (clone $query)->lockForUpdate()->orderByDesc('id')->first();
 
-            $seq = $counter ? $counter->last_sequence + 1 : 1;
-
-            do {
-                $formattedNumber = $this->formatNumber('baru', $division, $documentType, $seq, $branch, null);
-                $alreadyExists = Document::withTrashed()->where('document_number', $formattedNumber)->exists();
-                if ($alreadyExists) {
-                    $seq++;
+            $seq = 1;
+            if ($maxDoc && $maxDoc->document_number) {
+                $parts = explode('/', $maxDoc->document_number);
+                if (!empty($parts[0]) && is_numeric($parts[0])) {
+                    $seq = (int)$parts[0] + 1;
+                } else {
+                    $seq = (clone $query)->count() + 1;
                 }
-            } while ($alreadyExists);
+            }
 
-            if ($counter) {
-                DB::table('document_number_counters')
-                    ->where('id', $counter->id)
-                    ->update(['last_sequence' => $seq, 'updated_at' => now()]);
-            } else {
-                DB::table('document_number_counters')->insert([
-                    'year' => $year,
-                    'branch_id' => $branchId,
-                    'document_type_id' => $typeId,
-                    'last_sequence' => $seq,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
+            $typeCode = $documentType ? $documentType->code : 'DOC';
+            $branchCode = $branch ? $branch->effective_code : 'PST';
+            $romanMonth = $this->toRoman(now()->month);
+
+            $formattedNumber = $this->formatNumber(
+                $formatChoice,
+                $seq,
+                $typeCode,
+                $division,
+                $branchCode,
+                $romanMonth,
+                $year,
+                $unitKerja
+            );
+
+            // Safety check against collisions
+            $attempt = 0;
+            while (Document::withTrashed()->where('document_number', $formattedNumber)->exists()) {
+                $attempt++;
+                $seq++;
+                $formattedNumber = $this->formatNumber(
+                    $formatChoice,
+                    $seq,
+                    $typeCode,
+                    $division,
+                    $branchCode,
+                    $romanMonth,
+                    $year,
+                    $unitKerja
+                );
+                if ($attempt > 100) {
+                    break;
+                }
             }
 
             return $formattedNumber;
@@ -149,7 +176,19 @@ class DocumentService
      */
     public function previewNumber($formatChoice = null, $division = null, $documentType = null, $branch = null, $unitKerja = null): string
     {
-        if ($division instanceof DocumentType) {
+        if ($formatChoice instanceof Division) {
+            $unitKerja = $branch instanceof \App\Models\UnitKerja ? $branch : ($documentType instanceof \App\Models\UnitKerja ? $documentType : $unitKerja);
+            $branch = $branch instanceof \App\Models\Branch ? $branch : ($documentType instanceof \App\Models\Branch ? $documentType : null);
+            $documentType = $division instanceof \App\Models\DocumentType ? $division : ($documentType instanceof \App\Models\DocumentType ? $documentType : null);
+            $division = $formatChoice;
+            $formatChoice = !empty($unitKerja) ? 'lama' : 'baru';
+        } elseif ($formatChoice instanceof DocumentType) {
+            $unitKerja = $branch instanceof \App\Models\UnitKerja ? $branch : $unitKerja;
+            $branch = $division instanceof \App\Models\Branch ? $division : null;
+            $documentType = $formatChoice;
+            $division = null;
+            $formatChoice = !empty($unitKerja) ? 'lama' : 'baru';
+        } elseif ($division instanceof DocumentType) {
             $unitKerja = $branch instanceof \App\Models\UnitKerja ? $branch : $unitKerja;
             $branch = $documentType instanceof \App\Models\Branch ? $documentType : null;
             $documentType = $division;
@@ -157,6 +196,7 @@ class DocumentService
         }
 
         $formatChoice = is_string($formatChoice) ? $formatChoice : (!empty($unitKerja) ? 'lama' : 'baru');
+
         $year = now()->year;
         $branchId = $branch?->id;
         $typeId = $documentType?->id;
@@ -181,61 +221,68 @@ class DocumentService
                     $query->where('division_id', $division->id);
                 }
             }
+        } else {
+            $divisionId = $division?->id;
+            $query = Document::withTrashed()
+                ->where('document_type_id', $typeId)
+                ->whereYear('created_at', $year);
 
-            $lastDoc = $query->orderByDesc('id')->first();
-            $seq = $this->nextSequenceFrom($lastDoc);
-
-            do {
-                $formattedNumber = $this->formatNumber('lama', $division, $documentType, $seq, $branch, $unitKerja);
-                $alreadyExists = Document::withTrashed()->where('document_number', $formattedNumber)->exists();
-                if ($alreadyExists) {
-                    $seq++;
-                }
-            } while ($alreadyExists);
-
-            return $formattedNumber;
-        }
-
-        $counter = DB::table('document_number_counters')
-            ->where('year', $year)
-            ->where('branch_id', $branchId)
-            ->where('document_type_id', $typeId)
-            ->first();
-
-        $seq = $counter ? $counter->last_sequence + 1 : 1;
-
-        do {
-            $formattedNumber = $this->formatNumber('baru', $division, $documentType, $seq, $branch, null);
-            $alreadyExists = Document::withTrashed()->where('document_number', $formattedNumber)->exists();
-            if ($alreadyExists) {
-                $seq++;
+            if ($divisionId) {
+                $query->where('division_id', $divisionId);
             }
-        } while ($alreadyExists);
-
-        return $formattedNumber;
-    }
-
-    private function nextSequenceFrom(?Document $lastDoc): int
-    {
-        if (!$lastDoc || empty($lastDoc->document_number)) {
-            return 1;
+            if ($branchId) {
+                $query->where('branch_id', $branchId);
+            }
         }
 
-        $firstSegment = explode('/', $lastDoc->document_number)[0];
-        return (int) $firstSegment + 1;
+        $maxDoc = (clone $query)->orderByDesc('id')->first();
+
+        $seq = 1;
+        if ($maxDoc && $maxDoc->document_number) {
+            $parts = explode('/', $maxDoc->document_number);
+            if (!empty($parts[0]) && is_numeric($parts[0])) {
+                $seq = (int)$parts[0] + 1;
+            } else {
+                $seq = (clone $query)->count() + 1;
+            }
+        }
+
+        $typeCode = $documentType ? $documentType->code : 'DOC';
+        $branchCode = $branch ? $branch->effective_code : 'PST';
+        $romanMonth = $this->toRoman(now()->month);
+
+        return $this->formatNumber(
+            $formatChoice,
+            $seq,
+            $typeCode,
+            $division,
+            $branchCode,
+            $romanMonth,
+            $year,
+            $unitKerja
+        );
     }
 
-    private function formatNumber(string $formatChoice, ?Division $division, ?DocumentType $documentType, int $seq, ?\App\Models\Branch $branch = null, ?\App\Models\UnitKerja $unitKerja = null): string
+    private function toRoman(int $month): string
     {
-        $now = Carbon::now();
-        $year = $now->year;
-        $romanMonth = $this->toRomanMonth($now->month);
-        
-        $branchCode = $branch ? $branch->effective_code : config('dokuflow.central_code', 'JBM');
+        $map = [
+            1 => 'I', 2 => 'II', 3 => 'III', 4 => 'IV', 5 => 'V', 6 => 'VI',
+            7 => 'VII', 8 => 'VIII', 9 => 'IX', 10 => 'X', 11 => 'XI', 12 => 'XII',
+        ];
 
-        // "/" di kode tipe diganti "-" khusus untuk nomor dokumen, supaya
-        // jumlah segmen yang dipisah "/" tetap konsisten.
-        $typeCode = $documentType?->code ?? 'GEN';
+        return $map[$month] ?? 'I';
+    }
+
+    private function formatNumber(
+        string $formatChoice,
+        int $seq,
+        string $typeCode,
+        ?Division $division,
+        string $branchCode,
+        string $romanMonth,
+        int $year,
+        ?\App\Models\UnitKerja $unitKerja = null
+    ): string {
         $typeCodeForNumber = str_replace('/', '-', $typeCode);
 
         if ($formatChoice === 'baru') {
@@ -281,7 +328,7 @@ class DocumentService
         $unitKerja = !empty($data['unit_kerja_id']) ? \App\Models\UnitKerja::find($data['unit_kerja_id']) : null;
         $documentType = DocumentType::findOrFail($data['document_type_id']);
         $branch = !empty($data['branch_id']) ? \App\Models\Branch::with('company')->find($data['branch_id']) : null;
-        $formatChoice = $data['format_choice'] ?? 'baru';
+        $formatChoice = $data['format_choice'] ?? (!empty($unitKerja) ? 'lama' : 'baru');
 
         if ($branch && empty($data['company_id'])) {
             $data['company_id'] = $branch->company_id;
