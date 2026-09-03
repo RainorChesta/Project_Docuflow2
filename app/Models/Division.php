@@ -53,4 +53,5 @@ class Division extends Model
     {
         return $this->hasMany(DocumentDivisionShare::class);
     }
+
 }

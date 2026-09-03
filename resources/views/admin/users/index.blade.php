@@ -80,7 +80,11 @@
                                             <div class="text-xs text-base-content/50">{{ $user->phone_number }}</div>
                                         @endif
                                     </td>
-                                    <td>{{ $user->division?->code ?? '-' }}</td>
+                                    <td>
+                                        <div class="text-sm">
+                                            {{ $user->divisions->pluck('code')->join(', ') ?: '-' }}
+                                        </div>
+                                    </td>
                                     <td>
                                         <div class="text-xs">
                                             <span class="font-semibold">{{ $user->companies->pluck('code')->join(', ') ?: '-' }}</span>
