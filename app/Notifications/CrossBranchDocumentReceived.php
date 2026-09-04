@@ -31,7 +31,7 @@ class CrossBranchDocumentReceived extends Notification
                 'origin' => $this->document->branch?->name ?? 'Unknown',
                 'target' => $this->targetBranchName,
             ]),
-            'url'         => route('documents.show', $this->document),
+            'url'         => route('documents.show', $this->document, false),
             'icon'        => 'document-text',
             'document_id' => $this->document->id,
         ];

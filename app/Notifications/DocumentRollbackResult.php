@@ -47,7 +47,7 @@ class DocumentRollbackResult extends Notification
             'type'        => $isApproved ? 'rollback_approved' : 'rollback_rejected',
             'title'       => $title,
             'message'     => $message,
-            'url'         => route('documents.show', $this->document),
+            'url'         => route('documents.show', $this->document, false),
             'icon'        => $isApproved ? 'approval' : 'rejected',
             'document_id' => $this->document->id,
             'notes'       => $this->notes,

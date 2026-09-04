@@ -28,7 +28,7 @@ class WarningDocumentExpiring extends Notification implements ShouldQueue
             'type' => 'document_expiring_warning',
             'title' => 'Dokumen akan kedaluwarsa ' . $timeText,
             'message' => '"' . $this->document->title . '" akan kedaluwarsa pada ' . $this->document->expires_at?->format('d F Y') . '.',
-            'url' => route('documents.show', $this->document),
+            'url' => route('documents.show', $this->document, false),
             'icon' => 'document',
             'document_id' => $this->document->id
         ];

@@ -111,8 +111,8 @@
                                 </dialog>
 
                                 {{-- Custom Reject Modal --}}
-                                <dialog id="reject-sig-modal-{{ $pendingSigRequest->id }}" class="modal modal-bottom sm:modal-middle text-left whitespace-normal backdrop-blur-xs">
-                                    <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-lg">
+                                <dialog id="reject-sig-modal-{{ $pendingSigRequest->id }}" class="modal modal-bottom sm:modal-middle text-left whitespace-normal backdrop-blur-xs text-base-content">
+                                    <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-lg text-base-content">
                                         {{-- Header --}}
                                         <div class="p-6 pb-4">
                                             <div class="flex items-start justify-between gap-4">
@@ -165,7 +165,7 @@
                                                         id="reject-sig-preview-ver-reason-{{ $pendingSigRequest->id }}"
                                                         name="reason" 
                                                         maxlength="500"
-                                                        class="textarea textarea-bordered w-full text-sm rounded-xl bg-base-200/30 border-base-300 focus:border-error focus:ring-2 focus:ring-error/20 focus:outline-hidden transition-all placeholder:text-base-content/40 leading-relaxed min-h-[95px] p-3" 
+                                                        class="textarea textarea-bordered w-full text-sm text-base-content rounded-xl bg-base-200/30 border-base-300 focus:border-error focus:ring-2 focus:ring-error/20 focus:outline-hidden transition-all placeholder:text-base-content/40 leading-relaxed min-h-[95px] p-3" 
                                                         placeholder="{{ __('Tuliskan alasan penolakan izin tanda tangan...') }}"></textarea>
                                                 </div>
                                                 <p class="text-[11px] text-base-content/50 flex items-center gap-1">

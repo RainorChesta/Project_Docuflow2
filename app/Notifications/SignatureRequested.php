@@ -32,7 +32,7 @@ class SignatureRequested extends Notification
                 'name' => $this->requesterName,
                 'doc'  => $this->document->title,
             ]),
-            'url'      => route('signatures.requests.index'),
+            'url'      => route('signatures.requests.index', [], false),
             'icon'     => 'signature',
             'document_id' => $this->document->id
         ];

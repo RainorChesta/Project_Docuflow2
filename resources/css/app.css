@@ -29,7 +29,8 @@
     --border: 1px;
   }
 
-  .dark {
+  .dark,
+  [data-theme="dark"] {
     --color-base-100: oklch(0.28 0.04 250);
     --color-base-200: oklch(0.2 0.04 260);
     --color-base-300: oklch(0.35 0.04 250);
@@ -92,7 +93,8 @@
   --border: 1px;
 }
 
-.dark {
+.dark,
+[data-theme="dark"] {
   --brand-primary: #4AA9F0;
   --brand-primary-hover: #67BEF8;
   --brand-primary-soft: #12324A;
@@ -126,6 +128,24 @@
 /* Alpine x-cloak: hide element until Alpine initializes */
 [x-cloak] {
     display: none !important;
+}
+
+/* ─── Universal Theme Color Synchronization for Forms & Modals ───── */
+/* Ensure all inputs and textareas strictly use base-content text color matching active theme */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="submit"]):not([type="reset"]):not([type="button"]),
+textarea,
+select,
+.textarea,
+.input,
+.select {
+    color: var(--color-base-content);
+}
+
+/* Modals and dialogs: always reset text color to base-content and background to base-100 */
+dialog.modal,
+.modal,
+.modal-box {
+    color: var(--color-base-content);
 }
 
 /* ─── Sidebar Nav Micro-interactions ─────────────────────────────── */

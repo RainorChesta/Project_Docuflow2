@@ -43,7 +43,7 @@ class GroupedDocumentExpiring extends Notification implements ShouldQueue
             'type' => 'document_expiring_grouped',
             'title' => "{$total} Dokumen Memerlukan Perhatian",
             'message' => $message,
-            'url' => route('dashboard'), // The dashboard has the modal
+            'url' => route('dashboard', [], false), // The dashboard has the modal
             'icon' => 'document'
         ];
     }

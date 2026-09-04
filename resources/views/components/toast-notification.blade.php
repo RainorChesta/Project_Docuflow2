@@ -128,7 +128,7 @@
                                 title: notif.title,
                                 message: notif.message,
                                 reason: notif.reason,
-                                url: notif.url,
+                                url: this.formatUrl(notif.url),
                                 time: notif.time,
                                 isRejected: notif.icon === 'rejected' || (notif.type || '').includes('reject') || (notif.type || '').includes('revoked'),
                                 expanded: false
@@ -146,6 +146,18 @@
             .finally(() => {
                 this.isFetching = false;
             });
+        },
+        formatUrl(url) {
+            if (!url || url === '#') return '#';
+            if (url.includes('host.docker.internal')) {
+                try {
+                    const u = new URL(url);
+                    return u.pathname + u.search + u.hash;
+                } catch (e) {
+                    return url.replace(/^https?:\/\/host\.docker\.internal(:\d+)?/, '') || '#';
+                }
+            }
+            return url;
         },
         startDismissTimer() {
             this.stopDismissTimer();
@@ -265,7 +277,7 @@
 
                     <!-- Action Link -->
                     <div class="mt-3 flex items-center gap-3" x-show="toast.url && toast.url !== '#'">
-                        <a :href="toast.url" 
+                        <a :href="formatUrl(toast.url)" 
                            @click="markAsRead(toast.id)"
                            class="text-xs font-semibold hover:underline inline-flex items-center gap-1 transition-colors" 
                            :class="toast.isRejected ? 'text-error' : 'text-success'">

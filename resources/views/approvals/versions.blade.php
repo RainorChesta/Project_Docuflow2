@@ -300,8 +300,8 @@
                                             </button>
 
                                             {{-- Reject Reason Modal --}}
-                                            <dialog id="reject-doc-modal-{{ $version->id }}" class="modal modal-bottom sm:modal-middle text-left backdrop-blur-xs">
-                                                <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-lg">
+                                            <dialog id="reject-doc-modal-{{ $version->id }}" class="modal modal-bottom sm:modal-middle text-left backdrop-blur-xs text-base-content">
+                                                <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-lg text-base-content">
                                                     <div class="p-6 pb-4">
                                                         <div class="flex items-start justify-between gap-4">
                                                             <div class="flex items-center gap-3.5">
@@ -334,7 +334,7 @@
                                                             <label class="block text-xs font-semibold text-base-content/80 mb-1.5">
                                                                 {{ __('Alasan Penolakan') }} <span class="text-base-content/40 font-normal">({{ __('Opsional') }})</span>
                                                             </label>
-                                                            <textarea name="notes" rows="3" class="textarea textarea-bordered w-full text-xs rounded-xl focus:textarea-primary bg-base-200/30" placeholder="{{ __('Jelaskan alasan penolakan agar penulis dapat melakukan revisi...') }}"></textarea>
+                                                            <textarea name="notes" rows="3" class="textarea textarea-bordered w-full text-xs text-base-content rounded-xl focus:textarea-primary bg-base-200/30" placeholder="{{ __('Jelaskan alasan penolakan agar penulis dapat melakukan revisi...') }}"></textarea>
                                                         </div>
                                                         <div class="bg-base-200/40 px-6 py-4 border-t border-base-200 flex items-center justify-end gap-2.5">
                                                             <button type="button" onclick="document.getElementById('reject-doc-modal-{{ $version->id }}').close()" class="btn btn-ghost btn-sm sm:btn-md rounded-xl font-medium text-base-content/70 hover:text-base-content px-4">
@@ -421,8 +421,8 @@
         </dialog>
 
         {{-- Bulk Reject Modal --}}
-        <dialog id="bulk-reject-versions-modal" class="modal modal-bottom sm:modal-middle text-left backdrop-blur-xs">
-            <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-lg">
+        <dialog id="bulk-reject-versions-modal" class="modal modal-bottom sm:modal-middle text-left backdrop-blur-xs text-base-content">
+            <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-lg text-base-content">
                 <div class="p-6 pb-4">
                     <div class="flex items-start justify-between gap-4">
                         <div class="flex items-center gap-3.5">
@@ -457,7 +457,7 @@
                         <label class="block text-xs font-semibold text-base-content/80 mb-1.5">
                             {{ __('Alasan Penolakan Massal') }}
                         </label>
-                        <textarea name="notes" rows="3" class="textarea textarea-bordered w-full text-xs rounded-xl focus:textarea-error bg-base-200/30" placeholder="{{ __('Jelaskan alasan penolakan massal...') }}" required></textarea>
+                        <textarea name="notes" rows="3" class="textarea textarea-bordered w-full text-xs text-base-content rounded-xl focus:textarea-error bg-base-200/30" placeholder="{{ __('Jelaskan alasan penolakan massal...') }}" required></textarea>
                     </div>
                     <div class="bg-base-200/40 px-6 py-4 border-t border-base-200 flex items-center justify-end gap-2.5">
                         <button type="button" onclick="document.getElementById('bulk-reject-versions-modal').close()" class="btn btn-ghost btn-sm sm:btn-md rounded-xl font-medium text-base-content/70 hover:text-base-content px-4">

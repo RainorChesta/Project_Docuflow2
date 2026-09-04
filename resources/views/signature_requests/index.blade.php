@@ -381,8 +381,8 @@
                                                 </button>
 
                                                 {{-- Reject Reason Modal --}}
-                                                <dialog id="reject-modal-{{ $req->id }}" class="modal modal-bottom sm:modal-middle text-left whitespace-normal backdrop-blur-xs">
-                                                    <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-lg">
+                                                <dialog id="reject-modal-{{ $req->id }}" class="modal modal-bottom sm:modal-middle text-left whitespace-normal backdrop-blur-xs text-base-content">
+                                                    <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-lg text-base-content">
                                                         <div class="p-6 pb-4">
                                                             <div class="flex items-start justify-between gap-4">
                                                                 <div class="flex items-center gap-3.5">
@@ -432,7 +432,7 @@
                                                                         id="reject-sig-reason-{{ $req->id }}"
                                                                         name="reason" 
                                                                         maxlength="500"
-                                                                        class="textarea textarea-bordered w-full text-sm rounded-xl bg-base-200/30 border-base-300 focus:border-error focus:ring-2 focus:ring-error/20 focus:outline-hidden transition-all placeholder:text-base-content/40 leading-relaxed min-h-[95px] p-3" 
+                                                                        class="textarea textarea-bordered w-full text-sm text-base-content rounded-xl bg-base-200/30 border-base-300 focus:border-error focus:ring-2 focus:ring-error/20 focus:outline-hidden transition-all placeholder:text-base-content/40 leading-relaxed min-h-[95px] p-3" 
                                                                         placeholder="{{ __('Tuliskan alasan penolakan izin tanda tangan...') }}"></textarea>
                                                                 </div>
                                                             </div>
@@ -531,8 +531,8 @@
         </dialog>
 
         {{-- Bulk Reject Modal --}}
-        <dialog id="bulk-reject-modal" class="modal modal-bottom sm:modal-middle text-left whitespace-normal backdrop-blur-xs">
-            <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-lg">
+        <dialog id="bulk-reject-modal" class="modal modal-bottom sm:modal-middle text-left whitespace-normal backdrop-blur-xs text-base-content">
+            <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-lg text-base-content">
                 <div class="p-6 pb-4">
                     <div class="flex items-start justify-between gap-4">
                         <div class="flex items-center gap-3.5">
@@ -579,7 +579,7 @@
                             id="bulk-reject-reason"
                             name="reason" 
                             maxlength="500"
-                            class="textarea textarea-bordered w-full text-sm rounded-xl bg-base-200/30 border-base-300 focus:border-error focus:ring-2 focus:ring-error/20 focus:outline-hidden transition-all placeholder:text-base-content/40 leading-relaxed min-h-[90px] p-3" 
+                            class="textarea textarea-bordered w-full text-sm text-base-content rounded-xl bg-base-200/30 border-base-300 focus:border-error focus:ring-2 focus:ring-error/20 focus:outline-hidden transition-all placeholder:text-base-content/40 leading-relaxed min-h-[90px] p-3" 
                             placeholder="{{ __('Tuliskan alasan penolakan untuk seluruh permintaan terpilih...') }}"></textarea>
                     </div>
 

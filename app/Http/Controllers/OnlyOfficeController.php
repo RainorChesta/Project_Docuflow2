@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -175,6 +176,10 @@ class OnlyOfficeController extends Controller
      */
     public function callback(Request $request, Document $document): JsonResponse
     {
+        if (config('app.url')) {
+            URL::forceRootUrl(config('app.url'));
+        }
+
         $rawPayload = $request->all();
         Log::info("ONLYOFFICE callback received for document {$document->id}", [
             'status' => $rawPayload['status'] ?? null,
@@ -330,6 +335,10 @@ class OnlyOfficeController extends Controller
      */
     public function templateCallback(Request $request, \App\Models\DocumentTemplate $template): JsonResponse
     {
+        if (config('app.url')) {
+            URL::forceRootUrl(config('app.url'));
+        }
+
         $rawPayload = $request->all();
         Log::info("ONLYOFFICE callback received for template {$template->id}", [
             'status' => $rawPayload['status'] ?? null,

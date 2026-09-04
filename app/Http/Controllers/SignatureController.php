@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Company;
+use App\Models\Document;
 use App\Models\Signature;
 use App\Models\SignatureRequest;
 use App\Models\User;
+use App\Services\CompanyContextService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -33,6 +36,19 @@ class SignatureController extends Controller
             }
 
             $signatureId = $request->query('signature_id') ?? $request->input('signature_id');
+            if ($signatureId) {
+                $requestedSig = $user->signatures()->find($signatureId);
+                if ($requestedSig && $requestedSig->type === 'company_stamp') {
+                    $doc = Document::find($documentId);
+                    $docCompanyId = $doc ? ($doc->company_id ?? $doc->branch?->company_id) : null;
+                    if ($docCompanyId && (int)$requestedSig->company_id !== (int)$docCompanyId) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Stempel perusahaan tidak sesuai dengan perusahaan dokumen ini.',
+                        ], 422);
+                    }
+                }
+            }
             $pageNumber = (int) $request->input('page_number', 1);
             $posX = ($request->filled('pos_x') || $request->has('pos_x')) && $request->input('pos_x') !== null && $request->input('pos_x') !== '' ? (float) $request->input('pos_x') : null;
             $posY = ($request->filled('pos_y') || $request->has('pos_y')) && $request->input('pos_y') !== null && $request->input('pos_y') !== '' ? (float) $request->input('pos_y') : null;
@@ -307,6 +323,14 @@ class SignatureController extends Controller
         $currentUser = Auth::user();
         $documentId = $request->query('document_id');
 
+        $document = $documentId ? Document::with(['branch', 'company'])->find($documentId) : null;
+        $contextCompanyId = $document ? ($document->company_id ?? $document->branch?->company_id) : null;
+        if (!$contextCompanyId) {
+            $contextCompanyId = app(CompanyContextService::class)->getActiveCompanyId($currentUser);
+        }
+        $contextCompany = $contextCompanyId ? Company::find($contextCompanyId) : null;
+        $contextCompanyName = $contextCompany ? $contextCompany->name : null;
+
         $requestsGrouped = collect();
         if ($documentId) {
             $requestsGrouped = SignatureRequest::where('document_id', $documentId)
@@ -318,10 +342,10 @@ class SignatureController extends Controller
 
         $availableToReplaceCount = 0;
 
-        $users = User::with('division')
+        $users = User::with(['division', 'signatures.company'])
             ->where('is_active', true)
             ->get()
-            ->map(function ($u) use ($currentUser, $requestsGrouped, &$availableToReplaceCount) {
+            ->map(function ($u) use ($currentUser, $requestsGrouped, &$availableToReplaceCount, $contextCompanyId) {
                 $isMe = $u->id === $currentUser->id;
                 $userRequests = $requestsGrouped->get($u->id, collect());
 
@@ -357,6 +381,21 @@ class SignatureController extends Controller
                     }
                 }
 
+                // Filter signatures by document company context:
+                // 'original' is always allowed.
+                // 'company_stamp' is allowed ONLY if it matches the document's company context.
+                $filteredSignatures = $u->signatures->filter(function ($sig) use ($contextCompanyId) {
+                    if ($sig->type === 'original') {
+                        return true;
+                    }
+                    if ($sig->type === 'company_stamp' && $contextCompanyId && (int)$sig->company_id === (int)$contextCompanyId) {
+                        return true;
+                    }
+                    return false;
+                })->values();
+
+                $hasSignature = $filteredSignatures->isNotEmpty();
+
                 return [
                     'id' => $u->id,
                     'name' => $u->name,
@@ -368,11 +407,12 @@ class SignatureController extends Controller
                     },
                     'division' => $u->division ? $u->division->name : 'Umum',
                     'is_me' => $isMe,
-                    'has_signature' => $u->hasSignature(),
-                    'signatures' => $u->signatures()->with('company')->get()->map(function($sig) {
+                    'has_signature' => $hasSignature,
+                    'signatures' => $filteredSignatures->map(function($sig) {
                         return [
                             'id' => $sig->id,
                             'type' => $sig->type,
+                            'company_id' => $sig->company_id,
                             'company_name' => $sig->company ? $sig->company->name : null,
                         ];
                     }),
@@ -388,6 +428,8 @@ class SignatureController extends Controller
         return response()->json([
             'users' => $users,
             'available_to_replace_count' => $availableToReplaceCount,
+            'context_company_id' => $contextCompanyId,
+            'context_company_name' => $contextCompanyName,
         ]);
     }
 
@@ -493,6 +535,16 @@ class SignatureController extends Controller
                 'success' => false,
                 'message' => 'Tanda tangan / stempel digital tidak ditemukan.',
             ], 422);
+        }
+
+        if ($sig->type === 'company_stamp') {
+            $docCompanyId = $document->company_id ?? $document->branch?->company_id;
+            if ($docCompanyId && (int)$sig->company_id !== (int)$docCompanyId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Stempel perusahaan tidak sesuai dengan perusahaan dokumen ini.',
+                ], 422);
+            }
         }
 
         $version = $document->displayVersion();

@@ -32,7 +32,7 @@ class DocumentOpenedViaLink extends Notification
                 'viewer' => $this->viewerName,
                 'doc'    => $this->document->title,
             ]),
-            'url'     => route('documents.show', $this->document),
+            'url'     => route('documents.show', $this->document, false),
             'icon'    => 'document',
             'document_id' => $this->document->id
         ];

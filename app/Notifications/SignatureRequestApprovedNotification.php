@@ -34,7 +34,7 @@ class SignatureRequestApprovedNotification extends Notification
                 'name' => strtoupper($this->approverName),
                 'doc'  => strtoupper($this->document->title),
             ]),
-            'url'                  => route('documents.edit', $this->document),
+            'url'                  => route('documents.edit', $this->document, false),
             'icon'                 => 'signature',
             'document_id'          => $this->document->id,
             'signature_request_id' => $this->signatureRequest->id,

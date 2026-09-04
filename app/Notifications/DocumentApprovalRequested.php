@@ -35,7 +35,7 @@ class DocumentApprovalRequested extends Notification
                 'doc'    => $this->document->title,
                 'ver'    => $this->version->version_number,
             ]),
-            'url'     => route('documents.show', $this->document->id),
+            'url'     => route('documents.show', $this->document->id, false),
             'icon'    => 'approval',
             'document_id' => $this->document->id
         ];

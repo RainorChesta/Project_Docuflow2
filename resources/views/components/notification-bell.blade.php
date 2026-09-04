@@ -90,6 +90,18 @@
                 this.isFetching = false;
             });
         },
+        formatUrl(url) {
+            if (!url || url === '#') return '#';
+            if (url.includes('host.docker.internal')) {
+                try {
+                    const u = new URL(url);
+                    return u.pathname + u.search + u.hash;
+                } catch (e) {
+                    return url.replace(/^https?:\/\/host\.docker\.internal(:\d+)?/, '') || '#';
+                }
+            }
+            return url;
+        },
         togglePanel() {
             this.open = !this.open;
             if (this.open) {
@@ -199,7 +211,7 @@
                 <ul class="divide-y divide-base-300/50">
                     <template x-for="notif in notifications" :key="notif.id">
                         <li>
-                            <a :href="notif.url"
+                            <a :href="formatUrl(notif.url)"
                                class="flex items-start gap-3 px-4 py-3.5 transition-colors border-l-2"
                                :class="((notif.icon === 'rejected' || (notif.type || '').includes('reject') || (notif.type || '').includes('revoked'))
                                    ? (notif.read ? 'border-l-error/30 hover:bg-base-200/60' : 'border-l-error bg-error/5 hover:bg-error/10')

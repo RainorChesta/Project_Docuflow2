@@ -38,7 +38,7 @@ class ApprovalAlreadyHandled extends Notification
                 'action'  => $actionLabel,
                 'handler' => $this->handlerName,
             ]),
-            'url'         => route('documents.show', $this->document),
+            'url'         => route('documents.show', $this->document, false),
             'icon'        => 'info',
             'document_id' => $this->document->id,
         ];

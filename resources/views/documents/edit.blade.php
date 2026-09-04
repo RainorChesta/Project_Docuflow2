@@ -176,55 +176,29 @@
                                 </button>
 
                                 {{-- Quick Actions: Sisip TTD --}}
-                                <div class="dropdown dropdown-end shrink-0">
-                                    <label tabindex="0" class="btn btn-xs btn-outline btn-secondary gap-1 font-medium cursor-pointer" title="{{ __('Sisipkan Tanda Tangan Digital') }}">
+                                <button type="button"
+                                        onclick="openSignatureSelectorModal()"
+                                        class="btn btn-xs btn-outline btn-secondary gap-1 font-medium shrink-0"
+                                        title="{{ __('Sisipkan Tanda Tangan Digital') }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                    </svg>
+                                    <span class="hidden sm:inline">{{ __('Sisip TTD') }}</span>
+                                    <span class="sm:hidden">{{ __('TTD') }}</span>
+                                </button>
+
+                                @if($isPdf)
+                                    {{-- PDF Revert Last Signature Button --}}
+                                    <button type="button"
+                                            onclick="confirmRevertPdfSignature()"
+                                            class="btn btn-xs btn-outline btn-error gap-1 font-medium shrink-0"
+                                            title="{{ __('Batalkan TTD Terakhir') }}">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
                                         </svg>
-                                        <span class="hidden sm:inline">{{ __('Sisip TTD') }}</span>
-                                        <span class="sm:hidden">{{ __('TTD') }}</span>
-                                    </label>
-                                    <ul tabindex="0" class="dropdown-content z-[100] menu p-2 shadow-2xl bg-base-100 rounded-2xl w-64 border border-base-300 mt-1">
-                                        <li class="menu-title text-xs font-semibold px-2 py-1 text-base-content/60">{{ __('Pilih Tanda Tangan') }}</li>
-                                        @if($userSignatureUrl || $userSignatureDataUri)
-                                            <li>
-                                                <button type="button" onclick="insertMySignature()" class="flex items-center justify-between text-sm py-2">
-                                                    <span class="font-medium text-primary">{{ __('Tanda Tangan Saya') }}</span>
-                                                    <span class="badge badge-primary badge-xs">{{ __('Tersimpan') }}</span>
-                                                </button>
-                                            </li>
-                                        @else
-                                            <li>
-                                                <a href="{{ route('profile.signature.show') }}" class="text-xs text-warning flex items-center gap-1.5 py-2">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                                    </svg>
-                                                    <span>{{ __('Buat TTD Saya di Profil') }}</span>
-                                                </a>
-                                            </li>
-                                        @endif
-                                        <div class="divider my-1"></div>
-                                        <li>
-                                            <button type="button" onclick="openSignatureSelectorModal()" class="text-xs text-base-content/80 flex items-center gap-1.5 py-2">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                                                </svg>
-                                                <span>{{ __('Pilih Pengguna Lain...') }}</span>
-                                            </button>
-                                        </li>
-                                        @if($isPdf)
-                                            <div class="divider my-1"></div>
-                                            <li>
-                                                <button type="button" onclick="confirmRevertPdfSignature()" class="text-xs text-error font-semibold flex items-center gap-1.5 py-2 hover:bg-error/10 rounded-xl transition-colors">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-error shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                                                    </svg>
-                                                    <span>{{ __('Batalkan TTD Terakhir') }}</span>
-                                                </button>
-                                            </li>
-                                        @endif
-                                    </ul>
-                                </div>
+                                        <span class="hidden sm:inline">{{ __('Batalkan TTD') }}</span>
+                                    </button>
+                                @endif
                             </div>
                         </div>
 
@@ -273,13 +247,16 @@
             {{-- Signature Search Input --}}
             <div class="flex gap-2 mb-3">
                 <div class="relative flex-1">
-                    <input type="text" id="signature-search-input" oninput="filterSignatureUsers(this.value)" onkeypress="if(event.key === 'Enter') filterSignatureUsers(this.value)" placeholder="{{ __('Cari tanda tangan (nama, peran, divisi)...') }}" class="input input-bordered input-sm w-full pl-9 pr-8 bg-base-100 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary text-xs sm:text-sm">
+                    <input type="text" id="signature-search-input" onkeypress="if(event.key === 'Enter') filterSignatureUsers(this.value)" placeholder="{{ __('Ketik nama pengguna lain lalu klik Cari...') }}" class="input input-bordered input-sm w-full pl-9 pr-8 bg-base-100 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary text-xs sm:text-sm">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                     <button type="button" id="signature-search-clear" onclick="clearSignatureSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content text-xs p-1">✕</button>
                 </div>
-                <button type="button" onclick="filterSignatureUsers(document.getElementById('signature-search-input').value)" class="btn btn-primary btn-sm px-4 rounded-xl">
+                <button type="button" onclick="filterSignatureUsers(document.getElementById('signature-search-input').value)" class="btn btn-primary btn-sm px-4 rounded-xl gap-1.5 font-bold uppercase">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
                     {{ __('Cari') }}
                 </button>
             </div>
@@ -1289,20 +1266,21 @@
 
             function filterSignatureUsers(query) {
                 const clearBtn = document.getElementById('signature-search-clear');
-                if (clearBtn) {
-                    clearBtn.classList.toggle('hidden', !query);
-                }
                 const q = (query || '').toLowerCase().trim();
+                if (clearBtn) {
+                    clearBtn.classList.toggle('hidden', !q);
+                }
                 const filtered = allSignatureUsersData.filter(u => {
-                    if (!q) return u.is_me || (u.request_status && u.request_status !== 'none');
+                    if (!q) {
+                        return u.is_me || u.is_available_to_replace || u.request_status === 'pending';
+                    }
                     
                     return (u.name && u.name.toLowerCase().includes(q)) ||
                            (u.email && u.email.toLowerCase().includes(q)) ||
                            (u.role && u.role.toLowerCase().includes(q)) ||
-                           (u.division && u.division.toLowerCase().includes(q)) ||
-                           (u.rejected_reason && u.rejected_reason.toLowerCase().includes(q));
+                           (u.division && u.division.toLowerCase().includes(q));
                 });
-                renderSignatureUsersList(filtered);
+                renderSignatureUsersList(filtered, !q);
             }
 
             function clearSignatureSearch() {
@@ -1313,22 +1291,26 @@
                 }
             }
 
-            function renderSignatureUsersList(users) {
+            function renderSignatureUsersList(users, isInitialEmpty = false) {
                 const list = document.getElementById('signature-users-list');
                 if (!list) return;
 
                 if (!users || users.length === 0) {
-                    list.innerHTML = '<p class="text-sm text-base-content/60 text-center py-6 uppercase">{{ __("TIDAK ADA PENGGUNA DITEMUKAN.") }}</p>';
+                    list.innerHTML = '<p class="text-sm text-base-content/60 text-center py-6 uppercase font-medium">{{ __("TIDAK ADA PENGGUNA DITEMUKAN.") }}</p>';
                     return;
                 }
 
-                list.innerHTML = users.map(u => {
+                let html = users.map(u => {
                     let actionHtml = '';
 
                     if (!u.has_signature) {
-                        actionHtml = `<span class="text-xs text-base-content/40 italic uppercase">{{ __('BELUM ADA TTD') }}</span>`;
+                        if (u.is_me) {
+                            actionHtml = `<a href="{{ route('profile.signature.show') }}" class="btn btn-xs btn-outline btn-warning gap-1 uppercase font-bold">{{ __('BUAT TTD') }}</a>`;
+                        } else {
+                            actionHtml = `<span class="text-xs text-base-content/40 italic uppercase">{{ __('BELUM ADA TTD') }}</span>`;
+                        }
                     } else if (u.is_me) {
-                        actionHtml = `<button type="button" onclick="insertMySignature()" class="btn btn-xs btn-primary gap-1 uppercase font-bold">{{ __('SISIPKAN TTD SAYA') }}</button>`;
+                        actionHtml = `<span class="badge badge-primary badge-xs uppercase font-bold">{{ __('Tanda Tangan Saya') }}</span>`;
                     } else if (u.is_available_to_replace) {
                         const creditLabel = u.available_credits > 1 ? ` (${u.available_credits}X)` : '';
                         actionHtml = `
@@ -1350,11 +1332,8 @@
                         actionHtml = `
                             <div class="flex items-center gap-1.5">
                                 <span class="badge badge-error badge-xs gap-1 py-1 px-2 font-bold uppercase text-white">
-                                    ✕ {{ __('Ditolak') }}
+                                    ✕ {{ __('DITOLAK') }}
                                 </span>
-                                <button type="button" onclick="${isPdfDocument ? `openPdfVisualPlacementModal(${u.id}, '${u.name}')` : `fetchUserSignatureAndInsert(${u.id}, '${u.name}')`}" class="btn btn-xs btn-outline btn-error gap-1 uppercase font-bold">
-                                    {{ __('MINTA LAGI') }}
-                                </button>
                             </div>
                         `;
                     } else if (u.request_status === 'used') {
@@ -1363,16 +1342,11 @@
                                 <span class="badge badge-ghost badge-xs text-base-content/60 gap-1 py-2 px-2 font-bold uppercase">
                                     ✓ {{ __('SUDAH DIGUNAKAN') }}
                                 </span>
-                                <button type="button" onclick="${isPdfDocument ? `openPdfVisualPlacementModal(${u.id}, '${u.name}')` : `fetchUserSignatureAndInsert(${u.id}, '${u.name}')`}" class="btn btn-xs btn-outline btn-primary gap-1 uppercase font-bold">
-                                    {{ __('MINTA LAGI') }}
-                                </button>
                             </div>
                         `;
                     } else {
                         actionHtml = `
-                            <button type="button" onclick="${isPdfDocument ? `openPdfVisualPlacementModal(${u.id}, '${u.name}')` : `fetchUserSignatureAndInsert(${u.id}, '${u.name}')`}" class="btn btn-xs btn-outline btn-primary gap-1 uppercase font-bold">
-                                {{ __('MINTA TTD') }}
-                            </button>
+                            <span class="text-xs text-base-content/60 font-semibold uppercase">{{ __('PILIH TTD') }}</span>
                         `;
                     }
 
@@ -1391,9 +1365,9 @@
                             u.signatures.map(sig => {
                                 let sigActionHtml = '';
                                 if (u.is_me) {
-                                    sigActionHtml = '<button type="button" onclick="insertMySignature(' + sig.id + ')" class="btn btn-xs btn-primary gap-1 uppercase font-bold">SISIPKAN</button>';
+                                    sigActionHtml = '<button type="button" onclick="insertMySignature(' + sig.id + ')" class="btn btn-xs btn-primary gap-1 uppercase font-bold">{{ __("SISIPKAN") }}</button>';
                                 } else {
-                                    sigActionHtml = '<button type="button" onclick="' + (isPdfDocument ? `openPdfVisualPlacementModal(${u.id}, '${u.name}', 'signature', ${sig.id})` : `fetchUserSignatureAndInsert(${u.id}, &quot;${u.name}&quot;, ${sig.id})`) + '" class="btn btn-xs btn-outline btn-primary gap-1 uppercase font-bold">MINTA TTD</button>';
+                                    sigActionHtml = '<button type="button" onclick="' + (isPdfDocument ? `openPdfVisualPlacementModal(${u.id}, '${u.name}', 'signature', ${sig.id})` : `fetchUserSignatureAndInsert(${u.id}, &quot;${u.name}&quot;, ${sig.id})`) + '" class="btn btn-xs btn-outline btn-primary gap-1 uppercase font-bold">{{ __("MINTA TTD") }}</button>';
                                 }
                                 
                                 const typeLabel = sig.type === 'original' ? 'ORIGINAL' : 'STEMPEL: ' + (sig.company_name || 'PERUSAHAAN');
@@ -1424,6 +1398,17 @@
                         </div>
                     `;
                 }).join('');
+
+                if (isInitialEmpty) {
+                    html += `
+                        <div class="p-3 bg-base-200/40 rounded-xl text-center text-xs text-base-content/60 mt-3 border border-dashed border-base-300">
+                            <span class="font-semibold text-base-content/80">{{ __('Tips:') }}</span>
+                            {{ __('Ketik nama pengguna di kolom pencarian di atas lalu klik Cari untuk memilih tanda tangan pengguna lain.') }}
+                        </div>
+                    `;
+                }
+
+                list.innerHTML = html;
             }
 
             function consumeSignatureReplacement(requestId, userName) {

@@ -32,7 +32,7 @@ class DocumentAddedToDivision extends Notification
                 'doc'      => $this->document->title,
                 'division' => $this->divisionName,
             ]),
-            'url'     => route('documents.show', $this->document),
+            'url'     => route('documents.show', $this->document, false),
             'icon'    => 'document',
             'document_id' => $this->document->id
         ];

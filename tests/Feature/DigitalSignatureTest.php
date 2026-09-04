@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Company;
 use App\Models\Division;
 use App\Models\Document;
 use App\Models\DocumentType;
@@ -28,27 +29,24 @@ class DigitalSignatureTest extends TestCase
         $user = User::factory()->create();
 
         // 1x1 transparent PNG base64 string
-        $base64Image = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+        $base64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
         $response = $this->actingAs($user)->postJson(route('profile.signature.store'), [
-            'signature_data' => $base64Image,
+            'signature_data' => $base64,
         ]);
 
         $response->assertStatus(200)
             ->assertJson(['success' => true]);
 
-        $this->assertDatabaseHas('signatures', [
-            'user_id' => $user->id,
-        ]);
-
+        $this->assertDatabaseHas('signatures', ['user_id' => $user->id]);
         $this->assertTrue($user->fresh()->hasSignature());
     }
 
     public function test_user_can_delete_their_signature(): void
     {
         $user = User::factory()->create();
-        $filePath = 'signatures/sig_test.png';
-        Storage::disk('public')->put($filePath, 'fake image content');
+        $filePath = 'signatures/test_' . $user->id . '.png';
+        Storage::disk('public')->put($filePath, 'fake content');
 
         Signature::create([
             'user_id' => $user->id,
@@ -71,6 +69,56 @@ class DigitalSignatureTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonStructure(['users']);
+    }
+
+    public function test_available_users_filters_signatures_by_document_company_context(): void
+    {
+        $companyA = Company::create(['name' => 'PT Company A', 'code' => 'PTA']);
+        $companyB = Company::create(['name' => 'PT Company B', 'code' => 'PTB']);
+
+        $user = User::factory()->create(['name' => 'Charlie']);
+
+        // Original signature
+        $sigOrig = Signature::create([
+            'user_id' => $user->id,
+            'type' => 'original',
+            'file_path' => 'signatures/orig.png',
+        ]);
+        // Stamp for Company A
+        $sigStampA = Signature::create([
+            'user_id' => $user->id,
+            'type' => 'company_stamp',
+            'company_id' => $companyA->id,
+            'file_path' => 'signatures/stamp_a.png',
+        ]);
+        // Stamp for Company B
+        $sigStampB = Signature::create([
+            'user_id' => $user->id,
+            'type' => 'company_stamp',
+            'company_id' => $companyB->id,
+            'file_path' => 'signatures/stamp_b.png',
+        ]);
+
+        $docType = DocumentType::create(['name' => 'Surat', 'code' => 'SRT']);
+        $documentA = Document::create([
+            'document_number' => '001/SRT/2026',
+            'title' => 'Doc Company A',
+            'document_type_id' => $docType->id,
+            'owner_id' => $user->id,
+            'company_id' => $companyA->id,
+            'visibility' => 'general',
+        ]);
+
+        $response = $this->actingAs($user)->getJson(route('signatures.users', ['document_id' => $documentA->id]));
+
+        $response->assertStatus(200);
+        $userData = collect($response->json('users'))->firstWhere('id', $user->id);
+        $this->assertNotNull($userData);
+
+        $signatureIds = collect($userData['signatures'])->pluck('id')->all();
+        $this->assertContains($sigOrig->id, $signatureIds);
+        $this->assertContains($sigStampA->id, $signatureIds);
+        $this->assertNotContains($sigStampB->id, $signatureIds);
     }
 
     public function test_signature_resolver_handles_self_and_cross_user_requests(): void

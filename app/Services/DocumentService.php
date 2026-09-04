@@ -324,6 +324,18 @@ class DocumentService
 
     public function create(array $data, int $ownerId): Document
     {
+        if (empty($data['division_id']) && $ownerId) {
+            $owner = User::find($ownerId);
+            if ($owner) {
+                $activeDivId = app(\App\Services\CompanyContextService::class)->getActiveDivisionId($owner)
+                    ?? $owner->division_id
+                    ?? ($owner->allDivisionIds()[0] ?? null);
+                if ($activeDivId) {
+                    $data['division_id'] = $activeDivId;
+                }
+            }
+        }
+
         $division = !empty($data['division_id']) ? Division::find($data['division_id']) : null;
         $unitKerja = !empty($data['unit_kerja_id']) ? \App\Models\UnitKerja::find($data['unit_kerja_id']) : null;
         $documentType = DocumentType::findOrFail($data['document_type_id']);
@@ -370,6 +382,18 @@ class DocumentService
      */
     public function createFromUpload(array $data, int $ownerId, UploadedFile $file): Document
     {
+        if (empty($data['division_id']) && $ownerId) {
+            $owner = User::find($ownerId);
+            if ($owner) {
+                $activeDivId = app(\App\Services\CompanyContextService::class)->getActiveDivisionId($owner)
+                    ?? $owner->division_id
+                    ?? ($owner->allDivisionIds()[0] ?? null);
+                if ($activeDivId) {
+                    $data['division_id'] = $activeDivId;
+                }
+            }
+        }
+
         return DB::transaction(function () use ($data, $ownerId, $file) {
             $data['visibility'] ??= Document::VISIBILITY_DIVISION;
             $data['owner_id'] = $ownerId;
@@ -405,10 +429,23 @@ class DocumentService
      */
     public function createFromTemplate(array $data, int $ownerId, \App\Models\DocumentTemplate $template): Document
     {
+        if (empty($data['division_id']) && $ownerId) {
+            $owner = User::find($ownerId);
+            if ($owner) {
+                $activeDivId = app(\App\Services\CompanyContextService::class)->getActiveDivisionId($owner)
+                    ?? $owner->division_id
+                    ?? ($owner->allDivisionIds()[0] ?? null);
+                if ($activeDivId) {
+                    $data['division_id'] = $activeDivId;
+                }
+            }
+        }
+
         $division = !empty($data['division_id']) ? Division::find($data['division_id']) : null;
+        $unitKerja = !empty($data['unit_kerja_id']) ? \App\Models\UnitKerja::find($data['unit_kerja_id']) : null;
         $documentType = DocumentType::findOrFail($data['document_type_id']);
         $branch = !empty($data['branch_id']) ? \App\Models\Branch::with('company')->find($data['branch_id']) : null;
-        $formatChoice = $data['format_choice'] ?? 'baru';
+        $formatChoice = $data['format_choice'] ?? (!empty($unitKerja) ? 'lama' : 'baru');
 
         if ($branch && empty($data['company_id'])) {
             $data['company_id'] = $branch->company_id;
@@ -416,7 +453,7 @@ class DocumentService
 
         if (empty($data['document_number'])) {
             if ($formatChoice === 'baru' || $formatChoice === 'lama') {
-                $data['document_number'] = $this->generateId($formatChoice, $division, $documentType, $branch);
+                $data['document_number'] = $this->generateId($formatChoice, $division, $documentType, $branch, $unitKerja);
             }
         }
         $data['visibility'] ??= Document::VISIBILITY_DIVISION;

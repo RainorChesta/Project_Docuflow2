@@ -300,8 +300,8 @@
                                                     </button>
 
                                                     {{-- Reject Rename Modal --}}
-                                                    <dialog id="reject-rename-modal-{{ $doc->id }}" class="modal modal-bottom sm:modal-middle text-left whitespace-normal backdrop-blur-xs">
-                                                        <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-lg">
+                                                    <dialog id="reject-rename-modal-{{ $doc->id }}" class="modal modal-bottom sm:modal-middle text-left whitespace-normal backdrop-blur-xs text-base-content">
+                                                        <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-lg text-base-content">
                                                             <div class="p-6 pb-4">
                                                                 <div class="flex items-start justify-between gap-4">
                                                                     <div class="flex items-center gap-3.5">
@@ -331,7 +331,7 @@
                                                                         id="reject-rename-notes-{{ $doc->id }}"
                                                                         name="notes" 
                                                                         maxlength="500"
-                                                                        class="textarea textarea-bordered w-full text-sm rounded-xl bg-base-200/30 border-base-300 focus:border-error focus:ring-2 focus:ring-error/20 focus:outline-hidden transition-all placeholder:text-base-content/40 leading-relaxed min-h-[90px] p-3" 
+                                                                        class="textarea textarea-bordered w-full text-sm text-base-content rounded-xl bg-base-200/30 border-base-300 focus:border-error focus:ring-2 focus:ring-error/20 focus:outline-hidden transition-all placeholder:text-base-content/40 leading-relaxed min-h-[90px] p-3" 
                                                                         placeholder="{{ __('Tuliskan alasan penolakan...') }}"></textarea>
                                                                 </div>
 
@@ -493,8 +493,8 @@
                                                 </button>
 
                                                 {{-- Reject Rollback Modal --}}
-                                                <dialog id="reject-rollback-modal-{{ $doc->id }}" class="modal modal-bottom sm:modal-middle text-left whitespace-normal backdrop-blur-xs">
-                                                    <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-lg">
+                                                <dialog id="reject-rollback-modal-{{ $doc->id }}" class="modal modal-bottom sm:modal-middle text-left whitespace-normal backdrop-blur-xs text-base-content">
+                                                    <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-lg text-base-content">
                                                         <div class="p-6 pb-4">
                                                             <div class="flex items-start justify-between gap-4">
                                                                 <div class="flex items-center gap-3.5">
@@ -524,7 +524,7 @@
                                                                     id="reject-rollback-notes-{{ $doc->id }}"
                                                                     name="notes" 
                                                                     maxlength="500"
-                                                                    class="textarea textarea-bordered w-full text-sm rounded-xl bg-base-200/30 border-base-300 focus:border-error focus:ring-2 focus:ring-error/20 focus:outline-hidden transition-all placeholder:text-base-content/40 leading-relaxed min-h-[90px] p-3" 
+                                                                    class="textarea textarea-bordered w-full text-sm text-base-content rounded-xl bg-base-200/30 border-base-300 focus:border-error focus:ring-2 focus:ring-error/20 focus:outline-hidden transition-all placeholder:text-base-content/40 leading-relaxed min-h-[90px] p-3" 
                                                                     placeholder="{{ __('Tuliskan alasan penolakan rollback...') }}"></textarea>
                                                             </div>
 
@@ -712,8 +712,8 @@
                                                 </button>
 
                                                 {{-- Reject Reason Modal --}}
-                                                <dialog id="reject-doc-modal-{{ $version->id }}" class="modal modal-bottom sm:modal-middle text-left backdrop-blur-xs">
-                                                    <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-lg">
+                                                <dialog id="reject-doc-modal-{{ $version->id }}" class="modal modal-bottom sm:modal-middle text-left backdrop-blur-xs text-base-content">
+                                                    <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-lg text-base-content">
                                                         <div class="p-6 pb-4">
                                                             <div class="flex items-start justify-between gap-4">
                                                                 <div class="flex items-center gap-3.5">
@@ -755,7 +755,7 @@
                                                                     id="reject-notes-{{ $version->id }}"
                                                                     name="notes" 
                                                                     maxlength="500"
-                                                                    class="textarea textarea-bordered w-full text-sm rounded-xl bg-base-200/30 border-base-300 focus:border-error focus:ring-2 focus:ring-error/20 focus:outline-hidden transition-all placeholder:text-base-content/40 leading-relaxed min-h-[95px] p-3" 
+                                                                    class="textarea textarea-bordered w-full text-sm text-base-content rounded-xl bg-base-200/30 border-base-300 focus:border-error focus:ring-2 focus:ring-error/20 focus:outline-hidden transition-all placeholder:text-base-content/40 leading-relaxed min-h-[95px] p-3" 
                                                                     placeholder="{{ __('Tuliskan alasan penolakan atau catatan revisi...') }}"></textarea>
                                                             </div>
 
@@ -853,8 +853,8 @@
         </dialog>
 
         {{-- Bulk Reject Versions Modal --}}
-        <dialog id="bulk-reject-versions-modal" class="modal modal-bottom sm:modal-middle text-left whitespace-normal backdrop-blur-xs">
-            <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-lg">
+        <dialog id="bulk-reject-versions-modal" class="modal modal-bottom sm:modal-middle text-left whitespace-normal backdrop-blur-xs text-base-content">
+            <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-lg text-base-content">
                 <div class="p-6 pb-4">
                     <div class="flex items-start justify-between gap-4">
                         <div class="flex items-center gap-3.5">
@@ -901,7 +901,7 @@
                             id="bulk-reject-version-notes"
                             name="notes" 
                             maxlength="500"
-                            class="textarea textarea-bordered w-full text-sm rounded-xl bg-base-200/30 border-base-300 focus:border-error focus:ring-2 focus:ring-error/20 focus:outline-hidden transition-all placeholder:text-base-content/40 leading-relaxed min-h-[90px] p-3" 
+                            class="textarea textarea-bordered w-full text-sm text-base-content rounded-xl bg-base-200/30 border-base-300 focus:border-error focus:ring-2 focus:ring-error/20 focus:outline-hidden transition-all placeholder:text-base-content/40 leading-relaxed min-h-[90px] p-3" 
                             placeholder="{{ __('Tuliskan catatan alasan penolakan...') }}"></textarea>
                     </div>
 

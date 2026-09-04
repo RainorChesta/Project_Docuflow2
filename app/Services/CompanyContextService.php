@@ -99,6 +99,15 @@ class CompanyContextService
     }
 
     /**
+     * Get active division model from session, or resolve default.
+     */
+    public function getActiveDivision(?User $user = null): ?Division
+    {
+        $divisionId = $this->getActiveDivisionId($user);
+        return $divisionId ? Division::find($divisionId) : null;
+    }
+
+    /**
      * Get available companies for user.
      */
     public function getAvailableCompanies(?User $user = null)

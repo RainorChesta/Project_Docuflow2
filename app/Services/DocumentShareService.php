@@ -117,7 +117,10 @@ class DocumentShareService
             ['role' => $role, 'invited_by' => $invitedBy->id],
         );
 
-        $divisionUsers = User::where('division_id', $division->id)
+        $divisionUsers = User::where(function ($q) use ($division) {
+                $q->where('division_id', $division->id)
+                  ->orWhereHas('divisions', fn($dq) => $dq->where('divisions.id', $division->id));
+            })
             ->where('is_active', true)
             ->where('id', '!=', $invitedBy->id)
             ->get();
@@ -149,7 +152,10 @@ class DocumentShareService
         $share->delete();
 
         if ($divisionId && $documentId) {
-            $divisionUsers = User::where('division_id', $divisionId)
+            $divisionUsers = User::where(function ($q) use ($divisionId) {
+                    $q->where('division_id', $divisionId)
+                      ->orWhereHas('divisions', fn($dq) => $dq->where('divisions.id', $divisionId));
+                })
                 ->where('is_active', true)
                 ->get();
 

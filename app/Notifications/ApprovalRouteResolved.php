@@ -38,7 +38,7 @@ class ApprovalRouteResolved extends Notification
             'type'           => 'approval_route_resolved',
             'title'          => $title,
             'message'        => $this->routingMessage,
-            'url'            => route('documents.show', $this->document),
+            'url'            => route('documents.show', $this->document, false),
             'icon'           => 'approval',
             'document_id'    => $this->document->id,
             'approver_role'  => $this->approverRole,

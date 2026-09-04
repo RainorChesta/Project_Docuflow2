@@ -355,21 +355,24 @@
                             <label for="division_id" class="label">
                                 <span class="label-text font-medium">{{ __('Divisi') }}</span>
                             </label>
+                            @php
+                                $activeDivision = $activeDivision ?? app(\App\Services\CompanyContextService::class)->getActiveDivision();
+                                $activeDivisionId = $activeDivisionId ?? ($activeDivision?->id ?? app(\App\Services\CompanyContextService::class)->getActiveDivisionId());
+                            @endphp
                             @if(auth()->user()->isAdmin() || auth()->user()->isDirector())
                                 <select name="division_id" id="division_id" class="select select-bordered w-full" required>
                                     <option value="">{{ __('Pilih divisi...') }}</option>
                                     @foreach($divisions as $div)
-                                        <option value="{{ $div->id }}" {{ old('division_id') == $div->id ? 'selected' : '' }}>
+                                        <option value="{{ $div->id }}" {{ old('division_id', $activeDivisionId ?? '') == $div->id ? 'selected' : '' }}>
                                             {{ $div->code }} - {{ $div->name }}
                                         </option>
                                     @endforeach
                                 </select>
                                 <p class="text-xs text-base-content/50 mt-1">{{ __('Pilih divisi dokumen.') }}</p>
                             @else
-                                @php($myDivision = auth()->user()->division)
-                                <input type="text" value="{{ $myDivision ? $myDivision->code . ' - ' . $myDivision->name : '—' }}" class="input input-bordered w-full bg-base-200" disabled>
-                                <input type="hidden" name="division_id" value="{{ auth()->user()->division_id }}">
-                                <p class="text-xs text-base-content/50 mt-1">{{ __('Otomatis sesuai divisi akun kamu.') }}</p>
+                                <input type="text" value="{{ $activeDivision ? $activeDivision->code . ' - ' . $activeDivision->name : '—' }}" class="input input-bordered w-full bg-base-200" disabled>
+                                <input type="hidden" name="division_id" id="division_id" value="{{ $activeDivision?->id }}">
+                                <p class="text-xs text-base-content/50 mt-1">{{ __('Sesuai divisi aktif yang dipilih di switcher atas.') }}</p>
                             @endif
                             @error('division_id') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                         </div>

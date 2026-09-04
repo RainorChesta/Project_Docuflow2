@@ -249,6 +249,9 @@ class DocumentController extends Controller
         $activeBranch = $activeBranchId ? \App\Models\Branch::with('company')->find($activeBranchId) : null;
         $availableBranches = $contextService->getAvailableBranches($user);
 
+        $activeDivisionId = $contextService->getActiveDivisionId($user);
+        $activeDivision = $activeDivisionId ? Division::find($activeDivisionId) : null;
+
         $companies = ($user->isAdmin() || $user->isDirector())
             ? ($user->isAdmin()
                 ? \App\Models\Company::with('branches')->orderBy('name')->get()
@@ -266,8 +269,8 @@ class DocumentController extends Controller
             $selectedTemplate = DocumentTemplate::active()->with('documentType')->find($templateId);
             if ($selectedTemplate && $selectedTemplate->documentType) {
                 $userDivision = ($user->isAdmin() || $user->isDirector())
-                    ? ($request->filled('division_id') ? Division::find($request->input('division_id')) : null)
-                    : $user->division;
+                    ? ($request->filled('division_id') ? Division::find($request->input('division_id')) : $activeDivision)
+                    : $activeDivision;
                 $initialDocumentNumber = $this->documentService->previewNumber($userDivision, $selectedTemplate->documentType, $activeBranch);
             }
         }
@@ -275,7 +278,7 @@ class DocumentController extends Controller
         $unitKerjas = \App\Models\UnitKerja::with('cabang')->orderBy('kode_unit_kerja')->get();
 
         return view('documents.create', compact(
-            'divisions', 'unitKerjas', 'documentTypes', 'activeBranch', 'availableBranches', 'companies', 'selectedTemplate', 'initialDocumentNumber'
+            'divisions', 'unitKerjas', 'documentTypes', 'activeBranch', 'availableBranches', 'companies', 'selectedTemplate', 'initialDocumentNumber', 'activeDivision', 'activeDivisionId'
         ));
     }
 
@@ -295,14 +298,15 @@ class DocumentController extends Controller
         $formatChoice = $validated['format_choice'] ?? (!empty($validated['unit_kerja_id']) ? 'lama' : 'baru');
 
         $user = auth()->user();
-        $divisionId = ($user->isAdmin() || $user->isDirector())
-            ? ($validated['division_id'] ?? $user->division_id)
-            : $user->division_id;
+        $contextService = app(\App\Services\CompanyContextService::class);
+        $divisionId = $validated['division_id']
+            ?? $contextService->getActiveDivisionId($user)
+            ?? $user->division_id
+            ?? ($user->allDivisionIds()[0] ?? null);
         $division = $divisionId ? Division::find($divisionId) : null;
         $unitKerja = !empty($validated['unit_kerja_id']) ? \App\Models\UnitKerja::find($validated['unit_kerja_id']) : null;
         $documentType = DocumentType::findOrFail($validated['document_type_id']);
 
-        $contextService = app(\App\Services\CompanyContextService::class);
         $branchId = $validated['branch_id'] ?? $contextService->getActiveBranchId($user);
         $branch = $branchId ? \App\Models\Branch::with('company')->find($branchId) : null;
 
@@ -402,7 +406,7 @@ class DocumentController extends Controller
             $rules['division_id'] = 'nullable|exists:divisions,id';
             $rules['unit_kerja_id'] = $isSop ? 'required|exists:unit_kerjas,id' : 'nullable|exists:unit_kerjas,id';
         } else {
-            $rules['division_id'] = ($user->isAdmin() || $user->isDirector()) ? 'required|exists:divisions,id' : 'nullable';
+            $rules['division_id'] = 'nullable|exists:divisions,id';
             $rules['unit_kerja_id'] = 'nullable|exists:unit_kerjas,id';
         }
 
@@ -423,14 +427,23 @@ class DocumentController extends Controller
 
         $branchIds = (array) $request->input('branch_ids', []);
 
-        $validated['division_id'] = ($user->isAdmin() || $user->isDirector())
-            ? ($validated['division_id'] ?? null)
-            : $user->division_id;
+        $contextService = app(\App\Services\CompanyContextService::class);
+        $activeDivId = $contextService->getActiveDivisionId($user);
+
+        if ($user->isAdmin() || $user->isDirector()) {
+            $validated['division_id'] = $validated['division_id'] ?? $activeDivId;
+        } else {
+            $submittedDivId = $request->input('division_id');
+            if ($submittedDivId && in_array((int) $submittedDivId, $user->allDivisionIds(), true)) {
+                $validated['division_id'] = (int) $submittedDivId;
+            } else {
+                $validated['division_id'] = $activeDivId ?? $user->division_id ?? ($user->allDivisionIds()[0] ?? null);
+            }
+        }
         $validated['unit_kerja_id'] = $validated['unit_kerja_id'] ?? null;
         $validated['visibility'] = Document::VISIBILITY_DIVISION;
         $validated['expiration_date'] = $validated['expiration_date'] ?? null;
 
-        $contextService = app(\App\Services\CompanyContextService::class);
         $branchId = $validated['branch_id'] ?? (!empty($branchIds) ? $branchIds[0] : null) ?? $contextService->getActiveBranchId($user);
         if ($branchId) {
             $branch = \App\Models\Branch::find($branchId);
@@ -1006,8 +1019,11 @@ class DocumentController extends Controller
         ]);
 
         // Division scope keeps the document's original division; fall back to
-        // the current user's division if the document has none.
-        $divisionId = $document->division_id ?? auth()->user()->division_id;
+        // the current active division or user's division if the document has none.
+        $divisionId = $document->division_id
+            ?? app(\App\Services\CompanyContextService::class)->getActiveDivisionId(auth()->user())
+            ?? auth()->user()->division_id
+            ?? (auth()->user()->allDivisionIds()[0] ?? null);
 
         $document->update([
             'visibility' => $validated['visibility'],
@@ -1179,7 +1195,10 @@ class DocumentController extends Controller
         // Notify Division Heads about rename request
         $heads = collect();
         if ($document->division_id) {
-            $heads = \App\Models\User::where('division_id', $document->division_id)
+            $heads = \App\Models\User::where(function ($q) use ($document) {
+                    $q->where('division_id', $document->division_id)
+                      ->orWhereHas('divisions', fn($dq) => $dq->where('divisions.id', $document->division_id));
+                })
                 ->where('system_role', 'head')
                 ->where('id', '!=', $user->id)
                 ->where(function ($q) use ($document) {

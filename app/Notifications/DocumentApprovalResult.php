@@ -47,7 +47,7 @@ class DocumentApprovalResult extends Notification
             'type'        => 'approval_result',
             'title'       => $title,
             'message'     => $message,
-            'url'         => route('documents.show', $this->document),
+            'url'         => route('documents.show', $this->document, false),
             'icon'        => $isApproved ? 'approval' : 'rejected',
             'document_id' => $this->document->id,
             'notes'       => $this->notes,

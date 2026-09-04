@@ -87,6 +87,8 @@ class UserController extends Controller
         } elseif ($validated['system_role'] === 'direktur') {
             $validated['nip'] = null;
             $validated['division_id'] = null;
+        } else {
+            $validated['division_id'] = !empty($divisionIds) ? $divisionIds[0] : null;
         }
 
         $validated['is_active'] = $request->boolean('is_active');
@@ -155,6 +157,8 @@ class UserController extends Controller
         } elseif ($validated['system_role'] === 'direktur') {
             $validated['nip'] = null;
             $validated['division_id'] = null;
+        } else {
+            $validated['division_id'] = !empty($divisionIds) ? $divisionIds[0] : null;
         }
 
         $validated['is_active'] = $request->boolean('is_active');

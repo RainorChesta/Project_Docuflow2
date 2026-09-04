@@ -36,7 +36,7 @@ class DocumentSharedWithDivision extends Notification
                 'division' => $this->divisionName,
                 'role'     => $this->role,
             ]),
-            'url'         => route('documents.show', $this->document),
+            'url'         => route('documents.show', $this->document, false),
             'icon'        => 'document',
             'document_id' => $this->document->id,
         ];

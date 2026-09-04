@@ -121,6 +121,35 @@ class NotificationController extends Controller
     }
 
     /**
+     * Normalize notification URL to a clean relative path to avoid host mismatch issues
+     * (e.g. host.docker.internal, localhost vs LAN IP, or HTTP vs HTTPS).
+     */
+    private function normalizeNotificationUrl(?string $url): string
+    {
+        if (empty($url) || $url === '#') {
+            return '#';
+        }
+
+        if (str_starts_with($url, '/')) {
+            return $url;
+        }
+
+        $parsed = parse_url($url);
+        if (!empty($parsed['path'])) {
+            $relative = $parsed['path'];
+            if (!empty($parsed['query'])) {
+                $relative .= '?' . $parsed['query'];
+            }
+            if (!empty($parsed['fragment'])) {
+                $relative .= '#' . $parsed['fragment'];
+            }
+            return $relative;
+        }
+
+        return $url;
+    }
+
+    /**
      * Get recent notifications for the authenticated user.
      */
     public function index(Request $request): JsonResponse
@@ -133,7 +162,7 @@ class NotificationController extends Controller
             'type'     => $n->data['type'] ?? 'general',
             'title'    => $n->data['title'] ?? '',
             'message'  => $n->data['message'] ?? '',
-            'url'      => $n->data['url'] ?? '#',
+            'url'      => $this->normalizeNotificationUrl($n->data['url'] ?? '#'),
             'icon'     => $n->data['icon'] ?? 'bell',
             'read'     => !is_null($n->read_at),
             'time'     => $n->created_at->diffForHumans(),

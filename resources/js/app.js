@@ -55,6 +55,7 @@ Alpine.start();
 
     function apply(t) {
         document.documentElement.setAttribute('data-theme', t);
+        document.documentElement.classList.toggle('dark', t === 'dark');
     }
 
     function syncIcon() {
