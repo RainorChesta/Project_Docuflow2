@@ -408,10 +408,16 @@
 
                                         {{-- Format badge --}}
                                         <template x-if="item.format_choice === 'lama'">
-                                            <span class="badge badge-secondary badge-outline badge-xs">{{ __('Format Lama') }}</span>
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold tracking-wide rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 whitespace-nowrap shrink-0 leading-none" title="{{ __('Format Penomoran Lama') }}">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" aria-hidden="true"></span>
+                                                <span>{{ __('Format Lama') }}</span>
+                                            </span>
                                         </template>
                                         <template x-if="item.format_choice === 'baru'">
-                                            <span class="badge badge-primary badge-outline badge-xs">{{ __('Format Baru') }}</span>
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold tracking-wide rounded-full bg-primary/10 text-primary border border-primary/20 whitespace-nowrap shrink-0 leading-none" title="{{ __('Format Penomoran Baru') }}">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-primary shrink-0" aria-hidden="true"></span>
+                                                <span>{{ __('Format Baru') }}</span>
+                                            </span>
                                         </template>
 
                                         {{-- Type & Division --}}

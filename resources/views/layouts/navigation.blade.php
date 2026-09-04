@@ -106,7 +106,7 @@
               fixed inset-y-0 left-0 z-50 -translate-x-full 
               lg:static lg:translate-x-0 lg:my-4 lg:ml-4 lg:rounded-[28px] lg:h-[calc(100vh-2rem)]
               overflow-hidden transition-all duration-300 ease-out"
-       :class="open ? 'translate-x-0 w-[280px] max-w-[85vw]' : '-translate-x-full lg:translate-x-0 lg:w-[92px]'">
+       :class="open ? 'translate-x-0 w-[295px] max-w-[85vw]' : '-translate-x-full lg:translate-x-0 lg:w-[92px]'">
     
     <!-- Logo Header -->
     <div class="h-16 flex items-center shrink-0 overflow-hidden mt-4" :class="open ? 'px-6' : 'justify-center px-0'">
@@ -132,6 +132,16 @@
 
     <!-- Navigation List -->
     <nav class="flex-1 px-4 mt-2 space-y-1 overflow-y-auto overflow-x-hidden scrollbar-hide">
+        @php
+            $navUser = auth()->user();
+            $sharedDocsCount = $navUser ? $navUser->sharedDocumentsCount() : 0;
+            $pendingTtdCount = $navUser ? $navUser->receivedSignatureRequests()->where('status', 'pending')->count() : 0;
+            $pendingAdminTtdCount = $pendingTtdCount;
+            $pendingVersionsCount = $navUser ? $navUser->pendingVersionApprovalsCount() : 0;
+            $pendingRenamesCount = $navUser ? $navUser->pendingRenameApprovalsCount() : 0;
+            $totalApprovalCount = $pendingVersionsCount + $pendingRenamesCount;
+            $isApprovalActive = request()->routeIs('approvals.*');
+        @endphp
         
         <span class="px-2 text-[10px] font-extrabold text-base-content/40 uppercase tracking-[0.2em] whitespace-nowrap" :class="open ? 'block' : 'lg:hidden'">{{ __('Menu') }}</span>
 
@@ -192,7 +202,6 @@
            :title="open ? '' : '{{ __('Dokumen Dibagikan') }}'">
             <div class="icon-wrapper shrink-0 relative">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-                @php($sharedDocsCount = auth()->user()->sharedDocumentsCount())
                 @if($sharedDocsCount > 0)
                     <span class="absolute -top-1 -right-1 flex h-3 w-3">
                       <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
@@ -229,7 +238,6 @@
            :title="open ? '' : '{{ __('Persetujuan TTD') }}'">
             <div class="icon-wrapper shrink-0 relative">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                @php($pendingTtdCount = auth()->user()->receivedSignatureRequests()->where('status', 'pending')->count())
                 @if($pendingTtdCount > 0)
                     <span class="absolute -top-1 -right-1 flex h-3 w-3">
                       <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
@@ -247,28 +255,79 @@
         @endif
 
         @if(auth()->user()->isHead() || auth()->user()->isDirector() || auth()->user()->isAdmin())
-        <a href="{{ route('approvals.index') }}"
-           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
-                  {{ request()->routeIs('approvals.*') ? 'nav-item-new-active' : '' }}"
-           :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
-           :title="open ? '' : '{{ __('Persetujuan') }}'">
-            <div class="icon-wrapper shrink-0 relative">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                @php($pendingApprovalCount = auth()->user()->pendingApprovalsCount())
-                @if($pendingApprovalCount > 0)
-                    <span class="absolute -top-1 -right-1 flex h-3 w-3">
-                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
-                      <span class="relative inline-flex rounded-full h-3 w-3 border-2 border-base-100 bg-error"></span>
+        <div x-data="{ approvalOpen: {{ $isApprovalActive ? 'true' : 'false' }} }" class="space-y-1">
+            <button type="button"
+                    @click="open ? (approvalOpen = !approvalOpen) : (toggle(), approvalOpen = true)"
+                    class="w-full nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+                           {{ $isApprovalActive ? 'nav-item-new-active' : '' }}"
+                    :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
+                    :title="open ? '' : '{{ __('Approval') }}'">
+                <div class="icon-wrapper shrink-0 relative">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    @if($totalApprovalCount > 0)
+                        <span class="absolute -top-1 -right-1 flex h-3 w-3">
+                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
+                          <span class="relative inline-flex rounded-full h-3 w-3 border-2 border-base-100 bg-error"></span>
+                        </span>
+                    @endif
+                </div>
+                <span class="text-label min-w-0 flex-1 flex items-center justify-between gap-1.5" :class="open ? '' : 'lg:hidden'">
+                    <span class="truncate">{{ __('Approval') }}</span>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        @if($totalApprovalCount > 0)
+                            <span class="badge badge-error badge-sm font-bold text-white px-1.5 shadow-sm shadow-error/50">{{ $totalApprovalCount }}</span>
+                        @endif
+                        <svg xmlns="http://www.w3.org/2000/svg" 
+                             class="h-4 w-4 text-base-content/40 transition-transform duration-200" 
+                             :class="approvalOpen ? 'rotate-180 text-base-content/70' : ''" 
+                             fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </div>
+                </span>
+            </button>
+
+            {{-- Sub-menus for Approval --}}
+            <div x-show="approvalOpen && open"
+                 x-transition:enter="transition ease-out duration-150"
+                 x-transition:enter-start="opacity-0 -translate-y-1"
+                 x-transition:enter-end="opacity-100 translate-y-0"
+                 x-transition:leave="transition ease-in duration-100"
+                 x-transition:leave-start="opacity-100 translate-y-0"
+                 x-transition:leave-end="opacity-0 -translate-y-1"
+                 class="pl-2.5 pr-1 space-y-1 border-l-2 border-base-300/60 ml-3.5 my-1"
+                 x-cloak>
+                {{-- Sub-menu 1: Document Approval (Version) --}}
+                <a href="{{ route('approvals.versions') }}"
+                   class="flex items-center justify-between gap-1.5 px-2 py-2 rounded-xl text-[12.5px] font-medium transition-all duration-200
+                          {{ request()->routeIs('approvals.versions') || (request()->routeIs('approvals.index') && request('tab') !== 'renames') ? 'bg-primary/10 text-primary font-bold shadow-xs' : 'text-base-content/60 hover:text-base-content hover:bg-base-200/60' }}"
+                   title="{{ __('Document Approval (Version)') }}">
+                    <span class="flex items-center gap-2 min-w-0 flex-1">
+                        <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ request()->routeIs('approvals.versions') || (request()->routeIs('approvals.index') && request('tab') !== 'renames') ? 'bg-primary' : 'bg-base-content/30' }}"></span>
+                        <span class="leading-tight break-words">{{ __('Document Approval (Version)') }}</span>
                     </span>
-                @endif
+                    <span class="badge {{ $pendingVersionsCount > 0 ? 'badge-primary text-white font-bold' : 'badge-ghost text-base-content/50' }} badge-xs px-1.5 py-2 shrink-0 self-center ml-1">
+                        {{ $pendingVersionsCount }}
+                    </span>
+                </a>
+
+                {{-- Sub-menu 2: Rename Approval --}}
+                <a href="{{ route('approvals.renames') }}"
+                   class="flex items-center justify-between gap-1.5 px-2 py-2 rounded-xl text-[12.5px] font-medium transition-all duration-200
+                          {{ request()->routeIs('approvals.renames') || (request()->routeIs('approvals.index') && request('tab') === 'renames') ? 'bg-warning/15 text-warning-content font-bold shadow-xs' : 'text-base-content/60 hover:text-base-content hover:bg-base-200/60' }}"
+                   title="{{ __('Rename Approval') }}">
+                    <span class="flex items-center gap-2 min-w-0 flex-1">
+                        <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ request()->routeIs('approvals.renames') || (request()->routeIs('approvals.index') && request('tab') === 'renames') ? 'bg-amber-500' : 'bg-base-content/30' }}"></span>
+                        <span class="leading-tight break-words">{{ __('Rename Approval') }}</span>
+                    </span>
+                    <span class="badge {{ $pendingRenamesCount > 0 ? 'badge-warning font-bold text-amber-900' : 'badge-ghost text-base-content/50' }} badge-xs px-1.5 py-2 shrink-0 self-center ml-1">
+                        {{ $pendingRenamesCount }}
+                    </span>
+                </a>
             </div>
-            <span class="text-label min-w-0 flex-1 flex items-center justify-between gap-2" :class="open ? '' : 'lg:hidden'">
-                <span class="truncate">{{ __('Persetujuan') }}</span>
-                @if($pendingApprovalCount > 0)
-                    <span class="badge badge-error badge-sm font-bold text-white px-1.5 shrink-0 shadow-sm shadow-error/50">{{ $pendingApprovalCount }}</span>
-                @endif
-            </span>
-        </a>
+        </div>
         @endif
 
         @if(auth()->user()->isAdmin())
@@ -343,7 +402,6 @@
            :title="open ? '' : '{{ __('Tanda Tangan') }}'">
             <div class="icon-wrapper shrink-0 relative">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                @php($pendingAdminTtdCount = auth()->user()->receivedSignatureRequests()->where('status', 'pending')->count())
                 @if($pendingAdminTtdCount > 0)
                     <span class="absolute -top-1 -right-1 flex h-3 w-3">
                       <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
@@ -491,3 +549,4 @@
         </div>
     </div>
 </aside>
+

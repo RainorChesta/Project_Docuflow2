@@ -226,7 +226,12 @@
                                     $crumbs[] = ['label' => __('Detail'), 'url' => null];
                                 }
                             } elseif (str_starts_with($name, 'approvals.')) {
-                                $crumbs[] = ['label' => __('Persetujuan'), 'url' => null];
+                                $crumbs[] = ['label' => __('Approval'), 'url' => route('approvals.versions')];
+                                if ($name === 'approvals.versions') {
+                                    $crumbs[] = ['label' => __('Document Approval (Version)'), 'url' => null];
+                                } elseif ($name === 'approvals.renames') {
+                                    $crumbs[] = ['label' => __('Rename Approval'), 'url' => null];
+                                }
                             } elseif (str_starts_with($name, 'profile.')) {
                                 $crumbs[] = ['label' => __('Profil'), 'url' => null];
                             } elseif (str_starts_with($name, 'signatures.requests.')) {
@@ -251,4 +256,4 @@
         @stack('scripts')
     </body>
 </html>
-</html>
+

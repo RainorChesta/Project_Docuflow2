@@ -162,9 +162,9 @@ class User extends Authenticatable
     }
 
     /**
-     * Hitung total approval yang menunggu tindakan pengguna (Head / Direktur / Admin).
+     * Hitung total persetujuan versi dokumen yang menunggu tindakan pengguna.
      */
-    public function pendingApprovalsCount(): int
+    public function pendingVersionApprovalsCount(): int
     {
         if (!$this->isHead() && !$this->isDirector() && !$this->isAdmin()) {
             return 0;
@@ -182,24 +182,15 @@ class User extends Authenticatable
                 ->whereNull('discarded_at')
                 ->whereHas('document', $roleFilter);
 
-            $rollbacksQuery = Document::whereNotNull('pending_rollback_version_id')
-                ->where($roleFilter);
-
-            $renamesQuery = Document::whereNotNull('pending_title')
-                ->where('pending_title', '!=', '')
-                ->where($roleFilter);
-
             if (!$this->isAdmin() && !empty($companyIds)) {
                 $companyFilter = function ($q) use ($companyIds) {
                     $q->whereIn('company_id', $companyIds)
                       ->orWhereHas('branch', fn($bq) => $bq->whereIn('company_id', $companyIds));
                 };
                 $versionsQuery->whereHas('document', $companyFilter);
-                $rollbacksQuery->where($companyFilter);
-                $renamesQuery->where($companyFilter);
             }
 
-            return $versionsQuery->count() + $rollbacksQuery->count() + $renamesQuery->count();
+            return $versionsQuery->count();
         }
 
         $divisionIds = $this->allDivisionIds();
@@ -212,25 +203,116 @@ class User extends Authenticatable
               ->orWhereNull('approver_role');
         };
 
-        $versionsCount = DocumentVersion::where('status', 'pending')
+        return DocumentVersion::where('status', 'pending')
             ->whereNull('discarded_at')
             ->whereHas('document', fn($q) => $q->whereIn('division_id', $divisionIds)->visibleTo($this)->where($roleFilter))
             ->count();
+    }
 
-        $rollbacksCount = Document::whereIn('division_id', $divisionIds)
-            ->visibleTo($this)
-            ->whereNotNull('pending_rollback_version_id')
-            ->where($roleFilter)
-            ->count();
+    /**
+     * Hitung total persetujuan perubahan nama/judul dokumen yang menunggu tindakan pengguna.
+     */
+    public function pendingRenameApprovalsCount(): int
+    {
+        if (!$this->isHead() && !$this->isDirector() && !$this->isAdmin()) {
+            return 0;
+        }
 
-        $renamesCount = Document::whereIn('division_id', $divisionIds)
+        if ($this->isAdmin() || $this->isDirector()) {
+            $companyIds = $this->companies()->pluck('companies.id')->all();
+
+            $roleFilter = function ($q) {
+                $q->where('approver_role', $this->system_role)
+                  ->orWhereNull('approver_role');
+            };
+
+            $renamesQuery = Document::whereNotNull('pending_title')
+                ->where('pending_title', '!=', '')
+                ->where($roleFilter);
+
+            if (!$this->isAdmin() && !empty($companyIds)) {
+                $companyFilter = function ($q) use ($companyIds) {
+                    $q->whereIn('company_id', $companyIds)
+                      ->orWhereHas('branch', fn($bq) => $bq->whereIn('company_id', $companyIds));
+                };
+                $renamesQuery->where($companyFilter);
+            }
+
+            return $renamesQuery->count();
+        }
+
+        $divisionIds = $this->allDivisionIds();
+        if (empty($divisionIds)) {
+            return 0;
+        }
+
+        $roleFilter = function ($q) {
+            $q->where('approver_role', 'head')
+              ->orWhereNull('approver_role');
+        };
+
+        return Document::whereIn('division_id', $divisionIds)
             ->visibleTo($this)
             ->whereNotNull('pending_title')
             ->where('pending_title', '!=', '')
             ->where($roleFilter)
             ->count();
+    }
 
-        return $versionsCount + $rollbacksCount + $renamesCount;
+    /**
+     * Hitung total persetujuan rollback dokumen yang menunggu tindakan pengguna.
+     */
+    public function pendingRollbackApprovalsCount(): int
+    {
+        if (!$this->isHead() && !$this->isDirector() && !$this->isAdmin()) {
+            return 0;
+        }
+
+        if ($this->isAdmin() || $this->isDirector()) {
+            $companyIds = $this->companies()->pluck('companies.id')->all();
+
+            $roleFilter = function ($q) {
+                $q->where('approver_role', $this->system_role)
+                  ->orWhereNull('approver_role');
+            };
+
+            $rollbacksQuery = Document::whereNotNull('pending_rollback_version_id')
+                ->where($roleFilter);
+
+            if (!$this->isAdmin() && !empty($companyIds)) {
+                $companyFilter = function ($q) use ($companyIds) {
+                    $q->whereIn('company_id', $companyIds)
+                      ->orWhereHas('branch', fn($bq) => $bq->whereIn('company_id', $companyIds));
+                };
+                $rollbacksQuery->where($companyFilter);
+            }
+
+            return $rollbacksQuery->count();
+        }
+
+        $divisionIds = $this->allDivisionIds();
+        if (empty($divisionIds)) {
+            return 0;
+        }
+
+        $roleFilter = function ($q) {
+            $q->where('approver_role', 'head')
+              ->orWhereNull('approver_role');
+        };
+
+        return Document::whereIn('division_id', $divisionIds)
+            ->visibleTo($this)
+            ->whereNotNull('pending_rollback_version_id')
+            ->where($roleFilter)
+            ->count();
+    }
+
+    /**
+     * Hitung total approval yang menunggu tindakan pengguna (Head / Direktur / Admin).
+     */
+    public function pendingApprovalsCount(): int
+    {
+        return $this->pendingVersionApprovalsCount() + $this->pendingRenameApprovalsCount() + $this->pendingRollbackApprovalsCount();
     }
 
     /**

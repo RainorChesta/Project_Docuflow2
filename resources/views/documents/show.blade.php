@@ -534,13 +534,9 @@
                             @endif
                         </div>
                         @if($document->document_number)
-                            <div class="shrink-0 self-start sm:self-center flex items-center gap-1.5 flex-wrap">
-                                <span class="badge badge-outline badge-sm font-mono">{{ $document->document_number }}</span>
-                                @if($document->format_choice === 'lama')
-                                    <span class="badge badge-secondary badge-outline badge-sm">{{ __('Format Lama') }}</span>
-                                @else
-                                    <span class="badge badge-primary badge-outline badge-sm">{{ __('Format Baru') }}</span>
-                                @endif
+                            <div class="shrink-0 self-start sm:self-center flex items-center gap-2 flex-wrap">
+                                <span class="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-base-200/80 text-base-content/80 border border-base-300">{{ $document->document_number }}</span>
+                                <x-document-format-badge :format="$document->format_choice" size="sm" />
                             </div>
                         @endif
                     </div>

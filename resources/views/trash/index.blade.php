@@ -130,15 +130,11 @@
                                     </td>
                                     <td>
                                         <div class="font-bold text-base-content">{{ $doc->title }}</div>
-                                        <div class="flex items-center gap-2 mt-0.5">
-                                            <span class="text-xs font-mono text-base-content/60">{{ $doc->document_number }}</span>
-                                            @if($doc->format_choice === 'lama')
-                                                <span class="badge badge-secondary badge-outline badge-xs">{{ __('Format Lama') }}</span>
-                                            @else
-                                                <span class="badge badge-primary badge-outline badge-xs">{{ __('Format Baru') }}</span>
-                                            @endif
+                                        <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                                            <span class="font-mono text-xs font-medium text-base-content/70 bg-base-200/60 px-1.5 py-0.5 rounded border border-base-300/40 shrink-0">{{ $doc->document_number }}</span>
+                                            <x-document-format-badge :format="$doc->format_choice" />
                                             @if($doc->documentType)
-                                                <span class="badge badge-xs badge-outline max-w-[150px] inline-flex items-center" title="{{ $doc->documentType->name }}">
+                                                <span class="badge badge-ghost badge-xs max-w-[160px] inline-flex items-center text-base-content/70 border border-base-300/40 shrink-0" title="{{ $doc->documentType->name }}">
                                                     <span class="truncate">{{ $doc->documentType->name }}</span>
                                                 </span>
                                             @endif

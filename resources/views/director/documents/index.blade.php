@@ -563,12 +563,8 @@
                                                     </td>
                                                     <td class="font-mono text-base-content/60">
                                                         <div class="flex items-center gap-1.5 flex-wrap">
-                                                            <span>{{ $doc->document_number }}</span>
-                                                            @if($doc->format_choice === 'lama')
-                                                                <span class="badge badge-secondary badge-outline badge-xs">{{ __('Format Lama') }}</span>
-                                                            @else
-                                                                <span class="badge badge-primary badge-outline badge-xs">{{ __('Format Baru') }}</span>
-                                                            @endif
+                                                            <span class="font-medium text-base-content/80">{{ $doc->document_number }}</span>
+                                                            <x-document-format-badge :format="$doc->format_choice" />
                                                         </div>
                                                     </td>
                                                     <td>

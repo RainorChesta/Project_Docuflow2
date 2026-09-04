@@ -90,6 +90,8 @@ Route::middleware('auth')->group(function () {
 
     // Approvals
     Route::get('/approvals', [ApprovalController::class, 'index'])->name('approvals.index');
+    Route::get('/approvals/versions', [ApprovalController::class, 'versions'])->name('approvals.versions');
+    Route::get('/approvals/renames', [ApprovalController::class, 'renames'])->name('approvals.renames');
     Route::post('/approvals/bulk-approve-versions', [ApprovalController::class, 'bulkApproveVersions'])->name('approvals.bulk-approve-versions');
     Route::post('/approvals/bulk-reject-versions', [ApprovalController::class, 'bulkRejectVersions'])->name('approvals.bulk-reject-versions');
     Route::post('/documents/{document}/versions/{version}/approve', [ApprovalController::class, 'approve'])->name('approvals.approve');

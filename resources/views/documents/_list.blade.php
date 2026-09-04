@@ -11,16 +11,6 @@
             @if($doc->hasPendingRename())
                 <span class="badge badge-warning badge-outline badge-xs shrink-0" title="{{ __('Menunggu Persetujuan Ubah Nama') }}">{{ __('Ubah Nama') }}</span>
             @endif
-            @if($doc->format_choice === 'lama')
-                <span class="badge badge-secondary badge-outline badge-xs shrink-0" title="{{ __('Format Penomoran Lama') }}">{{ __('Format Lama') }}</span>
-            @else
-                <span class="badge badge-primary badge-outline badge-xs shrink-0" title="{{ __('Format Penomoran Baru') }}">{{ __('Format Baru') }}</span>
-            @endif
-            @if($doc->documentType)
-                <span class="badge badge-outline badge-sm shrink-0 max-w-[160px] inline-flex items-center" title="{{ $doc->documentType->name ?? $doc->documentType->code }}">
-                    <span class="truncate">{{ $doc->documentType->code }}</span>
-                </span>
-            @endif
             @if(isset($type) && $type === 'shared')
                 @php $shareRole = $doc->shares->first()?->role; @endphp
                 @if($shareRole)
@@ -28,17 +18,23 @@
                 @endif
             @endif
         </div>
-        <p class="text-sm text-base-content/60 break-words mt-0.5">
-            {{ $doc->document_number }}
+        <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 text-sm text-base-content/60 mt-1">
+            <span class="font-mono text-xs font-medium text-base-content/80 bg-base-200/60 px-1.5 py-0.5 rounded border border-base-300/40 shrink-0">{{ $doc->document_number }}</span>
+            <x-document-format-badge :format="$doc->format_choice" />
+            @if($doc->documentType)
+                <span class="badge badge-ghost badge-xs shrink-0 max-w-[160px] inline-flex items-center text-base-content/70 border border-base-300/40" title="{{ $doc->documentType->name ?? $doc->documentType->code }}">
+                    <span class="truncate">{{ $doc->documentType->code }}</span>
+                </span>
+            @endif
             @if($doc->branch)
-                <span class="font-medium text-base-content/80">· {{ $doc->branch->name }}</span>
+                <span class="font-medium text-base-content/80 text-xs">· {{ $doc->branch->name }}</span>
             @endif
-            @if($doc->isGeneral()) <span class="text-success">· {{ __('Umum') }}</span>
-            @elseif($doc->isPersonal()) <span class="text-info">· {{ __('Personal') }}</span>
-            @else <span>· {{ $doc->division?->code ?? '—' }}</span>
+            @if($doc->isGeneral()) <span class="text-success text-xs">· {{ __('Umum') }}</span>
+            @elseif($doc->isPersonal()) <span class="text-info text-xs">· {{ __('Personal') }}</span>
+            @else <span class="text-xs">· {{ $doc->division?->code ?? '—' }}</span>
             @endif
-            · {{ $doc->owner->name }}
-        </p>
+            <span class="text-xs">· {{ $doc->owner->name }}</span>
+        </div>
     </div>
     <div class="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">
         @php

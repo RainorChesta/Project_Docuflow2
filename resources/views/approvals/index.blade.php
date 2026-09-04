@@ -82,9 +82,9 @@
                 </div>
 
                 {{-- Search Box & Per-Page Controls --}}
-                <form method="GET" action="{{ route('approvals.index') }}" class="flex items-center gap-2">
+                <form method="GET" action="{{ route('approvals.index') }}" class="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full lg:w-auto justify-end">
                     <input type="hidden" name="tab" value="{{ $tab ?? 'all' }}">
-                    <div class="relative flex-1 sm:w-64">
+                    <div class="relative w-full sm:w-80 md:w-96 min-w-[220px]">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-base-content/40">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -94,27 +94,32 @@
                                name="search" 
                                value="{{ $search ?? '' }}" 
                                placeholder="{{ __('Cari judul, nomor dokumen, pemohon...') }}" 
-                               class="input input-sm input-bordered w-full pl-9 pr-8 text-xs rounded-lg bg-base-200/50 focus:bg-base-100" />
+                               class="input input-sm input-bordered w-full pl-9 pr-8 text-sm rounded-xl bg-base-200/50 focus:bg-base-100 transition-colors" />
                         @if(!empty($search))
-                            <a href="{{ route('approvals.index', ['tab' => $tab ?? 'all']) }}" class="absolute inset-y-0 right-0 pr-2.5 flex items-center text-base-content/40 hover:text-base-content">
-                                ✕
+                            <a href="{{ route('approvals.index', ['tab' => $tab ?? 'all']) }}" class="absolute inset-y-0 right-0 pr-2.5 flex items-center text-base-content/40 hover:text-base-content transition-colors" title="{{ __('Hapus pencarian') }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
                             </a>
                         @endif
                     </div>
 
-                    <select name="per_page" onchange="this.form.submit()" class="select select-sm select-bordered text-xs rounded-lg bg-base-200/50">
-                        <option value="10" {{ ($perPage ?? 15) == 10 ? 'selected' : '' }}>10 / hal</option>
-                        <option value="15" {{ ($perPage ?? 15) == 15 ? 'selected' : '' }}>15 / hal</option>
-                        <option value="25" {{ ($perPage ?? 15) == 25 ? 'selected' : '' }}>25 / hal</option>
-                        <option value="50" {{ ($perPage ?? 15) == 50 ? 'selected' : '' }}>50 / hal</option>
-                        <option value="100" {{ ($perPage ?? 15) == 100 ? 'selected' : '' }}>100 / hal</option>
-                    </select>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <select name="per_page" onchange="this.form.submit()" class="select select-sm select-bordered text-xs rounded-xl bg-base-200/50 shrink-0 w-auto font-medium">
+                            <option value="10" {{ ($perPage ?? 15) == 10 ? 'selected' : '' }}>10 / hal</option>
+                            <option value="15" {{ ($perPage ?? 15) == 15 ? 'selected' : '' }}>15 / hal</option>
+                            <option value="25" {{ ($perPage ?? 15) == 25 ? 'selected' : '' }}>25 / hal</option>
+                            <option value="50" {{ ($perPage ?? 15) == 50 ? 'selected' : '' }}>50 / hal</option>
+                            <option value="100" {{ ($perPage ?? 15) == 100 ? 'selected' : '' }}>100 / hal</option>
+                        </select>
 
-                    <button type="submit" class="btn btn-sm btn-ghost btn-square">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                        </svg>
-                    </button>
+                        <button type="submit" class="btn btn-sm btn-primary rounded-xl text-xs font-semibold px-4 shrink-0 shadow-xs flex items-center gap-1.5">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            {{ __('Cari') }}
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>
