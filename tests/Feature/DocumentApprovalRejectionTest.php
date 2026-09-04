@@ -247,4 +247,77 @@ class DocumentApprovalRejectionTest extends TestCase
         $this->assertSame('rejected', $v3->fresh()->status);
         $this->assertSame('rejected', $v4->fresh()->status);
     }
+
+    public function test_reviewer_can_view_rollback_approvals_page_and_approve(): void
+    {
+        Notification::fake();
+
+        $company = Company::create(['name' => 'PT Test', 'code' => 'TEST']);
+        $branch = Branch::create(['company_id' => $company->id, 'name' => 'Pusat', 'is_pusat' => true]);
+        $division = Division::create(['name' => 'Finance', 'code' => 'FIN']);
+
+        $reviewer = User::factory()->create([
+            'division_id' => $division->id,
+            'name' => 'Reviewer Kadiv',
+            'system_role' => 'head',
+        ]);
+        $reviewer->companies()->attach($company->id);
+        $reviewer->branches()->attach($branch->id);
+
+        $author = User::factory()->create(['division_id' => $division->id, 'name' => 'Staff Finance']);
+        $author->companies()->attach($company->id);
+        $author->branches()->attach($branch->id);
+
+        $docType = DocumentType::create(['name' => 'Standard SOP', 'code' => 'SOP']);
+        $document = Document::create([
+            'document_number' => '001/FIN/SOP/2026',
+            'title' => 'Financial SOP Document',
+            'document_type_id' => $docType->id,
+            'owner_id' => $author->id,
+            'division_id' => $division->id,
+            'company_id' => $company->id,
+            'branch_id' => $branch->id,
+            'visibility' => 'general',
+        ]);
+
+        $v1 = DocumentVersion::create([
+            'document_id' => $document->id,
+            'version_number' => 1,
+            'author_id' => $author->id,
+            'author_name' => $author->name,
+            'status' => 'active',
+            'content' => '<p>Version 1 Content</p>',
+        ]);
+
+        $v2 = DocumentVersion::create([
+            'document_id' => $document->id,
+            'version_number' => 2,
+            'author_id' => $author->id,
+            'author_name' => $author->name,
+            'status' => 'active',
+            'content' => '<p>Version 2 Content</p>',
+        ]);
+
+        $document->update([
+            'current_version_id' => $v2->id,
+            'pending_rollback_version_id' => $v1->id,
+            'rollback_requested_by_id' => $author->id,
+            'rollback_requested_at' => now(),
+        ]);
+
+        // 1. Visit approvals.rollbacks page
+        $response = $this->actingAs($reviewer)->get(route('approvals.rollbacks'));
+        $response->assertStatus(200);
+        $response->assertSee('Rollback Approval');
+        $response->assertSee('Financial SOP Document');
+        $response->assertSee('Staff Finance');
+
+        // 2. Approve the rollback request
+        $approveResponse = $this->actingAs($reviewer)->post(route('approvals.rollback-request.approve', $document));
+        $approveResponse->assertSessionHas('success');
+
+        $document->refresh();
+        $this->assertNull($document->pending_rollback_version_id);
+        $this->assertSame($v1->id, $document->current_version_id);
+    }
 }
