@@ -231,6 +231,8 @@
                                     $crumbs[] = ['label' => __('Document Approval (Version)'), 'url' => null];
                                 } elseif ($name === 'approvals.renames') {
                                     $crumbs[] = ['label' => __('Rename Approval'), 'url' => null];
+                                } elseif ($name === 'approvals.rollbacks') {
+                                    $crumbs[] = ['label' => __('Rollback Approval'), 'url' => null];
                                 }
                             } elseif (str_starts_with($name, 'profile.')) {
                                 $crumbs[] = ['label' => __('Profil'), 'url' => null];

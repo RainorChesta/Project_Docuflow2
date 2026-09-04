@@ -31,48 +31,48 @@
         <div class="max-w-7xl mx-auto w-full">
             {{-- Pending Alert if exists --}}
             @if($pending)
-                <div class="mb-4 px-4 py-3 bg-warning/10 border border-warning/20 rounded-xl text-xs text-warning-content flex items-center justify-between shadow-xs">
+                <div class="mb-4 px-4 py-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-500/30 rounded-xl text-xs text-amber-900 dark:text-amber-200 flex items-center justify-between shadow-xs">
                     <span>{{ __('Terdapat versi pending (v:version) yang menunggu review. Setiap perubahan yang Anda simpan akan memperbarui versi pending ini.', ['version' => $pending->version_number]) }}</span>
                 </div>
             @endif
 
             {{-- Signature Approval Banner (server-side rendered on page load) --}}
             @if(!empty($pendingApprovalBanner))
-                <div id="signature-banner-alert" class="mb-4 px-4 py-3 bg-success/20 border border-success/30 rounded-xl text-xs text-success-content flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 z-10 shadow-xs transition-all duration-300">
-                    <div class="flex items-center gap-2.5">
-                        <div class="h-6 w-6 rounded-full bg-success/30 flex flex-shrink-0 items-center justify-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div id="signature-banner-alert" class="mb-4 px-4 py-3 bg-emerald-50/90 dark:bg-emerald-950/50 border border-emerald-500/30 rounded-xl text-xs text-emerald-950 dark:text-emerald-100 flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 z-10 shadow-xs transition-all duration-300">
+                    <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div class="h-6 w-6 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex flex-shrink-0 items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </div>
-                        <span id="signature-banner-message" class="font-bold uppercase tracking-wide leading-tight">
+                        <span id="signature-banner-message" class="font-bold uppercase tracking-wide leading-tight text-emerald-950 dark:text-emerald-100 break-words">
                             TANDA TANGAN DARI {{ strtoupper(implode(', ', $pendingApprovalBanner)) }} TELAH DISETUJUI. SILAKAN KLIK "GANTI TTD" UNTUK MENGGANTI PLACEHOLDER DENGAN TANDA TANGAN RESMI.
                         </span>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <button type="button" onclick="document.getElementById('signature-banner-alert').classList.add('hidden')" class="btn btn-ghost btn-xs">
+                    <div class="flex items-center gap-2 shrink-0">
+                        <button type="button" onclick="document.getElementById('signature-banner-alert').classList.add('hidden')" class="btn btn-ghost btn-xs text-emerald-900/70 hover:text-emerald-950 dark:text-emerald-200/70 dark:hover:text-emerald-100">
                             {{ __('TUTUP') }}
                         </button>
-                        <button type="button" onclick="openSignatureSelectorModal()" class="btn btn-success btn-xs text-white uppercase font-bold">
+                        <button type="button" onclick="openSignatureSelectorModal()" class="btn btn-success btn-xs text-white uppercase font-bold shadow-xs">
                             {{ __('GANTI TTD') }}
                         </button>
                     </div>
                 </div>
             @else
-                <div id="signature-banner-alert" class="hidden mb-4 px-4 py-3 bg-success/20 border border-success/30 rounded-xl text-xs text-success-content flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 z-10 shadow-xs transition-all duration-300">
-                    <div class="flex items-center gap-2.5">
-                        <div class="h-6 w-6 rounded-full bg-success/30 flex flex-shrink-0 items-center justify-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div id="signature-banner-alert" class="hidden mb-4 px-4 py-3 bg-emerald-50/90 dark:bg-emerald-950/50 border border-emerald-500/30 rounded-xl text-xs text-emerald-950 dark:text-emerald-100 flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 z-10 shadow-xs transition-all duration-300">
+                    <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div class="h-6 w-6 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex flex-shrink-0 items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </div>
-                        <span id="signature-banner-message" class="font-bold uppercase tracking-wide leading-tight"></span>
+                        <span id="signature-banner-message" class="font-bold uppercase tracking-wide leading-tight text-emerald-950 dark:text-emerald-100 break-words"></span>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <button type="button" onclick="document.getElementById('signature-banner-alert').classList.add('hidden')" class="btn btn-ghost btn-xs">
+                    <div class="flex items-center gap-2 shrink-0">
+                        <button type="button" onclick="document.getElementById('signature-banner-alert').classList.add('hidden')" class="btn btn-ghost btn-xs text-emerald-900/70 hover:text-emerald-950 dark:text-emerald-200/70 dark:hover:text-emerald-100">
                             {{ __('TUTUP') }}
                         </button>
-                        <button type="button" onclick="openSignatureSelectorModal()" class="btn btn-success btn-xs text-white uppercase font-bold">
+                        <button type="button" onclick="openSignatureSelectorModal()" class="btn btn-success btn-xs text-white uppercase font-bold shadow-xs">
                             {{ __('GANTI TTD') }}
                         </button>
                     </div>

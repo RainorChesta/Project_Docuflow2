@@ -25,6 +25,9 @@ class ApprovalController extends Controller
         if ($tab === 'renames') {
             return $this->renames($request);
         }
+        if ($tab === 'rollbacks') {
+            return $this->rollbacks($request);
+        }
 
         return $this->versions($request);
     }
@@ -47,8 +50,9 @@ class ApprovalController extends Controller
         $counts = [
             'versions' => (clone $versionsQuery)->count(),
             'renames' => $this->getPendingRenamesQuery($user)->count(),
+            'rollbacks' => $this->getPendingRollbacksQuery($user)->count(),
         ];
-        $counts['total'] = $counts['versions'] + $counts['renames'];
+        $counts['total'] = $counts['versions'] + $counts['renames'] + $counts['rollbacks'];
 
         $pendingVersions = $versionsQuery
             ->with(['document.branch', 'document.company', 'document.division', 'author'])
@@ -82,8 +86,9 @@ class ApprovalController extends Controller
         $counts = [
             'versions' => $this->getPendingVersionsQuery($user)->count(),
             'renames' => (clone $renamesQuery)->count(),
+            'rollbacks' => $this->getPendingRollbacksQuery($user)->count(),
         ];
-        $counts['total'] = $counts['versions'] + $counts['renames'];
+        $counts['total'] = $counts['versions'] + $counts['renames'] + $counts['rollbacks'];
 
         $pendingRenames = $renamesQuery
             ->with(['renameRequestedBy', 'division', 'branch', 'company'])
@@ -94,6 +99,43 @@ class ApprovalController extends Controller
 
         return view('approvals.renames', compact(
             'pendingRenames',
+            'counts',
+            'search',
+            'perPage'
+        ));
+    }
+
+    public function rollbacks(Request $request): \Illuminate\View\View|\Illuminate\Http\RedirectResponse
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return redirect()->route('login');
+        }
+
+        $search = trim((string) $request->query('search', ''));
+        $perPage = (int) $request->query('per_page', 15);
+        if (!in_array($perPage, [10, 15, 25, 50, 100], true)) {
+            $perPage = 15;
+        }
+
+        $rollbacksQuery = $this->getPendingRollbacksQuery($user, $search);
+
+        $counts = [
+            'versions' => $this->getPendingVersionsQuery($user)->count(),
+            'renames' => $this->getPendingRenamesQuery($user)->count(),
+            'rollbacks' => (clone $rollbacksQuery)->count(),
+        ];
+        $counts['total'] = $counts['versions'] + $counts['renames'] + $counts['rollbacks'];
+
+        $pendingRollbacks = $rollbacksQuery
+            ->with(['rollbackRequestedBy', 'pendingRollbackVersion', 'division', 'branch', 'company', 'currentVersion'])
+            ->latest('rollback_requested_at')
+            ->latest('id')
+            ->paginate($perPage, ['*'], 'rollback_page')
+            ->withQueryString();
+
+        return view('approvals.rollbacks', compact(
+            'pendingRollbacks',
             'counts',
             'search',
             'perPage'
@@ -218,6 +260,62 @@ class ApprovalController extends Controller
         }
 
         return $pendingRenamesQuery;
+    }
+
+    protected function getPendingRollbacksQuery($user, string $search = '')
+    {
+        $roleFilter = function ($q) use ($user) {
+            if ($user->isAdmin() || $user->isDirector()) {
+                $q->where('approver_role', $user->system_role)
+                  ->orWhereNull('approver_role');
+            } else {
+                $q->where('approver_role', 'head')
+                  ->orWhereNull('approver_role');
+            }
+        };
+
+        if ($user->isAdmin() || $user->isDirector()) {
+            $companyIds = $user->companies()->pluck('companies.id')->all();
+
+            $pendingRollbacksQuery = Document::whereNotNull('pending_rollback_version_id')
+                ->where($roleFilter);
+
+            if (!$user->isAdmin() && !empty($companyIds)) {
+                $companyFilter = function ($q) use ($companyIds) {
+                    $q->whereIn('company_id', $companyIds)
+                      ->orWhereHas('branch', fn($bq) => $bq->whereIn('company_id', $companyIds));
+                };
+                $pendingRollbacksQuery->where($companyFilter);
+            }
+        } else {
+            $divisionIds = $user->allDivisionIds();
+
+            $pendingRollbacksQuery = Document::whereIn('division_id', $divisionIds)
+                ->visibleTo($user)
+                ->whereNotNull('pending_rollback_version_id')
+                ->where($roleFilter);
+        }
+
+        if ($search !== '') {
+            $pendingRollbacksQuery->where(function ($rq) use ($search) {
+                $rq->where('title', 'like', "%{$search}%")
+                   ->orWhere('document_number', 'like', "%{$search}%")
+                   ->orWhereHas('rollbackRequestedBy', function ($uq) use ($search) {
+                       $uq->where('name', 'like', "%{$search}%")
+                          ->orWhere('email', 'like', "%{$search}%");
+                   })
+                   ->orWhereHas('pendingRollbackVersion', function ($vq) use ($search) {
+                       $trimmedVersion = ltrim(strtolower($search), 'v. ');
+                       if (is_numeric($trimmedVersion)) {
+                           $vq->where('version_number', (int) $trimmedVersion);
+                       }
+                   })
+                   ->orWhereHas('division', fn($divQ) => $divQ->where('name', 'like', "%{$search}%"))
+                   ->orWhereHas('branch', fn($brQ) => $brQ->where('name', 'like', "%{$search}%"));
+            });
+        }
+
+        return $pendingRollbacksQuery;
     }
 
     /**

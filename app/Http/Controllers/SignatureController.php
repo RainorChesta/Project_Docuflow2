@@ -171,6 +171,24 @@ class SignatureController extends Controller
         $type = $request->input('type', 'original');
         $companyId = $request->input('company_id');
 
+        if ($user->hasSignature()) {
+            if ($request->filled('signature_data')) {
+                $msg = 'Canvas tanda tangan tidak dapat digunakan lagi karena tanda tangan sudah tersimpan. Silakan hapus tanda tangan yang tersimpan terlebih dahulu jika ingin menggambar ulang.';
+                if ($request->wantsJson()) {
+                    return response()->json(['success' => false, 'message' => $msg], 422);
+                }
+                return back()->with('error', $msg);
+            }
+
+            if ($type === 'original') {
+                $msg = 'Tanda tangan original sudah ada. Silakan hapus tanda tangan original yang tersimpan terlebih dahulu jika ingin menggantinya.';
+                if ($request->wantsJson()) {
+                    return response()->json(['success' => false, 'message' => $msg], 422);
+                }
+                return back()->with('error', $msg);
+            }
+        }
+
         if ($type === 'company_stamp') {
             if (!$user->hasSignature()) {
                 if ($request->wantsJson()) return response()->json(['success' => false, 'message' => 'HARUS MEMBUAT TANDA TANGAN ORIGINAL TERLEBIH DAHULU.'], 422);
@@ -180,7 +198,16 @@ class SignatureController extends Controller
                 if ($request->wantsJson()) return response()->json(['success' => false, 'message' => 'TANDA TANGAN PERUSAHAAN HARUS BERUPA UNGGAHAN GAMBAR.'], 422);
                 return back()->with('error', 'TANDA TANGAN PERUSAHAAN HARUS BERUPA UNGGAHAN GAMBAR.');
             }
-            if (!$companyId || !$user->companies->contains('id', $companyId)) {
+
+            $contextService = app(CompanyContextService::class);
+            if (!$companyId) {
+                $companyId = $contextService->getActiveCompanyId($user);
+            }
+
+            $availableCompanyIds = $contextService->getAvailableCompanies($user)->pluck('id')->all();
+            $userCompanyIds = array_unique(array_merge($availableCompanyIds, $user->allCompanyIds()));
+
+            if (!$companyId || (!$user->isAdmin() && !in_array((int)$companyId, array_map('intval', $userCompanyIds)))) {
                 if ($request->wantsJson()) return response()->json(['success' => false, 'message' => 'PERUSAHAAN TIDAK VALID ATAU ANDA TIDAK MEMILIKI AKSES.'], 422);
                 return back()->with('error', 'PERUSAHAAN TIDAK VALID ATAU ANDA TIDAK MEMILIKI AKSES.');
             }
@@ -223,7 +250,7 @@ class SignatureController extends Controller
         $filename = 'signatures/sig_' . $user->id . '_' . time() . '_' . uniqid() . '.png';
 
         if ($type === 'original') {
-            $existing = $user->signature;
+            $existing = $user->signatures()->where('type', 'original')->first();
             if ($existing && Storage::disk('public')->exists($existing->file_path)) {
                 Storage::disk('public')->delete($existing->file_path);
             }
@@ -232,13 +259,14 @@ class SignatureController extends Controller
                 ['file_path' => $filename, 'created_via' => $createdVia, 'company_id' => null]
             );
         } else {
-            $signature = Signature::create([
-                'user_id' => $user->id,
-                'file_path' => $filename,
-                'type' => 'company_stamp',
-                'company_id' => $companyId,
-                'created_via' => $createdVia,
-            ]);
+            $existing = $user->signatures()->where('type', 'company_stamp')->where('company_id', $companyId)->first();
+            if ($existing && Storage::disk('public')->exists($existing->file_path)) {
+                Storage::disk('public')->delete($existing->file_path);
+            }
+            $signature = Signature::updateOrCreate(
+                ['user_id' => $user->id, 'type' => 'company_stamp', 'company_id' => $companyId],
+                ['file_path' => $filename, 'created_via' => $createdVia]
+            );
         }
         
         Storage::disk('public')->put($filename, $imageData);
@@ -294,8 +322,8 @@ class SignatureController extends Controller
     {
         $user = Auth::user();
 
-        if (!$signature) {
-            $signature = $user->signature;
+        if (!$signature || !$signature->exists) {
+            $signature = $user->signatures()->where('type', 'original')->first();
         }
 
         if ($signature && $signature->user_id === $user->id) {

@@ -7,10 +7,8 @@
 
     <div class="py-6">
         <div class="max-w-7xl mx-auto w-full space-y-6">
-            <div id="signature-section" class="card bg-base-100 border border-base-300 shadow-sm">
-                <div class="card-body">
-                    @include('profile.partials.signature-pad-form')
-                </div>
+            <div id="signature-section">
+                @include('profile.partials.signature-pad-form')
             </div>
 
             <div class="card bg-base-100 border border-base-300 shadow-sm">

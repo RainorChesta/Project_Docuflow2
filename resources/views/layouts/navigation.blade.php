@@ -139,7 +139,8 @@
             $pendingAdminTtdCount = $pendingTtdCount;
             $pendingVersionsCount = $navUser ? $navUser->pendingVersionApprovalsCount() : 0;
             $pendingRenamesCount = $navUser ? $navUser->pendingRenameApprovalsCount() : 0;
-            $totalApprovalCount = $pendingVersionsCount + $pendingRenamesCount;
+            $pendingRollbacksCount = $navUser ? $navUser->pendingRollbackApprovalsCount() : 0;
+            $totalApprovalCount = $pendingVersionsCount + $pendingRenamesCount + $pendingRollbacksCount;
             $isApprovalActive = request()->routeIs('approvals.*');
         @endphp
         
@@ -302,10 +303,10 @@
                 {{-- Sub-menu 1: Document Approval (Version) --}}
                 <a href="{{ route('approvals.versions') }}"
                    class="flex items-center justify-between gap-1.5 px-2 py-2 rounded-xl text-[12.5px] font-medium transition-all duration-200
-                          {{ request()->routeIs('approvals.versions') || (request()->routeIs('approvals.index') && request('tab') !== 'renames') ? 'bg-primary/10 text-primary font-bold shadow-xs' : 'text-base-content/60 hover:text-base-content hover:bg-base-200/60' }}"
+                          {{ request()->routeIs('approvals.versions') || (request()->routeIs('approvals.index') && request('tab') !== 'renames' && request('tab') !== 'rollbacks') ? 'bg-primary/10 text-primary font-bold shadow-xs' : 'text-base-content/60 hover:text-base-content hover:bg-base-200/60' }}"
                    title="{{ __('Document Approval (Version)') }}">
                     <span class="flex items-center gap-2 min-w-0 flex-1">
-                        <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ request()->routeIs('approvals.versions') || (request()->routeIs('approvals.index') && request('tab') !== 'renames') ? 'bg-primary' : 'bg-base-content/30' }}"></span>
+                        <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ request()->routeIs('approvals.versions') || (request()->routeIs('approvals.index') && request('tab') !== 'renames' && request('tab') !== 'rollbacks') ? 'bg-primary' : 'bg-base-content/30' }}"></span>
                         <span class="leading-tight break-words">{{ __('Document Approval (Version)') }}</span>
                     </span>
                     <span class="badge {{ $pendingVersionsCount > 0 ? 'badge-primary text-white font-bold' : 'badge-ghost text-base-content/50' }} badge-xs px-1.5 py-2 shrink-0 self-center ml-1">
@@ -316,7 +317,7 @@
                 {{-- Sub-menu 2: Rename Approval --}}
                 <a href="{{ route('approvals.renames') }}"
                    class="flex items-center justify-between gap-1.5 px-2 py-2 rounded-xl text-[12.5px] font-medium transition-all duration-200
-                          {{ request()->routeIs('approvals.renames') || (request()->routeIs('approvals.index') && request('tab') === 'renames') ? 'bg-warning/15 text-warning-content font-bold shadow-xs' : 'text-base-content/60 hover:text-base-content hover:bg-base-200/60' }}"
+                          {{ request()->routeIs('approvals.renames') || (request()->routeIs('approvals.index') && request('tab') === 'renames') ? 'bg-amber-500/15 text-amber-800 dark:text-amber-200 font-bold shadow-xs' : 'text-base-content/60 hover:text-base-content hover:bg-base-200/60' }}"
                    title="{{ __('Rename Approval') }}">
                     <span class="flex items-center gap-2 min-w-0 flex-1">
                         <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ request()->routeIs('approvals.renames') || (request()->routeIs('approvals.index') && request('tab') === 'renames') ? 'bg-amber-500' : 'bg-base-content/30' }}"></span>
@@ -324,6 +325,20 @@
                     </span>
                     <span class="badge {{ $pendingRenamesCount > 0 ? 'badge-warning font-bold text-amber-900' : 'badge-ghost text-base-content/50' }} badge-xs px-1.5 py-2 shrink-0 self-center ml-1">
                         {{ $pendingRenamesCount }}
+                    </span>
+                </a>
+
+                {{-- Sub-menu 3: Rollback Approval --}}
+                <a href="{{ route('approvals.rollbacks') }}"
+                   class="flex items-center justify-between gap-1.5 px-2 py-2 rounded-xl text-[12.5px] font-medium transition-all duration-200
+                          {{ request()->routeIs('approvals.rollbacks') || (request()->routeIs('approvals.index') && request('tab') === 'rollbacks') ? 'bg-purple-500/15 text-purple-800 dark:text-purple-200 font-bold shadow-xs' : 'text-base-content/60 hover:text-base-content hover:bg-base-200/60' }}"
+                   title="{{ __('Rollback Approval') }}">
+                    <span class="flex items-center gap-2 min-w-0 flex-1">
+                        <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ request()->routeIs('approvals.rollbacks') || (request()->routeIs('approvals.index') && request('tab') === 'rollbacks') ? 'bg-purple-500' : 'bg-base-content/30' }}"></span>
+                        <span class="leading-tight break-words">{{ __('Rollback Approval') }}</span>
+                    </span>
+                    <span class="badge {{ $pendingRollbacksCount > 0 ? 'badge-secondary font-bold text-white' : 'badge-ghost text-base-content/50' }} badge-xs px-1.5 py-2 shrink-0 self-center ml-1">
+                        {{ $pendingRollbacksCount }}
                     </span>
                 </a>
             </div>

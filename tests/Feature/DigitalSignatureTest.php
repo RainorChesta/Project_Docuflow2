@@ -11,6 +11,7 @@ use App\Models\SignatureRequest;
 use App\Models\User;
 use App\Services\SignatureResolverService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -58,6 +59,144 @@ class DigitalSignatureTest extends TestCase
         $response->assertStatus(200);
         $this->assertDatabaseMissing('signatures', ['user_id' => $user->id]);
         Storage::disk('public')->assertMissing($filePath);
+    }
+
+    public function test_user_cannot_save_company_stamp_without_original_signature(): void
+    {
+        $user = User::factory()->create();
+        $company = Company::create(['name' => 'PT Jaya Bersama Makmur', 'code' => 'JBM']);
+        $user->companies()->attach($company->id);
+
+        $file = UploadedFile::fake()->image('stamp.png', 200, 100);
+
+        $response = $this->actingAs($user)->postJson(route('profile.signature.store'), [
+            'type' => 'company_stamp',
+            'company_id' => $company->id,
+            'signature_image' => $file,
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJson(['success' => false]);
+        $this->assertStringContainsString('HARUS MEMBUAT TANDA TANGAN ORIGINAL', $response->json('message'));
+    }
+
+    public function test_user_can_save_company_stamp_and_replacing_it_deletes_old_file(): void
+    {
+        $user = User::factory()->create();
+        $company = Company::create(['name' => 'PT Jaya Bersama Makmur', 'code' => 'JBM']);
+        $user->companies()->attach($company->id);
+
+        // First, create original signature
+        $base64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+        $this->actingAs($user)->postJson(route('profile.signature.store'), [
+            'type' => 'original',
+            'signature_data' => $base64,
+        ])->assertStatus(200);
+
+        // Upload first stamp
+        $file1 = UploadedFile::fake()->image('stamp1.png', 200, 100);
+        $res1 = $this->actingAs($user)->postJson(route('profile.signature.store'), [
+            'type' => 'company_stamp',
+            'company_id' => $company->id,
+            'signature_image' => $file1,
+        ]);
+        $res1->assertStatus(200)->assertJson(['success' => true]);
+
+        $stamp1 = Signature::where('user_id', $user->id)->where('type', 'company_stamp')->where('company_id', $company->id)->first();
+        $this->assertNotNull($stamp1);
+        $oldFilePath = $stamp1->file_path;
+        Storage::disk('public')->assertExists($oldFilePath);
+
+        // Upload replacement stamp for same company
+        $file2 = UploadedFile::fake()->image('stamp2.png', 200, 100);
+        $res2 = $this->actingAs($user)->postJson(route('profile.signature.store'), [
+            'type' => 'company_stamp',
+            'company_id' => $company->id,
+            'signature_image' => $file2,
+        ]);
+        $res2->assertStatus(200)->assertJson(['success' => true]);
+
+        // Verify only 1 stamp exists for this company and old file was removed
+        $stampCount = Signature::where('user_id', $user->id)->where('type', 'company_stamp')->where('company_id', $company->id)->count();
+        $this->assertEquals(1, $stampCount);
+        Storage::disk('public')->assertMissing($oldFilePath);
+    }
+
+    public function test_user_cannot_draw_on_canvas_if_signature_already_exists(): void
+    {
+        $user = User::factory()->create();
+
+        $base64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+        $res1 = $this->actingAs($user)->postJson(route('profile.signature.store'), [
+            'type' => 'original',
+            'signature_data' => $base64,
+        ]);
+        $res1->assertStatus(200);
+
+        $sig1 = $user->signatures()->where('type', 'original')->first();
+        $this->assertNotNull($sig1);
+        $oldPath = $sig1->file_path;
+        Storage::disk('public')->assertExists($oldPath);
+
+        // Attempting to draw new signature via canvas is blocked
+        $res2 = $this->actingAs($user)->postJson(route('profile.signature.store'), [
+            'type' => 'original',
+            'signature_data' => $base64,
+        ]);
+        $res2->assertStatus(422);
+        $this->assertStringContainsString('Canvas tanda tangan tidak dapat digunakan lagi', $res2->json('message'));
+
+        // Deleting the existing signature unlocks canvas
+        $delRes = $this->actingAs($user)->deleteJson(route('profile.signature.destroy'));
+        $delRes->assertStatus(200);
+        $this->assertFalse($user->fresh()->hasSignature());
+        Storage::disk('public')->assertMissing($oldPath);
+
+        // Now user can draw again
+        $res3 = $this->actingAs($user)->postJson(route('profile.signature.store'), [
+            'type' => 'original',
+            'signature_data' => $base64,
+        ]);
+        $res3->assertStatus(200);
+        $this->assertTrue($user->fresh()->hasSignature());
+    }
+
+    public function test_profile_page_renders_locked_canvas_when_user_has_signature(): void
+    {
+        $user = User::factory()->create();
+        $base64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+        $this->actingAs($user)->postJson(route('profile.signature.store'), [
+            'type' => 'original',
+            'signature_data' => $base64,
+        ]);
+
+        $res = $this->actingAs($user)->get(route('profile.edit'));
+        $res->assertStatus(200);
+        $res->assertSee(__('Canvas Dinonaktifkan'));
+        $res->assertSee('canvas-locked-overlay');
+        $res->assertSee('pointer-events-none cursor-not-allowed');
+    }
+
+    public function test_profile_page_renders_digital_signature_view_matching_reference(): void
+    {
+        $user = User::factory()->create();
+        $company = Company::create(['name' => 'PT Jaya Bersama Makmur', 'code' => 'JBM']);
+        $user->companies()->attach($company->id);
+
+        $base64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+        $this->actingAs($user)->postJson(route('profile.signature.store'), [
+            'type' => 'original',
+            'signature_data' => $base64,
+        ]);
+
+        $res = $this->actingAs($user)->get(route('profile.edit'));
+        $res->assertStatus(200);
+        $res->assertSee('Digital Signature');
+        $res->assertSee('Kelola tanda tangan original dan stempel perusahaan Anda.');
+        $res->assertSee('TTD Original Aktif');
+        $res->assertSee('Tambah Tanda Tangan Baru');
+        $res->assertSee('Current Saved Signature');
+        $res->assertSee('Original');
     }
 
     public function test_available_users_endpoint_returns_user_list(): void

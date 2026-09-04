@@ -17,6 +17,7 @@
     --color-base-300: oklch(0.92 0.01 250);
     --color-base-content: oklch(0.2 0.04 260);
     --color-info: oklch(0.58 0.16 245);
+    --color-info-content: oklch(1 0 0);
     --color-success: oklch(0.62 0.2 145);
     --color-success-content: oklch(1 0 0);
     --color-warning: oklch(0.7 0.16 70);
@@ -41,15 +42,16 @@
     --color-neutral-content: oklch(0.95 0.005 250);
     /* Info */
     --color-info: oklch(0.68 0.13 245);
-    /* Success — hijau lebih lembut */
-    --color-success: oklch(0.72 0.17 150);
-    --color-success-content: oklch(0.15 0.04 150);
+    --color-info-content: oklch(0.98 0.005 250);
+    /* Success — hijau lebih lembut & kontras */
+    --color-success: oklch(0.68 0.18 150);
+    --color-success-content: oklch(0.98 0.005 250);
     /* Warning — oranye/kuning lebih lembut */
-    --color-warning: oklch(0.78 0.13 75);
-    --color-warning-content: oklch(0.15 0.04 75);
+    --color-warning: oklch(0.75 0.15 75);
+    --color-warning-content: oklch(0.12 0.04 75);
     /* Error — merah lebih lembut */
     --color-error: oklch(0.65 0.18 25);
-    --color-error-content: oklch(0.15 0.04 25);
+    --color-error-content: oklch(0.98 0.005 250);
   }
 
   html, body {
@@ -81,6 +83,7 @@
   --color-neutral: oklch(0.28 0.04 250);
   --color-neutral-content: oklch(0.98 0.005 250);
   --color-info: oklch(0.58 0.16 245);
+  --color-info-content: oklch(1 0 0);
   --color-success: oklch(0.62 0.2 145);
   --color-success-content: oklch(1 0 0);
   --color-warning: oklch(0.7 0.16 70);
@@ -117,17 +120,88 @@
   --color-neutral: oklch(0.4 0.03 250);
   --color-neutral-content: oklch(0.95 0.005 250);
   --color-info: oklch(0.68 0.13 245);
-  --color-success: oklch(0.72 0.17 150);
-  --color-success-content: oklch(0.15 0.04 150);
-  --color-warning: oklch(0.78 0.13 75);
-  --color-warning-content: oklch(0.15 0.04 75);
+  --color-info-content: oklch(0.98 0.005 250);
+  --color-success: oklch(0.68 0.18 150);
+  --color-success-content: oklch(0.98 0.005 250);
+  --color-warning: oklch(0.75 0.15 75);
+  --color-warning-content: oklch(0.12 0.04 75);
   --color-error: oklch(0.65 0.18 25);
-  --color-error-content: oklch(0.15 0.04 25);
+  --color-error-content: oklch(0.98 0.005 250);
 }
 
 /* Alpine x-cloak: hide element until Alpine initializes */
 [x-cloak] {
     display: none !important;
+}
+
+/* ─── Universal Theme Synchronized Alerts ────────────────────────── */
+/* Light Mode Alerts: soft pastel background, crisp tinted border, dark readable text */
+:root .alert-success,
+[data-theme="light"] .alert-success {
+    background-color: oklch(0.96 0.03 150);
+    border-color: oklch(0.85 0.08 150);
+    color: oklch(0.25 0.09 150);
+}
+:root .alert-warning,
+[data-theme="light"] .alert-warning {
+    background-color: oklch(0.97 0.04 80);
+    border-color: oklch(0.88 0.1 80);
+    color: oklch(0.35 0.12 75);
+}
+:root .alert-error,
+[data-theme="light"] .alert-error {
+    background-color: oklch(0.96 0.04 25);
+    border-color: oklch(0.88 0.1 25);
+    color: oklch(0.35 0.14 25);
+}
+:root .alert-info,
+[data-theme="light"] .alert-info {
+    background-color: oklch(0.96 0.03 245);
+    border-color: oklch(0.86 0.08 245);
+    color: oklch(0.28 0.09 245);
+}
+
+/* Dark Mode Alerts: deep translucent background, glowing crisp border, bright readable text */
+.dark .alert-success,
+[data-theme="dark"] .alert-success {
+    background-color: oklch(0.25 0.05 150 / 0.85) !important;
+    border-color: oklch(0.45 0.12 150 / 0.6) !important;
+    color: oklch(0.94 0.06 150) !important;
+}
+.dark .alert-warning,
+[data-theme="dark"] .alert-warning {
+    background-color: oklch(0.26 0.06 75 / 0.85) !important;
+    border-color: oklch(0.5 0.14 75 / 0.6) !important;
+    color: oklch(0.94 0.07 75) !important;
+}
+.dark .alert-error,
+[data-theme="dark"] .alert-error {
+    background-color: oklch(0.26 0.06 25 / 0.85) !important;
+    border-color: oklch(0.48 0.14 25 / 0.6) !important;
+    color: oklch(0.94 0.07 25) !important;
+}
+.dark .alert-info,
+[data-theme="dark"] .alert-info {
+    background-color: oklch(0.25 0.05 245 / 0.85) !important;
+    border-color: oklch(0.45 0.12 245 / 0.6) !important;
+    color: oklch(0.94 0.06 245) !important;
+}
+
+/* Alert Children Sync: SVG icons and inner text automatically synchronize */
+.alert svg {
+    flex-shrink: 0;
+}
+.alert-success svg {
+    color: currentColor;
+}
+.alert-warning svg {
+    color: currentColor;
+}
+.alert-error svg {
+    color: currentColor;
+}
+.alert-info svg {
+    color: currentColor;
 }
 
 /* ─── Universal Theme Color Synchronization for Forms & Modals ───── */
@@ -139,12 +213,35 @@ select,
 .input,
 .select {
     color: var(--color-base-content);
+    background-color: var(--color-base-100);
+}
+
+/* Options inside select dropdowns */
+select option,
+.select option {
+    background-color: var(--color-base-100);
+    color: var(--color-base-content);
+}
+
+/* Placeholder contrast */
+::placeholder,
+.input::placeholder,
+.textarea::placeholder {
+    color: var(--color-base-content) !important;
+    opacity: 0.45 !important;
 }
 
 /* Modals and dialogs: always reset text color to base-content and background to base-100 */
 dialog.modal,
 .modal,
 .modal-box {
+    color: var(--color-base-content);
+}
+
+/* Dropdowns and menus theme synchronization */
+.dropdown-content,
+.menu {
+    background-color: var(--color-base-100);
     color: var(--color-base-content);
 }
 
