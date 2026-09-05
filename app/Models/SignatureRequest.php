@@ -88,4 +88,23 @@ class SignatureRequest extends Model
     {
         return $this->isApproved() && !$this->is_used;
     }
+
+    public function isStamp(): bool
+    {
+        return $this->requestedSignature && $this->requestedSignature->type === 'company_stamp';
+    }
+
+    public function isSignature(): bool
+    {
+        return !$this->isStamp();
+    }
+
+    public function getTypeLabelAttribute(): string
+    {
+        if ($this->isStamp()) {
+            $companyName = $this->requestedSignature->company?->name;
+            return $companyName ? "Stempel ({$companyName})" : 'Stempel Perusahaan';
+        }
+        return 'Tanda Tangan Original';
+    }
 }

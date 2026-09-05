@@ -762,8 +762,10 @@
             let activeVisualTargetUserId = null;
             let activeVisualTargetUserName = null;
             let activeVisualSignatureId = null;
+            let activeVisualSignatureType = 'original'; // 'original' | 'company_stamp'
+            let activeVisualCompanyName = null;
 
-            function openPdfVisualPlacementModal(targetUserId = null, targetUserName = null, visualType = 'signature', signatureId = null) {
+            function openPdfVisualPlacementModal(targetUserId = null, targetUserName = null, visualType = 'signature', signatureId = null, signatureType = 'original', companyName = null) {
                 const selectorModal = document.getElementById('signature-users-modal');
                 if (selectorModal && selectorModal.open) {
                     selectorModal.close();
@@ -773,12 +775,31 @@
                 activeVisualTargetUserId = targetUserId;
                 activeVisualTargetUserName = targetUserName;
                 activeVisualSignatureId = signatureId;
+                activeVisualSignatureType = signatureType;
+                activeVisualCompanyName = companyName;
 
                 const titleEl = document.getElementById('pdf-visual-modal-title');
                 const subTitleEl = document.getElementById('pdf-visual-modal-subtitle');
                 const tagTextEl = document.getElementById('pdf-box-signer-tag-text');
                 const previewContainer = document.getElementById('pdf-box-preview-container');
                 const actionBtnText = document.getElementById('pdf-visual-action-btn-text');
+
+                const isStamp = (signatureType === 'company_stamp');
+
+                // Resolve preview image URL from loaded signature users data
+                let resolvedPreviewUrl = null;
+                if (signatureId) {
+                    const userObj = (allSignatureUsersData || []).find(u => u.id == targetUserId);
+                    if (userObj) {
+                        const sigObj = (userObj.signatures || []).find(s => s.id == signatureId);
+                        if (sigObj) {
+                            resolvedPreviewUrl = sigObj.data_uri || sigObj.preview_url;
+                        }
+                    }
+                }
+                if (!resolvedPreviewUrl && !targetUserId) {
+                    resolvedPreviewUrl = mySignatureClientUrl;
+                }
 
                 if (activeVisualType === 'qrcode') {
                     if (titleEl) titleEl.textContent = 'Atur Posisi & Ukuran QR Code';
@@ -794,17 +815,64 @@
                     }
                     if (actionBtnText) actionBtnText.textContent = '{{ __("Bubuhkan QR Code Di Sini") }}';
                 } else if (targetUserId && targetUserName) {
-                    if (titleEl) titleEl.textContent = 'Atur Posisi & Ukuran TTD: ' + targetUserName.toUpperCase();
-                    if (subTitleEl) subTitleEl.textContent = 'Posisikan dan atur ukuran kotak tanda tangan untuk ' + targetUserName.toUpperCase() + ' pada halaman dokumen.';
-                    if (tagTextEl) tagTextEl.textContent = 'TTD: ' + targetUserName.toUpperCase();
-                    if (previewContainer) previewContainer.innerHTML = `<span class="text-xs font-bold text-primary uppercase tracking-wide">[ TTD: ${targetUserName} ]</span>`;
-                    if (actionBtnText) actionBtnText.textContent = '{{ __("Kirim Permintaan Tanda Tangan") }}';
+                    if (isStamp) {
+                        const compDisplay = companyName ? companyName.toUpperCase() : 'PERUSAHAAN';
+                        if (titleEl) titleEl.textContent = 'Atur Posisi & Ukuran Stempel: ' + compDisplay;
+                        if (subTitleEl) subTitleEl.textContent = 'Posisikan dan atur ukuran kotak stempel perusahaan (' + compDisplay + ') untuk ' + targetUserName.toUpperCase() + ' pada dokumen.';
+                        if (tagTextEl) tagTextEl.textContent = 'STEMPEL: ' + compDisplay;
+                        if (previewContainer) {
+                            if (resolvedPreviewUrl) {
+                                previewContainer.innerHTML = `<img src="${resolvedPreviewUrl}" alt="Stempel" class="w-full h-full object-fill block m-0 p-0 pointer-events-none" />`;
+                            } else {
+                                previewContainer.innerHTML = `<span class="text-xs font-bold text-secondary uppercase tracking-wide">[ STEMPEL: ${companyName || targetUserName} ]</span>`;
+                            }
+                        }
+                        if (actionBtnText) actionBtnText.textContent = '{{ __("Kirim Permintaan Stempel") }}';
+                    } else {
+                        if (titleEl) titleEl.textContent = 'Atur Posisi & Ukuran TTD: ' + targetUserName.toUpperCase();
+                        if (subTitleEl) subTitleEl.textContent = 'Posisikan dan atur ukuran kotak tanda tangan untuk ' + targetUserName.toUpperCase() + ' pada halaman dokumen.';
+                        if (tagTextEl) tagTextEl.textContent = 'TTD: ' + targetUserName.toUpperCase();
+                        if (previewContainer) {
+                            if (resolvedPreviewUrl) {
+                                previewContainer.innerHTML = `<img src="${resolvedPreviewUrl}" alt="TTD" class="w-full h-full object-fill block m-0 p-0 pointer-events-none" />`;
+                            } else {
+                                previewContainer.innerHTML = `<span class="text-xs font-bold text-primary uppercase tracking-wide">[ TTD: ${targetUserName} ]</span>`;
+                            }
+                        }
+                        if (actionBtnText) actionBtnText.textContent = '{{ __("Kirim Permintaan Tanda Tangan") }}';
+                    }
+
+                    // If preview image not in memory yet, fetch available users in background
+                    if (!resolvedPreviewUrl && signatureId) {
+                        fetch('{{ route("signatures.users") }}?document_id={{ $document->id }}')
+                            .then(res => res.json())
+                            .then(data => {
+                                allSignatureUsersData = data.users || [];
+                                const uObj = allSignatureUsersData.find(u => u.id == targetUserId);
+                                if (uObj) {
+                                    const sObj = (uObj.signatures || []).find(s => s.id == signatureId);
+                                    if (sObj && (sObj.data_uri || sObj.preview_url) && previewContainer && activeVisualSignatureId == signatureId) {
+                                        previewContainer.innerHTML = `<img src="${sObj.data_uri || sObj.preview_url}" alt="Preview" class="w-full h-full object-fill block m-0 p-0 pointer-events-none" />`;
+                                    }
+                                }
+                            })
+                            .catch(() => {});
+                    }
                 } else {
-                    if (titleEl) titleEl.textContent = signatureId ? 'Atur Posisi & Ukuran Stempel / TTD' : 'Atur Posisi & Ukuran Tanda Tangan Saya';
-                    if (subTitleEl) subTitleEl.textContent = 'Geser kotak TTD ke posisi yang diinginkan dan tarik sudut kanan bawah untuk mengubah ukuran.';
-                    if (tagTextEl) tagTextEl.textContent = signatureId ? 'Geser Stempel/TTD' : 'Geser TTD';
+                    if (isStamp) {
+                        const compDisplay = companyName ? companyName.toUpperCase() : 'PERUSAHAAN';
+                        if (titleEl) titleEl.textContent = 'Atur Posisi & Ukuran Stempel: ' + compDisplay;
+                        if (subTitleEl) subTitleEl.textContent = 'Geser kotak stempel ke posisi yang diinginkan dan tarik sudut kanan bawah untuk mengubah ukuran.';
+                        if (tagTextEl) tagTextEl.textContent = 'Geser Stempel';
+                    } else {
+                        if (titleEl) titleEl.textContent = signatureId ? 'Atur Posisi & Ukuran TTD' : 'Atur Posisi & Ukuran Tanda Tangan Saya';
+                        if (subTitleEl) subTitleEl.textContent = 'Geser kotak TTD ke posisi yang diinginkan dan tarik sudut kanan bawah untuk mengubah ukuran.';
+                        if (tagTextEl) tagTextEl.textContent = signatureId ? 'Geser TTD' : 'Geser TTD';
+                    }
                     if (previewContainer) {
-                        if (signatureId) {
+                        if (resolvedPreviewUrl) {
+                            previewContainer.innerHTML = `<img src="${resolvedPreviewUrl}" alt="Signature" class="w-full h-full object-fill block m-0 p-0 pointer-events-none" />`;
+                        } else if (signatureId) {
                             previewContainer.innerHTML = `<span class="loading loading-spinner loading-xs text-primary"></span>`;
                             fetch(`/profile/signature?signature_id=${signatureId}`)
                                 .then(res => res.json())
@@ -813,19 +881,17 @@
                                     if (src) {
                                         previewContainer.innerHTML = `<img src="${src}" alt="Signature" class="w-full h-full object-fill block m-0 p-0 pointer-events-none" />`;
                                     } else {
-                                        previewContainer.innerHTML = `<span class="text-xs font-bold text-primary/80 uppercase italic tracking-wide">[ {{ __("Tanda Tangan") }} ]</span>`;
+                                        previewContainer.innerHTML = `<span class="text-xs font-bold text-primary/80 uppercase italic tracking-wide">[ ${isStamp ? '{{ __("Stempel") }}' : '{{ __("Tanda Tangan") }}'} ]</span>`;
                                     }
                                 })
                                 .catch(() => {
-                                    previewContainer.innerHTML = `<span class="text-xs font-bold text-primary/80 uppercase italic tracking-wide">[ {{ __("Tanda Tangan") }} ]</span>`;
+                                    previewContainer.innerHTML = `<span class="text-xs font-bold text-primary/80 uppercase italic tracking-wide">[ ${isStamp ? '{{ __("Stempel") }}' : '{{ __("Tanda Tangan") }}'} ]</span>`;
                                 });
-                        } else if (mySignatureClientUrl) {
-                            previewContainer.innerHTML = `<img src="${mySignatureClientUrl}" alt="Signature" class="w-full h-full object-fill block m-0 p-0 pointer-events-none" />`;
                         } else {
-                            previewContainer.innerHTML = `<span class="text-xs font-bold text-primary/80 uppercase italic tracking-wide">[ {{ __("Tanda Tangan") }} ]</span>`;
+                            previewContainer.innerHTML = `<span class="text-xs font-bold text-primary/80 uppercase italic tracking-wide">[ ${isStamp ? '{{ __("Stempel") }}' : '{{ __("Tanda Tangan") }}'} ]</span>`;
                         }
                     }
-                    if (actionBtnText) actionBtnText.textContent = signatureId ? '{{ __("Bubuhkan Stempel / TTD Di Sini") }}' : '{{ __("Bubuhkan TTD Saya Di Sini") }}';
+                    if (actionBtnText) actionBtnText.textContent = isStamp ? '{{ __("Bubuhkan Stempel Di Sini") }}' : (signatureId ? '{{ __("Bubuhkan TTD Di Sini") }}' : '{{ __("Bubuhkan TTD Saya Di Sini") }}');
                 }
 
                 const visualModal = document.getElementById('pdf-visual-signature-modal');
@@ -846,6 +912,8 @@
                 activeVisualTargetUserId = null;
                 activeVisualTargetUserName = null;
                 activeVisualSignatureId = null;
+                activeVisualSignatureType = 'original';
+                activeVisualCompanyName = null;
             }
 
             function loadVisualPdfDocument(url) {
@@ -1158,6 +1226,7 @@
 
             function submitVisualSignatureRequest(userId, userName) {
                 const btn = document.getElementById('pdf-visual-action-btn');
+                const isStamp = (activeVisualSignatureType === 'company_stamp');
                 if (btn) {
                     btn.disabled = true;
                     btn.innerHTML = '<span class="loading loading-spinner loading-xs mr-1"></span> {{ __("Mengirim...") }}';
@@ -1172,23 +1241,28 @@
                         closePdfVisualPlacementModal();
                         if (btn) {
                             btn.disabled = false;
-                            btn.textContent = '{{ __("Kirim Permintaan Tanda Tangan") }}';
+                            btn.textContent = isStamp ? '{{ __("Kirim Permintaan Stempel") }}' : '{{ __("Kirim Permintaan Tanda Tangan") }}';
                         }
                         if (response.status === 200 && response.data.success) {
+                            const title = isStamp ? 'PERMINTAAN STEMPEL DIKIRIM' : 'PERMINTAAN TANDA TANGAN DIKIRIM';
+                            const defaultMsg = isStamp ? 'PERMINTAAN PENGGUNAAN STEMPEL PERUSAHAAN BERHASIL DIKIRIM.' : 'PERMINTAAN TANDA TANGAN BERHASIL DIKIRIM.';
+                            const autoMsg = isStamp 
+                                ? ' KETIKA DISETUJUI, STEMPEL AKAN OTOMATIS DIBUBUHKAN PADA DOKUMEN PDF SESUAI POSISI & UKURAN YANG TELAH DIATUR.'
+                                : ' KETIKA DISETUJUI, TANDA TANGAN AKAN OTOMATIS DIBUBUHKAN PADA DOKUMEN PDF SESUAI POSISI & UKURAN YANG TELAH DIATUR.';
                             showSignatureScreenAlert(
-                                'PERMINTAAN TANDA TANGAN DIKIRIM',
-                                (response.data.message || 'PERMINTAAN TANDA TANGAN BERHASIL DIKIRIM.') + ' KETIKA DISETUJUI, TANDA TANGAN AKAN OTOMATIS DIBUBUHKAN PADA DOKUMEN PDF SESUAI POSISI & UKURAN YANG TELAH DIATUR.',
+                                title,
+                                (response.data.message || defaultMsg) + autoMsg,
                                 true
                             );
                         } else {
-                            showSignatureScreenAlert('GAGAL MENGIRIM PERMINTAAN', response.data.message || 'GAGAL MENGIRIM PERMINTAAN TANDA TANGAN.', false);
+                            showSignatureScreenAlert('GAGAL MENGIRIM PERMINTAAN', response.data.message || (isStamp ? 'GAGAL MENGIRIM PERMINTAAN STEMPEL.' : 'GAGAL MENGIRIM PERMINTAAN TANDA TANGAN.'), false);
                         }
                     })
                     .catch(() => {
                         closePdfVisualPlacementModal();
                         if (btn) {
                             btn.disabled = false;
-                            btn.textContent = '{{ __("Kirim Permintaan Tanda Tangan") }}';
+                            btn.textContent = isStamp ? '{{ __("Kirim Permintaan Stempel") }}' : '{{ __("Kirim Permintaan Tanda Tangan") }}';
                         }
                         showSignatureScreenAlert('KESALAHAN SISTEM', 'GAGAL MENGHUBUNGI SERVER.', false);
                     });
@@ -1198,6 +1272,8 @@
                 if (!visualPlacementCoords.isCustom) {
                     updateCoordinateMetrics();
                 }
+
+                const isStamp = (activeVisualSignatureType === 'company_stamp');
 
                 const payload = {
                     page_number: visualPlacementCoords.page,
@@ -1228,13 +1304,13 @@
                 .then(response => {
                     closePdfVisualPlacementModal();
                     if (response.status === 200 && response.data.success) {
-                        showSignatureScreenAlert('BERHASIL', 'TANDA TANGAN SAYA BERHASIL DIBUBUHKAN SESUAI POSISI & UKURAN VISUAL.', true);
+                        showSignatureScreenAlert('BERHASIL', isStamp ? 'STEMPEL PERUSAHAAN BERHASIL DIBUBUHKAN SESUAI POSISI & UKURAN VISUAL.' : 'TANDA TANGAN SAYA BERHASIL DIBUBUHKAN SESUAI POSISI & UKURAN VISUAL.', true);
                         setTimeout(() => window.location.reload(), 1200);
                     } else {
-                        showSignatureScreenAlert('GAGAL MEMBUBUHKAN TTD', response.data.message || 'GAGAL MEMPROSES TANDA TANGAN.', false);
+                        showSignatureScreenAlert(isStamp ? 'GAGAL MEMBUBUHKAN STEMPEL' : 'GAGAL MEMBUBUHKAN TTD', response.data.message || (isStamp ? 'GAGAL MEMPROSES STEMPEL.' : 'GAGAL MEMPROSES TANDA TANGAN.'), false);
                         if (btn) {
                             btn.disabled = false;
-                            btn.textContent = '{{ __("Bubuhkan TTD Saya Di Sini") }}';
+                            btn.textContent = isStamp ? '{{ __("Bubuhkan Stempel Di Sini") }}' : '{{ __("Bubuhkan TTD Saya Di Sini") }}';
                         }
                     }
                 })
@@ -1243,7 +1319,7 @@
                     showSignatureScreenAlert('KESALAHAN SISTEM', 'GAGAL MENGHUBUNGI SERVER.', false);
                     if (btn) {
                         btn.disabled = false;
-                        btn.textContent = '{{ __("Bubuhkan TTD Saya Di Sini") }}';
+                        btn.textContent = isStamp ? '{{ __("Bubuhkan Stempel Di Sini") }}' : '{{ __("Bubuhkan TTD Saya Di Sini") }}';
                     }
                 });
             }
@@ -1275,9 +1351,9 @@
                 });
             }
 
-            function insertMySignature(signatureId = null) {
+            function insertMySignature(signatureId = null, signatureType = 'original', companyName = null) {
                 if (isPdfDocument) {
-                    openPdfVisualPlacementModal(null, null, 'signature', signatureId);
+                    openPdfVisualPlacementModal(null, null, 'signature', signatureId, signatureType, companyName);
                     return;
                 }
 
@@ -1348,7 +1424,8 @@
                 }
                 const filtered = allSignatureUsersData.filter(u => {
                     if (!q) {
-                        return u.is_me || u.is_available_to_replace || u.request_status === 'pending';
+                        const hasActiveReq = (u.signatures || []).some(s => s.is_available_to_replace || s.request_status === 'pending');
+                        return u.is_me || u.is_available_to_replace || u.request_status === 'pending' || hasActiveReq;
                     }
                     
                     return (u.name && u.name.toLowerCase().includes(q)) ||
@@ -1377,86 +1454,96 @@
                 }
 
                 let html = users.map(u => {
-                    let actionHtml = '';
-
-                    if (!u.has_signature) {
-                        if (u.is_me) {
-                            actionHtml = `<a href="{{ route('profile.signature.show') }}" class="btn btn-xs btn-outline btn-warning gap-1 uppercase font-bold">{{ __('BUAT TTD') }}</a>`;
-                        } else {
-                            actionHtml = `<span class="text-xs text-base-content/40 italic uppercase">{{ __('BELUM ADA TTD') }}</span>`;
-                        }
-                    } else if (u.is_me) {
-                        actionHtml = `<span class="badge badge-primary badge-xs uppercase font-bold">{{ __('Tanda Tangan Saya') }}</span>`;
-                    } else if (u.is_available_to_replace) {
-                        const creditLabel = u.available_credits > 1 ? ` (${u.available_credits}X)` : '';
-                        actionHtml = `
-                            <div class="flex items-center gap-1.5">
-                                <span class="badge badge-success badge-xs font-bold uppercase">{{ __('DISETUJUI') }}${creditLabel}</span>
-                                <button type="button" onclick="consumeSignatureReplacement(${u.request_id}, '${u.name}')" class="btn btn-xs btn-success text-white gap-1 shadow-sm font-bold uppercase">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                    {{ __('SISIPKAN TTD') }}
-                                </button>
-                            </div>
-                        `;
-                    } else if (u.request_status === 'pending') {
-                        actionHtml = `
-                            <span class="badge badge-warning badge-xs gap-1 py-2 px-2.5 font-bold uppercase">
-                                ⏳ {{ __('MENUNGGU PERSETUJUAN') }}
-                            </span>
-                        `;
-                    } else if (u.request_status === 'rejected') {
-                        actionHtml = `
-                            <div class="flex items-center gap-1.5">
-                                <span class="badge badge-error badge-xs gap-1 py-1 px-2 font-bold uppercase text-white">
-                                    ✕ {{ __('DITOLAK') }}
-                                </span>
-                            </div>
-                        `;
-                    } else if (u.request_status === 'used') {
-                        actionHtml = `
-                            <div class="flex items-center gap-1.5">
-                                <span class="badge badge-ghost badge-xs text-base-content/60 gap-1 py-2 px-2 font-bold uppercase">
-                                    ✓ {{ __('SUDAH DIGUNAKAN') }}
-                                </span>
-                            </div>
-                        `;
-                    } else {
-                        actionHtml = `
-                            <span class="text-xs text-base-content/60 font-semibold uppercase">{{ __('PILIH TTD') }}</span>
-                        `;
-                    }
-
-                    const reasonHtml = (u.request_status === 'rejected' && u.rejected_reason)
-                        ? `<div class="mt-1.5 p-2 rounded-lg bg-error/10 border border-error/20 text-xs text-error font-medium flex items-start gap-1.5">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
-                                <div>
-                                    <span class="font-bold">{{ __('Alasan:') }}</span>
-                                    <span>${u.rejected_reason}</span>
-                                </div>
-                           </div>`
-                        : '';
-
                     const signaturesHtml = (u.signatures && u.signatures.length > 0)
                         ? '<div class="border-t border-base-200 pt-2 mt-2 space-y-2">' +
                             u.signatures.map(sig => {
+                                const isStamp = (sig.type === 'company_stamp');
+                                const typeLabel = isStamp ? ('STEMPEL: ' + (sig.company_name || 'PERUSAHAAN')) : 'TANDA TANGAN ORIGINAL';
+                                const typeBadgeClass = isStamp ? 'badge-secondary' : 'badge-primary';
+                                const safeName = (u.name || '').replace(/'/g, "\\'");
+                                const safeComp = (sig.company_name || '').replace(/'/g, "\\'");
+                                
                                 let sigActionHtml = '';
                                 if (u.is_me) {
-                                    sigActionHtml = '<button type="button" onclick="insertMySignature(' + sig.id + ')" class="btn btn-xs btn-primary gap-1 uppercase font-bold">{{ __("SISIPKAN") }}</button>';
+                                    sigActionHtml = `<button type="button" onclick="insertMySignature(${sig.id}, '${sig.type}', '${safeComp}')" class="btn btn-xs ${isStamp ? 'btn-secondary' : 'btn-primary'} gap-1 uppercase font-bold">{{ __("SISIPKAN") }}</button>`;
+                                } else if (sig.is_available_to_replace) {
+                                    sigActionHtml = `
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="badge badge-success badge-xs font-bold uppercase">{{ __('DISETUJUI') }}</span>
+                                            <button type="button" onclick="consumeSignatureReplacement(${sig.request_id}, '${safeName}', '${sig.type}', '${safeComp}')" class="btn btn-xs btn-success text-white gap-1 shadow-sm font-bold uppercase">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                                {{ __('SISIPKAN') }}
+                                            </button>
+                                        </div>
+                                    `;
+                                } else if (sig.request_status === 'pending') {
+                                    sigActionHtml = `
+                                        <span class="badge badge-warning badge-xs gap-1 py-1.5 px-2 font-bold uppercase">
+                                            ⏳ {{ __('MENUNGGU') }}
+                                        </span>
+                                    `;
+                                } else if (sig.request_status === 'rejected') {
+                                    const reqAction = isPdfDocument 
+                                        ? `openPdfVisualPlacementModal(${u.id}, '${safeName}', 'signature', ${sig.id}, '${sig.type}', '${safeComp}')`
+                                        : `fetchUserSignatureAndInsert(${u.id}, &quot;${(u.name || '').replace(/"/g, '&quot;')}&quot;, ${sig.id})`;
+                                    sigActionHtml = `
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="badge badge-error badge-xs gap-1 py-1 px-2 font-bold uppercase text-white" title="${sig.rejected_reason || ''}">
+                                                ✕ {{ __('DITOLAK') }}
+                                            </span>
+                                            <button type="button" onclick="${reqAction}" class="btn btn-xs btn-outline btn-warning gap-1 uppercase font-bold">
+                                                {{ __('MINTA ULANG') }}
+                                            </button>
+                                        </div>
+                                    `;
+                                } else if (sig.request_status === 'used') {
+                                    const reqAction = isPdfDocument 
+                                        ? `openPdfVisualPlacementModal(${u.id}, '${safeName}', 'signature', ${sig.id}, '${sig.type}', '${safeComp}')`
+                                        : `fetchUserSignatureAndInsert(${u.id}, &quot;${(u.name || '').replace(/"/g, '&quot;')}&quot;, ${sig.id})`;
+                                    sigActionHtml = `
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="badge badge-ghost badge-xs text-base-content/60 gap-1 py-1 px-2 font-bold uppercase">
+                                                ✓ {{ __('DIGUNAKAN') }}
+                                            </span>
+                                            <button type="button" onclick="${reqAction}" class="btn btn-xs btn-outline ${isStamp ? 'btn-secondary' : 'btn-primary'} gap-1 uppercase font-bold">
+                                                ${isStamp ? '{{ __("MINTA STEMPEL") }}' : '{{ __("MINTA TTD") }}'}
+                                            </button>
+                                        </div>
+                                    `;
                                 } else {
-                                    sigActionHtml = '<button type="button" onclick="' + (isPdfDocument ? `openPdfVisualPlacementModal(${u.id}, '${u.name}', 'signature', ${sig.id})` : `fetchUserSignatureAndInsert(${u.id}, &quot;${u.name}&quot;, ${sig.id})`) + '" class="btn btn-xs btn-outline btn-primary gap-1 uppercase font-bold">{{ __("MINTA TTD") }}</button>';
+                                    const reqAction = isPdfDocument 
+                                        ? `openPdfVisualPlacementModal(${u.id}, '${safeName}', 'signature', ${sig.id}, '${sig.type}', '${safeComp}')`
+                                        : `fetchUserSignatureAndInsert(${u.id}, &quot;${(u.name || '').replace(/"/g, '&quot;')}&quot;, ${sig.id})`;
+                                    sigActionHtml = `<button type="button" onclick="${reqAction}" class="btn btn-xs btn-outline ${isStamp ? 'btn-secondary' : 'btn-primary'} gap-1 uppercase font-bold">${isStamp ? '{{ __("MINTA STEMPEL") }}' : '{{ __("MINTA TTD") }}'}</button>`;
                                 }
                                 
-                                const typeLabel = sig.type === 'original' ? 'ORIGINAL' : 'STEMPEL: ' + (sig.company_name || 'PERUSAHAAN');
-                                return '<div class="flex items-center justify-between text-xs bg-base-100 p-2 rounded-lg border border-base-200">' +
-                                    '<div><span class="font-bold">' + typeLabel + '</span></div>' +
-                                    '<div>' + sigActionHtml + '</div>' +
-                                '</div>';
+                                const sigReasonHtml = (sig.request_status === 'rejected' && sig.rejected_reason)
+                                    ? `<div class="mt-1 p-1.5 rounded-lg bg-error/10 border border-error/20 text-[11px] text-error font-medium flex items-start gap-1">
+                                            <span><strong>{{ __('Alasan Ditolak:') }}</strong> ${sig.rejected_reason}</span>
+                                       </div>`
+                                    : '';
+
+                                return `
+                                    <div class="p-2 rounded-lg bg-base-100 border border-base-200">
+                                        <div class="flex items-center justify-between text-xs gap-2">
+                                            <div class="flex items-center gap-1.5 min-w-0">
+                                                <span class="badge ${typeBadgeClass} badge-outline badge-xs font-bold uppercase shrink-0">${isStamp ? 'Stempel' : 'TTD'}</span>
+                                                <span class="font-bold truncate">${typeLabel}</span>
+                                            </div>
+                                            <div class="shrink-0">${sigActionHtml}</div>
+                                        </div>
+                                        ${sigReasonHtml}
+                                    </div>
+                                `;
                             }).join('') +
                           '</div>'
-                        : '';
+                        : (!u.has_signature ? '<p class="text-xs text-base-content/40 italic uppercase mt-1">{{ __("BELUM MEMILIKI TANDA TANGAN ATAU STEMPEL") }}</p>' : '');
+
+                    const hasAnyApproved = (u.signatures || []).some(s => s.is_available_to_replace) || u.is_available_to_replace;
+                    const hasAnyRejected = (u.signatures || []).some(s => s.request_status === 'rejected') || (u.request_status === 'rejected');
 
                     return `
-                        <div class="flex flex-col p-2.5 rounded-xl border border-base-200 hover:bg-base-200/40 transition-all ${u.is_available_to_replace ? 'bg-success/5 border-success/30' : (u.request_status === 'rejected' ? 'bg-error/5 border-error/20' : '')}">
+                        <div class="flex flex-col p-2.5 rounded-xl border border-base-200 hover:bg-base-200/40 transition-all ${hasAnyApproved ? 'bg-success/5 border-success/30' : (hasAnyRejected ? 'bg-error/5 border-error/20' : '')}">
                             <div class="flex items-center justify-between">
                                 <div class="pr-2">
                                     <div class="flex items-center gap-1.5 mb-0.5">
@@ -1465,11 +1552,7 @@
                                     </div>
                                     <p class="text-xs text-base-content/60 uppercase">${u.role} &bull; ${u.division}</p>
                                 </div>
-                                <div class="shrink-0">
-                                    ${actionHtml}
-                                </div>
                             </div>
-                            ${reasonHtml}
                             ${signaturesHtml}
                         </div>
                     `;
@@ -1479,7 +1562,7 @@
                     html += `
                         <div class="p-3 bg-base-200/40 rounded-xl text-center text-xs text-base-content/60 mt-3 border border-dashed border-base-300">
                             <span class="font-semibold text-base-content/80">{{ __('Tips:') }}</span>
-                            {{ __('Ketik nama pengguna di kolom pencarian di atas lalu klik Cari untuk memilih tanda tangan pengguna lain.') }}
+                            {{ __('Ketik nama pengguna di kolom pencarian di atas lalu klik Cari untuk memilih tanda tangan atau stempel pengguna lain.') }}
                         </div>
                     `;
                 }
@@ -1487,9 +1570,12 @@
                 list.innerHTML = html;
             }
 
-            function consumeSignatureReplacement(requestId, userName) {
+            function consumeSignatureReplacement(requestId, userName, sigType = 'original', companyName = '') {
                 document.getElementById('signature-users-modal').close();
                 document.getElementById('signature-banner-alert').classList.add('hidden'); // Hide banner if replacing
+
+                const isStamp = (sigType === 'company_stamp');
+                const displayName = (isStamp && companyName) ? `${companyName} (${userName})` : userName;
 
                 fetch(`/signature-requests/${requestId}/consume`, {
                     method: 'POST',
@@ -1505,8 +1591,8 @@
                     if (response.status === 200 && data.success && data.url) {
                         if (data.is_pdf || isPdfDocument) {
                             showSignatureScreenAlert(
-                                'TANDA TANGAN DIBUBUHKAN PADA PDF',
-                                'TANDA TANGAN RESMI DARI ' + userName.toUpperCase() + ' TELAH BERHASIL DIBUBUHKAN PADA DOKUMEN PDF.',
+                                isStamp ? 'STEMPEL DIBUBUHKAN PADA PDF' : 'TANDA TANGAN DIBUBUHKAN PADA PDF',
+                                (isStamp ? 'STEMPEL RESMI PERUSAHAAN DARI ' : 'TANDA TANGAN RESMI DARI ') + displayName.toUpperCase() + ' TELAH BERHASIL DIBUBUHKAN PADA DOKUMEN PDF.',
                                 true
                             );
                             setTimeout(() => window.location.reload(), 1200);
@@ -1555,14 +1641,14 @@
                         }
                         
                         showSignatureScreenAlert(
-                            'TANDA TANGAN DISETUJUI & DISISIPKAN',
-                            'TANDA TANGAN RESMI DARI ' + userName.toUpperCase() + ' TELAH BERHASIL DIMUAT DAN DISISIPKAN KE DALAM DOKUMEN.',
+                            isStamp ? 'STEMPEL DISETUJUI & DISISIPKAN' : 'TANDA TANGAN DISETUJUI & DISISIPKAN',
+                            (isStamp ? 'STEMPEL RESMI PERUSAHAAN DARI ' : 'TANDA TANGAN RESMI DARI ') + displayName.toUpperCase() + ' TELAH BERHASIL DIMUAT DAN DISISIPKAN KE DALAM DOKUMEN.',
                             true
                         );
                     } else {
                         showSignatureScreenAlert(
-                            'GAGAL MENGGANTI TANDA TANGAN',
-                            data.message || 'GAGAL MEMPROSES PENGGANTIAN TANDA TANGAN.',
+                            isStamp ? 'GAGAL MENYISIPKAN STEMPEL' : 'GAGAL MENGGANTI TANDA TANGAN',
+                            data.message || (isStamp ? 'GAGAL MEMPROSES PEMBUBUHAN STEMPEL.' : 'GAGAL MEMPROSES PENGGANTIAN TANDA TANGAN.'),
                             false
                         );
                     }
@@ -1604,15 +1690,15 @@
                             }
                             if (data.is_pending) {
                                 showSignatureScreenAlert(
-                                    'PERMINTAAN TANDA TANGAN DIKIRIM',
-                                    (data.message || ('Permintaan penggunaan tanda tangan telah berhasil dikirim ke ' + userName.toUpperCase() + '.')) + (isPdfDocument ? ' KETIKA DISETUJUI, TANDA TANGAN AKAN OTOMATIS DIBUBUHKAN PADA DOKUMEN PDF.' : ' Notifikasi telah dikirimkan ke akun terkait.'),
+                                    'PERMINTAAN DIKIRIM',
+                                    (data.message || ('Permintaan penggunaan tanda tangan / stempel telah berhasil dikirim ke ' + userName.toUpperCase() + '.')) + (isPdfDocument ? ' KETIKA DISETUJUI, ITEM AKAN OTOMATIS DIBUBUHKAN PADA DOKUMEN PDF.' : ' Notifikasi telah dikirimkan ke akun terkait.'),
                                     true
                                 );
                             } else if (data.message) {
                                 setTimeout(() => {
                                     showSignatureScreenAlert(
                                         'BERHASIL',
-                                        data.message + (isPdfDocument ? ' KETIKA DISETUJUI, TANDA TANGAN AKAN OTOMATIS DIBUBUHKAN PADA DOKUMEN PDF.' : ''),
+                                        data.message + (isPdfDocument ? ' KETIKA DISETUJUI, ITEM AKAN OTOMATIS DIBUBUHKAN PADA DOKUMEN PDF.' : ''),
                                         true
                                     );
                                 }, 400);
@@ -1620,13 +1706,13 @@
                         } else if (response.status === 403) {
                             showSignatureScreenAlert(
                                 'AKSES DITOLAK',
-                                data.message || 'ANDA TIDAK MEMILIKI IZIN UNTUK MENGGUNAKAN TANDA TANGAN PENGGUNA INI.',
+                                data.message || 'ANDA TIDAK MEMILIKI IZIN UNTUK MENGGUNAKAN TANDA TANGAN / STEMPEL PENGGUNA INI.',
                                 false
                             );
                         } else {
                             showSignatureScreenAlert(
-                                'TANDA TANGAN TIDAK DITEMUKAN',
-                                data.message || ('TANDA TANGAN UNTUK ' + userName.toUpperCase() + ' TIDAK DITEMUKAN.'),
+                                'DATA TIDAK DITEMUKAN',
+                                data.message || ('TANDA TANGAN / STEMPEL UNTUK ' + userName.toUpperCase() + ' TIDAK DITEMUKAN.'),
                                 false
                             );
                         }
@@ -1634,7 +1720,7 @@
                     .catch(() => {
                         showSignatureScreenAlert(
                             'KESALAHAN SISTEM',
-                            'GAGAL MENGAMBIL DATA TANDA TANGAN.',
+                            'GAGAL MENGAMBIL DATA TANDA TANGAN / STEMPEL.',
                             false
                         );
                     });

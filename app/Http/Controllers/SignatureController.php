@@ -36,19 +36,23 @@ class SignatureController extends Controller
             }
 
             $signatureId = $request->query('signature_id') ?? $request->input('signature_id');
-            if ($signatureId) {
-                $requestedSig = $user->signatures()->find($signatureId);
-                if ($requestedSig && $requestedSig->type === 'company_stamp') {
-                    $doc = Document::find($documentId);
-                    $docCompanyId = $doc ? ($doc->company_id ?? $doc->branch?->company_id) : null;
-                    if ($docCompanyId && (int)$requestedSig->company_id !== (int)$docCompanyId) {
-                        return response()->json([
-                            'success' => false,
-                            'message' => 'Stempel perusahaan tidak sesuai dengan perusahaan dokumen ini.',
-                        ], 422);
-                    }
+            $requestedSig = $signatureId ? $user->signatures()->find($signatureId) : $user->signatures()->where('type', 'original')->first();
+
+            if (!$requestedSig) {
+                return response()->json(['success' => false, 'message' => 'Tanda tangan / stempel pengguna tidak ditemukan.'], 404);
+            }
+
+            if ($requestedSig->type === 'company_stamp') {
+                $doc = Document::find($documentId);
+                $docCompanyId = $doc ? ($doc->company_id ?? $doc->branch?->company_id) : null;
+                if ($docCompanyId && (int)$requestedSig->company_id !== (int)$docCompanyId) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Stempel perusahaan tidak sesuai dengan perusahaan dokumen ini.',
+                    ], 422);
                 }
             }
+
             $pageNumber = (int) $request->input('page_number', 1);
             $posX = ($request->filled('pos_x') || $request->has('pos_x')) && $request->input('pos_x') !== null && $request->input('pos_x') !== '' ? (float) $request->input('pos_x') : null;
             $posY = ($request->filled('pos_y') || $request->has('pos_y')) && $request->input('pos_y') !== null && $request->input('pos_y') !== '' ? (float) $request->input('pos_y') : null;
@@ -56,11 +60,16 @@ class SignatureController extends Controller
             $height = (float) $request->input('height', 24.0);
             $preset = $request->input('preset_position', 'bottom-right');
 
-            // Find an active (non-used, non-rejected) signature request, or create a new pending request
+            // Find an active (non-used, non-rejected) signature request for this specific signature, or create a new pending request
             $requestRecord = SignatureRequest::where('requester_id', Auth::id())
                 ->where('target_user_id', $user->id)
                 ->where('document_id', $documentId)
-                ->where('requested_signature_id', $signatureId)
+                ->where(function ($q) use ($requestedSig) {
+                    $q->where('requested_signature_id', $requestedSig->id);
+                    if ($requestedSig->type === 'original') {
+                        $q->orWhereNull('requested_signature_id');
+                    }
+                })
                 ->where('is_used', false)
                 ->whereIn('status', ['pending', 'approved'])
                 ->latest()
@@ -72,7 +81,7 @@ class SignatureController extends Controller
                     'requester_id' => Auth::id(),
                     'target_user_id' => $user->id,
                     'document_id' => $documentId,
-                    'requested_signature_id' => $signatureId,
+                    'requested_signature_id' => $requestedSig->id,
                     'status' => 'pending',
                     'is_used' => false,
                     'page_number' => $pageNumber,
@@ -85,6 +94,7 @@ class SignatureController extends Controller
                 ]);
             } else {
                 $requestRecord->update([
+                    'requested_signature_id' => $requestedSig->id,
                     'status' => 'pending',
                     'is_used' => false,
                     'page_number' => $pageNumber,
@@ -96,11 +106,16 @@ class SignatureController extends Controller
                     'requested_at' => now(),
                 ]);
                 if ($doc) {
-                    $user->notify(new \App\Notifications\SignatureRequested($doc, Auth::user()->name));
+                    $user->notify(new \App\Notifications\SignatureRequested($doc, Auth::user()->name, $requestRecord));
                 }
             }
 
             if ($requestRecord->status !== 'approved') {
+                $isStamp = $requestedSig->type === 'company_stamp';
+                $msg = $isStamp
+                    ? 'Permintaan penggunaan stempel perusahaan telah dikirim ke ' . $user->name . '.'
+                    : 'Permintaan penggunaan tanda tangan telah dikirim ke ' . $user->name . '.';
+
                 return response()->json([
                     'success' => true,
                     'is_pending' => true,
@@ -108,7 +123,8 @@ class SignatureController extends Controller
                     'url' => null,
                     'token' => null,
                     'target_user_name' => $user->name,
-                    'message' => 'Permintaan penggunaan tanda tangan telah dikirim ke ' . $user->name . '.',
+                    'is_stamp' => $isStamp,
+                    'message' => $msg,
                 ]);
             }
         }
@@ -361,13 +377,12 @@ class SignatureController extends Controller
         $contextCompany = $contextCompanyId ? Company::find($contextCompanyId) : null;
         $contextCompanyName = $contextCompany ? $contextCompany->name : null;
 
-        $requestsGrouped = collect();
+        $requests = collect();
         if ($documentId) {
-            $requestsGrouped = SignatureRequest::where('document_id', $documentId)
+            $requests = SignatureRequest::where('document_id', $documentId)
                 ->where('requester_id', $currentUser->id)
                 ->latest()
-                ->get()
-                ->groupBy('target_user_id');
+                ->get();
         }
 
         $availableToReplaceCount = 0;
@@ -375,56 +390,101 @@ class SignatureController extends Controller
         $users = User::with(['division', 'signatures.company'])
             ->where('is_active', true)
             ->get()
-            ->map(function ($u) use ($currentUser, $requestsGrouped, &$availableToReplaceCount, $contextCompanyId) {
+            ->map(function ($u) use ($currentUser, $requests, &$availableToReplaceCount, $contextCompanyId) {
                 $isMe = $u->id === $currentUser->id;
-                $userRequests = $requestsGrouped->get($u->id, collect());
-
-                // Find approved and unused request if available
-                $approvedAvailableReq = $userRequests->first(fn($r) => $r->isApproved() && !$r->is_used);
-                $pendingReq = $userRequests->first(fn($r) => $r->isPending());
-                $latestReq = $userRequests->first();
-
-                $requestStatus = 'none'; // none, pending, approved, rejected, used
-                $requestId = null;
-                $isAvailableToReplace = false;
-                $availableCredits = 0;
-
-                if ($isMe) {
-                    $requestStatus = 'me';
-                } elseif ($userRequests->isNotEmpty()) {
-                    $availableCredits = $userRequests->filter(fn($r) => $r->isApproved() && !$r->is_used)->count();
-                    $availableToReplaceCount += $availableCredits;
-
-                    if ($approvedAvailableReq) {
-                        $requestId = $approvedAvailableReq->id;
-                        $requestStatus = 'approved';
-                        $isAvailableToReplace = true;
-                    } elseif ($pendingReq) {
-                        $requestId = $pendingReq->id;
-                        $requestStatus = 'pending';
-                    } elseif ($latestReq && $latestReq->is_used) {
-                        $requestId = $latestReq->id;
-                        $requestStatus = 'used';
-                    } elseif ($latestReq && $latestReq->isRejected()) {
-                        $requestId = $latestReq->id;
-                        $requestStatus = 'rejected';
-                    }
-                }
+                $userRequests = $requests->where('target_user_id', $u->id);
 
                 // Filter signatures by document company context:
                 // 'original' is always allowed.
-                // 'company_stamp' is allowed ONLY if it matches the document's company context.
+                // 'company_stamp' is allowed if document context matches or if no company context is set.
                 $filteredSignatures = $u->signatures->filter(function ($sig) use ($contextCompanyId) {
                     if ($sig->type === 'original') {
                         return true;
                     }
-                    if ($sig->type === 'company_stamp' && $contextCompanyId && (int)$sig->company_id === (int)$contextCompanyId) {
-                        return true;
+                    if ($sig->type === 'company_stamp') {
+                        if (!$contextCompanyId || (int)$sig->company_id === (int)$contextCompanyId) {
+                            return true;
+                        }
                     }
                     return false;
                 })->values();
 
+                $mappedSignatures = $filteredSignatures->map(function ($sig) use ($isMe, $userRequests, &$availableToReplaceCount) {
+                    $sigRequests = $userRequests->filter(function ($r) use ($sig) {
+                        if ((int)$r->requested_signature_id === (int)$sig->id) return true;
+                        if ($sig->type === 'original' && is_null($r->requested_signature_id)) return true;
+                        return false;
+                    });
+
+                    $approvedReq = $sigRequests->first(fn($r) => $r->isApproved() && !$r->is_used);
+                    $pendingReq = $sigRequests->first(fn($r) => $r->isPending());
+                    $latestSigReq = $sigRequests->first();
+
+                    $status = 'none'; // none, pending, approved, rejected, used
+                    $requestId = null;
+                    $isAvailableToReplace = false;
+
+                    if ($isMe) {
+                        $status = 'me';
+                    } elseif ($approvedReq) {
+                        $status = 'approved';
+                        $requestId = $approvedReq->id;
+                        $isAvailableToReplace = true;
+                        $availableToReplaceCount++;
+                    } elseif ($pendingReq) {
+                        $status = 'pending';
+                        $requestId = $pendingReq->id;
+                    } elseif ($latestSigReq && $latestSigReq->is_used) {
+                        $status = 'used';
+                        $requestId = $latestSigReq->id;
+                    } elseif ($latestSigReq && $latestSigReq->isRejected()) {
+                        $status = 'rejected';
+                        $requestId = $latestSigReq->id;
+                    }
+
+                    return [
+                        'id' => $sig->id,
+                        'type' => $sig->type,
+                        'company_id' => $sig->company_id,
+                        'company_name' => $sig->company ? $sig->company->name : null,
+                        'preview_url' => asset('storage/' . $sig->file_path),
+                        'data_uri' => $sig->base64,
+                        'request_id' => $requestId,
+                        'request_status' => $status,
+                        'rejected_reason' => ($latestSigReq && $latestSigReq->isRejected()) ? $latestSigReq->rejected_reason : null,
+                        'is_available_to_replace' => $isAvailableToReplace,
+                    ];
+                });
+
                 $hasSignature = $filteredSignatures->isNotEmpty();
+                $userAvailableCredits = $mappedSignatures->where('is_available_to_replace', true)->count();
+
+                // Top-level status for backwards compatibility / summary
+                $topApproved = $mappedSignatures->firstWhere('is_available_to_replace', true);
+                $topPending = $mappedSignatures->firstWhere('request_status', 'pending');
+                $topRejected = $mappedSignatures->firstWhere('request_status', 'rejected');
+                $topUsed = $mappedSignatures->firstWhere('request_status', 'used');
+
+                $summaryStatus = 'none';
+                $summaryReqId = null;
+                $summaryRejectedReason = null;
+
+                if ($isMe) {
+                    $summaryStatus = 'me';
+                } elseif ($topApproved) {
+                    $summaryStatus = 'approved';
+                    $summaryReqId = $topApproved['request_id'];
+                } elseif ($topPending) {
+                    $summaryStatus = 'pending';
+                    $summaryReqId = $topPending['request_id'];
+                } elseif ($topRejected) {
+                    $summaryStatus = 'rejected';
+                    $summaryReqId = $topRejected['request_id'];
+                    $summaryRejectedReason = $topRejected['rejected_reason'];
+                } elseif ($topUsed) {
+                    $summaryStatus = 'used';
+                    $summaryReqId = $topUsed['request_id'];
+                }
 
                 return [
                     'id' => $u->id,
@@ -438,20 +498,13 @@ class SignatureController extends Controller
                     'division' => $u->division ? $u->division->name : 'Umum',
                     'is_me' => $isMe,
                     'has_signature' => $hasSignature,
-                    'signatures' => $filteredSignatures->map(function($sig) {
-                        return [
-                            'id' => $sig->id,
-                            'type' => $sig->type,
-                            'company_id' => $sig->company_id,
-                            'company_name' => $sig->company ? $sig->company->name : null,
-                        ];
-                    }),
+                    'signatures' => $mappedSignatures,
                     'placeholder' => $isMe ? '[ttd.me]' : '[ttd:' . $u->name . ']',
-                    'request_id' => $requestId,
-                    'request_status' => $requestStatus,
-                    'rejected_reason' => ($latestReq && $latestReq->isRejected()) ? $latestReq->rejected_reason : null,
-                    'is_available_to_replace' => $isAvailableToReplace,
-                    'available_credits' => $availableCredits,
+                    'request_id' => $summaryReqId,
+                    'request_status' => $summaryStatus,
+                    'rejected_reason' => $summaryRejectedReason,
+                    'is_available_to_replace' => $userAvailableCredits > 0,
+                    'available_credits' => $userAvailableCredits,
                 ];
             });
 
@@ -505,12 +558,12 @@ class SignatureController extends Controller
         ]);
 
         $onlyOfficeService = app(\App\Services\OnlyOfficeService::class);
-        $sig = $signatureRequest->requestedSignature ?? $targetUser->signature;
+        $sig = $signatureRequest->requestedSignature ?? $targetUser->signatures()->where('type', 'original')->first();
 
         if (!$sig) {
             return response()->json([
                 'success' => false,
-                'message' => 'Tanda tangan pengguna tidak ditemukan.',
+                'message' => 'Tanda tangan / stempel pengguna tidak ditemukan.',
             ], 404);
         }
 
@@ -522,19 +575,20 @@ class SignatureController extends Controller
         $isPdf = false;
         if ($version && (($version->file_path && str_ends_with(strtolower($version->file_path), '.pdf')) || ($version->file_mime && str_contains(strtolower($version->file_mime), 'pdf')))) {
             $isPdf = true;
-            if ($sig && $sig->file_path) {
-                $signaturePath = Storage::disk('public')->path($sig->file_path);
-                $processor = app(\App\Services\DocumentProcessorService::class);
-                $processor->processSignature($document, $version, $signatureRequest->id, $signaturePath, $signatureRequest);
-            }
+            // Note: For PDF documents, the signature/stamp was already stamped directly onto the PDF file upon approval in executeApproval.
+            // We do NOT process/stamp again here to avoid duplicate or mixed overlapping stamps.
         }
+
+        $isStamp = $sig->type === 'company_stamp';
+        $itemLabel = $isStamp ? 'Stempel perusahaan' : 'Tanda tangan resmi';
 
         return response()->json([
             'success'        => true,
-            'message'        => $isPdf ? 'Tanda tangan resmi berhasil dibubuhkan pada dokumen PDF.' : 'Tanda tangan resmi berhasil dimuat.',
+            'message'        => $isPdf ? "{$itemLabel} berhasil dibubuhkan pada dokumen PDF." : "{$itemLabel} berhasil dimuat.",
             'url'            => $onlyOfficeUrl,
             'token'          => $token,
             'is_pdf'         => $isPdf,
+            'is_stamp'       => $isStamp,
             'client_url'     => asset('storage/' . $sig->file_path),
             'request_id'     => $signatureRequest->id,
             'target_user_id' => $targetUser->id,
@@ -750,7 +804,7 @@ class SignatureController extends Controller
         }
 
         // Base query for incoming requests
-        $incomingBaseQuery = SignatureRequest::with(['requester', 'document.branch', 'document.company', 'document.division'])
+        $incomingBaseQuery = SignatureRequest::with(['requester', 'requestedSignature.company', 'document.branch', 'document.company', 'document.division'])
             ->where('target_user_id', $user->id);
 
         // Counts for tab badges
@@ -789,7 +843,7 @@ class SignatureController extends Controller
             ->withQueryString();
 
         // Outgoing requests
-        $outgoingRequests = SignatureRequest::with(['targetUser', 'document'])
+        $outgoingRequests = SignatureRequest::with(['targetUser', 'requestedSignature.company', 'document'])
             ->where('requester_id', $user->id)
             ->latest('requested_at')
             ->latest('id')
@@ -952,8 +1006,11 @@ class SignatureController extends Controller
         if ($document && $version && $targetUser) {
             $requestId = $signatureRequest->id;
             
-            if ($targetUser->signature) {
-                $signaturePath = Storage::disk('public')->path($targetUser->signature->file_path);
+            // Resolve the exact requested signature or stamp (not hardcoded to targetUser->signature)
+            $sig = $signatureRequest->requestedSignature ?? $targetUser->signatures()->where('type', 'original')->first();
+            
+            if ($sig && $sig->file_path && Storage::disk('public')->exists($sig->file_path)) {
+                $signaturePath = Storage::disk('public')->path($sig->file_path);
                 
                 // Process the signature synchronously using PHPWord or FPDI
                 $processor = app(\App\Services\DocumentProcessorService::class);
@@ -961,7 +1018,7 @@ class SignatureController extends Controller
             }
         }
 
-        $signatureRequest->loadMissing(['requester', 'document', 'targetUser']);
+        $signatureRequest->loadMissing(['requester', 'document', 'targetUser', 'requestedSignature.company']);
         if ($signatureRequest->requester && $signatureRequest->document) {
             $signatureRequest->requester->notify(
                 new \App\Notifications\SignatureRequestApprovedNotification(

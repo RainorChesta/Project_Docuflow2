@@ -141,9 +141,13 @@ class User extends Authenticatable
         return $this->hasMany(SignatureRequest::class, 'target_user_id');
     }
 
-    public function hasSignature(): bool
+    public function hasSignature(?string $type = null): bool
     {
-        return $this->signatures()->where('type', 'original')->exists();
+        if ($type !== null) {
+            return $this->signatures()->where('type', $type)->exists();
+        }
+
+        return $this->signatures()->exists();
     }
 
     public function isAdmin(): bool

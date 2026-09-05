@@ -54,20 +54,24 @@
                         @endphp
                         <div class="flex flex-wrap items-center gap-2">
                             @if($pendingSigRequest)
-                                {{-- Approve Signature Button --}}
+                                @php
+                                    $isStampReq = $pendingSigRequest->isStamp();
+                                    $companyName = $isStampReq && $pendingSigRequest->requestedSignature && $pendingSigRequest->requestedSignature->company ? $pendingSigRequest->requestedSignature->company->name : null;
+                                @endphp
+                                {{-- Approve Button --}}
                                 <button type="button" onclick="document.getElementById('approve-sig-modal-{{ $pendingSigRequest->id }}').showModal()" class="btn btn-success btn-sm gap-1.5 font-semibold shadow-sm">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                                     </svg>
-                                    {{ __('Approve TTD') }}
+                                    {{ $isStampReq ? __('Approve Stempel') : __('Approve TTD') }}
                                 </button>
 
-                                {{-- Reject Signature Button --}}
+                                {{-- Reject Button --}}
                                 <button type="button" onclick="document.getElementById('reject-sig-modal-{{ $pendingSigRequest->id }}').showModal()" class="btn btn-error btn-outline btn-sm gap-1.5 font-semibold">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                                     </svg>
-                                    {{ __('Reject TTD') }}
+                                    {{ $isStampReq ? __('Reject Stempel') : __('Reject TTD') }}
                                 </button>
 
                                 {{-- Custom Approve Confirmation Modal --}}
@@ -80,18 +84,26 @@
                                                 </svg>
                                             </div>
                                             <div>
-                                                <h3 class="font-bold text-lg text-base-content">{{ __('Konfirmasi Persetujuan Tanda Tangan') }}</h3>
-                                                <p class="text-xs text-base-content/60">{{ __('Penyematan tanda tangan digital') }}</p>
+                                                <h3 class="font-bold text-lg text-base-content">{{ $isStampReq ? __('Konfirmasi Persetujuan Stempel') : __('Konfirmasi Persetujuan Tanda Tangan') }}</h3>
+                                                <p class="text-xs text-base-content/60">{{ $isStampReq ? ($companyName ? __('Stempel Perusahaan :comp', ['comp' => $companyName]) : __('Stempel Perusahaan')) : __('Penyematan tanda tangan digital') }}</p>
                                             </div>
                                         </div>
                                         <p class="text-sm text-base-content/80 py-2">
-                                            {!! __('Apakah Anda yakin ingin menyetujui penggunaan tanda tangan Anda oleh <strong>:name</strong> untuk dokumen <strong>:doc</strong>?', [
-                                                'name' => e($pendingSigRequest->requester->name),
-                                                'doc' => e($document->title)
-                                            ]) !!}
+                                            @if($isStampReq)
+                                                {!! __('Apakah Anda yakin ingin menyetujui penggunaan <strong>Stempel Perusahaan :company</strong> Anda oleh <strong>:name</strong> untuk dokumen <strong>:doc</strong>?', [
+                                                    'company' => e($companyName ?? 'Perusahaan'),
+                                                    'name' => e($pendingSigRequest->requester->name),
+                                                    'doc' => e($document->title)
+                                                ]) !!}
+                                            @else
+                                                {!! __('Apakah Anda yakin ingin menyetujui penggunaan tanda tangan Anda oleh <strong>:name</strong> untuk dokumen <strong>:doc</strong>?', [
+                                                    'name' => e($pendingSigRequest->requester->name),
+                                                    'doc' => e($document->title)
+                                                ]) !!}
+                                            @endif
                                         </p>
                                         <p class="text-xs text-base-content/60 bg-base-200/50 p-2.5 rounded-lg mb-4">
-                                            ℹ️ {{ __('Tanda tangan Anda akan dibubuhkan secara otomatis ke dalam dokumen ini.') }}
+                                            ℹ️ {{ $isStampReq ? __('Stempel perusahaan akan dibubuhkan secara otomatis ke dalam dokumen ini.') : __('Tanda tangan Anda akan dibubuhkan secara otomatis ke dalam dokumen ini.') }}
                                         </p>
                                         <div class="modal-action">
                                             <button type="button" onclick="document.getElementById('approve-sig-modal-{{ $pendingSigRequest->id }}').close()" class="btn btn-ghost btn-sm">{{ __('Batal') }}</button>
@@ -101,7 +113,7 @@
                                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                                                     </svg>
-                                                    {{ __('Ya, Setujui TTD') }}
+                                                    {{ $isStampReq ? __('Ya, Setujui Stempel') : __('Ya, Setujui TTD') }}
                                                 </button>
                                             </form>
                                         </div>
@@ -124,8 +136,8 @@
                                                         </svg>
                                                     </div>
                                                     <div>
-                                                        <h3 class="font-bold text-lg text-base-content leading-snug">{{ __('Tolak Penggunaan Tanda Tangan') }}</h3>
-                                                        <p class="text-xs text-base-content/60 mt-0.5">{{ __('Izin tanda tangan tidak akan diberikan.') }}</p>
+                                                        <h3 class="font-bold text-lg text-base-content leading-snug">{{ $isStampReq ? __('Tolak Penggunaan Stempel') : __('Tolak Penggunaan Tanda Tangan') }}</h3>
+                                                        <p class="text-xs text-base-content/60 mt-0.5">{{ $isStampReq ? __('Izin stempel perusahaan tidak akan diberikan.') : __('Izin tanda tangan tidak akan diberikan.') }}</p>
                                                     </div>
                                                 </div>
                                                 <button type="button" onclick="document.getElementById('reject-sig-modal-{{ $pendingSigRequest->id }}').close()" class="btn btn-ghost btn-sm btn-circle text-base-content/50 hover:text-base-content hover:bg-base-200">
@@ -167,13 +179,13 @@
                                                         name="reason" 
                                                         maxlength="500"
                                                         class="textarea textarea-bordered w-full text-sm text-base-content rounded-xl bg-base-200/30 border-base-300 focus:border-error focus:ring-2 focus:ring-error/20 focus:outline-hidden transition-all placeholder:text-base-content/40 leading-relaxed min-h-[95px] p-3" 
-                                                        placeholder="{{ __('Tuliskan alasan penolakan izin tanda tangan...') }}"></textarea>
+                                                        placeholder="{{ $isStampReq ? __('Tuliskan alasan penolakan izin stempel...') : __('Tuliskan alasan penolakan izin tanda tangan...') }}"></textarea>
                                                 </div>
                                                 <p class="text-[11px] text-base-content/50 flex items-center gap-1">
                                                     <svg class="w-3.5 h-3.5 text-base-content/40 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                     </svg>
-                                                    {{ __('Catatan ini akan dikirimkan ke pemohon izin tanda tangan.') }}
+                                                    {{ $isStampReq ? __('Catatan ini akan dikirimkan ke pemohon izin stempel.') : __('Catatan ini akan dikirimkan ke pemohon izin tanda tangan.') }}
                                                 </p>
                                             </div>
 

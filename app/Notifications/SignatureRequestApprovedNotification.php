@@ -27,17 +27,23 @@ class SignatureRequestApprovedNotification extends Notification
 
     public function toArray(object $notifiable): array
     {
+        $isStamp = $this->signatureRequest->isStamp();
+        $title = $isStamp ? __('STEMPEL PERUSAHAAN DISETUJUI') : __('TANDA TANGAN DISETUJUI');
+        $itemLabel = $isStamp ? __('STEMPEL PERUSAHAAN') : __('TANDA TANGAN');
+
         return [
-            'type'                 => 'signature_request_approved',
-            'title'                => __('TANDA TANGAN DISETUJUI'),
-            'message'              => __(':name TELAH MENYETUJUI PERMINTAAN TANDA TANGAN PADA DOKUMEN ":doc". SILAKAN BUKA EDITOR DAN LAKUKAN "REPLACE SIGNATURE" UNTUK MENAMPILKANNYA.', [
+            'type'                 => $isStamp ? 'stamp_request_approved' : 'signature_request_approved',
+            'title'                => $title,
+            'message'              => __(':name TELAH MENYETUJUI PERMINTAAN :item PADA DOKUMEN ":doc".', [
                 'name' => strtoupper($this->approverName),
+                'item' => $itemLabel,
                 'doc'  => strtoupper($this->document->title),
             ]),
             'url'                  => route('documents.edit', $this->document, false),
-            'icon'                 => 'signature',
+            'icon'                 => $isStamp ? 'stamp' : 'signature',
             'document_id'          => $this->document->id,
             'signature_request_id' => $this->signatureRequest->id,
+            'request_type'         => $isStamp ? 'stamp' : 'signature',
         ];
     }
 

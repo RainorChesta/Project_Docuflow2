@@ -28,17 +28,23 @@ class SignatureRequestRejectedNotification extends Notification
 
     public function toArray(object $notifiable): array
     {
+        $isStamp = $this->signatureRequest->isStamp();
+        $title = $isStamp ? __('STEMPEL PERUSAHAAN DITOLAK') : __('TANDA TANGAN DITOLAK');
+        $itemLabel = $isStamp ? __('STEMPEL PERUSAHAAN') : __('TANDA TANGAN');
+
         return [
-            'type'                 => 'signature_request_rejected',
-            'title'                => __('TANDA TANGAN DITOLAK'),
-            'message'              => __(':name TELAH MENOLAK PERMINTAAN TANDA TANGAN PADA DOKUMEN ":doc".', [
+            'type'                 => $isStamp ? 'stamp_request_rejected' : 'signature_request_rejected',
+            'title'                => $title,
+            'message'              => __(':name TELAH MENOLAK PERMINTAAN :item PADA DOKUMEN ":doc".', [
                 'name' => strtoupper($this->rejecterName),
+                'item' => $itemLabel,
                 'doc'  => strtoupper($this->document->title),
             ]),
             'url'                  => route('documents.edit', $this->document, false),
             'icon'                 => 'rejected',
             'document_id'          => $this->document->id,
             'signature_request_id' => $this->signatureRequest->id,
+            'request_type'         => $isStamp ? 'stamp' : 'signature',
             'reason'               => $this->reason,
         ];
     }

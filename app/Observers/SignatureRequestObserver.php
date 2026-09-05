@@ -12,14 +12,14 @@ class SignatureRequestObserver
      */
     public function created(SignatureRequest $signatureRequest): void
     {
-        $signatureRequest->loadMissing(['document', 'requester']);
+        $signatureRequest->loadMissing(['document', 'requester', 'requestedSignature.company']);
 
         $targetUser = $signatureRequest->targetUser;
         $document   = $signatureRequest->document;
         $requester  = $signatureRequest->requester;
 
         if ($targetUser && $document && $requester) {
-            $targetUser->notify(new SignatureRequested($document, $requester->name));
+            $targetUser->notify(new SignatureRequested($document, $requester->name, $signatureRequest));
         }
     }
 }

@@ -220,6 +220,7 @@
                                            title="{{ __('Pilih semua data pending pada halaman ini') }}" />
                                 </th>
                                 <th class="py-3 px-4">{{ __('Dokumen') }}</th>
+                                <th class="py-3 px-4">{{ __('Jenis') }}</th>
                                 <th class="py-3 px-4">{{ __('Pemohon') }}</th>
                                 <th class="py-3 px-4">{{ __('Waktu') }}</th>
                                 <th class="py-3 px-4">{{ __('Status') }}</th>
@@ -258,6 +259,19 @@
                                                 <span class="font-semibold text-sm text-base-content">{{ __('Dokumen Umum') }}</span>
                                             @endif
                                         </div>
+                                    </td>
+                                    <td class="px-4 py-4 whitespace-nowrap">
+                                        @if($req->isStamp())
+                                            <span class="badge badge-sm gap-1 py-2 px-2.5 font-semibold bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                                                <span>{{ $req->type_label }}</span>
+                                            </span>
+                                        @else
+                                            <span class="badge badge-sm gap-1 py-2 px-2.5 font-semibold bg-sky-50 text-sky-700 border-sky-300 dark:bg-sky-950/30 dark:text-sky-400 dark:border-sky-800">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                                <span>{{ __('TTD Original') }}</span>
+                                            </span>
+                                        @endif
                                     </td>
                                     <td class="px-4 py-4">
                                         <div class="font-medium text-sm text-base-content">{{ $req->requester?->name ?? '—' }}</div>
@@ -305,12 +319,23 @@
                                             @endif
 
                                             @if($req->isPending())
-                                                <button type="button" onclick="document.getElementById('approve-modal-{{ $req->id }}').showModal()" class="btn btn-success btn-xs gap-1 font-medium text-white shadow-xs" title="{{ __('Setujui penggunaan tanda tangan Anda pada dokumen ini') }}">
+                                                @php
+                                                    $isReqStamp = $req->isStamp();
+                                                    $approveBtnText = $isReqStamp ? __('Approve Stempel') : __('Approve TTD');
+                                                    $approveModalTitle = $isReqStamp ? __('Setujui Permintaan Stempel Perusahaan') : __('Setujui Permintaan Tanda Tangan');
+                                                    $approveModalSub = $isReqStamp ? __('Stempel perusahaan Anda akan dibubuhkan secara otomatis ke dalam dokumen ini.') : __('Tanda tangan Anda akan dibubuhkan secara otomatis ke dalam dokumen ini.');
+                                                    $approveSubmitText = $isReqStamp ? __('Ya, Setujui & Bubuhkan Stempel') : __('Ya, Setujui & Tanda Tangani');
+                                                    $rejectBtnText = $isReqStamp ? __('Reject Stempel') : __('Reject TTD');
+                                                    $rejectModalTitle = $isReqStamp ? __('Tolak Permintaan Stempel Perusahaan') : __('Tolak Permintaan Tanda Tangan');
+                                                    $rejectModalSub = $isReqStamp ? __('Izin stempel perusahaan tidak akan diberikan.') : __('Izin tanda tangan tidak akan diberikan.');
+                                                @endphp
+
+                                                <button type="button" onclick="document.getElementById('approve-modal-{{ $req->id }}').showModal()" class="btn btn-success btn-xs gap-1 font-medium text-white shadow-xs" title="{{ $isReqStamp ? __('Setujui penggunaan stempel perusahaan Anda pada dokumen ini') : __('Setujui penggunaan tanda tangan Anda pada dokumen ini') }}">
                                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                                    {{ __('Approve TTD') }}
+                                                    {{ $approveBtnText }}
                                                 </button>
 
-                                                {{-- Custom Approve Signature Modal --}}
+                                                {{-- Custom Approve Signature/Stamp Modal --}}
                                                 <dialog id="approve-modal-{{ $req->id }}" class="modal modal-bottom sm:modal-middle text-left whitespace-normal backdrop-blur-xs">
                                                     <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-lg">
                                                         <div class="p-6 pb-4">
@@ -322,8 +347,8 @@
                                                                         </svg>
                                                                     </div>
                                                                     <div>
-                                                                        <h3 class="font-bold text-lg text-base-content leading-snug">{{ __('Setujui Permintaan Tanda Tangan') }}</h3>
-                                                                        <p class="text-xs text-base-content/60 mt-0.5">{{ __('Tanda tangan Anda akan dibubuhkan secara otomatis ke dalam dokumen ini.') }}</p>
+                                                                        <h3 class="font-bold text-lg text-base-content leading-snug">{{ $approveModalTitle }}</h3>
+                                                                        <p class="text-xs text-base-content/60 mt-0.5">{{ $approveModalSub }}</p>
                                                                     </div>
                                                                 </div>
                                                                 <button type="button" onclick="document.getElementById('approve-modal-{{ $req->id }}').close()" class="btn btn-ghost btn-sm btn-circle text-base-content/50 hover:text-base-content hover:bg-base-200">
@@ -341,6 +366,14 @@
                                                                     <div class="flex items-center gap-2 flex-wrap">
                                                                         <span class="font-semibold text-sm text-base-content break-words">{{ $req->document?->title ?? __('Dokumen') }}</span>
                                                                     </div>
+                                                                    <div class="flex items-center gap-2 mt-1.5 flex-wrap">
+                                                                        <span class="text-xs text-base-content/60">{{ __('Jenis Permintaan') }}:</span>
+                                                                        @if($isReqStamp)
+                                                                            <span class="badge badge-xs font-semibold bg-emerald-100 text-emerald-800 border-emerald-300">{{ $req->type_label }}</span>
+                                                                        @else
+                                                                            <span class="badge badge-xs font-semibold bg-sky-100 text-sky-800 border-sky-300">{{ __('Tanda Tangan Original') }}</span>
+                                                                        @endif
+                                                                    </div>
                                                                     <p class="text-xs text-base-content/60 mt-1">
                                                                         {{ __('Diminta oleh') }}: <span class="font-medium text-base-content/80">{{ $req->requester?->name ?? '—' }}</span>
                                                                     </p>
@@ -351,7 +384,7 @@
                                                                 <svg class="w-4 h-4 text-success shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                                 </svg>
-                                                                <span>{{ __('Pastikan Anda telah memeriksa isi dokumen sebelum memberikan persetujuan pembubuhan tanda tangan.') }}</span>
+                                                                <span>{{ $isReqStamp ? __('Pastikan Anda telah memeriksa isi dokumen sebelum memberikan persetujuan pembubuhan stempel perusahaan.') : __('Pastikan Anda telah memeriksa isi dokumen sebelum memberikan persetujuan pembubuhan tanda tangan.') }}</span>
                                                             </div>
                                                         </div>
 
@@ -365,7 +398,7 @@
                                                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                                                                     </svg>
-                                                                    {{ __('Ya, Setujui & Tanda Tangani') }}
+                                                                    {{ $approveSubmitText }}
                                                                 </button>
                                                             </div>
                                                         </form>
@@ -375,9 +408,9 @@
                                                     </form>
                                                 </dialog>
 
-                                                <button type="button" onclick="document.getElementById('reject-modal-{{ $req->id }}').showModal()" class="btn btn-error btn-outline btn-xs gap-1 font-medium" title="{{ __('Tolak izin penggunaan tanda tangan Anda') }}">
+                                                <button type="button" onclick="document.getElementById('reject-modal-{{ $req->id }}').showModal()" class="btn btn-error btn-outline btn-xs gap-1 font-medium" title="{{ $isReqStamp ? __('Tolak izin penggunaan stempel perusahaan Anda') : __('Tolak izin penggunaan tanda tangan Anda') }}">
                                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                                    {{ __('Reject TTD') }}
+                                                    {{ $rejectBtnText }}
                                                 </button>
 
                                                 {{-- Reject Reason Modal --}}
@@ -392,8 +425,8 @@
                                                                         </svg>
                                                                     </div>
                                                                     <div>
-                                                                        <h3 class="font-bold text-lg text-base-content leading-snug">{{ __('Tolak Permintaan Tanda Tangan') }}</h3>
-                                                                        <p class="text-xs text-base-content/60 mt-0.5">{{ __('Izin tanda tangan tidak akan diberikan.') }}</p>
+                                                                        <h3 class="font-bold text-lg text-base-content leading-snug">{{ $rejectModalTitle }}</h3>
+                                                                        <p class="text-xs text-base-content/60 mt-0.5">{{ $rejectModalSub }}</p>
                                                                     </div>
                                                                 </div>
                                                                 <button type="button" onclick="document.getElementById('reject-modal-{{ $req->id }}').close()" class="btn btn-ghost btn-sm btn-circle text-base-content/50 hover:text-base-content hover:bg-base-200">
@@ -410,6 +443,14 @@
                                                                 <div class="min-w-0 flex-1">
                                                                     <div class="flex items-center gap-2 flex-wrap">
                                                                         <span class="font-semibold text-sm text-base-content break-words">{{ $req->document?->title ?? __('Dokumen') }}</span>
+                                                                    </div>
+                                                                    <div class="flex items-center gap-2 mt-1.5 flex-wrap">
+                                                                        <span class="text-xs text-base-content/60">{{ __('Jenis Permintaan') }}:</span>
+                                                                        @if($isReqStamp)
+                                                                            <span class="badge badge-xs font-semibold bg-emerald-100 text-emerald-800 border-emerald-300">{{ $req->type_label }}</span>
+                                                                        @else
+                                                                            <span class="badge badge-xs font-semibold bg-sky-100 text-sky-800 border-sky-300">{{ __('Tanda Tangan Original') }}</span>
+                                                                        @endif
                                                                     </div>
                                                                     <p class="text-xs text-base-content/60 mt-1">
                                                                         {{ __('Diminta oleh') }}: <span class="font-medium text-base-content/80">{{ $req->requester?->name ?? '—' }}</span>
@@ -433,7 +474,7 @@
                                                                         name="reason" 
                                                                         maxlength="500"
                                                                         class="textarea textarea-bordered w-full text-sm text-base-content rounded-xl bg-base-200/30 border-base-300 focus:border-error focus:ring-2 focus:ring-error/20 focus:outline-hidden transition-all placeholder:text-base-content/40 leading-relaxed min-h-[95px] p-3" 
-                                                                        placeholder="{{ __('Tuliskan alasan penolakan izin tanda tangan...') }}"></textarea>
+                                                                        placeholder="{{ $isReqStamp ? __('Tuliskan alasan penolakan izin stempel perusahaan...') : __('Tuliskan alasan penolakan izin tanda tangan...') }}"></textarea>
                                                                 </div>
                                                             </div>
 
@@ -688,7 +729,8 @@
                         <thead>
                             <tr class="bg-base-200/40 text-xs font-semibold uppercase tracking-wider text-base-content/70">
                                 <th class="py-3 px-5">{{ __('Dokumen') }}</th>
-                                <th class="py-3 px-4">{{ __('Pemilik TTD') }}</th>
+                                <th class="py-3 px-4">{{ __('Jenis') }}</th>
+                                <th class="py-3 px-4">{{ __('Target Pengguna') }}</th>
                                 <th class="py-3 px-4">{{ __('Waktu') }}</th>
                                 <th class="py-3 px-4">{{ __('Status') }}</th>
                                 <th class="py-3 px-5 text-right">{{ __('Aksi') }}</th>
@@ -710,6 +752,19 @@
                                                 <span class="font-semibold text-sm text-base-content">{{ __('Dokumen Umum') }}</span>
                                             @endif
                                         </div>
+                                    </td>
+                                    <td class="px-4 py-4 whitespace-nowrap">
+                                        @if($req->isStamp())
+                                            <span class="badge badge-sm gap-1 py-2 px-2.5 font-semibold bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                                                <span>{{ $req->type_label }}</span>
+                                            </span>
+                                        @else
+                                            <span class="badge badge-sm gap-1 py-2 px-2.5 font-semibold bg-sky-50 text-sky-700 border-sky-300 dark:bg-sky-950/30 dark:text-sky-400 dark:border-sky-800">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                                <span>{{ __('TTD Original') }}</span>
+                                            </span>
+                                        @endif
                                     </td>
                                     <td class="px-4 py-4">
                                         <div class="font-medium text-sm text-base-content">{{ $req->targetUser?->name ?? '—' }}</div>

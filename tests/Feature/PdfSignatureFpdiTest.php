@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Company;
 use App\Models\Division;
 use App\Models\Document;
 use App\Models\DocumentType;
@@ -550,5 +551,248 @@ class PdfSignatureFpdiTest extends TestCase
                 'success' => false,
                 'message' => 'Fitur ini khusus untuk dokumen format PDF.',
             ]);
+    }
+
+    public function test_stamp_request_from_another_user_stamps_only_stamp_and_not_original_signature_on_pdf(): void
+    {
+        $company = Company::create(['name' => 'PT Makmur Sentosa', 'code' => 'PMS']);
+        $requester = User::factory()->create();
+        $targetUser = User::factory()->create();
+
+        // Target user has both personal signature and company stamp
+        $this->createValidSignaturePng('signatures/sig_' . $targetUser->id . '.png');
+        $this->createValidSignaturePng('signatures/stamp_' . $targetUser->id . '.png');
+
+        $personalSig = Signature::create([
+            'user_id' => $targetUser->id,
+            'file_path' => 'signatures/sig_' . $targetUser->id . '.png',
+            'type' => 'original',
+        ]);
+
+        $companyStamp = Signature::create([
+            'user_id' => $targetUser->id,
+            'company_id' => $company->id,
+            'file_path' => 'signatures/stamp_' . $targetUser->id . '.png',
+            'type' => 'company_stamp',
+        ]);
+
+        $docType = DocumentType::create(['name' => 'Surat Edaran', 'code' => 'S.ED']);
+        $document = Document::create([
+            'document_number' => '007/S.ED/IT/2026',
+            'title' => 'Stamp Only PDF Doc',
+            'document_type_id' => $docType->id,
+            'owner_id' => $requester->id,
+            'visibility' => 'division',
+        ]);
+
+        $pdfPath = 'documents/' . $document->id . '/v1.pdf';
+        $this->createValidPdf($pdfPath);
+
+        DocumentVersion::create([
+            'document_id' => $document->id,
+            'version_number' => 1,
+            'content' => '',
+            'author_id' => $requester->id,
+            'author_name' => $requester->name,
+            'status' => 'draft',
+            'file_path' => $pdfPath,
+            'file_mime' => 'application/pdf',
+            'file_original_name' => 'stamp_doc.pdf',
+        ]);
+
+        // Requester requests company stamp with custom coordinates
+        $sigRequest = SignatureRequest::create([
+            'document_id' => $document->id,
+            'requester_id' => $requester->id,
+            'target_user_id' => $targetUser->id,
+            'requested_signature_id' => $companyStamp->id,
+            'status' => 'pending',
+            'page_number' => 1,
+            'preset_position' => 'custom',
+            'pos_x' => 120.0,
+            'pos_y' => 200.0,
+            'width' => 35.0,
+            'height' => 35.0,
+        ]);
+
+        $this->assertTrue($sigRequest->isStamp());
+        $this->assertFalse($sigRequest->isSignature());
+        $this->assertEquals('Stempel (PT MAKMUR SENTOSA)', $sigRequest->type_label);
+
+        // Target user approves the stamp request
+        $response = $this->actingAs($targetUser)->post(route('signatures.requests.approve', $sigRequest));
+        $response->assertRedirect();
+
+        $sigRequest->refresh();
+        $this->assertEquals('approved', $sigRequest->status);
+
+        // Verify PDF was stamped and is valid
+        $this->assertTrue(Storage::disk('local')->exists($pdfPath));
+        $fpdi = new Fpdi();
+        $tempFile = storage_path('app/temp_verify_stamp_' . uniqid() . '.pdf');
+        file_put_contents($tempFile, Storage::disk('local')->get($pdfPath));
+        $pages = $fpdi->setSourceFile($tempFile);
+        @unlink($tempFile);
+        $this->assertEquals(1, $pages);
+    }
+
+    public function test_consuming_approved_pdf_stamp_does_not_double_stamp_pdf(): void
+    {
+        $company = Company::create(['name' => 'PT Maju Terus', 'code' => 'PMT']);
+        $requester = User::factory()->create();
+        $targetUser = User::factory()->create();
+
+        $this->createValidSignaturePng('signatures/stamp_' . $targetUser->id . '.png');
+
+        $companyStamp = Signature::create([
+            'user_id' => $targetUser->id,
+            'company_id' => $company->id,
+            'file_path' => 'signatures/stamp_' . $targetUser->id . '.png',
+            'type' => 'company_stamp',
+        ]);
+
+        $docType = DocumentType::create(['name' => 'Surat Edaran', 'code' => 'S.ED']);
+        $document = Document::create([
+            'document_number' => '008/S.ED/IT/2026',
+            'title' => 'Consume Stamp PDF Doc',
+            'document_type_id' => $docType->id,
+            'owner_id' => $requester->id,
+            'visibility' => 'division',
+        ]);
+
+        $pdfPath = 'documents/' . $document->id . '/v1.pdf';
+        $this->createValidPdf($pdfPath);
+
+        DocumentVersion::create([
+            'document_id' => $document->id,
+            'version_number' => 1,
+            'content' => '',
+            'author_id' => $requester->id,
+            'author_name' => $requester->name,
+            'status' => 'draft',
+            'file_path' => $pdfPath,
+            'file_mime' => 'application/pdf',
+            'file_original_name' => 'consume_stamp.pdf',
+        ]);
+
+        $sigRequest = SignatureRequest::create([
+            'document_id' => $document->id,
+            'requester_id' => $requester->id,
+            'target_user_id' => $targetUser->id,
+            'requested_signature_id' => $companyStamp->id,
+            'status' => 'pending',
+            'page_number' => 1,
+            'preset_position' => 'bottom-right',
+            'pos_x' => 100.0,
+            'pos_y' => 150.0,
+            'width' => 30.0,
+            'height' => 30.0,
+        ]);
+
+        // Target approves -> stamps PDF once
+        $this->actingAs($targetUser)->post(route('signatures.requests.approve', $sigRequest));
+        $sigRequest->refresh();
+        $this->assertEquals('approved', $sigRequest->status);
+
+        $stampedPdfBytes = Storage::disk('local')->get($pdfPath);
+
+        // Requester consumes the approved request
+        $consumeRes = $this->actingAs($requester)->postJson("/signature-requests/{$sigRequest->id}/consume");
+        $consumeRes->assertStatus(200)->assertJson(['success' => true]);
+
+        $sigRequest->refresh();
+        $this->assertTrue($sigRequest->is_used);
+        $this->assertNotNull($sigRequest->used_at);
+
+        // PDF bytes should remain identical (not stamped a second time on top)
+        $this->assertEquals($stampedPdfBytes, Storage::disk('local')->get($pdfPath));
+    }
+
+    public function test_signature_and_stamp_requests_can_be_made_independently_to_same_user(): void
+    {
+        $company = Company::create(['name' => 'PT Berdikari', 'code' => 'PBD']);
+        $requester = User::factory()->create();
+        $targetUser = User::factory()->create();
+
+        $this->createValidSignaturePng('signatures/sig_' . $targetUser->id . '.png');
+        $this->createValidSignaturePng('signatures/stamp_' . $targetUser->id . '.png');
+
+        $personalSig = Signature::create([
+            'user_id' => $targetUser->id,
+            'file_path' => 'signatures/sig_' . $targetUser->id . '.png',
+            'type' => 'original',
+        ]);
+
+        $companyStamp = Signature::create([
+            'user_id' => $targetUser->id,
+            'company_id' => $company->id,
+            'file_path' => 'signatures/stamp_' . $targetUser->id . '.png',
+            'type' => 'company_stamp',
+        ]);
+
+        $docType = DocumentType::create(['name' => 'Surat Edaran', 'code' => 'S.ED']);
+        $document = Document::create([
+            'document_number' => '009/S.ED/IT/2026',
+            'title' => 'Independent Request PDF Doc',
+            'document_type_id' => $docType->id,
+            'owner_id' => $requester->id,
+            'visibility' => 'division',
+        ]);
+
+        $pdfPath = 'documents/' . $document->id . '/v1.pdf';
+        $this->createValidPdf($pdfPath);
+
+        DocumentVersion::create([
+            'document_id' => $document->id,
+            'version_number' => 1,
+            'content' => '',
+            'author_id' => $requester->id,
+            'author_name' => $requester->name,
+            'status' => 'draft',
+            'file_path' => $pdfPath,
+            'file_mime' => 'application/pdf',
+            'file_original_name' => 'indep.pdf',
+        ]);
+
+        // Request 1: Personal signature
+        $req1 = $this->actingAs($requester)->getJson("/profile/signature?user_id={$targetUser->id}&document_id={$document->id}&signature_id={$personalSig->id}&page_number=1&pos_x=50&pos_y=50&width=30&height=20");
+        $req1->assertStatus(200)->assertJson(['is_pending' => true]);
+
+        // Request 2: Company stamp
+        $req2 = $this->actingAs($requester)->getJson("/profile/signature?user_id={$targetUser->id}&document_id={$document->id}&signature_id={$companyStamp->id}&page_number=1&pos_x=120&pos_y=50&width=30&height=30");
+        $req2->assertStatus(200)->assertJson(['is_pending' => true]);
+
+        $this->assertDatabaseCount('signature_requests', 2);
+
+        // Check available users endpoint returns independent signature statuses
+        $usersRes = $this->actingAs($requester)->getJson(route('signatures.users', ['document_id' => $document->id]));
+        $usersRes->assertStatus(200);
+
+        $userData = collect($usersRes->json('users'))->firstWhere('id', $targetUser->id);
+        $this->assertNotNull($userData);
+        $this->assertCount(2, $userData['signatures']);
+
+        $sigItem = collect($userData['signatures'])->firstWhere('type', 'original');
+        $stampItem = collect($userData['signatures'])->firstWhere('type', 'company_stamp');
+
+        $this->assertEquals('pending', $sigItem['request_status']);
+        $this->assertEquals('pending', $stampItem['request_status']);
+        $this->assertEquals('PT BERDIKARI', strtoupper($stampItem['company_name']));
+
+        // Approve only the company stamp request
+        $stampRequest = SignatureRequest::where('requested_signature_id', $companyStamp->id)->first();
+        $this->actingAs($targetUser)->post(route('signatures.requests.approve', $stampRequest));
+
+        // Re-check available users
+        $usersRes2 = $this->actingAs($requester)->getJson(route('signatures.users', ['document_id' => $document->id]));
+        $userData2 = collect($usersRes2->json('users'))->firstWhere('id', $targetUser->id);
+        $sigItem2 = collect($userData2['signatures'])->firstWhere('type', 'original');
+        $stampItem2 = collect($userData2['signatures'])->firstWhere('type', 'company_stamp');
+
+        $this->assertEquals('pending', $sigItem2['request_status']);
+        $this->assertFalse($sigItem2['is_available_to_replace']);
+
+        $this->assertEquals('approved', $stampItem2['request_status']);
+        $this->assertTrue($stampItem2['is_available_to_replace']);
     }
 }
