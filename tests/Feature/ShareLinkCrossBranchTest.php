@@ -138,19 +138,44 @@ class ShareLinkCrossBranchTest extends TestCase
         $response->assertOk();
         $response->assertSee('Dokumen Direct Share Alfa');
 
+        // User B can ALSO view via share link route even though general_access is restricted
+        $token = $doc->share_token ?? $this->shareService->regenerateShareToken($doc);
+        $linkResponse = $this->actingAs($this->userB)->get(route('documents.shared', $token));
+        $linkResponse->assertOk();
+        $linkResponse->assertSee('Dokumen Direct Share Alfa');
+
         // User B sees it in 'shared' tab
         $sharedTabResp = $this->actingAs($this->userB)->get(route('documents.index', ['type' => 'shared']));
         $sharedTabResp->assertOk();
         $sharedTabResp->assertSee('Dokumen Direct Share Alfa');
     }
 
+    public function test_user_from_different_company_can_view_document_via_share_link_when_division_shared(): void
+    {
+        $doc = $this->createDocInCompanyA('Dokumen Division Share Alfa');
+        $this->shareService->addDivisionShare($doc, $this->divisionB, 'viewer', $this->userA);
+
+        // User B (in division B) can view via share link route while general_access is restricted
+        $token = $doc->share_token ?? $this->shareService->regenerateShareToken($doc);
+        $linkResponse = $this->actingAs($this->userB)->get(route('documents.shared', $token));
+        $linkResponse->assertOk();
+        $linkResponse->assertSee('Dokumen Division Share Alfa');
+    }
+
     public function test_user_from_different_company_cannot_access_unshared_restricted_document(): void
     {
         $doc = $this->createDocInCompanyA('Dokumen Rahasia Alfa');
+        $token = $doc->share_token ?? $this->shareService->regenerateShareToken($doc);
 
-        // User B cannot view unshared document
+        // User B cannot view unshared document via normal route or share link route
         $this->actingAs($this->userB)->get(route('documents.show', $doc))->assertForbidden();
+        $this->actingAs($this->userB)->get(route('documents.shared', $token))->assertForbidden();
         $this->actingAs($this->userB)->get(route('documents.edit', $doc))->assertForbidden();
+    }
+
+    public function test_invalid_share_token_returns_404(): void
+    {
+        $this->actingAs($this->userB)->get(route('documents.shared', 'non-existent-token-12345'))->assertNotFound();
     }
 
     public function test_global_search_includes_cross_branch_shared_documents(): void

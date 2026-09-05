@@ -175,6 +175,11 @@ class DocumentShareController extends Controller
     {
         $this->authorize('view', $document);
 
+        if (empty($document->share_token)) {
+            $document->update(['share_token' => \Illuminate\Support\Str::random(32)]);
+            $document->refresh();
+        }
+
         $document->load(['shares.user', 'divisionShares.division']);
 
         return response()->json([
@@ -182,7 +187,7 @@ class DocumentShareController extends Controller
                 'id' => $document->owner_id,
                 'name' => $document->owner?->name,
             ],
-            'general_access' => $document->general_access,
+            'general_access' => $document->general_access ?? 'restricted',
             'link_role' => $document->link_role,
             'share_token' => $document->share_token,
             'share_url' => $document->share_token ? route('documents.shared', $document->share_token) : null,
@@ -232,17 +237,24 @@ class DocumentShareController extends Controller
     {
         $document = Document::where('share_token', $token)->firstOrFail();
 
-        if ($document->general_access !== DocumentShareService::GENERAL_ACCESS_ANYONE_WITH_LINK) {
-            abort(404);
-        }
-
         $this->authorize('view', $document);
 
         $currentUser = auth()->user();
 
-        // Notify document owner when another user opens the document via the share link
+        if ($currentUser) {
+            // Mark unread share notifications for this document as read
+            $currentUser->unreadNotifications()
+                ->where('data->type', 'document_shared')
+                ->where('data->document_id', $document->id)
+                ->update(['read_at' => now()]);
+        }
+
+        // Notify document owner when another user opens the document via the share link (throttled)
         if ($document->owner_id && $currentUser && $currentUser->id !== $document->owner_id) {
-            $document->owner?->notify(new \App\Notifications\DocumentOpenedViaLink($document, $currentUser->name));
+            $throttleKey = 'notif_doc_opened_link_' . $document->id . '_' . $currentUser->id;
+            if (\Illuminate\Support\Facades\Cache::add($throttleKey, true, now()->addMinutes(15))) {
+                $document->owner?->notify(new \App\Notifications\DocumentOpenedViaLink($document, $currentUser->name));
+            }
         }
 
         $document->load('owner', 'division', 'documentType', 'currentVersion', 'versions.author', 'shares.user', 'divisionShares.division');

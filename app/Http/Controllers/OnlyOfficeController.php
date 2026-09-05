@@ -162,6 +162,10 @@ class OnlyOfficeController extends Controller
      */
     public function qrcode(Document $document, \App\Services\QrCodeService $qrCodeService): \Illuminate\Http\Response
     {
+        if (config('app.url')) {
+            URL::forceRootUrl(config('app.url'));
+        }
+
         $qrPng = $qrCodeService->pngBytes($qrCodeService->qrcodeUrl($document));
 
         return response($qrPng, 200, [

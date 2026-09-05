@@ -16,12 +16,8 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            CompanySeeder::class,
-            BranchSeeder::class,
-            DivisionSeeder::class,
             DocumentTypeSeeder::class,
             UserSeeder::class,
-            DocumentTemplateSeeder::class,
         ]);
 
         // User::factory(10)->create();
@@ -59,8 +55,8 @@ class DatabaseSeeder extends Seeder
             }
 
             \App\Models\Signature::updateOrCreate(
-                ['user_id' => $admin->id],
-                ['file_path' => $filePath, 'signature_type' => 'draw']
+                ['user_id' => $admin->id, 'type' => 'original'],
+                ['file_path' => $filePath, 'created_via' => 'canvas']
             );
         }
     }

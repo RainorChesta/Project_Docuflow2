@@ -46,7 +46,7 @@
                             </svg>
                         </div>
                         <span id="signature-banner-message" class="font-bold uppercase tracking-wide leading-tight text-emerald-950 dark:text-emerald-100 break-words">
-                            TANDA TANGAN DARI {{ strtoupper(implode(', ', $pendingApprovalBanner)) }} TELAH DISETUJUI. SILAKAN KLIK "GANTI TTD" UNTUK MENGGANTI PLACEHOLDER DENGAN TANDA TANGAN RESMI.
+                            TANDA TANGAN DARI {{ strtoupper(implode(', ', $pendingApprovalBanner)) }} TELAH DISETUJUI. SILAKAN KLIK "SISIPKAN TTD" UNTUK MEMBUBUHKAN TANDA TANGAN RESMI KE DOKUMEN.
                         </span>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
@@ -54,7 +54,7 @@
                             {{ __('TUTUP') }}
                         </button>
                         <button type="button" onclick="openSignatureSelectorModal()" class="btn btn-success btn-xs text-white uppercase font-bold shadow-xs">
-                            {{ __('GANTI TTD') }}
+                            {{ __('SISIPKAN TTD') }}
                         </button>
                     </div>
                 </div>
@@ -202,8 +202,8 @@
                             </div>
                         </div>
 
-                        {{-- ONLYOFFICE Editor Viewport (Fluid & Responsive on Mobile/Tablet, 1150px on Desktop) --}}
-                        <div class="w-full border border-base-300 rounded-lg overflow-hidden shadow-xs bg-base-100 h-[72vh] sm:h-[80vh] lg:h-[1150px] min-h-[520px] sm:min-h-[650px] lg:min-h-[1123px]">
+                        {{-- ONLYOFFICE Editor Viewport (Fluid & Responsive on Mobile/Tablet/Desktop) --}}
+                        <div class="w-full border border-base-300 rounded-lg overflow-hidden shadow-xs bg-base-100 h-[calc(100vh-13.5rem)] min-h-[520px] sm:min-h-[600px]">
                             <div id="onlyoffice-editor-container" class="w-full h-full"></div>
                             
                             <div id="onlyoffice-fallback" class="hidden flex flex-col items-center justify-center p-6 bg-base-100/95 text-center h-full">
@@ -276,6 +276,36 @@
             </div>
         </div>
     </dialog>
+
+    {{-- Signature Alert Modal --}}
+    <dialog id="signature-alert-modal" class="modal modal-bottom sm:modal-middle backdrop-blur-xs">
+        <div class="modal-box p-6 rounded-3xl border border-base-300/80 shadow-2xl bg-base-100 max-w-md w-full text-center">
+            <div id="signature-alert-icon" class="mx-auto mb-3 flex items-center justify-center h-12 w-12 rounded-full bg-success/15 text-success">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+            </div>
+            <h3 id="signature-alert-title" class="font-bold text-lg text-base-content uppercase leading-tight mb-2">{{ __('PEMBERITAHUAN TANDA TANGAN') }}</h3>
+            <p id="signature-alert-message" class="text-xs sm:text-sm text-base-content/70 leading-relaxed break-words mb-4"></p>
+            <div class="modal-action border-t border-base-200 pt-3 flex justify-center">
+                <form method="dialog">
+                    <button class="btn btn-primary btn-sm px-6 rounded-xl font-bold uppercase">{{ __('MENGERTI') }}</button>
+                </form>
+            </div>
+        </div>
+    </dialog>
+
+    {{-- Floating Live Toast Notification inside Editor --}}
+    <div id="signature-live-toast" class="fixed top-6 right-6 z-50 transform transition-all duration-300 translate-y-[-150%] opacity-0 pointer-events-none max-w-sm w-full">
+        <div id="signature-live-toast-box" class="flex items-start gap-3 p-4 rounded-2xl bg-base-100/95 backdrop-blur-md border border-success/30 shadow-2xl shadow-success/10 text-base-content pointer-events-auto">
+            <div id="signature-live-toast-icon" class="h-8 w-8 rounded-full bg-success/20 text-success flex items-center justify-center shrink-0 mt-0.5">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+            </div>
+            <div class="flex-1 min-w-0 pr-1">
+                <h4 id="signature-live-toast-title" class="font-bold text-xs uppercase text-success tracking-wide">PERMINTAAN DIKIRIM</h4>
+                <p id="signature-live-toast-message" class="text-xs text-base-content/80 mt-0.5 leading-relaxed break-words"></p>
+            </div>
+            <button type="button" onclick="hideSignatureLiveToast()" class="text-base-content/40 hover:text-base-content text-xs p-1">✕</button>
+        </div>
+    </div>
 
     @if($isPdf)
         {{-- Interactive Visual PDF Signature Placement Modal --}}
@@ -435,6 +465,32 @@
                 isCustom: false
             };
 
+            const mainScrollContainer = document.querySelector('main') || document.documentElement;
+
+            function preserveParentScroll(fn) {
+                const currentScrollTop = mainScrollContainer ? mainScrollContainer.scrollTop : 0;
+                let result = null;
+                if (typeof fn === 'function') {
+                    result = fn();
+                }
+                requestAnimationFrame(() => {
+                    if (mainScrollContainer && mainScrollContainer.scrollTop !== currentScrollTop) {
+                        mainScrollContainer.scrollTop = currentScrollTop;
+                    }
+                });
+                setTimeout(() => {
+                    if (mainScrollContainer && mainScrollContainer.scrollTop !== currentScrollTop) {
+                        mainScrollContainer.scrollTop = currentScrollTop;
+                    }
+                }, 50);
+                setTimeout(() => {
+                    if (mainScrollContainer && mainScrollContainer.scrollTop !== currentScrollTop) {
+                        mainScrollContainer.scrollTop = currentScrollTop;
+                    }
+                }, 150);
+                return result;
+            }
+
             document.addEventListener('DOMContentLoaded', function() {
                 if (typeof DocsAPI === 'undefined') {
                     document.getElementById('onlyoffice-fallback')?.classList.remove('hidden');
@@ -480,7 +536,16 @@
                     config.events = config.events || {};
                     config.events.onAppReady = function() {
                         console.log('ONLYOFFICE editor ready');
-                        replacePendingSignatures();
+                        if (mainScrollContainer) mainScrollContainer.scrollTop = 0;
+                        preserveParentScroll(() => {
+                            replacePendingSignatures();
+                        });
+                    };
+                    config.events.onDocumentReady = function() {
+                        if (mainScrollContainer) mainScrollContainer.scrollTop = 0;
+                        setTimeout(() => {
+                            if (mainScrollContainer) mainScrollContainer.scrollTop = 0;
+                        }, 50);
                     };
                     config.events.onDocumentStateChange = function(event) {
                         const isModified = event.data;
@@ -540,7 +605,7 @@
                             }
                             if (match && match.url) {
                                 aContentControls[i].RemoveAllElements();
-                                var oImage = Api.CreateImage(match.url, 140 * 36000, 140 * 36000);
+                                var oImage = Api.CreateImage(match.url, 24 * 36000, 24 * 36000);
                                 var oParagraph = Api.CreateParagraph();
                                 oParagraph.AddElement(oImage, 0);
                                 try {
@@ -558,43 +623,73 @@
                 });
             }
 
+            let signatureToastTimer = null;
+            function hideSignatureLiveToast() {
+                const toast = document.getElementById('signature-live-toast');
+                if (toast) {
+                    toast.classList.add('translate-y-[-150%]', 'opacity-0');
+                    toast.classList.remove('translate-y-0', 'opacity-100');
+                }
+                if (signatureToastTimer) {
+                    clearTimeout(signatureToastTimer);
+                    signatureToastTimer = null;
+                }
+            }
+
             function showSignatureScreenAlert(title, message, isSuccess = true) {
-                const modal = document.getElementById('signature-alert-modal');
-                const titleEl = document.getElementById('signature-alert-title');
-                const messageEl = document.getElementById('signature-alert-message');
-                const iconEl = document.getElementById('signature-alert-icon');
+                const toast = document.getElementById('signature-live-toast');
+                const toastTitle = document.getElementById('signature-live-toast-title');
+                const toastMsg = document.getElementById('signature-live-toast-message');
+                const toastIcon = document.getElementById('signature-live-toast-icon');
+                const toastBox = document.getElementById('signature-live-toast-box');
                 const banner = document.getElementById('signature-banner-alert');
                 const bannerMsg = document.getElementById('signature-banner-message');
 
-                // Update modal contents
-                if (titleEl) titleEl.textContent = (title || 'PEMBERITAHUAN TANDA TANGAN').toUpperCase();
-                if (messageEl) messageEl.textContent = (message || '').toUpperCase();
-
-                if (iconEl) {
-                    if (isSuccess) {
-                        iconEl.className = 'mx-auto mb-3 flex items-center justify-center h-12 w-12 rounded-full bg-success/15 text-success';
-                        iconEl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>`;
-                    } else {
-                        iconEl.className = 'mx-auto mb-3 flex items-center justify-center h-12 w-12 rounded-full bg-warning/15 text-warning';
-                        iconEl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>`;
-                    }
-                }
-
-                // If it's the approval notification, we show it in the banner too
+                // If it's the approval notification, update the banner as well
                 if (title === 'TANDA TANGAN TELAH DISETUJUI' && banner && bannerMsg) {
                     bannerMsg.textContent = (message || '').toUpperCase();
                     banner.classList.remove('hidden');
-                } else if (modal) {
-                    modal.showModal();
+                }
+
+                // Show floating Toast
+                if (toast && toastTitle && toastMsg) {
+                    toastTitle.textContent = (title || 'PEMBERITAHUAN').toUpperCase();
+                    toastTitle.className = 'font-bold text-xs uppercase tracking-wide ' + (isSuccess ? 'text-success' : 'text-error');
+                    toastMsg.textContent = message || '';
+
+                    if (toastBox) {
+                        toastBox.className = 'flex items-start gap-3 p-4 rounded-2xl bg-base-100/95 backdrop-blur-md border shadow-2xl text-base-content pointer-events-auto ' + 
+                            (isSuccess ? 'border-success/30 shadow-success/10' : 'border-error/30 shadow-error/10');
+                    }
+                    if (toastIcon) {
+                        toastIcon.className = 'h-8 w-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ' + 
+                            (isSuccess ? 'bg-success/20 text-success' : 'bg-error/20 text-error');
+                        toastIcon.innerHTML = isSuccess 
+                            ? `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>`
+                            : `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>`;
+                    }
+
+                    toast.classList.remove('translate-y-[-150%]', 'opacity-0');
+                    toast.classList.add('translate-y-0', 'opacity-100');
+
+                    if (signatureToastTimer) clearTimeout(signatureToastTimer);
+                    signatureToastTimer = setTimeout(() => {
+                        hideSignatureLiveToast();
+                    }, 5000);
                 } else {
-                    alert((title + '\n' + message).toUpperCase());
+                    const modal = document.getElementById('signature-alert-modal');
+                    const titleEl = document.getElementById('signature-alert-title');
+                    const messageEl = document.getElementById('signature-alert-message');
+                    if (titleEl) titleEl.textContent = (title || 'PEMBERITAHUAN').toUpperCase();
+                    if (messageEl) messageEl.textContent = message || '';
+                    if (modal) modal.showModal();
                 }
             }
 
             /**
              * Insert image directly into ONLYOFFICE document editor via Document Builder Connector or DocsAPI insertImage
              */
-            function insertImageIntoOnlyOffice(imageUrl, widthPx = 140, heightPx = 140, token = null) {
+            function insertImageIntoOnlyOffice(imageUrl, widthMm = 24, heightMm = 24, token = null) {
                 if (!window.docEditor) {
                     showSignatureScreenAlert('PERINGATAN', 'EDITOR BELUM SELESAI DIMUAT. TUNGGU SEBENTAR...', false);
                     return;
@@ -605,46 +700,48 @@
                     return;
                 }
 
-                try {
-                    // Method 1: Use Document Builder Connector (Native and most reliable in ONLYOFFICE)
-                    if (typeof window.docEditor.createConnector === 'function') {
-                        try {
-                            const connector = window.docEditor.createConnector();
-                            const script = `
-                                var oDocument = Api.GetDocument();
-                                var oParagraph = Api.CreateParagraph();
-                                var oImage = Api.CreateImage("${imageUrl}", ${widthPx} * 36000, ${heightPx} * 36000);
-                                oParagraph.AddElement(oImage, 0);
-                                oDocument.InsertContent([oParagraph]);
-                            `;
-                            connector.callCommand(new Function(script), function() {
-                                console.log("Image inserted successfully via connector.");
-                            });
-                            return;
-                        } catch (connErr) {
-                            console.warn("Connector callCommand failed, falling back to DocsAPI insertImage:", connErr);
+                preserveParentScroll(() => {
+                    try {
+                        // Method 1: Use Document Builder Connector (Native and most reliable in ONLYOFFICE)
+                        if (typeof window.docEditor.createConnector === 'function') {
+                            try {
+                                const connector = window.docEditor.createConnector();
+                                const script = `
+                                    var oDocument = Api.GetDocument();
+                                    var oParagraph = Api.CreateParagraph();
+                                    var oImage = Api.CreateImage("${imageUrl}", ${widthMm} * 36000, ${heightMm} * 36000);
+                                    oParagraph.AddElement(oImage, 0);
+                                    oDocument.InsertContent([oParagraph]);
+                                `;
+                                connector.callCommand(new Function(script), function() {
+                                    console.log("Image inserted successfully via connector.");
+                                });
+                                return;
+                            } catch (connErr) {
+                                console.warn("Connector callCommand failed, falling back to DocsAPI insertImage:", connErr);
+                            }
                         }
-                    }
 
-                    // Method 2: Fallback to DocsAPI insertImage
-                    const payload = {
-                        fileType: "png",
-                        url: imageUrl,
-                        width: widthPx,
-                        height: heightPx
-                    };
+                        // Method 2: Fallback to DocsAPI insertImage (Converting mm to approximate px at 96 DPI)
+                        const payload = {
+                            fileType: "png",
+                            url: imageUrl,
+                            width: Math.round(widthMm * 3.78),
+                            height: Math.round(heightMm * 3.78)
+                        };
 
-                    if (token) {
-                        payload.token = token;
-                    }
+                        if (token) {
+                            payload.token = token;
+                        }
 
-                    if (typeof window.docEditor.insertImage === 'function') {
-                        window.docEditor.insertImage(payload);
+                        if (typeof window.docEditor.insertImage === 'function') {
+                            window.docEditor.insertImage(payload);
+                        }
+                    } catch (err) {
+                        console.warn('insertImage error:', err);
+                        showSignatureScreenAlert('PERINGATAN', 'TIDAK DAPAT MENYISIPKAN GAMBAR SECARA OTOMATIS. SILAKAN GUNAKAN MENU INSERT -> PICTURE PADA TOOLBAR ONLYOFFICE.', false);
                     }
-                } catch (err) {
-                    console.warn('insertImage error:', err);
-                    showSignatureScreenAlert('PERINGATAN', 'TIDAK DAPAT MENYISIPKAN GAMBAR SECARA OTOMATIS. SILAKAN GUNAKAN MENU INSERT -> PICTURE PADA TOOLBAR ONLYOFFICE.', false);
-                }
+                });
             }
 
             function insertQrCodeToEditor() {
@@ -657,7 +754,7 @@
                     showSignatureScreenAlert('PERINGATAN', 'QR CODE DOKUMEN TIDAK TERSEDIA.', false);
                     return;
                 }
-                insertImageIntoOnlyOffice(qrCodeUrl, 140, 140, qrCodeToken);
+                insertImageIntoOnlyOffice(qrCodeUrl, 24, 24, qrCodeToken);
             }
 
             // --- PDF Visual Interactive Drag & Drop / Resizing Placement Tool ---
@@ -825,8 +922,8 @@
                             const pxPerMmX = canvas.width / pdfWidthMm;
                             const pxPerMmY = canvas.height / pdfHeightMm;
 
-                            const defaultWMm = activeVisualType === 'qrcode' ? 30 : 40;
-                            const defaultHMm = activeVisualType === 'qrcode' ? 30 : 25;
+                            const defaultWMm = activeVisualType === 'qrcode' ? 24 : 24;
+                            const defaultHMm = activeVisualType === 'qrcode' ? 24 : 24;
                             const boxW = Math.round(defaultWMm * pxPerMmX);
                             const boxH = Math.round(defaultHMm * pxPerMmY);
                             const initLeft = pdfViewport.width - boxW - Math.round(15 * pxPerMmX);
@@ -1194,38 +1291,17 @@
                     return;
                 }
 
-                insertImageIntoOnlyOffice(mySignatureUrl, 140, 140, mySignatureToken);
+                insertImageIntoOnlyOffice(mySignatureUrl, 24, 24, mySignatureToken);
                 showSignatureScreenAlert('BERHASIL', 'TANDA TANGAN SAYA BERHASIL DISISIPKAN KE DALAM DOKUMEN.', true);
             }
 
-            function insertSignatureImage(signatureUrl, userName, token = null, isPending = false, requestId = null) {
+            function insertSignatureImage(signatureUrl, userName, token = null) {
                 if (!signatureUrl) {
                     showSignatureScreenAlert('PERINGATAN', 'PENGGUNA ' + userName.toUpperCase() + ' BELUM MEMILIKI TANDA TANGAN TERSIMPAN.', false);
                     return;
                 }
 
-                if (isPending && requestId && window.docEditor && window.docEditor.createConnector) {
-                    try {
-                        var connector = window.docEditor.createConnector();
-                        var script = `
-                            var oDocument = Api.GetDocument();
-                            var oBlock = Api.CreateBlockLvlSdt();
-                            var oParagraph = Api.CreateParagraph();
-                            oParagraph.AddText("\${PENDING_SIG_${requestId}}");
-                            oBlock.AddElement(oParagraph, 0);
-                            oBlock.SetLabel("pending_sig_${requestId}");
-                            oDocument.InsertContent([oBlock]);
-                        `;
-                        connector.callCommand(new Function(script), function() {
-                            console.log("Pending signature block content control inserted for request " + "${requestId}");
-                        });
-                    } catch (e) {
-                        console.warn("Failed to insert block content control, falling back to basic image insertion.", e);
-                        insertImageIntoOnlyOffice(signatureUrl, 140, 140, token);
-                    }
-                } else {
-                    insertImageIntoOnlyOffice(signatureUrl, 140, 140, token);
-                }
+                insertImageIntoOnlyOffice(signatureUrl, 24, 24, token);
             }
 
             let allSignatureUsersData = [];
@@ -1318,7 +1394,7 @@
                                 <span class="badge badge-success badge-xs font-bold uppercase">{{ __('DISETUJUI') }}${creditLabel}</span>
                                 <button type="button" onclick="consumeSignatureReplacement(${u.request_id}, '${u.name}')" class="btn btn-xs btn-success text-white gap-1 shadow-sm font-bold uppercase">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                    {{ __('GANTI TTD') }}
+                                    {{ __('SISIPKAN TTD') }}
                                 </button>
                             </div>
                         `;
@@ -1448,7 +1524,7 @@
                                         var label = aContentControls[i].GetLabel();
                                         if (label === "pending_sig_${requestId}") {
                                             aContentControls[i].RemoveAllElements();
-                                            var oImage = Api.CreateImage("${data.url}", 140 * 36000, 140 * 36000);
+                                            var oImage = Api.CreateImage("${data.url}", 24 * 36000, 24 * 36000);
                                             var oParagraph = Api.CreateParagraph();
                                             oParagraph.AddElement(oImage, 0);
                                             try {
@@ -1468,14 +1544,14 @@
                                         console.log("Replaced signature directly in existing control.");
                                     } else {
                                         console.log("Content control not found. Inserting at cursor.");
-                                        insertImageIntoOnlyOffice(data.url, 140, 140, data.token || null);
+                                        insertImageIntoOnlyOffice(data.url, 24, 24, data.token || null);
                                     }
                                 });
                             } catch(e) {
-                                insertImageIntoOnlyOffice(data.url, 140, 140, data.token || null);
+                                insertImageIntoOnlyOffice(data.url, 24, 24, data.token || null);
                             }
                         } else {
-                            insertImageIntoOnlyOffice(data.url, 140, 140, data.token || null);
+                            insertImageIntoOnlyOffice(data.url, 24, 24, data.token || null);
                         }
                         
                         showSignatureScreenAlert(
@@ -1520,14 +1596,22 @@
                     .then(res => res.json().then(data => ({ status: res.status, data: data })))
                     .then(response => {
                         const data = response.data;
-                        if (response.status === 200 && data.success && data.url) {
-                            if (!isPdfDocument) {
-                                insertSignatureImage(data.url, userName, data.token || null, data.is_pending || false, data.request_id || null);
+                        if (response.status === 200 && data.success) {
+                            if (!data.is_pending && data.url) {
+                                if (!isPdfDocument) {
+                                    insertSignatureImage(data.url, userName, data.token || null);
+                                }
                             }
-                            if (data.message) {
+                            if (data.is_pending) {
+                                showSignatureScreenAlert(
+                                    'PERMINTAAN TANDA TANGAN DIKIRIM',
+                                    (data.message || ('Permintaan penggunaan tanda tangan telah berhasil dikirim ke ' + userName.toUpperCase() + '.')) + (isPdfDocument ? ' KETIKA DISETUJUI, TANDA TANGAN AKAN OTOMATIS DIBUBUHKAN PADA DOKUMEN PDF.' : ' Notifikasi telah dikirimkan ke akun terkait.'),
+                                    true
+                                );
+                            } else if (data.message) {
                                 setTimeout(() => {
                                     showSignatureScreenAlert(
-                                        'PERMINTAAN TANDA TANGAN DIKIRIM',
+                                        'BERHASIL',
                                         data.message + (isPdfDocument ? ' KETIKA DISETUJUI, TANDA TANGAN AKAN OTOMATIS DIBUBUHKAN PADA DOKUMEN PDF.' : ''),
                                         true
                                     );
@@ -1591,7 +1675,7 @@
                         if (count > 0 && banner && bannerMsg) {
                             // Find the names of users with approved signatures
                             const names = (data.users || []).filter(u => u.is_available_to_replace).map(u => u.name.toUpperCase()).join(', ');
-                            bannerMsg.textContent = 'TANDA TANGAN DARI ' + names + ' TELAH DISETUJUI. SILAKAN KLIK "GANTI TTD" UNTUK MENGGANTI PLACEHOLDER DENGAN TANDA TANGAN RESMI.';
+                            bannerMsg.textContent = 'TANDA TANGAN DARI ' + names + ' TELAH DISETUJUI. SILAKAN KLIK "SISIPKAN TTD" UNTUK MEMBUBUHKAN TANDA TANGAN RESMI KE DOKUMEN.';
                             banner.classList.remove('hidden');
                         }
                     })

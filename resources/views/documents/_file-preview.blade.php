@@ -5,10 +5,10 @@
 
 <div class="w-full">
     @if($isPdf)
-        <iframe src="{{ $fileUrl }}" class="w-full border-0 h-[72vh] sm:h-[80vh] lg:h-[1123px] min-h-[520px] sm:min-h-[650px] lg:min-h-[1123px] block" title="{{ __('Pratinjau dokumen') }}"></iframe>
+        <iframe src="{{ $fileUrl }}" class="w-full border-0 h-[72vh] sm:h-[80vh] lg:h-[85vh] min-h-[520px] sm:min-h-[650px] lg:min-h-[700px] block" title="{{ __('Pratinjau dokumen') }}"></iframe>
     @else
         @if(isset($onlyOfficeConfig))
-            <div class="w-full bg-base-100 h-[72vh] sm:h-[80vh] lg:h-[1150px] min-h-[520px] sm:min-h-[650px] lg:min-h-[1123px]">
+            <div class="w-full bg-base-100 h-[72vh] sm:h-[80vh] lg:h-[85vh] min-h-[520px] sm:min-h-[650px] lg:min-h-[700px]">
                 <div id="docx-preview-{{ $version->id }}" class="w-full h-full"></div>
             </div>
 
@@ -102,7 +102,7 @@
                                             if (match && match.url) {
                                                 aContentControls[i].RemoveAllElements();
                                                 var oParagraph = Api.CreateParagraph();
-                                                var oImage = Api.CreateImage(match.url, 140 * 36000, 140 * 36000);
+                                                var oImage = Api.CreateImage(match.url, 24 * 36000, 24 * 36000);
                                                 oParagraph.AddElement(oImage, 0);
                                                 aContentControls[i].AddElement(oParagraph, 0);
                                                 aContentControls[i].SetLabel("resolved_sig_" + reqId);
@@ -134,7 +134,7 @@
                 });
             </script>
         @else
-            <div id="docx-preview-{{ $version->id }}" class="prose max-w-none p-6 sm:p-8 bg-base-100" style="min-height: 1123px;">
+            <div id="docx-preview-{{ $version->id }}" class="prose max-w-none p-6 sm:p-8 bg-base-100" style="min-height: 600px;">
                 <p class="text-base-content/50 text-sm">{{ __('Memuat isi dokumen...') }}</p>
             </div>
 

@@ -176,7 +176,8 @@ class OnlyOfficeIntegrationTest extends TestCase
         \App\Models\Signature::create([
             'user_id' => $this->user->id,
             'file_path' => $sigPath,
-            'signature_type' => 'canvas',
+            'type' => 'original',
+            'created_via' => 'canvas',
         ]);
 
         $response = $this->get(route('onlyoffice.signature', ['user' => $this->user->id]));
@@ -239,7 +240,8 @@ class OnlyOfficeIntegrationTest extends TestCase
         \App\Models\Signature::create([
             'user_id' => $this->user->id,
             'file_path' => $sigPath,
-            'signature_type' => 'canvas',
+            'type' => 'original',
+            'created_via' => 'canvas',
         ]);
 
         config([

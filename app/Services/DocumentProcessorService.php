@@ -51,8 +51,8 @@ class DocumentProcessorService
                 $pageNumber = $signatureRequest?->page_number ?? 1;
                 $posX = $signatureRequest?->pos_x;
                 $posY = $signatureRequest?->pos_y;
-                $width = $signatureRequest?->width ?? 40.0;
-                $height = $signatureRequest?->height ?? 25.0;
+                $width = $signatureRequest?->width ?? 24.0;
+                $height = $signatureRequest?->height ?? 24.0;
                 $preset = $signatureRequest?->preset_position ?? PdfSignatureProcessorService::PRESET_BOTTOM_RIGHT;
 
                 return $this->pdfProcessor->processPdfSignature(
@@ -84,8 +84,8 @@ class DocumentProcessorService
             // The image is replaced directly
             $templateProcessor->setImageValue($macroName, [
                 'path' => $signaturePath,
-                'width' => 140,
-                'height' => 140,
+                'width' => 90,
+                'height' => 90,
                 'ratio' => false
             ]);
 

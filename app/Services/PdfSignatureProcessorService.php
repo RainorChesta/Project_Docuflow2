@@ -42,8 +42,8 @@ class PdfSignatureProcessorService
         ?int $pageNumber = 1,
         ?float $x = null,
         ?float $y = null,
-        float $width = 40.0,
-        float $height = 25.0,
+        float $width = 24.0,
+        float $height = 24.0,
         ?string $preset = self::PRESET_BOTTOM_RIGHT,
         ?string $signerName = null
     ): bool {

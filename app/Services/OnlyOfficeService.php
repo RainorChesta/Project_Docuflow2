@@ -115,10 +115,11 @@ class OnlyOfficeService
     }
 
     /**
-     * Crop/trim any signature or stamp PNG tightly to its ink strokes / content bounding box
-     * with transparent background, eliminating artificial canvas padding/whitespace.
+     * Format any signature or stamp PNG cropped and centered on a 1:1 true square
+     * transparent canvas with balanced margins, ensuring a consistent square aspect ratio
+     * and crisp rendering across ONLYOFFICE and PDF viewers.
      */
-    public function trimSignatureImage(string $rawPngBytes, int $padding = 2): string
+    public function formatSquareSignature(string $rawPngBytes, int $targetSize = 400, int $padding = 24): string
     {
         if (!extension_loaded('gd') || empty($rawPngBytes)) {
             return $rawPngBytes;
@@ -168,25 +169,32 @@ class OnlyOfficeService
             $maxY = $srcH - 1;
         }
 
-        // Apply slight padding if desired
-        $minX = max(0, $minX - $padding);
-        $minY = max(0, $minY - $padding);
-        $maxX = min($srcW - 1, $maxX + $padding);
-        $maxY = min($srcH - 1, $maxY + $padding);
-
         $cropW = max(1, $maxX - $minX + 1);
         $cropH = max(1, $maxY - $minY + 1);
 
-        // Create destination image with the EXACT cropped dimensions
-        $dest = imagecreatetruecolor($cropW, $cropH);
+        $targetSize = max(100, $targetSize);
+        $padding = max(4, min((int)($targetSize * 0.2), $padding));
+        $innerSize = max(20, $targetSize - ($padding * 2));
+
+        // Scale proportionally to fit within innerSize of the square canvas
+        $scale = min($innerSize / $cropW, $innerSize / $cropH);
+        $drawW = (int) round($cropW * $scale);
+        $drawH = (int) round($cropH * $scale);
+
+        // Center within square canvas
+        $destX = (int) round(($targetSize - $drawW) / 2);
+        $destY = (int) round(($targetSize - $drawH) / 2);
+
+        // Create 1:1 true square image with transparent background
+        $dest = imagecreatetruecolor($targetSize, $targetSize);
         imagealphablending($dest, false);
         imagesavealpha($dest, true);
         $transparent = imagecolorallocatealpha($dest, 255, 255, 255, 127);
-        imagefilledrectangle($dest, 0, 0, $cropW, $cropH, $transparent);
+        imagefilledrectangle($dest, 0, 0, $targetSize, $targetSize, $transparent);
         imagealphablending($dest, true);
 
-        // Copy exact cropped region
-        imagecopy($dest, $src, 0, 0, $minX, $minY, $cropW, $cropH);
+        // Resample cropped signature neatly into the center of the square canvas
+        imagecopyresampled($dest, $src, $destX, $destY, $minX, $minY, $drawW, $drawH, $cropW, $cropH);
 
         ob_start();
         imagepng($dest);
@@ -199,11 +207,11 @@ class OnlyOfficeService
     }
 
     /**
-     * Backward-compatible alias for trimSignatureImage.
+     * Crop/trim any signature or stamp PNG tightly to ink strokes and center on a 1:1 square canvas.
      */
-    public function formatSquareSignature(string $rawPngBytes, int $targetSize = 400, int $padding = 2): string
+    public function trimSignatureImage(string $rawPngBytes, int $padding = 24): string
     {
-        return $this->trimSignatureImage($rawPngBytes, $padding);
+        return $this->formatSquareSignature($rawPngBytes, 400, $padding);
     }
 
     /**

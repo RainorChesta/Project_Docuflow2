@@ -40,8 +40,8 @@
                             </div>
                         </div>
 
-                        {{-- ONLYOFFICE Editor Viewport (Fluid & Responsive on Mobile/Tablet, 1150px on Desktop) --}}
-                        <div class="w-full border border-base-300 rounded-lg overflow-hidden shadow-xs bg-base-100 h-[72vh] sm:h-[80vh] lg:h-[1150px] min-h-[520px] sm:min-h-[650px] lg:min-h-[1123px]">
+                        {{-- ONLYOFFICE Editor Viewport (Fluid & Responsive on Mobile/Tablet/Desktop) --}}
+                        <div class="w-full border border-base-300 rounded-lg overflow-hidden shadow-xs bg-base-100 h-[calc(100vh-13.5rem)] min-h-[520px] sm:min-h-[600px]">
                             <div id="onlyoffice-editor-container" class="w-full h-full"></div>
                             
                             <div id="onlyoffice-fallback" class="hidden flex flex-col items-center justify-center p-6 bg-base-100/95 text-center h-full">
@@ -71,6 +71,8 @@
         <script src="{{ rtrim(config('onlyoffice.url'), '/') }}/web-apps/apps/api/documents/api.js"
                 onerror="document.getElementById('onlyoffice-fallback').classList.remove('hidden');"></script>
         <script>
+            const mainScrollContainer = document.querySelector('main') || document.documentElement;
+
             document.addEventListener('DOMContentLoaded', function() {
                 if (typeof DocsAPI === 'undefined') {
                     document.getElementById('onlyoffice-fallback')?.classList.remove('hidden');
@@ -86,7 +88,7 @@
                     config.editorConfig = config.editorConfig || {};
                     config.editorConfig.mode = 'edit';
                     config.editorConfig.customization = config.editorConfig.customization || {};
-                    config.editorConfig.customization.compactHeader = true;
+                    config.editorConfig.compactHeader = true;
                     config.editorConfig.customization.autoFocus = false;
                     config.editorConfig.customization.mobile = { force: false };
 
@@ -111,6 +113,13 @@
                     config.events = config.events || {};
                     config.events.onAppReady = function() {
                         console.log('ONLYOFFICE editor ready');
+                        if (mainScrollContainer) mainScrollContainer.scrollTop = 0;
+                    };
+                    config.events.onDocumentReady = function() {
+                        if (mainScrollContainer) mainScrollContainer.scrollTop = 0;
+                        setTimeout(() => {
+                            if (mainScrollContainer) mainScrollContainer.scrollTop = 0;
+                        }, 50);
                     };
                     config.events.onDocumentStateChange = function(event) {
                         const isModified = event.data;

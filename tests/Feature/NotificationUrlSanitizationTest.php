@@ -124,4 +124,24 @@ class NotificationUrlSanitizationTest extends TestCase
         $this->assertEquals('http://localhost:8000', url('/'));
         $this->assertStringNotContainsString('host.docker.internal', url('/'));
     }
+
+    public function test_qrcode_url_uses_app_url_when_requested_with_host_docker_internal()
+    {
+        config([
+            'app.url' => 'http://localhost:8000',
+            'onlyoffice.internal_url' => 'http://host.docker.internal:8000',
+        ]);
+
+        $request = \Illuminate\Http\Request::create(
+            'http://host.docker.internal:8000/onlyoffice/documents/' . $this->document->id . '/qrcode',
+            'GET'
+        );
+        $this->app->instance('request', $request);
+
+        $qrCodeService = app(\App\Services\QrCodeService::class);
+        $url = $qrCodeService->qrcodeUrl($this->document);
+
+        $this->assertStringStartsWith('http://localhost:8000/d/', $url);
+        $this->assertStringNotContainsString('host.docker.internal', $url);
+    }
 }

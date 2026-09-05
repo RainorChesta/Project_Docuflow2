@@ -18,7 +18,8 @@ class AdminDocumentTypeTest extends TestCase
         Signature::create([
             'user_id' => $admin->id,
             'file_path' => 'signatures/admin.png',
-            'signature_type' => 'canvas',
+            'type' => 'original',
+            'created_via' => 'canvas',
         ]);
         return $admin;
     }

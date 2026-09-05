@@ -52,8 +52,8 @@ class SignatureController extends Controller
             $pageNumber = (int) $request->input('page_number', 1);
             $posX = ($request->filled('pos_x') || $request->has('pos_x')) && $request->input('pos_x') !== null && $request->input('pos_x') !== '' ? (float) $request->input('pos_x') : null;
             $posY = ($request->filled('pos_y') || $request->has('pos_y')) && $request->input('pos_y') !== null && $request->input('pos_y') !== '' ? (float) $request->input('pos_y') : null;
-            $width = (float) $request->input('width', 40.0);
-            $height = (float) $request->input('height', 25.0);
+            $width = (float) $request->input('width', 24.0);
+            $height = (float) $request->input('height', 24.0);
             $preset = $request->input('preset_position', 'bottom-right');
 
             // Find an active (non-used, non-rejected) signature request, or create a new pending request
@@ -66,6 +66,7 @@ class SignatureController extends Controller
                 ->latest()
                 ->first();
 
+            $doc = Document::find($documentId);
             if (!$requestRecord) {
                 $requestRecord = SignatureRequest::create([
                     'requester_id' => Auth::id(),
@@ -84,29 +85,30 @@ class SignatureController extends Controller
                 ]);
             } else {
                 $requestRecord->update([
+                    'status' => 'pending',
+                    'is_used' => false,
                     'page_number' => $pageNumber,
                     'pos_x' => $posX,
                     'pos_y' => $posY,
                     'width' => $width,
                     'height' => $height,
                     'preset_position' => $preset,
+                    'requested_at' => now(),
                 ]);
+                if ($doc) {
+                    $user->notify(new \App\Notifications\SignatureRequested($doc, Auth::user()->name));
+                }
             }
 
             if ($requestRecord->status !== 'approved') {
-
-                $onlyOfficeService = app(\App\Services\OnlyOfficeService::class);
-                $internalBase = rtrim(config('onlyoffice.internal_url'), '/');
-                $placeholderUrl = $internalBase . route('onlyoffice.signature.placeholder', [], false);
-                $token = $placeholderUrl ? $onlyOfficeService->generateInsertImageToken($placeholderUrl) : null;
-
                 return response()->json([
                     'success' => true,
                     'is_pending' => true,
                     'request_id' => $requestRecord->id,
-                    'url' => $placeholderUrl,
-                    'token' => $token,
-                    'message' => 'PERMINTAAN PENGGUNAAN TANDA TANGAN TELAH DIKIRIM KE PENGGUNA TERKAIT.',
+                    'url' => null,
+                    'token' => null,
+                    'target_user_name' => $user->name,
+                    'message' => 'Permintaan penggunaan tanda tangan telah dikirim ke ' . $user->name . '.',
                 ]);
             }
         }
@@ -597,8 +599,8 @@ class SignatureController extends Controller
         $preset = $request->input('preset_position', 'bottom-right');
         $posX = ($request->filled('pos_x') || $request->has('pos_x')) && $request->input('pos_x') !== null && $request->input('pos_x') !== '' ? (float) $request->input('pos_x') : null;
         $posY = ($request->filled('pos_y') || $request->has('pos_y')) && $request->input('pos_y') !== null && $request->input('pos_y') !== '' ? (float) $request->input('pos_y') : null;
-        $width = (float) $request->input('width', 40.0);
-        $height = (float) $request->input('height', 25.0);
+        $width = (float) $request->input('width', 24.0);
+        $height = (float) $request->input('height', 24.0);
 
         $signaturePath = Storage::disk('public')->path($sig->file_path);
         $pdfProcessor = app(\App\Services\PdfSignatureProcessorService::class);
@@ -657,8 +659,8 @@ class SignatureController extends Controller
         $preset = $request->input('preset_position', 'bottom-right');
         $posX = ($request->filled('pos_x') || $request->has('pos_x')) && $request->input('pos_x') !== null && $request->input('pos_x') !== '' ? (float) $request->input('pos_x') : null;
         $posY = ($request->filled('pos_y') || $request->has('pos_y')) && $request->input('pos_y') !== null && $request->input('pos_y') !== '' ? (float) $request->input('pos_y') : null;
-        $width = (float) $request->input('width', 30.0);
-        $height = (float) $request->input('height', 30.0);
+        $width = (float) $request->input('width', 24.0);
+        $height = (float) $request->input('height', 24.0);
 
         $qrCodeService = app(\App\Services\QrCodeService::class);
         $qrPngBytes = $qrCodeService->pngBytes($qrCodeService->qrcodeUrl($document));

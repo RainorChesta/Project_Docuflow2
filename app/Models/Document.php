@@ -37,6 +37,18 @@ class Document extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::creating(function (Document $document) {
+            if (empty($document->share_token)) {
+                $document->share_token = \Illuminate\Support\Str::random(32);
+            }
+            if (empty($document->general_access)) {
+                $document->general_access = \App\Services\DocumentShareService::GENERAL_ACCESS_RESTRICTED;
+            }
+        });
+    }
+
     /**
      * Get the effective expiration date.
      * Uses manual expiration_date if set, otherwise calculates from created_at + default_retention_years.

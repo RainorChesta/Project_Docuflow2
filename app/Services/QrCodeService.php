@@ -29,10 +29,22 @@ class QrCodeService
 
         $path = route('documents.hash', ['token' => $token], false);
 
+        $internalHost = parse_url(config('onlyoffice.internal_url', ''), PHP_URL_HOST);
+
         // Dynamically detect current request host in web browser context (e.g. https://dokuflow.cmhgroup.id).
-        // Fall back to config('app.url') for CLI / queue workers.
+        // If request originates from internal Docker container (e.g. host.docker.internal), fall back to config('app.url').
         if (app()->bound('request') && request()->getHttpHost()) {
-            $baseUrl = request()->schemeAndHttpHost();
+            $currentHost = request()->getHost();
+
+            if (
+                $currentHost === 'host.docker.internal' ||
+                $currentHost === 'docker.for.win.localhost' ||
+                ($internalHost && $currentHost === $internalHost)
+            ) {
+                $baseUrl = rtrim(config('app.url'), '/');
+            } else {
+                $baseUrl = request()->schemeAndHttpHost();
+            }
         } else {
             $baseUrl = rtrim(config('app.url'), '/');
         }
