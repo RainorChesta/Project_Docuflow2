@@ -48,6 +48,7 @@
                             $backUrl = match(true) {
                                 $isSignatureContext => route('signatures.requests.index'),
                                 $isApprovalContext => route('documents.approvals'),
+                                request()->routeIs('documents.hash*') && request()->route('token') => route('documents.hash', ['token' => request()->route('token')]),
                                 auth()->user()->can('view', $document) => route('documents.show', $document),
                                 default => route('dashboard'),
                             };

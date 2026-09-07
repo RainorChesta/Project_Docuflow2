@@ -988,13 +988,47 @@ class DocumentController extends Controller
             abort(404);
         }
 
-        $document = Document::findOrFail($id);
+        $document = Document::with(['owner', 'division', 'documentType', 'currentVersion'])->findOrFail($id);
 
-        if (!auth()->user()->can('view', $document)) {
-            abort(403, 'Anda tidak punya akses ke dalam dokumen ini.');
+        return view('documents.verified', compact('document', 'token'));
+    }
+
+    /**
+     * Preview dokumen melalui token hash QR code.
+     * Mencegah pembocoran ID dokumen asli di URL browser & breadcrumb.
+     */
+    public function previewByHash(string $token)
+    {
+        try {
+            $id = Crypt::decryptString(base64_decode(strtr($token, '-_', '+/')));
+        } catch (\Throwable) {
+            abort(404);
         }
 
-        return view('documents.verified', compact('document'));
+        $document = Document::with(['owner', 'division', 'documentType', 'currentVersion'])->findOrFail($id);
+
+        if (!auth()->check()) {
+            return redirect()->guest(route('login'));
+        }
+
+        if (!auth()->user()->can('view', $document)) {
+            abort(403, __('Anda tidak memiliki izin untuk melihat dokumen ini.'));
+        }
+
+        $version = $document->displayVersion();
+        $onlyOfficeConfig = null;
+        if ($version) {
+            $onlyOfficeConfig = $this->onlyOfficeService->generateEditorConfig(
+                $document,
+                $version,
+                auth()->user(),
+                'view'
+            );
+        }
+
+        $approvedSignatures = $this->getApprovedSignatures($document);
+
+        return view('documents.preview', compact('document', 'onlyOfficeConfig', 'approvedSignatures'));
     }
 
     /**

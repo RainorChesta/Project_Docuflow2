@@ -24,12 +24,13 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+// Public QR Code verification routes
+Route::get('/d/{token}', [DocumentController::class, 'viewByHash'])->name('documents.hash');
+Route::get('/d/{token}/preview', [DocumentController::class, 'previewByHash'])->name('documents.hash.preview');
+
 use App\Http\Controllers\SignatureController;
 
 Route::middleware(['auth', 'signature.required'])->group(function () {
-// Public QR Code verification route
-Route::get('/d/{token}', [DocumentController::class, 'viewByHash'])->name('documents.hash');
-
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 

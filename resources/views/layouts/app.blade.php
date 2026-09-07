@@ -196,6 +196,11 @@
                                         }
                                     }
                                     $crumbs[] = ['label' => __('Pratinjau Dokumen'), 'url' => null];
+                                } elseif ($name === 'documents.hash.preview') {
+                                    if ($token = request()->route('token')) {
+                                        $crumbs[] = ['label' => __('Verifikasi Dokumen'), 'url' => route('documents.hash', ['token' => $token])];
+                                    }
+                                    $crumbs[] = ['label' => __('Pratinjau Dokumen'), 'url' => null];
                                 } elseif ($name === 'documents.index') {
                                     $crumbs[] = ['label' => $docTypeLabel, 'url' => null];
                                 }

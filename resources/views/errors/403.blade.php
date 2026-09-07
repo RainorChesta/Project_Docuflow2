@@ -1,4 +1,9 @@
-@if(auth()->check())
+@php
+    $isQrContext = request()->is('d/*') || request('from') === 'qr' || request()->routeIs('documents.hash*');
+    $qrToken = request()->route('token') ?? (request()->is('d/*') ? explode('/', request()->path())[1] ?? null : null);
+@endphp
+
+@if(auth()->check() && !$isQrContext)
 <x-app-layout>
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-base-content leading-tight">
@@ -64,8 +69,8 @@
     <link rel="shortcut icon" type="image/png" href="{{ asset('logo.png') }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="min-h-screen bg-base-200 flex items-center justify-center p-4">
-    <div class="card bg-base-100 shadow-xl max-w-md w-full text-center p-6 sm:p-8 space-y-6">
+<body class="min-h-screen bg-gradient-to-br from-primary/10 via-base-200 to-secondary/10 font-sans antialiased flex items-center justify-center p-4">
+    <div class="card bg-base-100/90 backdrop-blur-md shadow-2xl border border-base-300 max-w-md w-full text-center p-6 sm:p-8 space-y-6 rounded-3xl">
         <div class="inline-flex items-center justify-center relative mx-auto">
             <div class="w-20 h-20 rounded-2xl bg-error/10 border border-error/20 flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
@@ -79,13 +84,25 @@
             </div>
         </div>
         <div class="space-y-2">
-            <h1 class="text-xl font-bold text-base-content">{{ __('Dokumen Tidak Bisa Diakses') }}</h1>
-            <p class="text-base-content/70 text-sm">
+            <h1 class="text-xl sm:text-2xl font-bold text-base-content">{{ __('Dokumen Tidak Bisa Diakses') }}</h1>
+            <p class="text-base-content/70 text-sm leading-relaxed">
                 {{ $exception?->getMessage() ?: __('Anda tidak memiliki izin untuk mengakses dokumen ini.') }}
             </p>
+            <p class="text-xs text-base-content/50">
+                {{ __('Dokumen ini bersifat rahasia/terbatas dan hanya dapat diakses oleh pihak yang berwenang.') }}
+            </p>
         </div>
-        <div>
-            <a href="{{ route('login') }}" class="btn btn-primary btn-sm w-full">{{ __('Masuk') }}</a>
+        <div class="flex flex-col sm:flex-row gap-2.5 pt-2">
+            @if(auth()->check())
+                <a href="{{ route('dashboard') }}" class="btn btn-primary btn-sm flex-1">{{ __('Kembali ke Dashboard') }}</a>
+            @else
+                <a href="{{ route('login') }}" class="btn btn-primary btn-sm flex-1">{{ __('Masuk') }}</a>
+            @endif
+            @if($qrToken)
+                <a href="{{ route('documents.hash', ['token' => $qrToken]) }}" class="btn btn-outline btn-sm flex-1">{{ __('Status Dokumen') }}</a>
+            @else
+                <a href="/" class="btn btn-outline btn-sm flex-1">{{ __('Beranda') }}</a>
+            @endif
         </div>
     </div>
 </body>
