@@ -151,8 +151,36 @@ class OnlyOfficeService
             return $rawPngBytes;
         }
 
+        // Convert palette/indexed images (PNG-8, etc.) to truecolor immediately.
+        // On indexed images, imagecolorat() returns palette indices instead of ARGB values,
+        // which causes transparent/white backgrounds to be mistakenly treated as solid blue/black opaque pixels.
+        if (!imageistruecolor($src)) {
+            imagepalettetotruecolor($src);
+        }
+
         $srcW = imagesx($src);
         $srcH = imagesy($src);
+
+        // Detect if the source image already has a transparent background by sampling border pixels
+        $totalBorderPixels = 0;
+        $transparentBorderPixels = 0;
+        $stepX = max(1, (int)($srcW / 25));
+        $stepY = max(1, (int)($srcH / 25));
+        for ($x = 0; $x < $srcW; $x += $stepX) {
+            foreach ([0, $srcH - 1] as $y) {
+                $c = imagecolorat($src, $x, $y);
+                $totalBorderPixels++;
+                if ((($c >> 24) & 0x7F) >= 80) $transparentBorderPixels++;
+            }
+        }
+        for ($y = 0; $y < $srcH; $y += $stepY) {
+            foreach ([0, $srcW - 1] as $x) {
+                $c = imagecolorat($src, $x, $y);
+                $totalBorderPixels++;
+                if ((($c >> 24) & 0x7F) >= 80) $transparentBorderPixels++;
+            }
+        }
+        $hasTransparentBg = ($totalBorderPixels > 0 && ($transparentBorderPixels / $totalBorderPixels) > 0.3);
 
         // Find bounding box of signature / stamp content
         $minX = $srcW;
@@ -173,7 +201,7 @@ class OnlyOfficeService
                 $isNotTransparent = ($alpha < 110);
                 $isNotWhite = ($r < 240 || $g < 240 || $b < 240);
 
-                if ($isNotTransparent && $isNotWhite) {
+                if ($isNotTransparent && ($hasTransparentBg || $isNotWhite)) {
                     $hasStroke = true;
                     if ($x < $minX) $minX = $x;
                     if ($x > $maxX) $maxX = $x;
@@ -224,13 +252,13 @@ class OnlyOfficeService
                     continue;
                 }
 
-                // If white or near-white background, make transparent
-                if ($r >= 238 && $g >= 238 && $b >= 238) {
+                // If white or near-white background on an opaque image, make transparent
+                if (!$hasTransparentBg && $r >= 238 && $g >= 238 && $b >= 238) {
                     continue;
                 }
 
-                // Smooth edge anti-aliasing for light pixels to eliminate white fringe/halo
-                if ($r > 200 && $g > 200 && $b > 200) {
+                // Smooth edge anti-aliasing for light pixels on opaque scans to eliminate white fringe/halo
+                if (!$hasTransparentBg && $r > 200 && $g > 200 && $b > 200) {
                     $lightness = ($r + $g + $b) / (3 * 255.0);
                     $extraAlpha = (int) round(($lightness - 0.78) / (1.0 - 0.78) * 127);
                     $newAlpha = min(127, max($alpha, $extraAlpha));
@@ -253,7 +281,6 @@ class OnlyOfficeService
         imagesavealpha($dest, true);
         $transparent = imagecolorallocatealpha($dest, 255, 255, 255, 127);
         imagefilledrectangle($dest, 0, 0, $targetSize, $targetSize, $transparent);
-        imagealphablending($dest, true);
 
         // Resample cropped signature neatly into the center of the square canvas
         imagecopyresampled($dest, $cropped, $destX, $destY, 0, 0, $drawW, $drawH, $cropW, $cropH);

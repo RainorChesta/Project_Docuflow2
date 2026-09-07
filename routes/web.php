@@ -142,6 +142,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('unit-kerja', \App\Http\Controllers\Admin\UnitKerjaController::class);
         Route::resource('divisions', DivisionController::class);
         Route::resource('users', UserController::class);
+        Route::resource('signatures', \App\Http\Controllers\Admin\SignatureController::class)->except(['show']);
         Route::get('/retention', [RetentionController::class, 'edit'])->name('retention.edit');
         Route::put('/retention', [RetentionController::class, 'update'])->name('retention.update');
         Route::resource('document-types', DocumentTypeController::class);
