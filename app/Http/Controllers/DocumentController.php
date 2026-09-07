@@ -35,16 +35,23 @@ class DocumentController extends Controller
         return \App\Models\SignatureRequest::where('document_id', $document->id)
             ->where('status', 'approved')
             ->where('is_used', false)
-            ->with('targetUser.signature')
+            ->with(['targetUser.signatures', 'requestedSignature.company'])
             ->get()
             ->map(function ($req) {
-                if (!$req->targetUser || !$req->targetUser->hasSignature()) {
+                $targetUser = $req->targetUser;
+                if (!$targetUser || !$targetUser->hasSignature()) {
+                    return null;
+                }
+                $sig = $req->requestedSignature ?? $targetUser->signatures()->where('type', 'original')->first();
+                if (!$sig) {
                     return null;
                 }
                 return [
                     'request_id' => $req->id,
-                    'url' => $this->onlyOfficeService->getSignatureFileUrl($req->targetUser),
-                    'target_user_name' => $req->targetUser->name,
+                    'url' => $this->onlyOfficeService->getSignatureFileUrlForSignature($sig),
+                    'target_user_name' => $targetUser->name,
+                    'type' => $sig->type,
+                    'company_name' => $sig->company?->name,
                 ];
             })
             ->filter()
@@ -699,18 +706,6 @@ class DocumentController extends Controller
 
         $approvedSignatures = $this->getApprovedSignatures($document);
 
-        // Build server-side banner data for approved signature requests
-        $pendingApprovalBanner = \App\Models\SignatureRequest::where('document_id', $document->id)
-            ->where('requester_id', $currentUser->id)
-            ->where('status', 'approved')
-            ->where('is_used', false)
-            ->with('targetUser')
-            ->get()
-            ->map(fn($r) => $r->targetUser?->name)
-            ->filter()
-            ->values()
-            ->toArray();
-
         return view('documents.edit', compact(
             'document',
             'version',
@@ -722,8 +717,7 @@ class DocumentController extends Controller
             'userSignatureToken',
             'userSignatureClientUrl',
             'userSignatureDataUri',
-            'approvedSignatures',
-            'pendingApprovalBanner'
+            'approvedSignatures'
         ));
     }
 

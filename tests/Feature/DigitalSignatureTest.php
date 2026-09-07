@@ -43,6 +43,43 @@ class DigitalSignatureTest extends TestCase
         $this->assertTrue($user->fresh()->hasSignature());
     }
 
+    public function test_saved_signature_has_transparent_background(): void
+    {
+        $user = User::factory()->create();
+
+        // Create a 50x50 canvas image with white background and black stroke in center
+        $im = imagecreatetruecolor(50, 50);
+        $white = imagecolorallocate($im, 255, 255, 255);
+        $black = imagecolorallocate($im, 0, 0, 0);
+        imagefilledrectangle($im, 0, 0, 50, 50, $white);
+        imageline($im, 10, 25, 40, 25, $black);
+        ob_start();
+        imagepng($im);
+        $pngData = ob_get_clean();
+        imagedestroy($im);
+
+        $base64 = 'data:image/png;base64,' . base64_encode($pngData);
+
+        $response = $this->actingAs($user)->postJson(route('profile.signature.store'), [
+            'signature_data' => $base64,
+        ]);
+
+        $response->assertStatus(200)->assertJson(['success' => true]);
+
+        $sig = Signature::where('user_id', $user->id)->first();
+        $this->assertNotNull($sig);
+
+        $savedContent = Storage::disk('public')->get($sig->file_path);
+        $savedIm = imagecreatefromstring($savedContent);
+        $this->assertNotFalse($savedIm);
+
+        // Check corner pixel (should be transparent alpha 127)
+        $rgba = imagecolorat($savedIm, 0, 0);
+        $alpha = ($rgba >> 24) & 0x7F;
+        $this->assertGreaterThanOrEqual(120, $alpha, 'Corner background pixel should be transparent');
+        imagedestroy($savedIm);
+    }
+
     public function test_user_can_delete_their_signature(): void
     {
         $user = User::factory()->create();

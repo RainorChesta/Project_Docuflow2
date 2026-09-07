@@ -65,6 +65,7 @@ class SignatureResolverService
                 $requestRecord = SignatureRequest::where('requester_id', $requesterId)
                     ->where('target_user_id', $targetUser->id)
                     ->where('document_id', $document->id)
+                    ->latest()
                     ->first();
 
                 // If request record does not exist yet, auto-create it as pending

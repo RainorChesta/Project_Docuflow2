@@ -398,7 +398,7 @@
         }
 
         const signaturePad = new SignaturePad(canvas, {
-            backgroundColor: 'rgba(255,255,255,1)',
+            backgroundColor: 'rgba(255, 255, 255, 0)',
             penColor: '#000000',
             minWidth: 1.5,
             maxWidth: 3.5,

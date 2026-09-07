@@ -78,42 +78,6 @@
                         config.events.onAppReady = function() {
                             if (typeof origOnAppReady === 'function') origOnAppReady();
                             restoreScrollIfAutofocused();
-
-                            // Execute macro to resolve pending signatures
-                            const approvedSignatures = @json($approvedSignatures ?? []);
-                            if (approvedSignatures && approvedSignatures.length > 0 && window.docEditorPreview && window.docEditorPreview.createConnector) {
-                                const connector = window.docEditorPreview.createConnector();
-                                const script = `
-                                    var oDocument = Api.GetDocument();
-                                    var aContentControls = oDocument.GetAllContentControls();
-                                    var approved = ${JSON.stringify(approvedSignatures)};
-                                    
-                                    for (var i = 0; i < aContentControls.length; i++) {
-                                        var label = aContentControls[i].GetLabel();
-                                        if (label && label.indexOf("pending_sig_") === 0) {
-                                            var reqId = parseInt(label.split("_")[2]);
-                                            var match = null;
-                                            for (var j = 0; j < approved.length; j++) {
-                                                if (approved[j].request_id === reqId) {
-                                                    match = approved[j];
-                                                    break;
-                                                }
-                                            }
-                                            if (match && match.url) {
-                                                aContentControls[i].RemoveAllElements();
-                                                var oParagraph = Api.CreateParagraph();
-                                                var oImage = Api.CreateImage(match.url, 24 * 36000, 24 * 36000);
-                                                oParagraph.AddElement(oImage, 0);
-                                                aContentControls[i].AddElement(oParagraph, 0);
-                                                aContentControls[i].SetLabel("resolved_sig_" + reqId);
-                                            }
-                                        }
-                                    }
-                                `;
-                                connector.callCommand(new Function(script), function() {
-                                    console.log("Pending signatures replaced automatically in preview.");
-                                });
-                            }
                         };
                         
                         const origOnDocumentReady = config.events.onDocumentReady;

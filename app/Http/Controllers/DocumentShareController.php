@@ -278,16 +278,23 @@ class DocumentShareController extends Controller
         $approvedSignatures = \App\Models\SignatureRequest::where('document_id', $document->id)
             ->where('status', 'approved')
             ->where('is_used', false)
-            ->with('targetUser.signature')
+            ->with(['targetUser.signatures', 'requestedSignature.company'])
             ->get()
             ->map(function ($req) use ($onlyOfficeService) {
-                if (!$req->targetUser || !$req->targetUser->hasSignature()) {
+                $targetUser = $req->targetUser;
+                if (!$targetUser || !$targetUser->hasSignature()) {
+                    return null;
+                }
+                $sig = $req->requestedSignature ?? $targetUser->signatures()->where('type', 'original')->first();
+                if (!$sig) {
                     return null;
                 }
                 return [
                     'request_id' => $req->id,
-                    'url' => $onlyOfficeService->getSignatureFileUrl($req->targetUser),
-                    'target_user_name' => $req->targetUser->name,
+                    'url' => $onlyOfficeService->getSignatureFileUrlForSignature($sig),
+                    'target_user_name' => $targetUser->name,
+                    'type' => $sig->type,
+                    'company_name' => $sig->company?->name,
                 ];
             })
             ->filter()

@@ -107,7 +107,7 @@ class OnlyOfficeController extends Controller
     }
 
     /**
-     * Serve a placeholder image for pending signatures.
+     * Serve a placeholder image for pending signatures (1:1 square aspect ratio).
      */
     public function signaturePlaceholder(Request $request): \Illuminate\Http\Response
     {
@@ -125,31 +125,100 @@ class OnlyOfficeController extends Controller
         $transparent = imagecolorallocatealpha($image, 255, 255, 255, 127);
         imagefilledrectangle($image, 0, 0, $width, $height, $transparent);
         imagealphablending($image, true);
-        
-        $textColor = imagecolorallocate($image, 150, 150, 150);
-        $font = 5;
-        
-        $lines = ["PENDING", "SIGNATURE", "APPROVAL"];
-        $fh = imagefontheight($font);
-        
-        $totalHeight = count($lines) * $fh + (count($lines) - 1) * 10;
-        $startY = ($height - $totalHeight) / 2;
 
-        foreach ($lines as $i => $line) {
-            $fw = imagefontwidth($font);
-            $textWidth = $fw * strlen($line);
-            $x = ($width - $textWidth) / 2;
-            $y = $startY + ($i * ($fh + 10));
-            imagestring($image, $font, (int) $x, (int) $y, $line, $textColor);
+        // Amber background card
+        $bgColor = imagecolorallocate($image, 254, 243, 199);       // #FEF3C7
+        $borderColor = imagecolorallocate($image, 245, 158, 11);     // #F59E0B
+        $titleColor = imagecolorallocate($image, 180, 83, 9);        // #B45309
+        $subtitleColor = imagecolorallocate($image, 146, 64, 14);    // #92400E
+        $pillBg = imagecolorallocate($image, 253, 230, 138);         // #FDE68A
+        $pillBorder = imagecolorallocate($image, 217, 119, 6);       // #D97706
+        $dividerColor = imagecolorallocate($image, 252, 211, 77);    // #FCD34D
+        $mutedColor = imagecolorallocate($image, 161, 98, 7);        // #A16207
+
+        // Outer box with border
+        imagefilledrectangle($image, 6, 6, $width - 7, $height - 7, $bgColor);
+        imagerectangle($image, 6, 6, $width - 7, $height - 7, $borderColor);
+        imagerectangle($image, 7, 7, $width - 8, $height - 8, $borderColor);
+
+        $customText = $request->query('text');
+        $isStamp = $request->boolean('is_stamp');
+        
+        $header = $isStamp ? "[ STEMPEL PERUSAHAAN ]" : "[ TANDA TANGAN DIGITAL ]";
+        $subHeader = "MENUNGGU PERSETUJUAN:";
+        $mainText = $customText ? strtoupper($customText) : ($isStamp ? "STEMPEL PERUSAHAAN" : "TANDA TANGAN RESMI");
+        $pillText = "PENDING APPROVAL";
+        $footnote = "OTOMATIS BERUBAH SETELAH DISETUJUI";
+
+        // Section 1: Header
+        $fontHeader = 4;
+        $fwH = imagefontwidth($fontHeader);
+        $xH = ($width - ($fwH * strlen($header))) / 2;
+        imagestring($image, $fontHeader, max(12, (int) $xH), 40, $header, $titleColor);
+
+        // Divider 1
+        imageline($image, 30, 75, $width - 31, 75, $dividerColor);
+
+        // Section 2: Subheader ("MENUNGGU PERSETUJUAN:")
+        $fontSub = 3;
+        $fwSub = imagefontwidth($fontSub);
+        $xSub = ($width - ($fwSub * strlen($subHeader))) / 2;
+        imagestring($image, $fontSub, max(12, (int) $xSub), 115, $subHeader, $subtitleColor);
+
+        // Section 3: Main Name (Font 5)
+        $fontLarge = 5;
+        $fwL = imagefontwidth($fontLarge);
+        $truncatedMain = strlen($mainText) > 26 ? (substr($mainText, 0, 24) . '..') : $mainText;
+        $xL = ($width - ($fwL * strlen($truncatedMain))) / 2;
+        imagestring($image, $fontLarge, max(12, (int) $xL), 165, $truncatedMain, $subtitleColor);
+
+        // Divider 2
+        imageline($image, 30, 225, $width - 31, 225, $dividerColor);
+
+        // Section 4: Pill Badge
+        $pillLeft = 50;
+        $pillRight = $width - 51;
+        $pillTop = 250;
+        $pillBottom = 295;
+        imagefilledrectangle($image, $pillLeft, $pillTop, $pillRight, $pillBottom, $pillBg);
+        imagerectangle($image, $pillLeft, $pillTop, $pillRight, $pillBottom, $pillBorder);
+
+        $fontPill = 4;
+        $fwP = imagefontwidth($fontPill);
+        $xP = ($width - ($fwP * strlen($pillText))) / 2;
+        imagestring($image, $fontPill, max(12, (int) $xP), 265, $pillText, $titleColor);
+
+        // Section 5: Footnote
+        $fontFoot = 2;
+        $fwF = imagefontwidth($fontFoot);
+        $xF = ($width - ($fwF * strlen($footnote))) / 2;
+        imagestring($image, $fontFoot, max(12, (int) $xF), 335, $footnote, $mutedColor);
+
+        $requestId = $request->query('request_id');
+        if ($requestId) {
+            imagestring($image, 1, 10, 380, "DocuFlowSigReq:" . $requestId, $bgColor);
         }
-        
-        $borderColor = imagecolorallocate($image, 200, 200, 200);
-        imagerectangle($image, 0, 0, $width - 1, $height - 1, $borderColor);
-        
+
         ob_start();
         imagepng($image);
         $imageData = ob_get_clean();
         imagedestroy($image);
+
+        if ($requestId) {
+            $keyword = "DocuFlowSigReq";
+            $text = (string) $requestId;
+            $chunkData = $keyword . "\0" . $text;
+            $chunkLen = pack('N', strlen($chunkData));
+            $chunkType = 'tEXt';
+            $crc = pack('N', crc32($chunkType . $chunkData));
+            $tExtChunk = $chunkLen . $chunkType . $chunkData . $crc;
+
+            $iendPos = strrpos($imageData, "IEND");
+            if ($iendPos !== false && $iendPos >= 4) {
+                $insertPos = $iendPos - 4;
+                $imageData = substr($imageData, 0, $insertPos) . $tExtChunk . substr($imageData, $insertPos);
+            }
+        }
         
         return response($imageData, 200, [
             'Content-Type' => 'image/png',
@@ -249,7 +318,7 @@ class OnlyOfficeController extends Controller
                 if ($approvedRequests->isNotEmpty()) {
                     $processor = app(\App\Services\DocumentProcessorService::class);
                     foreach ($approvedRequests as $req) {
-                        $sig = $req->requestedSignature ?? $req->targetUser?->signature;
+                        $sig = $req->requestedSignature ?? $req->targetUser?->signatures()->where('type', 'original')->first();
                         if ($sig && $sig->file_path && Storage::disk('public')->exists($sig->file_path)) {
                             $signaturePath = Storage::disk('public')->path($sig->file_path);
                             $processor->processSignature($document, $version, $req->id, $signaturePath, $req);

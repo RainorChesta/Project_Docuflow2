@@ -79,6 +79,27 @@ class OnlyOfficeService
     }
 
     /**
+     * Get the URL ONLYOFFICE uses to fetch a placeholder badge image for pending signatures.
+     */
+    public function getPlaceholderImageUrl(?string $text = null, ?int $requestId = null, bool $isStamp = false): string
+    {
+        $internalBase = rtrim(config('onlyoffice.internal_url'), '/');
+
+        $params = [];
+        if ($text) {
+            $params['text'] = $text;
+        }
+        if ($requestId) {
+            $params['request_id'] = $requestId;
+        }
+        if ($isStamp) {
+            $params['is_stamp'] = 1;
+        }
+
+        return $internalBase . route('onlyoffice.signature.placeholder', $params, false);
+    }
+
+    /**
      * Get the URL ONLYOFFICE uses to fetch the document's QR code PNG image.
      */
     public function getQrCodeFileUrl(Document $document): string
@@ -181,6 +202,47 @@ class OnlyOfficeService
         $drawW = (int) round($cropW * $scale);
         $drawH = (int) round($cropH * $scale);
 
+        // Create an intermediate cropped & transparent truecolor image
+        $cropped = imagecreatetruecolor($cropW, $cropH);
+        imagealphablending($cropped, false);
+        imagesavealpha($cropped, true);
+        $cropTrans = imagecolorallocatealpha($cropped, 0, 0, 0, 127);
+        imagefilledrectangle($cropped, 0, 0, $cropW, $cropH, $cropTrans);
+
+        for ($cy = 0; $cy < $cropH; $cy++) {
+            for ($cx = 0; $cx < $cropW; $cx++) {
+                $sx = $minX + $cx;
+                $sy = $minY + $cy;
+                $rgba = imagecolorat($src, $sx, $sy);
+                $alpha = ($rgba >> 24) & 0x7F;
+                $r = ($rgba >> 16) & 0xFF;
+                $g = ($rgba >> 8) & 0xFF;
+                $b = $rgba & 0xFF;
+
+                // If already transparent in source, leave as transparent
+                if ($alpha >= 120) {
+                    continue;
+                }
+
+                // If white or near-white background, make transparent
+                if ($r >= 238 && $g >= 238 && $b >= 238) {
+                    continue;
+                }
+
+                // Smooth edge anti-aliasing for light pixels to eliminate white fringe/halo
+                if ($r > 200 && $g > 200 && $b > 200) {
+                    $lightness = ($r + $g + $b) / (3 * 255.0);
+                    $extraAlpha = (int) round(($lightness - 0.78) / (1.0 - 0.78) * 127);
+                    $newAlpha = min(127, max($alpha, $extraAlpha));
+                    $color = imagecolorallocatealpha($cropped, $r, $g, $b, $newAlpha);
+                } else {
+                    $color = imagecolorallocatealpha($cropped, $r, $g, $b, $alpha);
+                }
+
+                imagesetpixel($cropped, $cx, $cy, $color);
+            }
+        }
+
         // Center within square canvas
         $destX = (int) round(($targetSize - $drawW) / 2);
         $destY = (int) round(($targetSize - $drawH) / 2);
@@ -194,13 +256,14 @@ class OnlyOfficeService
         imagealphablending($dest, true);
 
         // Resample cropped signature neatly into the center of the square canvas
-        imagecopyresampled($dest, $src, $destX, $destY, $minX, $minY, $drawW, $drawH, $cropW, $cropH);
+        imagecopyresampled($dest, $cropped, $destX, $destY, 0, 0, $drawW, $drawH, $cropW, $cropH);
 
         ob_start();
         imagepng($dest);
         $result = ob_get_clean();
 
         imagedestroy($src);
+        imagedestroy($cropped);
         imagedestroy($dest);
 
         return $result ?: $rawPngBytes;

@@ -36,48 +36,7 @@
                 </div>
             @endif
 
-            {{-- Signature Approval Banner (server-side rendered on page load) --}}
-            @if(!empty($pendingApprovalBanner))
-                <div id="signature-banner-alert" class="mb-4 px-4 py-3 bg-emerald-50/90 dark:bg-emerald-950/50 border border-emerald-500/30 rounded-xl text-xs text-emerald-950 dark:text-emerald-100 flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 z-10 shadow-xs transition-all duration-300">
-                    <div class="flex items-center gap-2.5 min-w-0 flex-1">
-                        <div class="h-6 w-6 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex flex-shrink-0 items-center justify-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                        </div>
-                        <span id="signature-banner-message" class="font-bold uppercase tracking-wide leading-tight text-emerald-950 dark:text-emerald-100 break-words">
-                            TANDA TANGAN DARI {{ strtoupper(implode(', ', $pendingApprovalBanner)) }} TELAH DISETUJUI. SILAKAN KLIK "SISIPKAN TTD" UNTUK MEMBUBUHKAN TANDA TANGAN RESMI KE DOKUMEN.
-                        </span>
-                    </div>
-                    <div class="flex items-center gap-2 shrink-0">
-                        <button type="button" onclick="document.getElementById('signature-banner-alert').classList.add('hidden')" class="btn btn-ghost btn-xs text-emerald-900/70 hover:text-emerald-950 dark:text-emerald-200/70 dark:hover:text-emerald-100">
-                            {{ __('TUTUP') }}
-                        </button>
-                        <button type="button" onclick="openSignatureSelectorModal()" class="btn btn-success btn-xs text-white uppercase font-bold shadow-xs">
-                            {{ __('SISIPKAN TTD') }}
-                        </button>
-                    </div>
-                </div>
-            @else
-                <div id="signature-banner-alert" class="hidden mb-4 px-4 py-3 bg-emerald-50/90 dark:bg-emerald-950/50 border border-emerald-500/30 rounded-xl text-xs text-emerald-950 dark:text-emerald-100 flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 z-10 shadow-xs transition-all duration-300">
-                    <div class="flex items-center gap-2.5 min-w-0 flex-1">
-                        <div class="h-6 w-6 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex flex-shrink-0 items-center justify-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                        </div>
-                        <span id="signature-banner-message" class="font-bold uppercase tracking-wide leading-tight text-emerald-950 dark:text-emerald-100 break-words"></span>
-                    </div>
-                    <div class="flex items-center gap-2 shrink-0">
-                        <button type="button" onclick="document.getElementById('signature-banner-alert').classList.add('hidden')" class="btn btn-ghost btn-xs text-emerald-900/70 hover:text-emerald-950 dark:text-emerald-200/70 dark:hover:text-emerald-100">
-                            {{ __('TUTUP') }}
-                        </button>
-                        <button type="button" onclick="openSignatureSelectorModal()" class="btn btn-success btn-xs text-white uppercase font-bold shadow-xs">
-                            {{ __('GANTI TTD') }}
-                        </button>
-                    </div>
-                </div>
-            @endif
+
 
             <div class="card bg-base-100 border border-base-300 shadow-sm mb-6 print:border-none print:shadow-none print:bg-transparent print:mb-0 print:rounded-none">
                 <div class="card-body p-0">
@@ -236,18 +195,15 @@
             {{-- Header --}}
             <div class="flex items-start justify-between border-b border-base-200 pb-4 mb-4">
                 <div>
-                    <h3 class="font-bold text-lg text-base-content leading-tight">{{ __('PILIH & GANTI TANDA TANGAN') }}</h3>
-                    <p class="text-xs text-base-content/60 mt-0.5">{{ __('Kelola permintaan dan pembubuhan tanda tangan digital pada dokumen ini.') }}</p>
-                </div>
-                <div id="signature-available-count-badge" class="badge badge-success badge-sm gap-1 hidden font-bold shrink-0">
-                    <span id="signature-available-count-text">0</span> {{ __('TERSEDIA') }}
+                    <h3 class="font-bold text-lg text-base-content leading-tight">{{ __('PILIH TANDA TANGAN / STEMPEL') }}</h3>
+                    <p class="text-xs text-base-content/60 mt-0.5">{{ __('Pilih tanda tangan Anda untuk disisipkan, atau minta tanda tangan / stempel dari pengguna lain.') }}</p>
                 </div>
             </div>
 
             {{-- Signature Search Input --}}
             <div class="flex gap-2 mb-3">
                 <div class="relative flex-1">
-                    <input type="text" id="signature-search-input" onkeypress="if(event.key === 'Enter') filterSignatureUsers(this.value)" placeholder="{{ __('Ketik nama pengguna lain lalu klik Cari...') }}" class="input input-bordered input-sm w-full pl-9 pr-8 bg-base-100 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary text-xs sm:text-sm">
+                    <input type="text" id="signature-search-input" oninput="filterSignatureUsers(this.value)" onkeypress="if(event.key === 'Enter') filterSignatureUsers(this.value)" placeholder="{{ __('Ketik nama pengguna lain lalu klik Cari...') }}" class="input input-bordered input-sm w-full pl-9 pr-8 bg-base-100 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary text-xs sm:text-sm">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
@@ -491,14 +447,22 @@
                 return result;
             }
 
-            document.addEventListener('DOMContentLoaded', function() {
+            function initOnlyOfficeEditor() {
+                const container = document.getElementById("onlyoffice-editor-container");
+                if (!container) return;
+
                 if (typeof DocsAPI === 'undefined') {
+                    console.error("DocsAPI is not defined. ONLYOFFICE script might have failed to load.");
                     document.getElementById('onlyoffice-fallback')?.classList.remove('hidden');
                     return;
                 }
 
                 try {
                     const config = @json($onlyOfficeConfig);
+                    if (!config) {
+                        console.error("ONLYOFFICE config is empty or invalid.");
+                        return;
+                    }
                     const isMobileOrTablet = window.innerWidth < 1024;
 
                     // Always use desktop type to bypass ONLYOFFICE Community Edition mobile license restriction
@@ -506,22 +470,18 @@
                     config.editorConfig = config.editorConfig || {};
                     config.editorConfig.mode = 'edit';
                     config.editorConfig.customization = config.editorConfig.customization || {};
+                    config.editorConfig.compactToolbar = true;
                     config.editorConfig.customization.compactHeader = true;
                     config.editorConfig.customization.autoFocus = false;
                     config.editorConfig.customization.mobile = { force: false };
 
                     if (isMobileOrTablet) {
                         // Responsive mode for small/shrinking viewports:
-                        // - Compact single-row toolbar instead of bulky tabs
                         config.editorConfig.customization.compactToolbar = true;
-                        // - Hide left & right sidebar panels to maximize document width
                         config.editorConfig.customization.leftMenu = false;
                         config.editorConfig.customization.rightMenu = false;
-                        // - Hide rulers that take up margins
                         config.editorConfig.customization.ruler = false;
-                        // - Hide duplicate file name in toolbar
                         config.editorConfig.customization.toolbarHideFileName = true;
-                        // - Fit to Width (-2) scales document page to fill 100% available viewport width
                         config.editorConfig.customization.zoom = -2;
                     } else {
                         // Desktop screen - preserve standard layout intact
@@ -537,9 +497,6 @@
                     config.events.onAppReady = function() {
                         console.log('ONLYOFFICE editor ready');
                         if (mainScrollContainer) mainScrollContainer.scrollTop = 0;
-                        preserveParentScroll(() => {
-                            replacePendingSignatures();
-                        });
                     };
                     config.events.onDocumentReady = function() {
                         if (mainScrollContainer) mainScrollContainer.scrollTop = 0;
@@ -580,48 +537,15 @@
                     console.error('ONLYOFFICE initialization error:', e);
                     document.getElementById('onlyoffice-fallback')?.classList.remove('hidden');
                 }
-            });
-
-            function replacePendingSignatures() {
-                const approvedSignatures = @json($approvedSignatures ?? []);
-                if (!approvedSignatures || approvedSignatures.length === 0 || !window.docEditor || !window.docEditor.createConnector) return;
-
-                const connector = window.docEditor.createConnector();
-                const script = `
-                    var oDocument = Api.GetDocument();
-                    var aContentControls = oDocument.GetAllContentControls();
-                    var approved = ${JSON.stringify(approvedSignatures)};
-                    
-                    for (var i = 0; i < aContentControls.length; i++) {
-                        var label = aContentControls[i].GetLabel();
-                        if (label && label.indexOf("pending_sig_") === 0) {
-                            var reqId = parseInt(label.split("_")[2]);
-                            var match = null;
-                            for (var j = 0; j < approved.length; j++) {
-                                if (approved[j].request_id === reqId) {
-                                    match = approved[j];
-                                    break;
-                                }
-                            }
-                            if (match && match.url) {
-                                aContentControls[i].RemoveAllElements();
-                                var oImage = Api.CreateImage(match.url, 24 * 36000, 24 * 36000);
-                                var oParagraph = Api.CreateParagraph();
-                                oParagraph.AddElement(oImage, 0);
-                                try {
-                                    aContentControls[i].AddElement(oParagraph, 0);
-                                } catch (e) {
-                                    aContentControls[i].AddElement(oImage, 0);
-                                }
-                                aContentControls[i].SetLabel("resolved_sig_" + reqId);
-                            }
-                        }
-                    }
-                `;
-                connector.callCommand(new Function(script), function() {
-                    console.log("Pending signatures replaced automatically.");
-                });
             }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initOnlyOfficeEditor);
+            } else {
+                initOnlyOfficeEditor();
+            }
+
+
 
             let signatureToastTimer = null;
             function hideSignatureLiveToast() {
@@ -642,14 +566,6 @@
                 const toastMsg = document.getElementById('signature-live-toast-message');
                 const toastIcon = document.getElementById('signature-live-toast-icon');
                 const toastBox = document.getElementById('signature-live-toast-box');
-                const banner = document.getElementById('signature-banner-alert');
-                const bannerMsg = document.getElementById('signature-banner-message');
-
-                // If it's the approval notification, update the banner as well
-                if (title === 'TANDA TANGAN TELAH DISETUJUI' && banner && bannerMsg) {
-                    bannerMsg.textContent = (message || '').toUpperCase();
-                    banner.classList.remove('hidden');
-                }
 
                 // Show floating Toast
                 if (toast && toastTitle && toastMsg) {
@@ -687,9 +603,9 @@
             }
 
             /**
-             * Insert image directly into ONLYOFFICE document editor via Document Builder Connector or DocsAPI insertImage
+             * Insert image directly into ONLYOFFICE document editor via DocsAPI insertImage or Document Builder Connector
              */
-            function insertImageIntoOnlyOffice(imageUrl, widthMm = 24, heightMm = 24, token = null) {
+            function insertImageIntoOnlyOffice(imageUrl, widthMm = 18, heightMm = 18, token = null) {
                 if (!window.docEditor) {
                     showSignatureScreenAlert('PERINGATAN', 'EDITOR BELUM SELESAI DIMUAT. TUNGGU SEBENTAR...', false);
                     return;
@@ -702,27 +618,6 @@
 
                 preserveParentScroll(() => {
                     try {
-                        // Method 1: Use Document Builder Connector (Native and most reliable in ONLYOFFICE)
-                        if (typeof window.docEditor.createConnector === 'function') {
-                            try {
-                                const connector = window.docEditor.createConnector();
-                                const script = `
-                                    var oDocument = Api.GetDocument();
-                                    var oParagraph = Api.CreateParagraph();
-                                    var oImage = Api.CreateImage("${imageUrl}", ${widthMm} * 36000, ${heightMm} * 36000);
-                                    oParagraph.AddElement(oImage, 0);
-                                    oDocument.InsertContent([oParagraph]);
-                                `;
-                                connector.callCommand(new Function(script), function() {
-                                    console.log("Image inserted successfully via connector.");
-                                });
-                                return;
-                            } catch (connErr) {
-                                console.warn("Connector callCommand failed, falling back to DocsAPI insertImage:", connErr);
-                            }
-                        }
-
-                        // Method 2: Fallback to DocsAPI insertImage (Converting mm to approximate px at 96 DPI)
                         const payload = {
                             fileType: "png",
                             url: imageUrl,
@@ -734,12 +629,33 @@
                             payload.token = token;
                         }
 
+                        // Method 1: Use native DocsAPI insertImage (most compatible in all ONLYOFFICE editions)
                         if (typeof window.docEditor.insertImage === 'function') {
                             window.docEditor.insertImage(payload);
+                            console.log("Image inserted successfully via docEditor.insertImage");
+                            return;
+                        }
+
+                        // Method 2: Fallback to Document Builder Connector
+                        if (typeof window.docEditor.createConnector === 'function') {
+                            const connector = window.docEditor.createConnector();
+                            const script = `
+                                var oDocument = Api.GetDocument();
+                                var oParagraph = Api.CreateParagraph();
+                                var oImage = Api.CreateImage("${imageUrl}", ${widthMm} * 36000, ${heightMm} * 36000);
+                                oParagraph.AddElement(oImage, 0);
+                                try {
+                                    oDocument.InsertContent([oParagraph]);
+                                } catch(e) {
+                                    oDocument.Push(oParagraph);
+                                }
+                            `;
+                            connector.callCommand(new Function(script), function() {
+                                console.log("Image inserted successfully via connector.");
+                            });
                         }
                     } catch (err) {
                         console.warn('insertImage error:', err);
-                        showSignatureScreenAlert('PERINGATAN', 'TIDAK DAPAT MENYISIPKAN GAMBAR SECARA OTOMATIS. SILAKAN GUNAKAN MENU INSERT -> PICTURE PADA TOOLBAR ONLYOFFICE.', false);
                     }
                 });
             }
@@ -754,7 +670,7 @@
                     showSignatureScreenAlert('PERINGATAN', 'QR CODE DOKUMEN TIDAK TERSEDIA.', false);
                     return;
                 }
-                insertImageIntoOnlyOffice(qrCodeUrl, 24, 24, qrCodeToken);
+                insertImageIntoOnlyOffice(qrCodeUrl, 18, 18, qrCodeToken);
             }
 
             // --- PDF Visual Interactive Drag & Drop / Resizing Placement Tool ---
@@ -780,39 +696,84 @@
 
                 const titleEl = document.getElementById('pdf-visual-modal-title');
                 const subTitleEl = document.getElementById('pdf-visual-modal-subtitle');
+                const tagBadgeEl = document.getElementById('pdf-box-signer-tag');
                 const tagTextEl = document.getElementById('pdf-box-signer-tag-text');
                 const previewContainer = document.getElementById('pdf-box-preview-container');
+                const actionBtn = document.getElementById('pdf-visual-action-btn');
                 const actionBtnText = document.getElementById('pdf-visual-action-btn-text');
+                const dragBox = document.getElementById('pdf-signature-drag-box');
+                const resizeHandle = document.getElementById('pdf-sig-resize-handle');
 
                 const isStamp = (signatureType === 'company_stamp');
+                const isQr = (visualType === 'qrcode');
 
-                // Resolve preview image URL from loaded signature users data
+                // Reset position flag to let renderVisualPdfPage calculate optimal dimensions (e.g. square for stamp/QR vs rectangular for signature)
+                if (dragBox) {
+                    dragBox.dataset.positioned = "";
+                }
+
+                // Dynamic styling based on type (Primary for TTD, Secondary for Stempel, Accent for QR Code)
+                if (dragBox) {
+                    dragBox.className = isStamp
+                        ? "absolute border-2 border-secondary/90 bg-secondary/5 cursor-move shadow-lg select-none touch-none transition-shadow group hover:shadow-2xl hover:border-secondary p-0 m-0 rounded-lg"
+                        : (isQr
+                            ? "absolute border-2 border-accent/90 bg-accent/5 cursor-move shadow-lg select-none touch-none transition-shadow group hover:shadow-2xl hover:border-accent p-0 m-0 rounded-lg"
+                            : "absolute border-2 border-primary/90 bg-primary/5 cursor-move shadow-lg select-none touch-none transition-shadow group hover:shadow-2xl hover:border-primary p-0 m-0 rounded-lg");
+                }
+                if (tagBadgeEl) {
+                    tagBadgeEl.className = isStamp
+                        ? "badge badge-secondary badge-xs font-bold uppercase tracking-wider flex items-center gap-1 shadow-xs px-2 py-0.5 text-[10px]"
+                        : (isQr
+                            ? "badge badge-accent badge-xs font-bold uppercase tracking-wider flex items-center gap-1 shadow-xs px-2 py-0.5 text-[10px]"
+                            : "badge badge-primary badge-xs font-bold uppercase tracking-wider flex items-center gap-1 shadow-xs px-2 py-0.5 text-[10px]");
+                }
+                if (resizeHandle) {
+                    resizeHandle.className = isStamp
+                        ? "absolute -right-3 -bottom-3 w-6 h-6 bg-secondary text-secondary-content rounded-full flex items-center justify-center cursor-nwse-resize shadow-lg hover:scale-110 active:scale-95 transition-transform z-30 ring-2 ring-white"
+                        : (isQr
+                            ? "absolute -right-3 -bottom-3 w-6 h-6 bg-accent text-accent-content rounded-full flex items-center justify-center cursor-nwse-resize shadow-lg hover:scale-110 active:scale-95 transition-transform z-30 ring-2 ring-white"
+                            : "absolute -right-3 -bottom-3 w-6 h-6 bg-primary text-primary-content rounded-full flex items-center justify-center cursor-nwse-resize shadow-lg hover:scale-110 active:scale-95 transition-transform z-30 ring-2 ring-white");
+                }
+                if (actionBtn) {
+                    actionBtn.className = isStamp
+                        ? "btn btn-secondary btn-sm gap-1.5 rounded-xl font-bold shadow-xs"
+                        : (isQr
+                            ? "btn btn-accent btn-sm gap-1.5 rounded-xl font-bold shadow-xs"
+                            : "btn btn-primary btn-sm gap-1.5 rounded-xl font-bold shadow-xs");
+                }
+
+                // Resolve preview image URL
                 let resolvedPreviewUrl = null;
-                if (signatureId) {
+                if (isQr) {
+                    resolvedPreviewUrl = @json($qrCodeDataUri ?? null) || qrCodeUrl;
+                } else if (targetUserId) {
                     const userObj = (allSignatureUsersData || []).find(u => u.id == targetUserId);
                     if (userObj) {
-                        const sigObj = (userObj.signatures || []).find(s => s.id == signatureId);
-                        if (sigObj) {
-                            resolvedPreviewUrl = sigObj.data_uri || sigObj.preview_url;
+                        if (signatureId) {
+                            const sigObj = (userObj.signatures || []).find(s => s.id == signatureId);
+                            if (sigObj) resolvedPreviewUrl = sigObj.data_uri || sigObj.preview_url;
+                        } else if (userObj.signatures && userObj.signatures.length > 0) {
+                            resolvedPreviewUrl = userObj.signatures[0].data_uri || userObj.signatures[0].preview_url;
                         }
                     }
-                }
-                if (!resolvedPreviewUrl && !targetUserId) {
-                    resolvedPreviewUrl = mySignatureClientUrl;
+                } else {
+                    if (signatureId) {
+                        const meObj = (allSignatureUsersData || []).find(u => u.is_me || u.id == {{ auth()->id() }});
+                        if (meObj) {
+                            const sigObj = (meObj.signatures || []).find(s => s.id == signatureId);
+                            if (sigObj) resolvedPreviewUrl = sigObj.data_uri || sigObj.preview_url;
+                        }
+                    }
+                    if (!resolvedPreviewUrl) {
+                        resolvedPreviewUrl = mySignatureClientUrl || @json($userSignatureDataUri ?? null);
+                    }
                 }
 
-                if (activeVisualType === 'qrcode') {
+                // Titles, Subtitles, Tags, and Action Buttons
+                if (isQr) {
                     if (titleEl) titleEl.textContent = 'Atur Posisi & Ukuran QR Code';
                     if (subTitleEl) subTitleEl.textContent = 'Geser kotak QR Code ke posisi yang diinginkan dan tarik sudut kanan bawah untuk mengatur ukuran.';
                     if (tagTextEl) tagTextEl.textContent = 'QR Code';
-                    if (previewContainer) {
-                        const qrSrc = @json($qrCodeDataUri ?? null) || qrCodeUrl;
-                        if (qrSrc) {
-                            previewContainer.innerHTML = `<img src="${qrSrc}" alt="QR Code" class="w-full h-full object-fill block m-0 p-0 pointer-events-none" />`;
-                        } else {
-                            previewContainer.innerHTML = `<span class="text-xs font-bold text-primary uppercase">[ QR Code ]</span>`;
-                        }
-                    }
                     if (actionBtnText) actionBtnText.textContent = '{{ __("Bubuhkan QR Code Di Sini") }}';
                 } else if (targetUserId && targetUserName) {
                     if (isStamp) {
@@ -820,78 +781,74 @@
                         if (titleEl) titleEl.textContent = 'Atur Posisi & Ukuran Stempel: ' + compDisplay;
                         if (subTitleEl) subTitleEl.textContent = 'Posisikan dan atur ukuran kotak stempel perusahaan (' + compDisplay + ') untuk ' + targetUserName.toUpperCase() + ' pada dokumen.';
                         if (tagTextEl) tagTextEl.textContent = 'STEMPEL: ' + compDisplay;
-                        if (previewContainer) {
-                            if (resolvedPreviewUrl) {
-                                previewContainer.innerHTML = `<img src="${resolvedPreviewUrl}" alt="Stempel" class="w-full h-full object-fill block m-0 p-0 pointer-events-none" />`;
-                            } else {
-                                previewContainer.innerHTML = `<span class="text-xs font-bold text-secondary uppercase tracking-wide">[ STEMPEL: ${companyName || targetUserName} ]</span>`;
-                            }
-                        }
                         if (actionBtnText) actionBtnText.textContent = '{{ __("Kirim Permintaan Stempel") }}';
                     } else {
                         if (titleEl) titleEl.textContent = 'Atur Posisi & Ukuran TTD: ' + targetUserName.toUpperCase();
                         if (subTitleEl) subTitleEl.textContent = 'Posisikan dan atur ukuran kotak tanda tangan untuk ' + targetUserName.toUpperCase() + ' pada halaman dokumen.';
                         if (tagTextEl) tagTextEl.textContent = 'TTD: ' + targetUserName.toUpperCase();
-                        if (previewContainer) {
-                            if (resolvedPreviewUrl) {
-                                previewContainer.innerHTML = `<img src="${resolvedPreviewUrl}" alt="TTD" class="w-full h-full object-fill block m-0 p-0 pointer-events-none" />`;
-                            } else {
-                                previewContainer.innerHTML = `<span class="text-xs font-bold text-primary uppercase tracking-wide">[ TTD: ${targetUserName} ]</span>`;
-                            }
-                        }
                         if (actionBtnText) actionBtnText.textContent = '{{ __("Kirim Permintaan Tanda Tangan") }}';
-                    }
-
-                    // If preview image not in memory yet, fetch available users in background
-                    if (!resolvedPreviewUrl && signatureId) {
-                        fetch('{{ route("signatures.users") }}?document_id={{ $document->id }}')
-                            .then(res => res.json())
-                            .then(data => {
-                                allSignatureUsersData = data.users || [];
-                                const uObj = allSignatureUsersData.find(u => u.id == targetUserId);
-                                if (uObj) {
-                                    const sObj = (uObj.signatures || []).find(s => s.id == signatureId);
-                                    if (sObj && (sObj.data_uri || sObj.preview_url) && previewContainer && activeVisualSignatureId == signatureId) {
-                                        previewContainer.innerHTML = `<img src="${sObj.data_uri || sObj.preview_url}" alt="Preview" class="w-full h-full object-fill block m-0 p-0 pointer-events-none" />`;
-                                    }
-                                }
-                            })
-                            .catch(() => {});
                     }
                 } else {
                     if (isStamp) {
                         const compDisplay = companyName ? companyName.toUpperCase() : 'PERUSAHAAN';
                         if (titleEl) titleEl.textContent = 'Atur Posisi & Ukuran Stempel: ' + compDisplay;
                         if (subTitleEl) subTitleEl.textContent = 'Geser kotak stempel ke posisi yang diinginkan dan tarik sudut kanan bawah untuk mengubah ukuran.';
-                        if (tagTextEl) tagTextEl.textContent = 'Geser Stempel';
+                        if (tagTextEl) tagTextEl.textContent = 'STEMPEL: ' + compDisplay;
+                        if (actionBtnText) actionBtnText.textContent = '{{ __("Bubuhkan Stempel Di Sini") }}';
                     } else {
                         if (titleEl) titleEl.textContent = signatureId ? 'Atur Posisi & Ukuran TTD' : 'Atur Posisi & Ukuran Tanda Tangan Saya';
                         if (subTitleEl) subTitleEl.textContent = 'Geser kotak TTD ke posisi yang diinginkan dan tarik sudut kanan bawah untuk mengubah ukuran.';
-                        if (tagTextEl) tagTextEl.textContent = signatureId ? 'Geser TTD' : 'Geser TTD';
+                        if (tagTextEl) tagTextEl.textContent = 'TTD SAYA';
+                        if (actionBtnText) actionBtnText.textContent = signatureId ? '{{ __("Bubuhkan TTD Di Sini") }}' : '{{ __("Bubuhkan TTD Saya Di Sini") }}';
                     }
-                    if (previewContainer) {
-                        if (resolvedPreviewUrl) {
-                            previewContainer.innerHTML = `<img src="${resolvedPreviewUrl}" alt="Signature" class="w-full h-full object-fill block m-0 p-0 pointer-events-none" />`;
-                        } else if (signatureId) {
-                            previewContainer.innerHTML = `<span class="loading loading-spinner loading-xs text-primary"></span>`;
-                            fetch(`/profile/signature?signature_id=${signatureId}`)
+                }
+
+                // Render image preview in previewContainer
+                if (previewContainer) {
+                    if (resolvedPreviewUrl) {
+                        previewContainer.innerHTML = `<img id="pdf-box-preview-img" src="${resolvedPreviewUrl}" alt="Preview" class="w-full h-full object-fill block m-0 p-0 pointer-events-none select-none transition-none" draggable="false" />`;
+                    } else {
+                        // Show animated loading indicator while fetching preview in background
+                        previewContainer.innerHTML = `
+                            <div class="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-base-200/40 border border-dashed ${isStamp ? 'border-secondary/40 text-secondary' : 'border-primary/40 text-primary'} rounded">
+                                <span class="loading loading-spinner loading-xs mb-1"></span>
+                                <span class="text-[9px] font-bold uppercase tracking-wider">${isStamp ? 'Memuat Stempel...' : 'Memuat TTD...'}</span>
+                            </div>
+                        `;
+
+                        const fetchUrl = targetUserId
+                            ? '{{ route("signatures.users") }}?document_id={{ $document->id }}'
+                            : (signatureId ? `/profile/signature?signature_id=${signatureId}` : null);
+
+                        if (fetchUrl) {
+                            fetch(fetchUrl)
                                 .then(res => res.json())
                                 .then(data => {
-                                    const src = data.client_url || data.data_uri || data.url;
-                                    if (src) {
-                                        previewContainer.innerHTML = `<img src="${src}" alt="Signature" class="w-full h-full object-fill block m-0 p-0 pointer-events-none" />`;
-                                    } else {
-                                        previewContainer.innerHTML = `<span class="text-xs font-bold text-primary/80 uppercase italic tracking-wide">[ ${isStamp ? '{{ __("Stempel") }}' : '{{ __("Tanda Tangan") }}'} ]</span>`;
+                                    let fetchedSrc = null;
+                                    if (data.users) {
+                                        allSignatureUsersData = data.users || [];
+                                        const uObj = allSignatureUsersData.find(u => u.id == targetUserId);
+                                        if (uObj) {
+                                            const sObj = signatureId ? (uObj.signatures || []).find(s => s.id == signatureId) : (uObj.signatures || [])[0];
+                                            if (sObj) fetchedSrc = sObj.data_uri || sObj.preview_url;
+                                        }
+                                    } else if (data.client_url || data.data_uri || data.url) {
+                                        fetchedSrc = data.client_url || data.data_uri || data.url;
+                                    }
+
+                                    if (fetchedSrc && previewContainer && (activeVisualSignatureId == signatureId || !activeVisualSignatureId)) {
+                                        previewContainer.innerHTML = `<img id="pdf-box-preview-img" src="${fetchedSrc}" alt="Preview" class="w-full h-full object-fill block m-0 p-0 pointer-events-none select-none transition-none" draggable="false" />`;
+                                    } else if (previewContainer && (activeVisualSignatureId == signatureId || !activeVisualSignatureId)) {
+                                        previewContainer.innerHTML = `<span class="text-xs font-bold ${isStamp ? 'text-secondary/80' : 'text-primary/80'} uppercase italic tracking-wide">[ ${isStamp ? '{{ __("Stempel") }}' : '{{ __("Tanda Tangan") }}'} ]</span>`;
                                     }
                                 })
                                 .catch(() => {
-                                    previewContainer.innerHTML = `<span class="text-xs font-bold text-primary/80 uppercase italic tracking-wide">[ ${isStamp ? '{{ __("Stempel") }}' : '{{ __("Tanda Tangan") }}'} ]</span>`;
+                                    if (previewContainer && (activeVisualSignatureId == signatureId || !activeVisualSignatureId)) {
+                                        previewContainer.innerHTML = `<span class="text-xs font-bold ${isStamp ? 'text-secondary/80' : 'text-primary/80'} uppercase italic tracking-wide">[ ${isStamp ? '{{ __("Stempel") }}' : '{{ __("Tanda Tangan") }}'} ]</span>`;
+                                    }
                                 });
-                        } else {
-                            previewContainer.innerHTML = `<span class="text-xs font-bold text-primary/80 uppercase italic tracking-wide">[ ${isStamp ? '{{ __("Stempel") }}' : '{{ __("Tanda Tangan") }}'} ]</span>`;
                         }
                     }
-                    if (actionBtnText) actionBtnText.textContent = isStamp ? '{{ __("Bubuhkan Stempel Di Sini") }}' : (signatureId ? '{{ __("Bubuhkan TTD Di Sini") }}' : '{{ __("Bubuhkan TTD Saya Di Sini") }}');
                 }
 
                 const visualModal = document.getElementById('pdf-visual-signature-modal');
@@ -990,8 +947,18 @@
                             const pxPerMmX = canvas.width / pdfWidthMm;
                             const pxPerMmY = canvas.height / pdfHeightMm;
 
-                            const defaultWMm = activeVisualType === 'qrcode' ? 24 : 24;
-                            const defaultHMm = activeVisualType === 'qrcode' ? 24 : 24;
+                            const isStamp = (activeVisualSignatureType === 'company_stamp');
+                            const isQr = (activeVisualType === 'qrcode');
+                            let defaultWMm = 35;
+                            let defaultHMm = 20;
+                            if (isQr) {
+                                defaultWMm = 18;
+                                defaultHMm = 18;
+                            } else if (isStamp) {
+                                defaultWMm = 25;
+                                defaultHMm = 25;
+                            }
+
                             const boxW = Math.round(defaultWMm * pxPerMmX);
                             const boxH = Math.round(defaultHMm * pxPerMmY);
                             const initLeft = pdfViewport.width - boxW - Math.round(15 * pxPerMmX);
@@ -1357,18 +1324,7 @@
                     return;
                 }
 
-                if (signatureId) {
-                    fetchUserSignatureAndInsert({{ auth()->id() }}, 'SAYA', signatureId);
-                    return;
-                }
-
-                if (!mySignatureUrl) {
-                    showSignatureScreenAlert('PERINGATAN', 'ANDA BELUM MEMILIKI TANDA TANGAN TERSIMPAN.', false);
-                    return;
-                }
-
-                insertImageIntoOnlyOffice(mySignatureUrl, 24, 24, mySignatureToken);
-                showSignatureScreenAlert('BERHASIL', 'TANDA TANGAN SAYA BERHASIL DISISIPKAN KE DALAM DOKUMEN.', true);
+                fetchUserSignatureAndInsert({{ auth()->id() }}, '{{ addslashes(auth()->user()->name) }}', signatureId);
             }
 
             function insertSignatureImage(signatureUrl, userName, token = null) {
@@ -1377,7 +1333,7 @@
                     return;
                 }
 
-                insertImageIntoOnlyOffice(signatureUrl, 24, 24, token);
+                insertImageIntoOnlyOffice(signatureUrl, 18, 18, token);
             }
 
             let allSignatureUsersData = [];
@@ -1385,8 +1341,6 @@
             function openSignatureSelectorModal() {
                 const modal = document.getElementById('signature-users-modal');
                 const list = document.getElementById('signature-users-list');
-                const badge = document.getElementById('signature-available-count-badge');
-                const badgeText = document.getElementById('signature-available-count-text');
                 const searchInput = document.getElementById('signature-search-input');
                 if (searchInput) searchInput.value = '';
                 const clearBtn = document.getElementById('signature-search-clear');
@@ -1398,17 +1352,6 @@
                     .then(res => res.json())
                     .then(data => {
                         allSignatureUsersData = data.users || [];
-                        const availableCount = data.available_to_replace_count || 0;
-
-                        if (badge && badgeText) {
-                            if (availableCount > 0) {
-                                badgeText.textContent = availableCount;
-                                badge.classList.remove('hidden');
-                            } else {
-                                badge.classList.add('hidden');
-                            }
-                        }
-
                         filterSignatureUsers('');
                     })
                     .catch(err => {
@@ -1424,8 +1367,8 @@
                 }
                 const filtered = allSignatureUsersData.filter(u => {
                     if (!q) {
-                        const hasActiveReq = (u.signatures || []).some(s => s.is_available_to_replace || s.request_status === 'pending');
-                        return u.is_me || u.is_available_to_replace || u.request_status === 'pending' || hasActiveReq;
+                        // When not searching, only show the current user
+                        return !!u.is_me;
                     }
                     
                     return (u.name && u.name.toLowerCase().includes(q)) ||
@@ -1466,21 +1409,25 @@
                                 let sigActionHtml = '';
                                 if (u.is_me) {
                                     sigActionHtml = `<button type="button" onclick="insertMySignature(${sig.id}, '${sig.type}', '${safeComp}')" class="btn btn-xs ${isStamp ? 'btn-secondary' : 'btn-primary'} gap-1 uppercase font-bold">{{ __("SISIPKAN") }}</button>`;
-                                } else if (sig.is_available_to_replace) {
-                                    sigActionHtml = `
-                                        <div class="flex items-center gap-1.5">
-                                            <span class="badge badge-success badge-xs font-bold uppercase">{{ __('DISETUJUI') }}</span>
-                                            <button type="button" onclick="consumeSignatureReplacement(${sig.request_id}, '${safeName}', '${sig.type}', '${safeComp}')" class="btn btn-xs btn-success text-white gap-1 shadow-sm font-bold uppercase">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                                {{ __('SISIPKAN') }}
-                                            </button>
-                                        </div>
-                                    `;
                                 } else if (sig.request_status === 'pending') {
                                     sigActionHtml = `
                                         <span class="badge badge-warning badge-xs gap-1 py-1.5 px-2 font-bold uppercase">
                                             ⏳ {{ __('MENUNGGU') }}
                                         </span>
+                                    `;
+                                } else if (sig.request_status === 'approved') {
+                                    const reqAction = isPdfDocument 
+                                        ? `openPdfVisualPlacementModal(${u.id}, '${safeName}', 'signature', ${sig.id}, '${sig.type}', '${safeComp}')`
+                                        : `fetchUserSignatureAndInsert(${u.id}, &quot;${(u.name || '').replace(/"/g, '&quot;')}&quot;, ${sig.id})`;
+                                    sigActionHtml = `
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="badge badge-success badge-xs gap-1 py-1 px-2 font-bold uppercase text-white">
+                                                ✓ {{ __('DISETUJUI') }}
+                                            </span>
+                                            <button type="button" onclick="${reqAction}" class="btn btn-xs btn-outline ${isStamp ? 'btn-secondary' : 'btn-primary'} gap-1 uppercase font-bold">
+                                                {{ __('MINTA ULANG') }}
+                                            </button>
+                                        </div>
                                     `;
                                 } else if (sig.request_status === 'rejected') {
                                     const reqAction = isPdfDocument 
@@ -1539,11 +1486,10 @@
                           '</div>'
                         : (!u.has_signature ? '<p class="text-xs text-base-content/40 italic uppercase mt-1">{{ __("BELUM MEMILIKI TANDA TANGAN ATAU STEMPEL") }}</p>' : '');
 
-                    const hasAnyApproved = (u.signatures || []).some(s => s.is_available_to_replace) || u.is_available_to_replace;
-                    const hasAnyRejected = (u.signatures || []).some(s => s.request_status === 'rejected') || (u.request_status === 'rejected');
+                    const isMe = u.is_me;
 
                     return `
-                        <div class="flex flex-col p-2.5 rounded-xl border border-base-200 hover:bg-base-200/40 transition-all ${hasAnyApproved ? 'bg-success/5 border-success/30' : (hasAnyRejected ? 'bg-error/5 border-error/20' : '')}">
+                        <div class="flex flex-col p-2.5 rounded-xl border border-base-200 hover:bg-base-200/40 transition-all ${isMe ? 'bg-primary/5 border-primary/20' : ''}">
                             <div class="flex items-center justify-between">
                                 <div class="pr-2">
                                     <div class="flex items-center gap-1.5 mb-0.5">
@@ -1568,98 +1514,6 @@
                 }
 
                 list.innerHTML = html;
-            }
-
-            function consumeSignatureReplacement(requestId, userName, sigType = 'original', companyName = '') {
-                document.getElementById('signature-users-modal').close();
-                document.getElementById('signature-banner-alert').classList.add('hidden'); // Hide banner if replacing
-
-                const isStamp = (sigType === 'company_stamp');
-                const displayName = (isStamp && companyName) ? `${companyName} (${userName})` : userName;
-
-                fetch(`/signature-requests/${requestId}/consume`, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    }
-                })
-                .then(res => res.json().then(data => ({ status: res.status, data: data })))
-                .then(response => {
-                    const data = response.data;
-                    if (response.status === 200 && data.success && data.url) {
-                        if (data.is_pdf || isPdfDocument) {
-                            showSignatureScreenAlert(
-                                isStamp ? 'STEMPEL DIBUBUHKAN PADA PDF' : 'TANDA TANGAN DIBUBUHKAN PADA PDF',
-                                (isStamp ? 'STEMPEL RESMI PERUSAHAAN DARI ' : 'TANDA TANGAN RESMI DARI ') + displayName.toUpperCase() + ' TELAH BERHASIL DIBUBUHKAN PADA DOKUMEN PDF.',
-                                true
-                            );
-                            setTimeout(() => window.location.reload(), 1200);
-                            return;
-                        }
-                        
-                        if (window.docEditor && window.docEditor.createConnector) {
-                            try {
-                                var connector = window.docEditor.createConnector();
-                                var script = `
-                                    var oDocument = Api.GetDocument();
-                                    var aContentControls = oDocument.GetAllContentControls();
-                                    var found = false;
-                                    for (var i = 0; i < aContentControls.length; i++) {
-                                        var label = aContentControls[i].GetLabel();
-                                        if (label === "pending_sig_${requestId}") {
-                                            aContentControls[i].RemoveAllElements();
-                                            var oImage = Api.CreateImage("${data.url}", 24 * 36000, 24 * 36000);
-                                            var oParagraph = Api.CreateParagraph();
-                                            oParagraph.AddElement(oImage, 0);
-                                            try {
-                                                aContentControls[i].AddElement(oParagraph, 0);
-                                            } catch(e) {
-                                                aContentControls[i].AddElement(oImage, 0);
-                                            }
-                                            aContentControls[i].SetLabel("resolved_sig_${requestId}");
-                                            found = true;
-                                            break;
-                                        }
-                                    }
-                                    return found;
-                                `;
-                                connector.callCommand(new Function(script), function(found) {
-                                    if (found) {
-                                        console.log("Replaced signature directly in existing control.");
-                                    } else {
-                                        console.log("Content control not found. Inserting at cursor.");
-                                        insertImageIntoOnlyOffice(data.url, 24, 24, data.token || null);
-                                    }
-                                });
-                            } catch(e) {
-                                insertImageIntoOnlyOffice(data.url, 24, 24, data.token || null);
-                            }
-                        } else {
-                            insertImageIntoOnlyOffice(data.url, 24, 24, data.token || null);
-                        }
-                        
-                        showSignatureScreenAlert(
-                            isStamp ? 'STEMPEL DISETUJUI & DISISIPKAN' : 'TANDA TANGAN DISETUJUI & DISISIPKAN',
-                            (isStamp ? 'STEMPEL RESMI PERUSAHAAN DARI ' : 'TANDA TANGAN RESMI DARI ') + displayName.toUpperCase() + ' TELAH BERHASIL DIMUAT DAN DISISIPKAN KE DALAM DOKUMEN.',
-                            true
-                        );
-                    } else {
-                        showSignatureScreenAlert(
-                            isStamp ? 'GAGAL MENYISIPKAN STEMPEL' : 'GAGAL MENGGANTI TANDA TANGAN',
-                            data.message || (isStamp ? 'GAGAL MEMPROSES PEMBUBUHAN STEMPEL.' : 'GAGAL MEMPROSES PENGGANTIAN TANDA TANGAN.'),
-                            false
-                        );
-                    }
-                })
-                .catch(() => {
-                    showSignatureScreenAlert(
-                        'KESALAHAN SISTEM',
-                        'GAGAL MENGHUBUNGI SERVER UNTUK MEMPROSES TANDA TANGAN.',
-                        false
-                    );
-                });
             }
 
             function fetchUserSignatureAndInsert(userId, userName, signatureId = null) {
@@ -1689,9 +1543,14 @@
                                 }
                             }
                             if (data.is_pending) {
+                                if (!isPdfDocument) {
+                                    if (data.url) {
+                                        insertImageIntoOnlyOffice(data.url, 18, 18, data.token || null);
+                                    }
+                                }
                                 showSignatureScreenAlert(
                                     'PERMINTAAN DIKIRIM',
-                                    (data.message || ('Permintaan penggunaan tanda tangan / stempel telah berhasil dikirim ke ' + userName.toUpperCase() + '.')) + (isPdfDocument ? ' KETIKA DISETUJUI, ITEM AKAN OTOMATIS DIBUBUHKAN PADA DOKUMEN PDF.' : ' Notifikasi telah dikirimkan ke akun terkait.'),
+                                    (data.message || ('Permintaan penggunaan tanda tangan / stempel telah berhasil dikirim ke ' + userName.toUpperCase() + '.')) + (isPdfDocument ? ' KETIKA DISETUJUI, ITEM AKAN OTOMATIS DIBUBUHKAN PADA DOKUMEN PDF.' : ' KOTAK KUNING TELAH DISISIPKAN DI POSISI KURSOR DAN AKAN OTOMATIS BERUBAH MENJADI TTD RESMI KETIKA DISETUJUI.'),
                                     true
                                 );
                             } else if (data.message) {
@@ -1727,16 +1586,19 @@
             }
 
             // Real-time Echo Listener for signature approval and rejection notifications on screen
-            document.addEventListener('DOMContentLoaded', function() {
+            function initEchoSignatureListeners() {
                 if (typeof window.Echo !== 'undefined') {
                     window.Echo.private('App.Models.User.{{ auth()->id() }}')
                         .notification((notification) => {
                             if (notification.type === 'signature_request_approved' && notification.document_id == {{ $document->id }}) {
                                 showSignatureScreenAlert(
                                     'TANDA TANGAN TELAH DISETUJUI',
-                                    (notification.message || 'TANDA TANGAN TELAH DISETUJUI OLEH PEMILIK TTD. SILAKAN BUKA MENU TANDA TANGAN UNTUK MELAKUKAN REPLACE SIGNATURE.').toUpperCase(),
+                                    (notification.message || 'TANDA TANGAN TELAH DISETUJUI DAN DITERAPKAN PADA DOKUMEN.').toUpperCase(),
                                     true
                                 );
+                                if (isPdfDocument) {
+                                    setTimeout(() => window.location.reload(), 1200);
+                                }
                             } else if (notification.type === 'signature_request_rejected' && notification.document_id == {{ $document->id }}) {
                                 showSignatureScreenAlert(
                                     'PERMINTAAN TANDA TANGAN DITOLAK',
@@ -1746,28 +1608,13 @@
                             }
                         });
                 }
+            }
 
-                // Polling fallback: check for newly approved signatures every 15s
-                // This works even without Reverb/Echo running
-                setInterval(function() {
-                    fetch('{{ route("signatures.users") }}?document_id={{ $document->id }}', {
-                        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-                    })
-                    .then(r => r.json())
-                    .then(data => {
-                        const count = data.available_to_replace_count || 0;
-                        const banner = document.getElementById('signature-banner-alert');
-                        const bannerMsg = document.getElementById('signature-banner-message');
-                        if (count > 0 && banner && bannerMsg) {
-                            // Find the names of users with approved signatures
-                            const names = (data.users || []).filter(u => u.is_available_to_replace).map(u => u.name.toUpperCase()).join(', ');
-                            bannerMsg.textContent = 'TANDA TANGAN DARI ' + names + ' TELAH DISETUJUI. SILAKAN KLIK "SISIPKAN TTD" UNTUK MEMBUBUHKAN TANDA TANGAN RESMI KE DOKUMEN.';
-                            banner.classList.remove('hidden');
-                        }
-                    })
-                    .catch(() => {});
-                }, 15000);
-            });
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initEchoSignatureListeners);
+            } else {
+                initEchoSignatureListeners();
+            }
 
             /**
              * "Selesai Edit" action: saves document changes from ONLYOFFICE and redirects to show page.

@@ -29,12 +29,8 @@ class SignatureController extends Controller
             return response()->json(['success' => false, 'message' => 'Pengguna tidak ditemukan.'], 404);
         }
 
-        // If requesting someone else's signature, check approval
-        if ($user->id !== Auth::id()) {
-            if (!$documentId) {
-                return response()->json(['success' => false, 'message' => 'ID DOKUMEN DIPERLUKAN UNTUK MEMERIKSA IZIN.'], 403);
-            }
-
+        // If requesting someone else's signature on a document, require approval (returns pending placeholder badge)
+        if ($documentId && $user->id !== Auth::id()) {
             $signatureId = $request->query('signature_id') ?? $request->input('signature_id');
             $requestedSig = $signatureId ? $user->signatures()->find($signatureId) : $user->signatures()->where('type', 'original')->first();
 
@@ -56,11 +52,11 @@ class SignatureController extends Controller
             $pageNumber = (int) $request->input('page_number', 1);
             $posX = ($request->filled('pos_x') || $request->has('pos_x')) && $request->input('pos_x') !== null && $request->input('pos_x') !== '' ? (float) $request->input('pos_x') : null;
             $posY = ($request->filled('pos_y') || $request->has('pos_y')) && $request->input('pos_y') !== null && $request->input('pos_y') !== '' ? (float) $request->input('pos_y') : null;
-            $width = (float) $request->input('width', 24.0);
-            $height = (float) $request->input('height', 24.0);
+            $width = (float) $request->input('width', 18.0);
+            $height = (float) $request->input('height', 18.0);
             $preset = $request->input('preset_position', 'bottom-right');
 
-            // Find an active (non-used, non-rejected) signature request for this specific signature, or create a new pending request
+            // Find an active pending signature request for this specific signature, or create a new pending request
             $requestRecord = SignatureRequest::where('requester_id', Auth::id())
                 ->where('target_user_id', $user->id)
                 ->where('document_id', $documentId)
@@ -70,13 +66,25 @@ class SignatureController extends Controller
                         $q->orWhereNull('requested_signature_id');
                     }
                 })
+                ->where('status', 'pending')
                 ->where('is_used', false)
-                ->whereIn('status', ['pending', 'approved'])
                 ->latest()
                 ->first();
 
             $doc = Document::find($documentId);
             if (!$requestRecord) {
+                // Invalidate any older requests for this signature on this document so they cannot be reused
+                SignatureRequest::where('requester_id', Auth::id())
+                    ->where('target_user_id', $user->id)
+                    ->where('document_id', $documentId)
+                    ->where(function ($q) use ($requestedSig) {
+                        $q->where('requested_signature_id', $requestedSig->id);
+                        if ($requestedSig->type === 'original') {
+                            $q->orWhereNull('requested_signature_id');
+                        }
+                    })
+                    ->update(['is_used' => true]);
+
                 $requestRecord = SignatureRequest::create([
                     'requester_id' => Auth::id(),
                     'target_user_id' => $user->id,
@@ -92,6 +100,9 @@ class SignatureController extends Controller
                     'preset_position' => $preset,
                     'requested_at' => now(),
                 ]);
+                if ($doc && $user->id !== Auth::id()) {
+                    $user->notify(new \App\Notifications\SignatureRequested($doc, Auth::user()->name, $requestRecord));
+                }
             } else {
                 $requestRecord->update([
                     'requested_signature_id' => $requestedSig->id,
@@ -105,28 +116,30 @@ class SignatureController extends Controller
                     'preset_position' => $preset,
                     'requested_at' => now(),
                 ]);
-                if ($doc) {
-                    $user->notify(new \App\Notifications\SignatureRequested($doc, Auth::user()->name, $requestRecord));
-                }
             }
 
-            if ($requestRecord->status !== 'approved') {
-                $isStamp = $requestedSig->type === 'company_stamp';
-                $msg = $isStamp
-                    ? 'Permintaan penggunaan stempel perusahaan telah dikirim ke ' . $user->name . '.'
-                    : 'Permintaan penggunaan tanda tangan telah dikirim ke ' . $user->name . '.';
+            $isStamp = $requestedSig->type === 'company_stamp';
+            $msg = $isStamp
+                ? ($user->id === Auth::id() ? 'Permintaan penggunaan stempel perusahaan telah dicatat.' : 'Permintaan penggunaan stempel perusahaan telah dikirim ke ' . $user->name . '.')
+                : ($user->id === Auth::id() ? 'Penanda tanda tangan digital telah disisipkan (menunggu persetujuan).' : 'Permintaan penggunaan tanda tangan telah dikirim ke ' . $user->name . '.');
 
-                return response()->json([
-                    'success' => true,
-                    'is_pending' => true,
-                    'request_id' => $requestRecord->id,
-                    'url' => null,
-                    'token' => null,
-                    'target_user_name' => $user->name,
-                    'is_stamp' => $isStamp,
-                    'message' => $msg,
-                ]);
-            }
+            $onlyOfficeService = app(\App\Services\OnlyOfficeService::class);
+            $badgeText = $isStamp 
+                ? ($requestedSig->company?->name ?? $user->name) 
+                : $user->name;
+            $badgeUrl = $onlyOfficeService->getPlaceholderImageUrl($badgeText, $requestRecord->id, $isStamp);
+            $token = $badgeUrl ? $onlyOfficeService->generateInsertImageToken($badgeUrl) : null;
+
+            return response()->json([
+                'success' => true,
+                'is_pending' => true,
+                'request_id' => $requestRecord->id,
+                'url' => $badgeUrl,
+                'token' => $token,
+                'target_user_name' => $user->name,
+                'is_stamp' => $isStamp,
+                'message' => $msg,
+            ]);
         }
 
         $signatureId = $request->query('signature_id');
@@ -416,9 +429,7 @@ class SignatureController extends Controller
                         return false;
                     });
 
-                    $approvedReq = $sigRequests->first(fn($r) => $r->isApproved() && !$r->is_used);
-                    $pendingReq = $sigRequests->first(fn($r) => $r->isPending());
-                    $latestSigReq = $sigRequests->first();
+                    $latestSigReq = $sigRequests->first(); // Ordered latest()
 
                     $status = 'none'; // none, pending, approved, rejected, used
                     $requestId = null;
@@ -426,14 +437,14 @@ class SignatureController extends Controller
 
                     if ($isMe) {
                         $status = 'me';
-                    } elseif ($approvedReq) {
+                    } elseif ($latestSigReq && $latestSigReq->isPending()) {
+                        $status = 'pending';
+                        $requestId = $latestSigReq->id;
+                    } elseif ($latestSigReq && $latestSigReq->isApproved() && !$latestSigReq->is_used) {
                         $status = 'approved';
-                        $requestId = $approvedReq->id;
+                        $requestId = $latestSigReq->id;
                         $isAvailableToReplace = true;
                         $availableToReplaceCount++;
-                    } elseif ($pendingReq) {
-                        $status = 'pending';
-                        $requestId = $pendingReq->id;
                     } elseif ($latestSigReq && $latestSigReq->is_used) {
                         $status = 'used';
                         $requestId = $latestSigReq->id;
@@ -460,10 +471,10 @@ class SignatureController extends Controller
                 $userAvailableCredits = $mappedSignatures->where('is_available_to_replace', true)->count();
 
                 // Top-level status for backwards compatibility / summary
-                $topApproved = $mappedSignatures->firstWhere('is_available_to_replace', true);
                 $topPending = $mappedSignatures->firstWhere('request_status', 'pending');
-                $topRejected = $mappedSignatures->firstWhere('request_status', 'rejected');
+                $topApproved = $mappedSignatures->firstWhere('request_status', 'approved');
                 $topUsed = $mappedSignatures->firstWhere('request_status', 'used');
+                $topRejected = $mappedSignatures->firstWhere('request_status', 'rejected');
 
                 $summaryStatus = 'none';
                 $summaryReqId = null;
@@ -471,19 +482,19 @@ class SignatureController extends Controller
 
                 if ($isMe) {
                     $summaryStatus = 'me';
-                } elseif ($topApproved) {
-                    $summaryStatus = 'approved';
-                    $summaryReqId = $topApproved['request_id'];
                 } elseif ($topPending) {
                     $summaryStatus = 'pending';
                     $summaryReqId = $topPending['request_id'];
+                } elseif ($topApproved) {
+                    $summaryStatus = 'approved';
+                    $summaryReqId = $topApproved['request_id'];
+                } elseif ($topUsed) {
+                    $summaryStatus = 'used';
+                    $summaryReqId = $topUsed['request_id'];
                 } elseif ($topRejected) {
                     $summaryStatus = 'rejected';
                     $summaryReqId = $topRejected['request_id'];
                     $summaryRejectedReason = $topRejected['rejected_reason'];
-                } elseif ($topUsed) {
-                    $summaryStatus = 'used';
-                    $summaryReqId = $topUsed['request_id'];
                 }
 
                 return [
