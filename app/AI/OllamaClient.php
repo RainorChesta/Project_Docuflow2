@@ -59,7 +59,8 @@ class OllamaClient implements AIClientInterface
             $responses = Http::pool(function (\Illuminate\Http\Client\Pool $pool) use ($batch, $timeout, $temperature, $maxTokens) {
                 $reqs = [];
                 foreach ($batch as $key => $payload) {
-                    $reqs[$key] = $pool->timeout($timeout)
+                    $reqs[] = $pool->as((string) $key)
+                        ->timeout($timeout)
                         ->post(rtrim($this->baseUrl, '/') . '/api/generate', [
                             'model' => $this->model,
                             'system' => $payload['system'],

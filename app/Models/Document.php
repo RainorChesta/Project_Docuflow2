@@ -190,7 +190,7 @@ class Document extends Model
             return $this->currentVersion;
         }
 
-        return $versions->first(fn($v) => $v->status === 'draft');
+        return $versions->first(fn($v) => $v->status === 'draft') ?? $versions->first();
     }
 
     public function versions(): HasMany

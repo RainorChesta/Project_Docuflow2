@@ -727,7 +727,7 @@
                                 <label for="summary-model" class="text-xs text-base-content/70">{{ __('AI Model:') }}</label>
                                 <select id="summary-model" class="select select-bordered select-xs w-36">
                                     <option value="auto">Auto (Fallback)</option>
-                                    <option value="groq">Groq (Llama)</option>
+                                    <option value="groq">Groq (Qwen 3.8 / Cloud AI)</option>
                                     <option value="deepseek">DeepSeek</option>
                                     <option value="ollama">Ollama (Custom AI)</option>
                                 </select>

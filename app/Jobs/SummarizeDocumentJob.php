@@ -55,16 +55,27 @@ class SummarizeDocumentJob implements ShouldQueue
             if ($this->model === 'auto') {
                 $client = app(\App\AI\Contracts\AIClientInterface::class);
             } else {
-                $client = match ($this->model) {
+                $primaryClient = match ($this->model) {
                     'groq' => app(\App\AI\GroqClient::class),
                     'deepseek' => app(\App\AI\DeepseekClient::class),
                     'ollama' => app(\App\AI\OllamaClient::class),
                     default => null,
                 };
 
-                if (!$client) {
+                if (!$primaryClient) {
                     throw new \Exception("Model AI '{$this->model}' belum dikonfigurasi (Konfigurasi / API Key tidak ditemukan).");
                 }
+
+                // Fallback otomatis ke model lain jika model primer mengalami kendala
+                $fallbacks = [
+                    'groq' => app(\App\AI\GroqClient::class),
+                    'deepseek' => app(\App\AI\DeepseekClient::class),
+                    'ollama' => app(\App\AI\OllamaClient::class),
+                ];
+                unset($fallbacks[$this->model]);
+
+                $clients = array_values(array_filter([$primaryClient, ...array_values($fallbacks)]));
+                $client = count($clients) > 1 ? new \App\AI\AIFallbackManager($clients) : $primaryClient;
             }
 
             $summarizer = new DocumentSummarizer($client, $pdfExtractor);

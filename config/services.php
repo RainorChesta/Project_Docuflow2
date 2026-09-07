@@ -37,9 +37,9 @@ return [
 
     'groq' => [
         'key' => env('GROQ_API_KEY'),
-        'model' => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
+        'model' => env('GROQ_MODEL', 'qwen/qwen3.8-27b'),
         'temperature' => env('GROQ_TEMPERATURE', 0.2),
-        'max_tokens' => env('GROQ_MAX_TOKENS', 4096),
+        'max_tokens' => env('GROQ_MAX_TOKENS', 2048),
         'timeout' => env('GROQ_TIMEOUT', 90),
     ],
 

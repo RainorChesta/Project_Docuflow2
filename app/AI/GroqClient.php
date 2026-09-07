@@ -37,7 +37,7 @@ class GroqClient implements AIClientInterface
                     ['role' => 'user', 'content' => $content],
                 ],
                 'temperature' => (float) config('services.groq.temperature', 0.2),
-                'max_tokens' => (int) config('services.groq.max_tokens', 8192),
+                'max_tokens' => (int) config('services.groq.max_tokens', 2048),
             ]);
 
         if ($response->failed()) {
@@ -73,7 +73,7 @@ class GroqClient implements AIClientInterface
         
         $timeout = (int) config('services.groq.timeout', 90);
         $temperature = (float) config('services.groq.temperature', 0.2);
-        $maxTokens = (int) config('services.groq.max_tokens', 9000);
+        $maxTokens = (int) config('services.groq.max_tokens', 2048);
 
         foreach ($batches as $batch) {
             $responses = Http::pool(function (\Illuminate\Http\Client\Pool $pool) use ($batch, $timeout, $temperature, $maxTokens) {
