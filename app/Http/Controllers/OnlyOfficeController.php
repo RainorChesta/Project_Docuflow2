@@ -276,6 +276,11 @@ class OnlyOfficeController extends Controller
         // Status 2 = Ready for saving (user closed editor or autosave interval reached)
         // Status 6 = Mustsave / ForceSave
         if (in_array($status, [2, 6], true)) {
+            if (\Illuminate\Support\Facades\Cache::has('ignore_onlyoffice_save_' . $document->id)) {
+                Log::info("ONLYOFFICE callback status {$status} for document {$document->id} ignored due to discard on leave.");
+                return response()->json(['error' => 0]);
+            }
+
             $downloadUrl = $payload['url'] ?? null;
 
             if (!$downloadUrl) {
@@ -359,24 +364,21 @@ class OnlyOfficeController extends Controller
                 return response()->json(['error' => 1, 'message' => $e->getMessage()], 500);
             }
         } elseif ($status === 4) {
-            // Document closed without changes. We MUST touch the version so the documentKey changes 
-            // for the next session, preventing ONLYOFFICE "Version Changed" cache collisions.
-            $activeVersion = $document->versions()->whereIn('status', ['pending', 'draft'])
-                ->whereNull('discarded_at')
-                ->orderBy('version_number', 'desc')
-                ->first();
+            // Document closed without changes. Rotate session key and touch the version
+            $this->onlyOfficeService->rotateDocumentKey($document);
+            $activeVersion = $document->displayVersion();
             
             if ($activeVersion) {
                 $activeVersion->touch();
             } else {
                 $document->touch();
             }
-            Log::info("ONLYOFFICE closed without changes for document {$document->id}. Version touched to rotate key.");
+            Log::info("ONLYOFFICE closed without changes for document {$document->id}. Key rotated.");
         }
 
         if (in_array($status, [2, 3, 4, 7], true)) {
             \Illuminate\Support\Facades\Cache::forget($cacheKey);
-            \Illuminate\Support\Facades\Cache::forget('onlyoffice_doc_key_' . $document->id);
+            $this->onlyOfficeService->rotateDocumentKey($document);
         }
 
         // For other statuses (1 = editing, 3 = saving error, 7 = corrupt):

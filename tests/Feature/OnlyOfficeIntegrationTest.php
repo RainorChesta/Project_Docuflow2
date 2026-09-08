@@ -290,6 +290,11 @@ class OnlyOfficeIntegrationTest extends TestCase
         $this->assertNotEquals($keyV1, $keyV2, 'ONLYOFFICE keys must be distinct between version 1 and version 2');
         $this->assertStringContainsString('v1', $keyV1);
         $this->assertStringContainsString('v2', $keyV2);
+
+        // Test key rotation produces a new key
+        $service->rotateDocumentKey($this->document, $this->version);
+        $keyV1Rotated = $service->generateDocumentKey($this->document, $this->version);
+        $this->assertNotEquals($keyV1, $keyV1Rotated, 'Rotating document key must generate a new unique key for the next session');
     }
 
     public function test_user_can_download_specific_version_docx()
@@ -319,6 +324,104 @@ class OnlyOfficeIntegrationTest extends TestCase
         $responseV1 = $this->actingAs($this->user)->get(route('documents.download', [$this->document, 'version_id' => $this->version->id]));
         $responseV1->assertStatus(200);
         $responseV1->assertHeader('content-disposition', 'attachment; filename="Test ONLYOFFICE Doc.docx"');
+    }
+
+    public function test_discard_endpoint_returns_json_and_sets_ignore_cache()
+    {
+        // Create a pending version
+        $pendingVersion = $this->document->versions()->create([
+            'version_number' => 2,
+            'content' => '',
+            'file_path' => 'documents/' . $this->document->id . '/v2.docx',
+            'file_original_name' => 'Test ONLYOFFICE Doc v2.docx',
+            'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'author_id' => $this->user->id,
+            'author_name' => $this->user->name,
+            'status' => 'pending',
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->postJson(route('documents.discard', $this->document));
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'discarded' => true,
+        ]);
+
+        $this->assertDatabaseMissing('document_versions', [
+            'id' => $pendingVersion->id,
+        ]);
+
+        $this->assertTrue(\Illuminate\Support\Facades\Cache::has('ignore_onlyoffice_save_' . $this->document->id));
+    }
+
+    public function test_onlyoffice_callback_ignores_save_when_ignore_cache_is_set()
+    {
+        \Illuminate\Support\Facades\Cache::put('ignore_onlyoffice_save_' . $this->document->id, true, now()->addSeconds(30));
+
+        \Illuminate\Support\Facades\Http::fake([
+            'http://onlyoffice-server/download/updated.docx' => \Illuminate\Support\Facades\Http::response('updated-docx-content-bytes', 200),
+        ]);
+
+        $payload = [
+            'status' => 2,
+            'url' => 'http://onlyoffice-server/download/updated.docx',
+            'users' => [(string) $this->user->id],
+            'key' => 'doc_test_key',
+        ];
+
+        $response = $this->postJson(route('onlyoffice.callback', $this->document), $payload);
+
+        $response->assertStatus(200);
+        $response->assertJson(['error' => 0]);
+
+        // Verify that no pending version was created
+        $this->assertDatabaseMissing('document_versions', [
+            'document_id' => $this->document->id,
+            'status' => 'pending',
+        ]);
+    }
+
+    public function test_discard_on_document_without_active_version_soft_deletes_empty_document()
+    {
+        $newDoc = \App\Models\Document::create([
+            'title' => 'Brand New Unapproved Doc',
+            'document_number' => '999/TEST/DIV/PST/IX/2026',
+            'owner_id' => $this->user->id,
+            'division_id' => $this->division->id,
+            'document_type_id' => $this->docType->id,
+        ]);
+
+        $v1Pending = $newDoc->versions()->create([
+            'version_number' => 1,
+            'content' => '',
+            'file_path' => 'documents/' . $newDoc->id . '/v1.docx',
+            'file_original_name' => 'Brand New Doc.docx',
+            'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'author_id' => $this->user->id,
+            'author_name' => $this->user->name,
+            'status' => 'pending',
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->postJson(route('documents.discard', $newDoc));
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'discarded' => true,
+        ]);
+
+        // v1Pending is deleted
+        $this->assertDatabaseMissing('document_versions', [
+            'id' => $v1Pending->id,
+        ]);
+
+        // Document itself is soft-deleted
+        $this->assertSoftDeleted('documents', [
+            'id' => $newDoc->id,
+        ]);
     }
 }
 

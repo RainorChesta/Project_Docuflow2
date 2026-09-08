@@ -56,8 +56,12 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
             </svg>
         </a>
-        <div class="text-sm text-base-content/60">
-            @if($doc->currentVersion)
+        <div class="text-sm text-base-content/60 flex items-center gap-1">
+            @if($hasPending && $doc->currentVersion)
+                <span class="badge badge-warning badge-sm w-auto px-2 justify-center font-medium" title="{{ __('Versi aktif v:active, menunggu persetujuan v:pending', ['active' => $doc->currentVersion->version_number, 'pending' => $doc->displayVersion()?->version_number]) }}">
+                    v{{ $doc->currentVersion->version_number }} (v{{ $doc->displayVersion()?->version_number }} {{ __('Pending') }})
+                </span>
+            @elseif($doc->currentVersion)
                 <span class="badge badge-success badge-sm w-16 justify-center">v{{ $doc->currentVersion->version_number }}</span>
             @elseif($hasPending)
                 <span class="badge badge-warning badge-sm w-16 justify-center">{{ __('Tertunda') }}</span>

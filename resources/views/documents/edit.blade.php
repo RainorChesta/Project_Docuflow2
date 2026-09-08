@@ -504,11 +504,18 @@
                             if (mainScrollContainer) mainScrollContainer.scrollTop = 0;
                         }, 50);
                     };
+                    window._hasSessionChanges = false;
                     config.events.onDocumentStateChange = function(event) {
                         const isModified = event.data;
                         
+                        if (isModified) {
+                            window._hasSessionChanges = true;
+                        }
+
+                        // Keep navigation dirty if ANY modification was made during this session,
+                        // even if ONLYOFFICE internally fires isModified=false after forcesave.
                         if (typeof window.setNavigationDirty === 'function') {
-                            window.setNavigationDirty(isModified);
+                            window.setNavigationDirty(window._hasSessionChanges || isModified);
                         }
                         
                         const btnSelesai = document.getElementById('btn-selesai-edit');
@@ -1617,9 +1624,45 @@
             }
 
             /**
+             * Navigation Guard Custom Leave Handler:
+             * If user leaves the page without clicking "Selesai Edit", discard any changes made in this session.
+             */
+            window.onNavigationGuardLeave = function(pendingUrl) {
+                if (window._hasSessionChanges) {
+                    const discardUrl = "{{ route('documents.discard', $document) }}";
+                    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+                    fetch(discardUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'Accept': 'application/json'
+                        },
+                        keepalive: true
+                    }).catch((e) => {
+                        console.warn('Discard request error:', e);
+                    }).finally(() => {
+                        if (pendingUrl === 'history_back') {
+                            history.go(-2);
+                        } else if (pendingUrl) {
+                            window.location.href = pendingUrl;
+                        }
+                    });
+                } else {
+                    if (pendingUrl === 'history_back') {
+                        history.go(-2);
+                    } else if (pendingUrl) {
+                        window.location.href = pendingUrl;
+                    }
+                }
+            };
+
+            /**
              * "Selesai Edit" action: saves document changes from ONLYOFFICE and redirects to show page.
              */
             function finishEditingDocument() {
+                window._hasSessionChanges = false;
                 if (typeof window.allowIntentionalLeave === 'function') {
                     window.allowIntentionalLeave();
                 }

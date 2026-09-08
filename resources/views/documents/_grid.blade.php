@@ -79,7 +79,9 @@
             @if($doc->hasPendingRename())
                 <span class="badge badge-warning badge-xs text-[9px] px-1" title="{{ __('Menunggu Persetujuan Ubah Nama') }}">✎</span>
             @endif
-            @if($doc->currentVersion)
+            @if($hasPending && $doc->currentVersion)
+                <span class="badge badge-warning badge-xs text-[9px] px-1 font-medium" title="{{ __('Versi aktif v:active, menunggu persetujuan v:pending', ['active' => $doc->currentVersion->version_number, 'pending' => $doc->displayVersion()?->version_number]) }}">v{{ $doc->currentVersion->version_number }} (v{{ $doc->displayVersion()?->version_number }}P)</span>
+            @elseif($doc->currentVersion)
                 <span class="badge badge-success badge-xs text-[10px] px-1">v{{ $doc->currentVersion->version_number }}</span>
             @elseif($hasPending)
                 <span class="badge badge-warning badge-xs text-[10px] px-1">{{ __('Tertunda') }}</span>

@@ -18,12 +18,12 @@ class OnlyOfficeService
      */
     public function generateDocumentKey(Document $document, DocumentVersion $version): string
     {
-        $updatedAt = $version->updated_at ? $version->updated_at->timestamp : ($version->created_at ? $version->created_at->timestamp : time());
-        $cacheKey = 'onlyoffice_doc_key_' . $document->id . '_v' . $version->id . '_' . $updatedAt;
-        
-        return \Illuminate\Support\Facades\Cache::remember($cacheKey, now()->addDays(1), function () use ($document, $version, $updatedAt) {
+        $sessionCacheKey = 'onlyoffice_doc_session_key_' . $document->id . '_v' . $version->id;
+
+        return \Illuminate\Support\Facades\Cache::remember($sessionCacheKey, now()->addHours(2), function () use ($document, $version) {
             $timeKey = uniqid();
-            
+            $updatedAt = $version->updated_at ? $version->updated_at->timestamp : ($version->created_at ? $version->created_at->timestamp : time());
+
             $raw = sprintf(
                 'doc_%d_v%d_%d_%d_%s',
                 $document->id,
@@ -35,6 +35,19 @@ class OnlyOfficeService
 
             return substr(preg_replace('/[^0-9a-zA-Z_\-]/', '_', $raw), 0, 128);
         });
+    }
+
+    /**
+     * Rotate / clear cached ONLYOFFICE document keys for a document so the next session opens cleanly.
+     */
+    public function rotateDocumentKey(Document $document, ?DocumentVersion $version = null): void
+    {
+        if ($version) {
+            \Illuminate\Support\Facades\Cache::forget('onlyoffice_doc_session_key_' . $document->id . '_v' . $version->id);
+        }
+        foreach ($document->versions as $v) {
+            \Illuminate\Support\Facades\Cache::forget('onlyoffice_doc_session_key_' . $document->id . '_v' . $v->id);
+        }
     }
 
     /**

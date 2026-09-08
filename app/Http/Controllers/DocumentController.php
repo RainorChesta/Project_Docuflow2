@@ -15,6 +15,7 @@ use App\Services\VersionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
@@ -826,16 +827,39 @@ class DocumentController extends Controller
         return redirect()->route('documents.show', $document)->with('success', $message);
     }
 
-    public function discard(Request $request, Document $document): RedirectResponse
+    public function discard(Request $request, Document $document): RedirectResponse|JsonResponse
     {
         $this->authorize('update', $document);
 
+        // Lock out any incoming ONLYOFFICE callbacks from recreating/saving the version
+        Cache::put('ignore_onlyoffice_save_' . $document->id, true, now()->addSeconds(30));
+
         $discarded = $this->versionService->discardPending($document);
+
+        // Rotate ONLYOFFICE document key and touch current version so the next editing session opens fresh
+        $this->onlyOfficeService->rotateDocumentKey($document);
+        $document->currentVersion?->touch();
+        $document->touch();
 
         if ($discarded) {
             $this->auditService->log(auth()->user(), 'version.discarded', 'document_version', $discarded->id, [
                 'document_id' => $document->id,
                 'version_number' => $discarded->version_number,
+            ]);
+        }
+
+        // If the document has no remaining versions and was never approved, soft delete it into Trash
+        if ($document->versions()->count() === 0 && !$document->currentVersion) {
+            $document->delete();
+        }
+
+        if ($request->expectsJson() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'discarded' => (bool) $discarded,
+                'message' => $discarded
+                    ? __('Versi pending v:version dibuang.', ['version' => $discarded->version_number])
+                    : __('Tidak ada versi pending untuk dibuang.')
             ]);
         }
 

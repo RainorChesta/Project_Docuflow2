@@ -100,17 +100,21 @@
                 this.isIntentionalLeave = true;
                 this.$dispatch('close-modal', 'confirm-navigation-modal');
                 
-                // Forcefully NUKE all iframes from the DOM.
-                // Since ONLYOFFICE runs in an iframe on a different port (cross-origin), 
-                // its internal beforeunload listener triggers the browser warning.
-                // Removing the iframe instantly destroys its window and bypasses the warning!
+                // Gracefully notify ONLYOFFICE Docs API to close the session
+                if (window.docEditor) {
+                    try { window.docEditor.destroyEditor(); } catch (e) {}
+                }
+                
+                // Forcefully NUKE all iframes from the DOM to silence cross-origin beforeunload prompts
                 document.querySelectorAll('iframe').forEach(iframe => iframe.remove());
                 
                 const container = document.getElementById('onlyoffice-editor-container');
                 if (container) container.remove();
-
-                if (window.docEditor) {
-                    try { window.docEditor.destroyEditor(); } catch (e) {}
+                
+                // If a custom leave handler is registered (e.g. discarding unfinalized changes)
+                if (typeof window.onNavigationGuardLeave === 'function') {
+                    window.onNavigationGuardLeave(this.pendingUrl);
+                    return;
                 }
                 
                 // Continue the intended navigation
