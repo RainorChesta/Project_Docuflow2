@@ -337,7 +337,49 @@ class OnlyOfficeController extends Controller
                 ]);
 
                 // Trigger approval routing and notifications if the version is pending
-                if ($version->status === 'pending') {
+                // ONLY when status is 2 (final save on close / finish editing) - NOT on status 6 (intermediate save / forcesave while editing)
+                if ($status === 2 && $version->status === 'pending') {
+                    \Illuminate\Support\Facades\Cache::forget('onlyoffice_pending_notif_' . $document->id);
+
+                    $resolution = $this->approvalRoutingService->resolveApprover($document, $author);
+                    $this->approvalRoutingService->applyToDocument($document, $resolution);
+
+                    foreach ($resolution['approvers'] as $approver) {
+                        $approver->notify(new \App\Notifications\DocumentApprovalRequested($document, $version, $author->name));
+                    }
+
+                    if ($resolution['role'] !== null) {
+                        $author->notify(new \App\Notifications\ApprovalRouteResolved(
+                            $document,
+                            $resolution['role'],
+                            $resolution['approvers']->pluck('name')->join(', '),
+                            $resolution['message'],
+                            $resolution['isFallback'],
+                        ));
+                    }
+                } elseif ($status === 6 && $version->status === 'pending') {
+                    // Mark that pending version was saved/modified in this session and will need notification when edit finishes
+                    \Illuminate\Support\Facades\Cache::put('onlyoffice_pending_notif_' . $document->id, [
+                        'version_id' => $version->id,
+                        'author_id' => $author->id,
+                    ], now()->addHours(2));
+                }
+
+                Log::info("Document {$document->id} saved successfully from ONLYOFFICE to v{$version->version_number}.");
+            } catch (\Throwable $e) {
+                Log::error("Exception processing ONLYOFFICE callback: " . $e->getMessage(), [
+                    'exception' => $e,
+                ]);
+                return response()->json(['error' => 1, 'message' => $e->getMessage()], 500);
+            }
+        } elseif ($status === 4) {
+            // Document closed without changes (or closed after previous forcesave status 6).
+            // Check if there is a pending notification from status 6 that needs to be fired upon closing
+            $pendingNotif = \Illuminate\Support\Facades\Cache::pull('onlyoffice_pending_notif_' . $document->id);
+            if ($pendingNotif) {
+                $version = \App\Models\DocumentVersion::find($pendingNotif['version_id']);
+                $author = \App\Models\User::find($pendingNotif['author_id']) ?? $document->owner;
+                if ($version && $version->status === 'pending') {
                     $resolution = $this->approvalRoutingService->resolveApprover($document, $author);
                     $this->approvalRoutingService->applyToDocument($document, $resolution);
 
@@ -355,16 +397,9 @@ class OnlyOfficeController extends Controller
                         ));
                     }
                 }
-
-                Log::info("Document {$document->id} saved successfully from ONLYOFFICE to v{$version->version_number}.");
-            } catch (\Throwable $e) {
-                Log::error("Exception processing ONLYOFFICE callback: " . $e->getMessage(), [
-                    'exception' => $e,
-                ]);
-                return response()->json(['error' => 1, 'message' => $e->getMessage()], 500);
             }
-        } elseif ($status === 4) {
-            // Document closed without changes. Rotate session key and touch the version
+
+            // Rotate session key and touch the version
             $this->onlyOfficeService->rotateDocumentKey($document);
             $activeVersion = $document->displayVersion();
             

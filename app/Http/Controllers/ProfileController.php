@@ -54,6 +54,30 @@ class ProfileController extends Controller
     }
 
     /**
+     * Delete the user's profile avatar.
+     */
+    public function destroyAvatar(Request $request): RedirectResponse|\Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+
+        if ($user->profile_picture && \Illuminate\Support\Facades\Storage::disk('public')->exists($user->profile_picture)) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($user->profile_picture);
+        }
+
+        $user->profile_picture = null;
+        $user->save();
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => __('Foto profil berhasil dihapus.'),
+            ]);
+        }
+
+        return Redirect::route('profile.edit')->with('status', 'profile-avatar-deleted');
+    }
+
+    /**
      * Delete the user's account.
      */
     public function destroy(Request $request): RedirectResponse
@@ -63,6 +87,10 @@ class ProfileController extends Controller
         ]);
 
         $user = $request->user();
+
+        if ($user->profile_picture && \Illuminate\Support\Facades\Storage::disk('public')->exists($user->profile_picture)) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($user->profile_picture);
+        }
 
         Auth::logout();
 

@@ -423,5 +423,82 @@ class OnlyOfficeIntegrationTest extends TestCase
             'id' => $newDoc->id,
         ]);
     }
+
+    public function test_onlyoffice_status_6_saves_content_without_dispatching_approval_notifications()
+    {
+        \Illuminate\Support\Facades\Notification::fake();
+
+        \Illuminate\Support\Facades\Http::fake([
+            'http://onlyoffice-server/download/status6.docx' => \Illuminate\Support\Facades\Http::response('status-6-content', 200),
+        ]);
+
+        $payload = [
+            'status' => 6,
+            'url' => 'http://onlyoffice-server/download/status6.docx',
+            'users' => [(string) $this->user->id],
+            'key' => 'doc_test_key_status6',
+        ];
+
+        $response = $this->postJson(route('onlyoffice.callback', $this->document), $payload);
+
+        $response->assertStatus(200);
+        $response->assertJson(['error' => 0]);
+
+        // File is updated / pending version created
+        $this->assertDatabaseHas('document_versions', [
+            'document_id' => $this->document->id,
+            'status' => 'pending',
+            'author_id' => $this->user->id,
+        ]);
+
+        // Notifications should NOT be sent on status 6
+        \Illuminate\Support\Facades\Notification::assertNothingSent();
+
+        // Pending notif flag is cached
+        $this->assertTrue(\Illuminate\Support\Facades\Cache::has('onlyoffice_pending_notif_' . $this->document->id));
+    }
+
+    public function test_onlyoffice_status_4_after_status_6_dispatches_deferred_notifications()
+    {
+        \Illuminate\Support\Facades\Notification::fake();
+
+        // Simulate status 6 first
+        \Illuminate\Support\Facades\Http::fake([
+            'http://onlyoffice-server/download/status6.docx' => \Illuminate\Support\Facades\Http::response('status-6-content', 200),
+        ]);
+
+        $this->postJson(route('onlyoffice.callback', $this->document), [
+            'status' => 6,
+            'url' => 'http://onlyoffice-server/download/status6.docx',
+            'users' => [(string) $this->user->id],
+            'key' => 'doc_test_key_status6',
+        ]);
+
+        \Illuminate\Support\Facades\Notification::assertNothingSent();
+
+        // Create head approver in the same division & branch
+        $head = User::factory()->create([
+            'division_id' => $this->division->id,
+            'system_role' => 'head',
+            'is_active' => true,
+        ]);
+        $head->branches()->attach($this->document->branch_id);
+
+        // Now simulate status 4 (closing editor after status 6)
+        $this->postJson(route('onlyoffice.callback', $this->document), [
+            'status' => 4,
+            'key' => 'doc_test_key_status6',
+        ]);
+
+        // Notifications should now be sent
+        \Illuminate\Support\Facades\Notification::assertSentTo(
+            $head,
+            \App\Notifications\DocumentApprovalRequested::class
+        );
+        \Illuminate\Support\Facades\Notification::assertSentTo(
+            $this->user,
+            \App\Notifications\ApprovalRouteResolved::class
+        );
+    }
 }
 

@@ -96,4 +96,56 @@ class ProfileTest extends TestCase
 
         $this->assertNotNull($user->fresh());
     }
+
+    public function test_user_can_delete_avatar_via_destroy_endpoint(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+        $file = \Illuminate\Http\UploadedFile::fake()->image('avatar.jpg');
+        $path = $file->store('avatars', 'public');
+
+        $user = User::factory()->create([
+            'profile_picture' => $path,
+        ]);
+
+        \Illuminate\Support\Facades\Storage::disk('public')->assertExists($path);
+
+        $response = $this
+            ->actingAs($user)
+            ->deleteJson(route('profile.avatar.destroy'));
+
+        $response->assertOk()
+            ->assertJson(['success' => true]);
+
+        $user->refresh();
+        $this->assertNull($user->profile_picture);
+        $this->assertNull($user->avatar_url);
+        \Illuminate\Support\Facades\Storage::disk('public')->assertMissing($path);
+    }
+
+    public function test_user_can_remove_avatar_via_profile_update(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+        $file = \Illuminate\Http\UploadedFile::fake()->image('avatar.jpg');
+        $path = $file->store('avatars', 'public');
+
+        $user = User::factory()->create([
+            'profile_picture' => $path,
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->patch('/profile', [
+                'name' => $user->name,
+                'email' => $user->email,
+                'remove_profile_picture' => '1',
+            ]);
+
+        $response
+            ->assertSessionHasNoErrors()
+            ->assertRedirect('/profile');
+
+        $user->refresh();
+        $this->assertNull($user->profile_picture);
+        \Illuminate\Support\Facades\Storage::disk('public')->assertMissing($path);
+    }
 }
