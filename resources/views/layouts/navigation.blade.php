@@ -309,9 +309,11 @@
                         <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ request()->routeIs('approvals.versions') || (request()->routeIs('approvals.index') && request('tab') !== 'renames' && request('tab') !== 'rollbacks') ? 'bg-primary' : 'bg-base-content/30' }}"></span>
                         <span class="leading-tight break-words">{{ __('Document Approval (Version)') }}</span>
                     </span>
-                    <span class="badge {{ $pendingVersionsCount > 0 ? 'badge-primary text-white font-bold' : 'badge-ghost text-base-content/50' }} badge-xs px-1.5 py-2 shrink-0 self-center ml-1">
-                        {{ $pendingVersionsCount }}
-                    </span>
+                    @if($pendingVersionsCount > 0)
+                        <span class="badge badge-primary text-white font-bold badge-xs px-1.5 py-2 shrink-0 self-center ml-1">
+                            {{ $pendingVersionsCount }}
+                        </span>
+                    @endif
                 </a>
 
                 {{-- Sub-menu 2: Rename Approval --}}
@@ -323,9 +325,11 @@
                         <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ request()->routeIs('approvals.renames') || (request()->routeIs('approvals.index') && request('tab') === 'renames') ? 'bg-amber-500' : 'bg-base-content/30' }}"></span>
                         <span class="leading-tight break-words">{{ __('Rename Approval') }}</span>
                     </span>
-                    <span class="badge {{ $pendingRenamesCount > 0 ? 'badge-warning font-bold text-amber-900' : 'badge-ghost text-base-content/50' }} badge-xs px-1.5 py-2 shrink-0 self-center ml-1">
-                        {{ $pendingRenamesCount }}
-                    </span>
+                    @if($pendingRenamesCount > 0)
+                        <span class="badge badge-warning font-bold text-amber-900 badge-xs px-1.5 py-2 shrink-0 self-center ml-1">
+                            {{ $pendingRenamesCount }}
+                        </span>
+                    @endif
                 </a>
 
                 {{-- Sub-menu 3: Rollback Approval --}}
@@ -337,9 +341,11 @@
                         <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ request()->routeIs('approvals.rollbacks') || (request()->routeIs('approvals.index') && request('tab') === 'rollbacks') ? 'bg-purple-500' : 'bg-base-content/30' }}"></span>
                         <span class="leading-tight break-words">{{ __('Rollback Approval') }}</span>
                     </span>
-                    <span class="badge {{ $pendingRollbacksCount > 0 ? 'badge-secondary font-bold text-white' : 'badge-ghost text-base-content/50' }} badge-xs px-1.5 py-2 shrink-0 self-center ml-1">
-                        {{ $pendingRollbacksCount }}
-                    </span>
+                    @if($pendingRollbacksCount > 0)
+                        <span class="badge badge-secondary font-bold text-white badge-xs px-1.5 py-2 shrink-0 self-center ml-1">
+                            {{ $pendingRollbacksCount }}
+                        </span>
+                    @endif
                 </a>
             </div>
         </div>

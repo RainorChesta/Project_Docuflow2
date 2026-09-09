@@ -117,7 +117,26 @@ class DocumentPolicy
     {
         if (!$this->view($user, $document)) return false;
         if ($user->isAdmin() || $user->isDirector()) return true;
-        return $user->isHead() && ($user->division_id === $document->division_id || in_array($document->division_id, $user->allDivisionIds(), true));
+
+        if ($user->isHead() && ($user->division_id === $document->division_id || in_array($document->division_id, $user->allDivisionIds(), true))) {
+            $contextService = app(\App\Services\CompanyContextService::class);
+            $activeCompanyId = $contextService->getActiveCompanyId($user);
+            $activeBranchId = $contextService->getActiveBranchId($user);
+
+            if ($activeBranchId && $document->branch_id && (int) $document->branch_id !== (int) $activeBranchId) {
+                return false;
+            }
+            if ($activeCompanyId) {
+                $docCompanyId = $document->company_id ?? $document->branch?->company_id;
+                if ($docCompanyId && (int) $docCompanyId !== (int) $activeCompanyId) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     public function reject(User $user, Document $document): bool
@@ -150,8 +169,22 @@ class DocumentPolicy
             return true;
         }
 
-        // Division Head can approve requests in their division (including their own)
+        // Division Head can approve requests in their division within active context
         if ($user->isHead() && ($user->division_id === $document->division_id || in_array($document->division_id, $user->allDivisionIds(), true))) {
+            $contextService = app(\App\Services\CompanyContextService::class);
+            $activeCompanyId = $contextService->getActiveCompanyId($user);
+            $activeBranchId = $contextService->getActiveBranchId($user);
+
+            if ($activeBranchId && $document->branch_id && (int) $document->branch_id !== (int) $activeBranchId) {
+                return false;
+            }
+            if ($activeCompanyId) {
+                $docCompanyId = $document->company_id ?? $document->branch?->company_id;
+                if ($docCompanyId && (int) $docCompanyId !== (int) $activeCompanyId) {
+                    return false;
+                }
+            }
+
             return true;
         }
 

@@ -166,9 +166,53 @@ class User extends Authenticatable
     }
 
     /**
+     * Terapkan filter konteks perusahaan dan cabang pada query dokumen.
+     */
+    protected function applyContextFilterToDocumentQuery($query, ?int $companyId = null, ?int $branchId = null, bool $scopedToContext = true): void
+    {
+        if ($branchId !== null) {
+            $query->where(function ($sq) use ($branchId, $companyId) {
+                $sq->where('documents.branch_id', $branchId);
+                if ($companyId !== null) {
+                    $sq->orWhere(function ($fallback) use ($companyId) {
+                        $fallback->whereNull('documents.branch_id')
+                                 ->where('documents.company_id', $companyId);
+                    });
+                }
+            });
+        } elseif ($companyId !== null) {
+            $query->where(function ($sq) use ($companyId) {
+                $sq->where('documents.company_id', $companyId)
+                   ->orWhereHas('branch', fn($bq) => $bq->where('company_id', $companyId));
+            });
+        } elseif ($scopedToContext && $this->isHead()) {
+            $contextService = app(\App\Services\CompanyContextService::class);
+            $activeCompanyId = $contextService->getActiveCompanyId($this);
+            $activeBranchId = $contextService->getActiveBranchId($this);
+
+            if ($activeBranchId) {
+                $query->where(function ($sq) use ($activeBranchId, $activeCompanyId) {
+                    $sq->where('documents.branch_id', $activeBranchId)
+                       ->orWhere(function ($fallback) use ($activeCompanyId) {
+                           $fallback->whereNull('documents.branch_id');
+                           if ($activeCompanyId) {
+                               $fallback->where('documents.company_id', $activeCompanyId);
+                           }
+                       });
+                });
+            } elseif ($activeCompanyId) {
+                $query->where(function ($sq) use ($activeCompanyId) {
+                    $sq->where('documents.company_id', $activeCompanyId)
+                       ->orWhereHas('branch', fn($bq) => $bq->where('company_id', $activeCompanyId));
+                });
+            }
+        }
+    }
+
+    /**
      * Hitung total persetujuan versi dokumen yang menunggu tindakan pengguna.
      */
-    public function pendingVersionApprovalsCount(): int
+    public function pendingVersionApprovalsCount(?int $companyId = null, ?int $branchId = null, bool $scopedToContext = true): int
     {
         if (!$this->isHead() && !$this->isDirector() && !$this->isAdmin()) {
             return 0;
@@ -186,7 +230,17 @@ class User extends Authenticatable
                 ->whereNull('discarded_at')
                 ->whereHas('document', $roleFilter);
 
-            if (!$this->isAdmin() && !empty($companyIds)) {
+            if ($companyId !== null) {
+                $companyFilter = function ($q) use ($companyId, $branchId) {
+                    if ($branchId !== null) {
+                        $q->where('branch_id', $branchId);
+                    } else {
+                        $q->where('company_id', $companyId)
+                          ->orWhereHas('branch', fn($bq) => $bq->where('company_id', $companyId));
+                    }
+                };
+                $versionsQuery->whereHas('document', $companyFilter);
+            } elseif (!$this->isAdmin() && !empty($companyIds)) {
                 $companyFilter = function ($q) use ($companyIds) {
                     $q->whereIn('company_id', $companyIds)
                       ->orWhereHas('branch', fn($bq) => $bq->whereIn('company_id', $companyIds));
@@ -209,14 +263,20 @@ class User extends Authenticatable
 
         return DocumentVersion::where('status', 'pending')
             ->whereNull('discarded_at')
-            ->whereHas('document', fn($q) => $q->whereIn('division_id', $divisionIds)->visibleTo($this)->where($roleFilter))
+            ->whereHas('document', function ($q) use ($divisionIds, $roleFilter, $companyId, $branchId, $scopedToContext) {
+                $q->whereIn('division_id', $divisionIds)
+                  ->visibleTo($this)
+                  ->where($roleFilter);
+
+                $this->applyContextFilterToDocumentQuery($q, $companyId, $branchId, $scopedToContext);
+            })
             ->count();
     }
 
     /**
      * Hitung total persetujuan perubahan nama/judul dokumen yang menunggu tindakan pengguna.
      */
-    public function pendingRenameApprovalsCount(): int
+    public function pendingRenameApprovalsCount(?int $companyId = null, ?int $branchId = null, bool $scopedToContext = true): int
     {
         if (!$this->isHead() && !$this->isDirector() && !$this->isAdmin()) {
             return 0;
@@ -234,7 +294,16 @@ class User extends Authenticatable
                 ->where('pending_title', '!=', '')
                 ->where($roleFilter);
 
-            if (!$this->isAdmin() && !empty($companyIds)) {
+            if ($companyId !== null) {
+                if ($branchId !== null) {
+                    $renamesQuery->where('branch_id', $branchId);
+                } else {
+                    $renamesQuery->where(function ($q) use ($companyId) {
+                        $q->where('company_id', $companyId)
+                          ->orWhereHas('branch', fn($bq) => $bq->where('company_id', $companyId));
+                    });
+                }
+            } elseif (!$this->isAdmin() && !empty($companyIds)) {
                 $companyFilter = function ($q) use ($companyIds) {
                     $q->whereIn('company_id', $companyIds)
                       ->orWhereHas('branch', fn($bq) => $bq->whereIn('company_id', $companyIds));
@@ -255,18 +324,21 @@ class User extends Authenticatable
               ->orWhereNull('approver_role');
         };
 
-        return Document::whereIn('division_id', $divisionIds)
+        $renamesQuery = Document::whereIn('division_id', $divisionIds)
             ->visibleTo($this)
             ->whereNotNull('pending_title')
             ->where('pending_title', '!=', '')
-            ->where($roleFilter)
-            ->count();
+            ->where($roleFilter);
+
+        $this->applyContextFilterToDocumentQuery($renamesQuery, $companyId, $branchId, $scopedToContext);
+
+        return $renamesQuery->count();
     }
 
     /**
      * Hitung total persetujuan rollback dokumen yang menunggu tindakan pengguna.
      */
-    public function pendingRollbackApprovalsCount(): int
+    public function pendingRollbackApprovalsCount(?int $companyId = null, ?int $branchId = null, bool $scopedToContext = true): int
     {
         if (!$this->isHead() && !$this->isDirector() && !$this->isAdmin()) {
             return 0;
@@ -283,7 +355,16 @@ class User extends Authenticatable
             $rollbacksQuery = Document::whereNotNull('pending_rollback_version_id')
                 ->where($roleFilter);
 
-            if (!$this->isAdmin() && !empty($companyIds)) {
+            if ($companyId !== null) {
+                if ($branchId !== null) {
+                    $rollbacksQuery->where('branch_id', $branchId);
+                } else {
+                    $rollbacksQuery->where(function ($q) use ($companyId) {
+                        $q->where('company_id', $companyId)
+                          ->orWhereHas('branch', fn($bq) => $bq->where('company_id', $companyId));
+                    });
+                }
+            } elseif (!$this->isAdmin() && !empty($companyIds)) {
                 $companyFilter = function ($q) use ($companyIds) {
                     $q->whereIn('company_id', $companyIds)
                       ->orWhereHas('branch', fn($bq) => $bq->whereIn('company_id', $companyIds));
@@ -304,19 +385,50 @@ class User extends Authenticatable
               ->orWhereNull('approver_role');
         };
 
-        return Document::whereIn('division_id', $divisionIds)
+        $rollbacksQuery = Document::whereIn('division_id', $divisionIds)
             ->visibleTo($this)
             ->whereNotNull('pending_rollback_version_id')
-            ->where($roleFilter)
-            ->count();
+            ->where($roleFilter);
+
+        $this->applyContextFilterToDocumentQuery($rollbacksQuery, $companyId, $branchId, $scopedToContext);
+
+        return $rollbacksQuery->count();
     }
 
     /**
      * Hitung total approval yang menunggu tindakan pengguna (Head / Direktur / Admin).
      */
-    public function pendingApprovalsCount(): int
+    public function pendingApprovalsCount(?int $companyId = null, ?int $branchId = null, bool $scopedToContext = true): int
     {
-        return $this->pendingVersionApprovalsCount() + $this->pendingRenameApprovalsCount() + $this->pendingRollbackApprovalsCount();
+        return $this->pendingVersionApprovalsCount($companyId, $branchId, $scopedToContext)
+            + $this->pendingRenameApprovalsCount($companyId, $branchId, $scopedToContext)
+            + $this->pendingRollbackApprovalsCount($companyId, $branchId, $scopedToContext);
+    }
+
+    /**
+     * Hitung total approval yang menunggu per perusahaan untuk pengguna (Head / Direktur / Admin).
+     * Mengembalikan array asosiatif [company_id => total_count].
+     */
+    public function pendingApprovalsCountByCompany(): array
+    {
+        if (!$this->isHead() && !$this->isDirector() && !$this->isAdmin()) {
+            return [];
+        }
+
+        $accessibleCompanies = app(\App\Services\CompanyContextService::class)->getAvailableCompanies($this);
+        if ($accessibleCompanies->isEmpty()) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($accessibleCompanies as $company) {
+            $count = $this->pendingApprovalsCount((int) $company->id, null, false);
+            if ($count > 0) {
+                $result[$company->id] = $count;
+            }
+        }
+
+        return $result;
     }
 
     /**

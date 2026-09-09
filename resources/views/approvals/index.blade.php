@@ -9,12 +9,14 @@
                     {{ __('Kelola permintaan persetujuan versi dokumen, rollback, dan perubahan nama') }}
                 </p>
             </div>
+            @if(($counts['total'] ?? 0) > 0)
             <div class="flex items-center gap-2 shrink-0">
-                <span class="badge {{ ($counts['total'] ?? 0) > 0 ? 'badge-primary' : 'badge-ghost' }} gap-1.5 text-xs py-2.5 px-3 font-semibold shadow-xs">
+                <span class="badge badge-primary gap-1.5 text-xs py-2.5 px-3 font-semibold shadow-xs">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    {{ $counts['total'] ?? 0 }} {{ __('Menunggu') }}
+                    {{ $counts['total'] }} {{ __('Menunggu') }}
                 </span>
             </div>
+            @endif
         </div>
     </x-slot>
 
@@ -62,22 +64,30 @@
                     <a href="{{ route('approvals.index', array_merge(request()->query(), ['tab' => 'all'])) }}" 
                        class="btn btn-xs sm:btn-sm gap-1.5 rounded-lg {{ ($tab ?? 'all') === 'all' ? 'btn-primary' : 'btn-ghost text-base-content/70' }}">
                         <span>{{ __('Semua') }}</span>
-                        <span class="badge badge-sm {{ ($tab ?? 'all') === 'all' ? 'bg-primary-content text-primary font-bold' : 'badge-ghost' }}">{{ $counts['total'] ?? 0 }}</span>
+                        @if(($counts['total'] ?? 0) > 0)
+                            <span class="badge badge-sm {{ ($tab ?? 'all') === 'all' ? 'bg-primary-content text-primary font-bold' : 'badge-ghost' }}">{{ $counts['total'] }}</span>
+                        @endif
                     </a>
                     <a href="{{ route('approvals.index', array_merge(request()->query(), ['tab' => 'versions'])) }}" 
                        class="btn btn-xs sm:btn-sm gap-1.5 rounded-lg {{ ($tab ?? '') === 'versions' ? 'btn-primary' : 'btn-ghost text-base-content/70' }}">
                         <span>{{ __('Versi Baru') }}</span>
-                        <span class="badge badge-sm {{ ($tab ?? '') === 'versions' ? 'bg-primary-content text-primary font-bold' : 'badge-ghost' }}">{{ $counts['versions'] ?? 0 }}</span>
+                        @if(($counts['versions'] ?? 0) > 0)
+                            <span class="badge badge-sm {{ ($tab ?? '') === 'versions' ? 'bg-primary-content text-primary font-bold' : 'badge-ghost' }}">{{ $counts['versions'] }}</span>
+                        @endif
                     </a>
                     <a href="{{ route('approvals.index', array_merge(request()->query(), ['tab' => 'rollbacks'])) }}" 
                        class="btn btn-xs sm:btn-sm gap-1.5 rounded-lg {{ ($tab ?? '') === 'rollbacks' ? 'btn-warning text-warning-content' : 'btn-ghost text-base-content/70' }}">
                         <span>{{ __('Rollback') }}</span>
-                        <span class="badge badge-sm {{ ($tab ?? '') === 'rollbacks' ? 'bg-amber-900 text-amber-100 font-bold' : 'badge-warning badge-outline' }}">{{ $counts['rollbacks'] ?? 0 }}</span>
+                        @if(($counts['rollbacks'] ?? 0) > 0)
+                            <span class="badge badge-sm {{ ($tab ?? '') === 'rollbacks' ? 'bg-amber-900 text-amber-100 font-bold' : 'badge-warning badge-outline' }}">{{ $counts['rollbacks'] }}</span>
+                        @endif
                     </a>
                     <a href="{{ route('approvals.index', array_merge(request()->query(), ['tab' => 'renames'])) }}" 
                        class="btn btn-xs sm:btn-sm gap-1.5 rounded-lg {{ ($tab ?? '') === 'renames' ? 'btn-primary' : 'btn-ghost text-base-content/70' }}">
                         <span>{{ __('Ubah Nama') }}</span>
-                        <span class="badge badge-sm {{ ($tab ?? '') === 'renames' ? 'bg-primary-content text-primary font-bold' : 'badge-ghost' }}">{{ $counts['renames'] ?? 0 }}</span>
+                        @if(($counts['renames'] ?? 0) > 0)
+                            <span class="badge badge-sm {{ ($tab ?? '') === 'renames' ? 'bg-primary-content text-primary font-bold' : 'badge-ghost' }}">{{ $counts['renames'] }}</span>
+                        @endif
                     </a>
                 </div>
 

@@ -5,13 +5,17 @@
     $activeCompanyId = (string) $contextService->getActiveCompanyId($user);
     $activeBranchId = (string) $contextService->getActiveBranchId($user);
     $activeDivisionId = (string) $contextService->getActiveDivisionId($user);
+    $pendingApprovalsPerCompany = $user ? $user->pendingApprovalsCountByCompany() : [];
+    $totalCompanyApprovals = collect($pendingApprovalsPerCompany)->sum();
     
-    $companiesData = $companies->map(function ($c) use ($contextService, $user) {
+    $companiesData = $companies->map(function ($c) use ($contextService, $user, $pendingApprovalsPerCompany) {
         $cBranches = $contextService->getAvailableBranches($user, $c->id);
+        $pendingCount = (int) ($pendingApprovalsPerCompany[$c->id] ?? 0);
         return [
             'id' => (string) $c->id,
             'name' => $c->name,
             'code' => $c->code,
+            'pending_approvals_count' => $pendingCount,
             'branches' => $cBranches->map(function ($b) {
                 return [
                     'id' => (string) $b->id,
@@ -214,16 +218,63 @@
 
         {{-- Desktop: inline dropdowns (visible xl+) --}}
         <div class="hidden xl:flex items-center gap-1.5 2xl:gap-2 mr-1 shrink-0">
-            {{-- Company Dropdown --}}
-            <div class="relative">
-                <select x-model="selectedCompanyId" 
-                        @change="onDesktopCompanyChange($event.target.value)" 
-                        class="select select-bordered select-xs sm:select-sm font-semibold bg-base-200/60 w-auto min-w-[130px] max-w-[200px] 2xl:max-w-[260px] focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer truncate"
+            {{-- Company Dropdown with Notification Counter --}}
+            <div class="relative" x-data="{ companyDropdownOpen: false }" @click.outside="companyDropdownOpen = false">
+                <button type="button" 
+                        @click="companyDropdownOpen = !companyDropdownOpen"
+                        class="btn btn-xs sm:btn-sm font-semibold bg-base-200/60 hover:bg-base-200 border-base-300/80 hover:border-base-300 w-auto min-w-[140px] max-w-[220px] 2xl:max-w-[280px] flex items-center justify-between gap-1.5 text-left rounded-lg text-xs normal-case shadow-2xs transition-all"
                         title="{{ __('Pilih Perusahaan Aktif') }}">
+                    <span class="truncate" x-text="currentCompany ? (currentCompany.code + ' - ' + currentCompany.name) : '{{ __('Pilih Perusahaan') }}'"></span>
+                    <div class="flex items-center gap-1 shrink-0 ml-1">
+                        <template x-if="currentCompany && currentCompany.pending_approvals_count > 0">
+                            <span class="badge badge-error badge-xs font-bold text-white px-1 shadow-xs" 
+                                  x-text="currentCompany.pending_approvals_count"
+                                  :title="currentCompany.pending_approvals_count + ' {{ __('persetujuan menunggu di perusahaan ini') }}'"></span>
+                        </template>
+                        <template x-if="(!currentCompany || currentCompany.pending_approvals_count === 0) && {{ $totalCompanyApprovals }} > 0">
+                            <span class="badge badge-error badge-xs font-bold text-white px-1 shadow-xs" 
+                                  title="{{ $totalCompanyApprovals }} {{ __('persetujuan menunggu di perusahaan lain') }}">
+                                {{ $totalCompanyApprovals }}
+                            </span>
+                        </template>
+                        <svg class="w-3 h-3 text-base-content/40 transition-transform duration-200" :class="companyDropdownOpen ? 'rotate-180' : ''" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    </div>
+                </button>
+
+                {{-- Hidden select for form compatibility / fallback --}}
+                <select x-model="selectedCompanyId" class="sr-only" aria-hidden="true" tabindex="-1">
                     @foreach($companies as $comp)
                         <option value="{{ $comp->id }}">{{ $comp->code }} - {{ $comp->name }}</option>
                     @endforeach
                 </select>
+
+                {{-- Dropdown Menu --}}
+                <div x-show="companyDropdownOpen" 
+                     x-transition:enter="transition ease-out duration-100"
+                     x-transition:enter-start="transform opacity-0 scale-95"
+                     x-transition:enter-end="transform opacity-100 scale-100"
+                     x-transition:leave="transition ease-in duration-75"
+                     x-transition:leave-start="transform opacity-100 scale-100"
+                     x-transition:leave-end="transform opacity-0 scale-95"
+                     class="absolute left-0 mt-1 w-72 bg-base-100 border border-base-300 rounded-xl shadow-xl z-50 p-1.5 space-y-1 max-h-80 overflow-y-auto"
+                     style="display: none;">
+                    <template x-for="comp in companies" :key="comp.id">
+                        <button type="button"
+                                @click="companyDropdownOpen = false; onDesktopCompanyChange(comp.id)"
+                                class="w-full flex items-center justify-between px-3 py-2 text-xs rounded-lg text-left transition-colors"
+                                :class="comp.id === activeCompanyId ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-base-200/80 text-base-content'">
+                            <div class="flex items-center gap-2 truncate min-w-0 mr-2">
+                                <span class="badge badge-sm badge-neutral/10 font-bold shrink-0 text-[10px]" x-text="comp.code"></span>
+                                <span class="truncate" x-text="comp.name"></span>
+                            </div>
+                            <template x-if="comp.pending_approvals_count > 0">
+                                <span class="badge badge-error badge-sm font-bold text-white px-1.5 shadow-sm shadow-error/40 shrink-0" 
+                                      x-text="comp.pending_approvals_count" 
+                                      :title="comp.pending_approvals_count + ' {{ __('persetujuan menunggu') }}'"></span>
+                            </template>
+                        </button>
+                    </template>
+                </div>
             </div>
 
             {{-- Branch Dropdown --}}
@@ -272,6 +323,9 @@
                     <span class="text-base-content/30">•</span>
                     <span class="truncate text-[11px] text-base-content/70">{{ $activeDivision?->code ?? '-' }}</span>
                 @endif
+                @if($totalCompanyApprovals > 0)
+                    <span class="badge badge-error badge-xs font-bold text-white px-1 shadow-xs ml-0.5" title="{{ $totalCompanyApprovals }} {{ __('persetujuan menunggu') }}">{{ $totalCompanyApprovals }}</span>
+                @endif
                 <svg class="w-3 h-3 text-base-content/40 group-hover:text-base-content/70 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
             </button>
         </div>
@@ -279,13 +333,16 @@
         {{-- Mobile: Icon button (visible below sm) --}}
         <div class="sm:hidden shrink-0">
             <button type="button"
-                    class="btn btn-ghost btn-circle btn-sm hover:bg-base-200 transition-colors"
+                    class="btn btn-ghost btn-circle btn-sm hover:bg-base-200 transition-colors relative"
                     @click="openMobileModal()"
                     title="{{ __('Pilih Perusahaan & Cabang') }}"
                     aria-label="{{ __('Pilih Perusahaan & Cabang') }}">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-base-content/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
+                @if($totalCompanyApprovals > 0)
+                    <span class="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-error ring-2 ring-base-100" title="{{ $totalCompanyApprovals }} {{ __('persetujuan menunggu') }}"></span>
+                @endif
             </button>
         </div>
 
@@ -333,7 +390,10 @@
                                     @change="onMobileCompanyChange($event.target.value)"
                                     class="select select-bordered select-sm w-full bg-base-100 text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary rounded-xl">
                                 @foreach($companies as $comp)
-                                    <option value="{{ $comp->id }}">{{ $comp->code }} - {{ $comp->name }}</option>
+                                    @php $pCount = (int) ($pendingApprovalsPerCompany[$comp->id] ?? 0); @endphp
+                                    <option value="{{ $comp->id }}">
+                                        {{ $comp->code }} - {{ $comp->name }}@if($pCount > 0) ({{ $pCount }} {{ __('menunggu') }})@endif
+                                    </option>
                                 @endforeach
                             </select>
                         </div>
@@ -464,6 +524,15 @@
                                     </template>
                                 </div>
                             </div>
+                            <template x-if="targetCompany && targetCompany.pending_approvals_count > 0">
+                                <div class="mt-2.5 pt-2 border-t border-primary/20 flex items-center justify-between text-xs">
+                                    <span class="text-primary font-medium flex items-center gap-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                                        {{ __('Persetujuan Menunggu:') }}
+                                    </span>
+                                    <span class="badge badge-error badge-sm font-bold text-white shadow-xs" x-text="targetCompany.pending_approvals_count + ' {{ __('Permintaan') }}'"></span>
+                                </div>
+                            </template>
                         </div>
                     </div>
 

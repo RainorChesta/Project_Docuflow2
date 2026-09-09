@@ -64,6 +64,12 @@ class AppServiceProvider extends ServiceProvider
 
             return new AIFallbackManager($clients);
         });
+
+        // Safe broadcast channel: ensures WebSocket outages don't break notifications or HTTP transactions
+        $this->app->bind(
+            \Illuminate\Notifications\Channels\BroadcastChannel::class,
+            \App\Channels\SafeBroadcastChannel::class
+        );
     }
 
     public function boot(): void
@@ -74,5 +80,23 @@ class AppServiceProvider extends ServiceProvider
 
         // Observers
         \App\Models\SignatureRequest::observe(\App\Observers\SignatureRequestObserver::class);
+
+        // Register fault-tolerant broadcaster for 'reverb' and 'pusher'
+        $this->registerSafeBroadcasters();
+    }
+
+    /**
+     * Extend Reverb and Pusher broadcasters to catch network / connection errors gracefully.
+     */
+    protected function registerSafeBroadcasters(): void
+    {
+        $broadcastManager = $this->app->make(\Illuminate\Broadcasting\BroadcastManager::class);
+
+        foreach (['reverb', 'pusher'] as $driver) {
+            $broadcastManager->extend($driver, function ($app, $config) use ($broadcastManager) {
+                $pusher = $broadcastManager->pusher($config);
+                return new \App\Broadcasting\SafePusherBroadcaster($pusher, $config['jsonp'] ?? false);
+            });
+        }
     }
 }
