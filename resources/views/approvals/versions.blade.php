@@ -9,12 +9,14 @@
                     {{ __('Tinjau dan setujui pembaruan konten atau versi dokumen baru sebelum dipublikasikan.') }}
                 </p>
             </div>
+            @if(($counts['versions'] ?? $pendingVersions->total()) > 0)
             <div class="flex items-center gap-2 shrink-0">
-                <span class="badge {{ ($counts['versions'] ?? $pendingVersions->total()) > 0 ? 'badge-primary' : 'badge-ghost' }} gap-1.5 text-xs py-2.5 px-3 font-semibold shadow-xs">
+                <span class="badge badge-primary gap-1.5 text-xs py-2.5 px-3 font-semibold shadow-xs">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     {{ $counts['versions'] ?? $pendingVersions->total() }} {{ __('Menunggu') }}
                 </span>
             </div>
+            @endif
         </div>
     </x-slot>
 
@@ -64,7 +66,9 @@
                         </svg>
                         {{ __('Daftar Versi Dokumen Menunggu Persetujuan') }}
                     </span>
-                    <span class="badge badge-sm badge-primary font-bold">{{ $pendingVersions->total() }}</span>
+                    @if($pendingVersions->total() > 0)
+                        <span class="badge badge-sm badge-primary font-bold">{{ $pendingVersions->total() }}</span>
+                    @endif
                 </div>
 
                 {{-- Search Box & Per-Page Controls --}}
@@ -150,7 +154,9 @@
                     <div>
                         <h3 class="font-bold text-base text-base-content flex items-center gap-2">
                             {{ __('Document Approval (Version)') }}
-                            <span class="badge badge-primary badge-sm font-semibold">{{ $pendingVersions->total() }}</span>
+                            @if($pendingVersions->total() > 0)
+                                <span class="badge badge-primary badge-sm font-semibold">{{ $pendingVersions->total() }}</span>
+                            @endif
                         </h3>
                         <p class="text-xs text-base-content/60">
                             {{ __('Dokumen menunggu persetujuan versi sebelum dipublikasikan kepada pengguna lain.') }}

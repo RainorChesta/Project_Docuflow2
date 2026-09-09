@@ -9,14 +9,16 @@
                     {{ __('Tinjau dan setujui permintaan perubahan nama atau judul dokumen dari staf.') }}
                 </p>
             </div>
+            @if(($counts['renames'] ?? $pendingRenames->total()) > 0)
             <div class="flex items-center gap-2 shrink-0">
-                <span class="badge {{ ($counts['renames'] ?? $pendingRenames->total()) > 0 ? 'badge-warning font-bold text-amber-900' : 'badge-ghost' }} gap-1.5 text-xs py-2.5 px-3 font-semibold shadow-xs">
+                <span class="badge badge-warning font-bold text-amber-900 gap-1.5 text-xs py-2.5 px-3 font-semibold shadow-xs">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     {{ $counts['renames'] ?? $pendingRenames->total() }} {{ __('Menunggu') }}
                 </span>
             </div>
+            @endif
         </div>
     </x-slot>
 
@@ -43,7 +45,9 @@
                         </svg>
                         {{ __('Daftar Permintaan Ubah Nama Dokumen') }}
                     </span>
-                    <span class="badge badge-sm badge-warning font-bold text-amber-900">{{ $pendingRenames->total() }}</span>
+                    @if($pendingRenames->total() > 0)
+                        <span class="badge badge-sm badge-warning font-bold text-amber-900">{{ $pendingRenames->total() }}</span>
+                    @endif
                 </div>
 
                 {{-- Search Box & Per-Page Controls --}}
@@ -99,7 +103,9 @@
                     <div>
                         <h3 class="font-bold text-base text-base-content flex items-center gap-2">
                             {{ __('Rename Approval') }}
-                            <span class="badge badge-warning font-semibold text-amber-900 badge-sm">{{ $pendingRenames->total() }}</span>
+                            @if($pendingRenames->total() > 0)
+                                <span class="badge badge-warning font-semibold text-amber-900 badge-sm">{{ $pendingRenames->total() }}</span>
+                            @endif
                         </h3>
                         <p class="text-xs text-base-content/60">
                             {{ __('Permintaan dari staf untuk memperbarui nama atau judul dokumen resmi.') }}

@@ -173,7 +173,13 @@ class ApprovalController extends Controller
 
             $pendingVersionsQuery = DocumentVersion::where('status', 'pending')
                 ->whereNull('discarded_at')
-                ->whereHas('document', fn($q) => $q->whereIn('division_id', $divisionIds)->visibleTo($user)->where($roleFilter));
+                ->whereHas('document', function ($q) use ($user, $divisionIds, $roleFilter) {
+                    $q->whereIn('division_id', $divisionIds)
+                      ->visibleTo($user)
+                      ->where($roleFilter);
+
+                    $this->applyContextFilterToDocumentQuery($q, $user);
+                });
         }
 
         if ($search !== '') {
@@ -243,6 +249,8 @@ class ApprovalController extends Controller
                 ->whereNotNull('pending_title')
                 ->where('pending_title', '!=', '')
                 ->where($roleFilter);
+
+            $this->applyContextFilterToDocumentQuery($pendingRenamesQuery, $user);
         }
 
         if ($search !== '') {
@@ -294,6 +302,8 @@ class ApprovalController extends Controller
                 ->visibleTo($user)
                 ->whereNotNull('pending_rollback_version_id')
                 ->where($roleFilter);
+
+            $this->applyContextFilterToDocumentQuery($pendingRollbacksQuery, $user);
         }
 
         if ($search !== '') {
@@ -316,6 +326,37 @@ class ApprovalController extends Controller
         }
 
         return $pendingRollbacksQuery;
+    }
+
+    /**
+     * Terapkan isolasi konteks cabang & perusahaan aktif untuk pengguna Kepala Divisi (Head).
+     */
+    protected function applyContextFilterToDocumentQuery($query, $user): void
+    {
+        if (!$user->isHead()) {
+            return;
+        }
+
+        $contextService = app(\App\Services\CompanyContextService::class);
+        $activeCompanyId = $contextService->getActiveCompanyId($user);
+        $activeBranchId = $contextService->getActiveBranchId($user);
+
+        if ($activeBranchId) {
+            $query->where(function ($sq) use ($activeBranchId, $activeCompanyId) {
+                $sq->where('documents.branch_id', $activeBranchId)
+                   ->orWhere(function ($fallback) use ($activeCompanyId) {
+                       $fallback->whereNull('documents.branch_id');
+                       if ($activeCompanyId) {
+                           $fallback->where('documents.company_id', $activeCompanyId);
+                       }
+                   });
+            });
+        } elseif ($activeCompanyId) {
+            $query->where(function ($sq) use ($activeCompanyId) {
+                $sq->where('documents.company_id', $activeCompanyId)
+                   ->orWhereHas('branch', fn($bq) => $bq->where('company_id', $activeCompanyId));
+            });
+        }
     }
 
     /**
