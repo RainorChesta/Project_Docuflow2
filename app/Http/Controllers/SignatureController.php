@@ -1026,6 +1026,8 @@ class SignatureController extends Controller
                 // Process the signature synchronously using PHPWord or FPDI
                 $processor = app(\App\Services\DocumentProcessorService::class);
                 $processor->processSignature($document, $version, $requestId, $signaturePath, $signatureRequest);
+
+                app(\App\Services\OnlyOfficeService::class)->rotateDocumentKey($document, $version);
             }
         }
 

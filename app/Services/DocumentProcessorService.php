@@ -105,9 +105,10 @@ class DocumentProcessorService
             $disk->put($filePath, $modifiedContent);
             @unlink($tempDocxPath);
 
-            // Touch version and document to rotate ONLYOFFICE cache key
+            // Touch version and document and rotate ONLYOFFICE cache key
             $version->touch();
             $document->touch();
+            $this->onlyOfficeService?->rotateDocumentKey($document, $version);
 
             Log::info("DocumentProcessorService: Successfully processed DOCX signature for document version ID: {$version->id}");
             return true;
