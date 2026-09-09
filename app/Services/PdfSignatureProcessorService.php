@@ -145,6 +145,7 @@ class PdfSignatureProcessorService
             $version->touch();
             $document->touch();
             Cache::forget('onlyoffice_doc_key_' . $document->id);
+            app(\App\Services\OnlyOfficeService::class)->rotateDocumentKey($document, $version);
 
             Log::info("PdfSignatureProcessorService: Successfully stamped signature on Document #{$document->id} (Page {$targetPage})");
             return true;
