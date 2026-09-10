@@ -6,7 +6,22 @@
         $divisions = $divisions ?? (auth()->user()?->isAdmin() ? \App\Models\Division::all() : \App\Models\Division::whereIn('id', auth()->user()?->allDivisionIds() ?? [])->get());
         $approvedSignatures = $approvedSignatures ?? [];
         $version = $version ?? $document->displayVersion();
+        $pendingVersion = $document->versions->firstWhere('status', 'pending');
+        $isPendingV1 = (!$document->current_version_id && !$document->currentVersion)
+            && ($document->versions->where('status', 'pending')->where('version_number', 1)->isNotEmpty()
+                || $document->versions->count() <= 1);
     @endphp
+
+    <x-confirm-modal
+        name="confirm-discard-v1-{{ $document->id }}"
+        :title="__('Discard Document?')"
+        :message="__('Are you sure you want to discard this document? The pending v1 document will be moved to trash.')"
+        :action="route('documents.discard', $document)"
+        method="POST"
+        :confirmLabel="__('Buang ke Trash')"
+        :cancelLabel="__('Batal')"
+        confirmClass="btn-error"
+    />
 
     <x-confirm-modal
         name="confirm-discard-{{ $document->id }}"
@@ -192,7 +207,6 @@
             @endif
 
             <!-- Pending Banner (paling atas) -->
-            @php $pendingVersion = $document->versions->firstWhere('status', 'pending'); @endphp
             @if($pendingVersion)
                 <div class="alert alert-warning mb-3 sm:mb-4 rounded-2xl shadow-xs print:hidden">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
@@ -205,7 +219,18 @@
                                 <p class="text-xs text-base-content/70">{{ __('Versi menunggu review oleh kepala divisi.') }}</p>
                             </div>
                         </div>
-                        <div class="flex flex-wrap gap-2 shrink-0">
+                        <div class="flex flex-wrap items-center gap-2 shrink-0">
+                            @if($isPendingV1 && (auth()->id() === $document->owner_id || auth()->user()->can('update', $document) || auth()->user()->can('delete', $document)))
+                                <button type="button" 
+                                        onclick="window.dispatchEvent(new CustomEvent('open-modal', { detail: 'confirm-discard-v1-{{ $document->id }}' }))" 
+                                        class="btn btn-outline btn-error btn-sm rounded-xl gap-1 font-medium"
+                                        title="{{ __('Buang Dokumen') }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    {{ __('Buang Dokumen') }}
+                                </button>
+                            @endif
 
                             @can('approve', $document)
                                 <form method="POST" action="{{ route('approvals.approve', [$document, $pendingVersion]) }}" class="inline">
@@ -349,12 +374,12 @@
                     </div>
 
                     @if($latestRejectedVersion->notes)
-                        <div class="mt-3.5 sm:ml-10 p-3.5 rounded-xl bg-base-100/90 dark:bg-base-200/90 border border-error/20 text-xs text-base-content shadow-xs">
+                        <div class="mt-3.5 sm:ml-10 p-3.5 rounded-xl bg-base-100/90 dark:bg-base-200/90 border border-error/20 text-xs text-base-content shadow-xs min-w-0 max-w-full overflow-hidden">
                             <div class="font-semibold text-error text-[11px] mb-1.5 flex items-center gap-1.5 uppercase tracking-wider">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
                                 {{ __('Catatan Penolakan:') }}
                             </div>
-                            <p class="text-base-content/85 text-xs leading-relaxed whitespace-pre-wrap break-words">{{ $latestRejectedVersion->notes }}</p>
+                            <p class="text-base-content/85 text-xs leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{{ $latestRejectedVersion->notes }}</p>
                         </div>
                     @endif
                 </div>
@@ -1533,11 +1558,11 @@
                             <span class="badge badge-warning badge-sm ml-2">Target Rollback</span>
                         @endif
                         @if($version->status === 'rejected' && $version->notes)
-                            <div class="w-full mt-1.5 p-2 rounded-lg bg-error/10 border border-error/20 text-xs text-error font-medium flex items-start gap-1.5">
+                            <div class="w-full mt-1.5 p-2 rounded-lg bg-error/10 border border-error/20 text-xs text-error font-medium flex items-start gap-1.5 min-w-0 max-w-full overflow-hidden">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
-                                <div>
+                                <div class="min-w-0 flex-1 break-words [overflow-wrap:anywhere]">
                                     <span class="font-bold">{{ __('Catatan Penolakan:') }}</span>
-                                    <span>{{ $version->notes }}</span>
+                                    <span class="whitespace-pre-wrap text-base-content/85 dark:text-base-content/90 font-normal">{{ $version->notes }}</span>
                                 </div>
                             </div>
                         @endif

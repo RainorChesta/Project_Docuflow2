@@ -125,6 +125,212 @@ class DocumentProcessorService
     }
 
     /**
+     * Remove any inserted signature placeholder images, content controls, or text badges for a rejected signature request.
+     */
+    public function removeSignaturePlaceholder(
+        Document $document,
+        DocumentVersion $version,
+        int $requestId
+    ): bool {
+        try {
+            $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
+            $filePath = $version->file_path;
+
+            if (!$disk->exists($filePath)) {
+                Log::error("DocumentProcessorService: File does not exist at path: {$filePath}");
+                return false;
+            }
+
+            // Determine if the file is PDF or DOCX
+            $isPdf = false;
+            if ($filePath && str_ends_with(strtolower($filePath), '.pdf')) {
+                $isPdf = true;
+            } elseif ($version->file_mime && str_contains(strtolower($version->file_mime), 'pdf')) {
+                $isPdf = true;
+            }
+
+            if ($isPdf) {
+                // PDFs are not stamped with placeholders during request creation, so we only rotate keys
+                $version->touch();
+                $document->touch();
+                $this->onlyOfficeService?->rotateDocumentKey($document, $version);
+                return true;
+            }
+
+            // Handle DOCX removal
+            $tempDocxPath = storage_path('app/temp_rm_sig_' . uniqid() . '.docx');
+            $fileContent = $disk->get($filePath);
+            file_put_contents($tempDocxPath, $fileContent);
+
+            $this->purgeDocxSignaturePlaceholder($tempDocxPath, $requestId);
+
+            $modifiedContent = file_get_contents($tempDocxPath);
+            $disk->put($filePath, $modifiedContent);
+            @unlink($tempDocxPath);
+
+            // Touch version and document and rotate ONLYOFFICE cache key
+            $version->touch();
+            $document->touch();
+            $this->onlyOfficeService?->rotateDocumentKey($document, $version);
+
+            Log::info("DocumentProcessorService: Successfully purged rejected signature placeholder for document version ID: {$version->id}, request ID: {$requestId}");
+            return true;
+
+        } catch (\Throwable $e) {
+            Log::error("DocumentProcessorService: Error removing signature placeholder: " . $e->getMessage(), [
+                'exception' => $e,
+            ]);
+
+            if (isset($tempDocxPath) && file_exists($tempDocxPath)) {
+                @unlink($tempDocxPath);
+            }
+
+            return false;
+        }
+    }
+
+    /**
+     * Remove any placeholder images in word/media/, their drawing references in word/document.xml,
+     * relationships in word/_rels/document.xml.rels, Content Controls, or text badges for the rejected request ID.
+     */
+    protected function purgeDocxSignaturePlaceholder(string $docxPath, int $requestId): bool
+    {
+        try {
+            $zip = new \ZipArchive();
+            if ($zip->open($docxPath) !== true) {
+                return false;
+            }
+
+            $targetMediaEntries = [];
+
+            // 1. Scan word/media/ for matching placeholder images
+            for ($i = 0; $i < $zip->numFiles; $i++) {
+                $entryName = $zip->getNameIndex($i);
+                if (str_starts_with($entryName, 'word/media/')) {
+                    $imgBytes = $zip->getFromIndex($i);
+                    if ($imgBytes) {
+                        $isTarget = false;
+                        if (str_contains($imgBytes, "DocuFlowSigReq\0" . $requestId) || 
+                            str_contains($imgBytes, "DocuFlowSigReq:" . $requestId) || 
+                            str_contains($imgBytes, "request_id=" . $requestId) ||
+                            str_contains($imgBytes, "PENDING_SIG_" . $requestId)) {
+                            $isTarget = true;
+                        } elseif (str_contains($imgBytes, "DocuFlowSigReq") && !preg_match('/DocuFlowSigReq[^\d]*(\d+)/', $imgBytes)) {
+                            $isTarget = true;
+                        }
+
+                        if ($isTarget) {
+                            $targetMediaEntries[] = $entryName;
+                        }
+                    }
+                }
+            }
+
+            // 2. Map target media filenames to Relationship IDs in word/_rels/document.xml.rels
+            $relsXml = $zip->getFromName('word/_rels/document.xml.rels');
+            $targetRIds = [];
+            if ($relsXml !== false) {
+                foreach ($targetMediaEntries as $mediaEntry) {
+                    $baseMediaName = basename($mediaEntry);
+                    if (preg_match_all('/<Relationship\b[^>]*?Id="([^"]+)"[^>]*?Target="[^"]*' . preg_quote($baseMediaName, '/') . '"[^>]*\/?>/i', $relsXml, $matches)) {
+                        foreach ($matches[1] as $rId) {
+                            $targetRIds[] = $rId;
+                        }
+                    }
+                }
+            }
+
+            // 3. Remove drawings, shapes, content controls, and text badges in word/document.xml
+            $documentXml = $zip->getFromName('word/document.xml');
+            if ($documentXml !== false) {
+                $dom = new \DOMDocument();
+                $prevEntityLoader = libxml_use_internal_errors(true);
+                if ($dom->loadXML($documentXml)) {
+                    $xpath = new \DOMXPath($dom);
+                    $xpath->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
+                    $xpath->registerNamespace('a', 'http://schemas.openxmlformats.org/drawingml/2006/main');
+                    $xpath->registerNamespace('r', 'http://schemas.openxmlformats.org/officeDocument/2006/relationships');
+                    $xpath->registerNamespace('v', 'urn:schemas-microsoft-com:vml');
+
+                    // Remove drawing/shape elements referencing the target rIds
+                    foreach ($targetRIds as $rId) {
+                        $nodes = $xpath->query("//*[@r:embed='{$rId}' or @r:id='{$rId}' or @r:link='{$rId}' or @id='{$rId}']");
+                        if ($nodes && $nodes->length > 0) {
+                            foreach ($nodes as $node) {
+                                $curr = $node;
+                                while ($curr && !in_array($curr->localName, ['drawing', 'pict', 'r', 'p', 'sdt'], true)) {
+                                    $curr = $curr->parentNode;
+                                }
+                                if ($curr) {
+                                    if ($curr->localName === 'drawing' || $curr->localName === 'pict') {
+                                        $parentRun = $curr->parentNode;
+                                        if ($parentRun && $parentRun->localName === 'r') {
+                                            $parentParagraph = $parentRun->parentNode;
+                                            $parentRun->removeChild($curr);
+                                            if (!$parentRun->hasChildNodes() && $parentParagraph) {
+                                                $parentParagraph->removeChild($parentRun);
+                                                if (!$parentParagraph->hasChildNodes() && $parentParagraph->parentNode) {
+                                                    $parentParagraph->parentNode->removeChild($parentParagraph);
+                                                }
+                                            }
+                                        } else {
+                                            $curr->parentNode?->removeChild($curr);
+                                        }
+                                    } elseif ($curr->localName === 'r') {
+                                        $parentParagraph = $curr->parentNode;
+                                        $parentParagraph?->removeChild($curr);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Remove Content Controls matching pending_sig_{$requestId}
+                    $sdtNodes = $xpath->query("//w:sdt[.//w:tag[@w:val='pending_sig_{$requestId}'] or .//w:alias[@w:val='pending_sig_{$requestId}'] or contains(., 'pending_sig_{$requestId}') or contains(., 'PENDING_SIG_{$requestId}')]");
+                    if ($sdtNodes && $sdtNodes->length > 0) {
+                        foreach ($sdtNodes as $sdtNode) {
+                            $sdtNode->parentNode?->removeChild($sdtNode);
+                        }
+                    }
+
+                    $documentXml = $dom->saveXML();
+                }
+                libxml_clear_errors();
+                libxml_use_internal_errors($prevEntityLoader);
+
+                // Remove text badge paragraph
+                $badgePattern = '/<w:p\b[^>]*>(?:(?!<\/w:p>).)*?(?:MENUNGGU.*?PENDING_SIG_' . $requestId . '|MENUNGGU.*?#' . $requestId . '|MENUNGGU.*?' . $requestId . ')(?:(?!<\/w:p>).)*?<\/w:p>/is';
+                $documentXml = preg_replace($badgePattern, '', $documentXml);
+
+                // Remove standalone macro text
+                $pattern = '/(?:\$\{)?(?:PENDING_SIG_|pending_sig_)' . $requestId . '\}?/i';
+                $documentXml = preg_replace($pattern, '', $documentXml);
+
+                $zip->addFromString('word/document.xml', $documentXml);
+            }
+
+            // 4. Delete target media entries from the zip
+            foreach ($targetMediaEntries as $mediaEntry) {
+                $zip->deleteName($mediaEntry);
+            }
+
+            // 5. Clean up relationships in word/_rels/document.xml.rels
+            if ($relsXml !== false && !empty($targetRIds)) {
+                foreach ($targetRIds as $rId) {
+                    $relsXml = preg_replace('/<Relationship\b[^>]*?Id="' . preg_quote($rId, '/') . '"[^>]*\/?>/i', '', $relsXml);
+                }
+                $zip->addFromString('word/_rels/document.xml.rels', $relsXml);
+            }
+
+            $zip->close();
+            return true;
+        } catch (\Throwable $e) {
+            Log::warning("DocumentProcessorService: Failed to purge docx signature placeholder: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Convert any Word OpenXML Content Controls (<w:sdt>) or pending text badges matching pending_sig_{$requestId}
      * into a standard ${PENDING_SIG_{$requestId}} placeholder macro so TemplateProcessor can replace it with an image.
      * Also replaces any inserted placeholder PNGs in word/media/ with the approved signature image.

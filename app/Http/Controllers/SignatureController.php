@@ -100,9 +100,6 @@ class SignatureController extends Controller
                     'preset_position' => $preset,
                     'requested_at' => now(),
                 ]);
-                if ($doc && $user->id !== Auth::id()) {
-                    $user->notify(new \App\Notifications\SignatureRequested($doc, Auth::user()->name, $requestRecord));
-                }
             } else {
                 $requestRecord->update([
                     'requested_signature_id' => $requestedSig->id,
@@ -1056,6 +1053,15 @@ class SignatureController extends Controller
             'rejected_reason' => $reason,
             'responded_at' => now(),
         ]);
+
+        $document = $signatureRequest->document;
+        $version = $document?->displayVersion();
+
+        if ($document && $version) {
+            $processor = app(\App\Services\DocumentProcessorService::class);
+            $processor->removeSignaturePlaceholder($document, $version, $signatureRequest->id);
+            app(\App\Services\OnlyOfficeService::class)->rotateDocumentKey($document, $version);
+        }
 
         $signatureRequest->loadMissing(['requester', 'document', 'targetUser']);
         if ($signatureRequest->requester && $signatureRequest->document) {

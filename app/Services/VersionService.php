@@ -246,10 +246,15 @@ class VersionService
             ->first();
 
         if ($pending) {
-            if ($pending->file_path) {
-                Storage::disk('local')->delete($pending->file_path);
+            // Only delete the pending version if there is another version to fall back to (e.g. v1 when discarding v2).
+            // If v1 is the only version, we preserve it so the document is never left without versions.
+            $hasOtherVersions = $document->versions()->where('id', '!=', $pending->id)->exists();
+            if ($hasOtherVersions) {
+                if ($pending->file_path) {
+                    Storage::disk('local')->delete($pending->file_path);
+                }
+                $pending->delete();
             }
-            $pending->delete();
         }
         
         // Hapus juga semua versi yang sebelumnya sudah ditandai discarded (jika ada)

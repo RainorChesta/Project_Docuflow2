@@ -353,6 +353,15 @@ class OnlyOfficeIntegrationTest extends TestCase
             'id' => $pendingVersion->id,
         ]);
 
+        $this->assertDatabaseHas('document_versions', [
+            'id' => $this->version->id,
+        ]);
+
+        $this->assertDatabaseHas('documents', [
+            'id' => $this->document->id,
+            'deleted_at' => null,
+        ]);
+
         $this->assertTrue(\Illuminate\Support\Facades\Cache::has('ignore_onlyoffice_save_' . $this->document->id));
     }
 
@@ -383,7 +392,7 @@ class OnlyOfficeIntegrationTest extends TestCase
         ]);
     }
 
-    public function test_discard_on_document_without_active_version_soft_deletes_empty_document()
+    public function test_discard_on_leave_guard_preserves_document_and_base_version()
     {
         $newDoc = \App\Models\Document::create([
             'title' => 'Brand New Unapproved Doc',
@@ -405,20 +414,57 @@ class OnlyOfficeIntegrationTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->user)
-            ->postJson(route('documents.discard', $newDoc));
+            ->postJson(route('documents.discard', $newDoc), [
+                'is_leave_guard' => true,
+            ]);
 
         $response->assertStatus(200);
         $response->assertJson([
             'success' => true,
-            'discarded' => true,
         ]);
 
-        // v1Pending is deleted
-        $this->assertDatabaseMissing('document_versions', [
+        // Base version v1 is preserved
+        $this->assertDatabaseHas('document_versions', [
             'id' => $v1Pending->id,
         ]);
 
-        // Document itself is soft-deleted
+        // Document itself is NOT deleted
+        $this->assertDatabaseHas('documents', [
+            'id' => $newDoc->id,
+            'deleted_at' => null,
+        ]);
+
+        $this->assertTrue(\Illuminate\Support\Facades\Cache::has('ignore_onlyoffice_save_' . $newDoc->id));
+    }
+
+    public function test_discard_on_pending_approval_v1_soft_deletes_to_trash_with_success_alert()
+    {
+        $newDoc = \App\Models\Document::create([
+            'title' => 'Pending V1 Doc to Discard',
+            'document_number' => '998/TEST/DIV/PST/IX/2026',
+            'owner_id' => $this->user->id,
+            'division_id' => $this->division->id,
+            'document_type_id' => $this->docType->id,
+        ]);
+
+        $v1Pending = $newDoc->versions()->create([
+            'version_number' => 1,
+            'content' => '',
+            'file_path' => 'documents/' . $newDoc->id . '/v1.docx',
+            'file_original_name' => 'Pending V1 Doc.docx',
+            'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'author_id' => $this->user->id,
+            'author_name' => $this->user->name,
+            'status' => 'pending',
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->post(route('documents.discard', $newDoc));
+
+        $response->assertRedirect(route('documents.index', ['type' => 'mine']));
+        $response->assertSessionHas('success', __('Dokumen telah dipindahkan ke trash.'));
+
+        // Document is soft-deleted
         $this->assertSoftDeleted('documents', [
             'id' => $newDoc->id,
         ]);

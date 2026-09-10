@@ -28,16 +28,19 @@ class DocumentApprovalRequested extends Notification
     public function toArray(object $notifiable): array
     {
         return [
-            'type'    => 'approval_request',
-            'title'   => __('Permintaan Persetujuan Dokumen'),
-            'message' => __(':author mengajukan dokumen ":doc" (v:ver) untuk persetujuan.', [
+            'type'            => 'approval_request',
+            'title'           => __('Permintaan Persetujuan Dokumen'),
+            'message'         => __(':author mengajukan dokumen ":doc" (v:ver) untuk persetujuan.', [
                 'author' => $this->authorName,
                 'doc'    => $this->document->title,
                 'ver'    => $this->version->version_number,
             ]),
-            'url'     => route('documents.show', $this->document->id, false),
-            'icon'    => 'approval',
-            'document_id' => $this->document->id
+            'url'             => route('documents.show', $this->document->id, false),
+            'icon'            => 'approval',
+            'document_id'     => $this->document->id,
+            'document_title'  => $this->document->title,
+            'document_number' => $this->document->document_number,
+            'actor_name'      => $this->authorName,
         ];
     }
 
