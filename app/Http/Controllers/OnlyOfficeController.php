@@ -331,6 +331,18 @@ class OnlyOfficeController extends Controller
                     }
                 }
 
+                // Automatically remove any rejected signature placeholders from the document
+                $rejectedRequests = \App\Models\SignatureRequest::where('document_id', $document->id)
+                    ->where('status', 'rejected')
+                    ->get();
+
+                if ($rejectedRequests->isNotEmpty()) {
+                    $processor = app(\App\Services\DocumentProcessorService::class);
+                    foreach ($rejectedRequests as $req) {
+                        $processor->removeSignaturePlaceholder($document, $version, $req->id);
+                    }
+                }
+
                 $this->auditService->log($author, 'document.saved_onlyoffice', 'document', $document->id, [
                     'version_number' => $version->version_number,
                     'status' => $status,

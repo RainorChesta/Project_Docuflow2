@@ -1,31 +1,35 @@
 <x-app-layout>
     <x-slot name="header">{{ __('ONLYOFFICE Document Editor') }}</x-slot>
 
-    <x-confirm-modal
-        name="confirm-discard-{{ $document->id }}"
-        :title="__('Discard Document?')"
-        :message="__('Are you sure you want to discard this document and all its changes?')"
-        :action="route('documents.destroy', $document)"
-        method="DELETE"
-        :confirmLabel="__('Discard')"
-        :cancelLabel="__('Batal')"
-    />
-
-    <x-confirm-modal
-        name="confirm-discard-version-{{ $document->id }}"
-        :title="__('Discard Changes?')"
-        :message="__('Are you sure you want to discard the pending changes? The approved version will remain intact.')"
-        :action="route('documents.discard', $document)"
-        method="POST"
-        :confirmLabel="__('Discard Changes')"
-        :cancelLabel="__('Batal')"
-    />
-
     @php
         $pending = $document->versions->first(fn($v) => $v->status === 'pending' && !$v->discarded_at);
+        $isPendingV1 = (!$document->currentVersion) && (!$pending || $pending->version_number === 1);
         $hasDraftOnly = !$pending && !$document->currentVersion;
         $isPdf = ($version && ($version->file_path && str_ends_with(strtolower($version->file_path), '.pdf'))) || ($version && $version->file_mime && str_contains(strtolower($version->file_mime), 'pdf'));
     @endphp
+
+    @if($isPendingV1)
+        <x-confirm-modal
+            name="confirm-discard-v1-{{ $document->id }}"
+            :title="__('Discard Document?')"
+            :message="__('Are you sure you want to discard this document? The pending v1 document will be moved to trash.')"
+            :action="route('documents.discard', $document)"
+            method="POST"
+            :confirmLabel="__('Buang ke Trash')"
+            :cancelLabel="__('Batal')"
+            confirmClass="btn-error"
+        />
+    @else
+        <x-confirm-modal
+            name="confirm-discard-version-{{ $document->id }}"
+            :title="__('Discard Changes?')"
+            :message="__('Are you sure you want to discard recent unsaved changes? The document and its base version will remain intact.')"
+            :action="route('documents.discard', $document)"
+            method="POST"
+            :confirmLabel="__('Discard Changes')"
+            :cancelLabel="__('Batal')"
+        />
+    @endif
 
     <div class="pb-6">
         <div class="max-w-7xl mx-auto w-full">
@@ -80,9 +84,20 @@
                                     <span class="sm:hidden">{{ __('Unduh') }}</span>
                                 </a>
 
-                                {{-- Discard Changes --}}
-                                @if($document->currentVersion)
-                                    @can('update', $document)
+                                {{-- Discard --}}
+                                @can('update', $document)
+                                    @if($isPendingV1)
+                                        <button type="button"
+                                                class="btn btn-outline btn-error btn-xs gap-1 shrink-0"
+                                                x-on:click="$dispatch('open-modal', 'confirm-discard-v1-{{ $document->id }}')"
+                                                title="{{ __('Buang Dokumen') }}">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                            <span class="hidden sm:inline">{{ __('Buang Dokumen') }}</span>
+                                            <span class="sm:hidden">{{ __('Buang') }}</span>
+                                        </button>
+                                    @else
                                         <button type="button"
                                                 class="btn btn-outline btn-error btn-xs gap-1 shrink-0"
                                                 x-on:click="$dispatch('open-modal', 'confirm-discard-version-{{ $document->id }}')"
@@ -93,21 +108,8 @@
                                             <span class="hidden sm:inline">{{ __('Buang Perubahan') }}</span>
                                             <span class="sm:hidden">{{ __('Buang') }}</span>
                                         </button>
-                                    @endcan
-                                @else
-                                    @can('delete', $document)
-                                        <button type="button"
-                                                class="btn btn-outline btn-error btn-xs gap-1 shrink-0"
-                                                x-on:click="$dispatch('open-modal', 'confirm-discard-{{ $document->id }}')"
-                                                title="{{ __('Discard') }}">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                            </svg>
-                                            <span class="hidden sm:inline">{{ __('Buang') }}</span>
-                                            <span class="sm:hidden">{{ __('Buang') }}</span>
-                                        </button>
-                                    @endcan
-                                @endif
+                                    @endif
+                                @endcan
 
                                 {{-- Selesai Edit --}}
                                 <button type="button"
@@ -218,7 +220,7 @@
             </div>
 
             {{-- User List --}}
-            <div id="signature-users-list" class="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+            <div id="signature-users-list" class="space-y-2.5 max-h-72 overflow-y-auto overflow-x-hidden pr-1 min-w-0 max-w-full">
                 <div class="flex justify-center py-6 text-sm text-base-content/60">
                     <span class="loading loading-spinner loading-sm mr-2"></span> {{ __('MEMUAT PENGGUNA...') }}
                 </div>
@@ -1394,6 +1396,13 @@
                 }
             }
 
+            function escapeHtml(str) {
+                if (!str) return '';
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
+            }
+
             function renderSignatureUsersList(users, isInitialEmpty = false) {
                 const list = document.getElementById('signature-users-list');
                 if (!list) return;
@@ -1405,7 +1414,7 @@
 
                 let html = users.map(u => {
                     const signaturesHtml = (u.signatures && u.signatures.length > 0)
-                        ? '<div class="border-t border-base-200 pt-2 mt-2 space-y-2">' +
+                        ? '<div class="border-t border-base-200 pt-2 mt-2 space-y-2 min-w-0">' +
                             u.signatures.map(sig => {
                                 const isStamp = (sig.type === 'company_stamp');
                                 const typeLabel = isStamp ? ('STEMPEL: ' + (sig.company_name || 'PERUSAHAAN')) : 'TANDA TANGAN ORIGINAL';
@@ -1415,10 +1424,10 @@
                                 
                                 let sigActionHtml = '';
                                 if (u.is_me) {
-                                    sigActionHtml = `<button type="button" onclick="insertMySignature(${sig.id}, '${sig.type}', '${safeComp}')" class="btn btn-xs ${isStamp ? 'btn-secondary' : 'btn-primary'} gap-1 uppercase font-bold">{{ __("SISIPKAN") }}</button>`;
+                                    sigActionHtml = `<button type="button" onclick="insertMySignature(${sig.id}, '${sig.type}', '${safeComp}')" class="btn btn-xs ${isStamp ? 'btn-secondary' : 'btn-primary'} gap-1 uppercase font-bold shrink-0">{{ __("SISIPKAN") }}</button>`;
                                 } else if (sig.request_status === 'pending') {
                                     sigActionHtml = `
-                                        <span class="badge badge-warning badge-xs gap-1 py-1.5 px-2 font-bold uppercase">
+                                        <span class="badge badge-warning badge-xs gap-1 py-1.5 px-2 font-bold uppercase shrink-0">
                                             ⏳ {{ __('MENUNGGU') }}
                                         </span>
                                     `;
@@ -1427,7 +1436,7 @@
                                         ? `openPdfVisualPlacementModal(${u.id}, '${safeName}', 'signature', ${sig.id}, '${sig.type}', '${safeComp}')`
                                         : `fetchUserSignatureAndInsert(${u.id}, &quot;${(u.name || '').replace(/"/g, '&quot;')}&quot;, ${sig.id})`;
                                     sigActionHtml = `
-                                        <div class="flex items-center gap-1.5">
+                                        <div class="flex items-center gap-1.5 shrink-0">
                                             <span class="badge badge-success badge-xs gap-1 py-1 px-2 font-bold uppercase text-white">
                                                 ✓ {{ __('DISETUJUI') }}
                                             </span>
@@ -1441,8 +1450,8 @@
                                         ? `openPdfVisualPlacementModal(${u.id}, '${safeName}', 'signature', ${sig.id}, '${sig.type}', '${safeComp}')`
                                         : `fetchUserSignatureAndInsert(${u.id}, &quot;${(u.name || '').replace(/"/g, '&quot;')}&quot;, ${sig.id})`;
                                     sigActionHtml = `
-                                        <div class="flex items-center gap-1.5">
-                                            <span class="badge badge-error badge-xs gap-1 py-1 px-2 font-bold uppercase text-white" title="${sig.rejected_reason || ''}">
+                                        <div class="flex items-center gap-1.5 shrink-0">
+                                            <span class="badge badge-error badge-xs gap-1 py-1 px-2 font-bold uppercase text-white" title="${escapeHtml(sig.rejected_reason || '')}">
                                                 ✕ {{ __('DITOLAK') }}
                                             </span>
                                             <button type="button" onclick="${reqAction}" class="btn btn-xs btn-outline btn-warning gap-1 uppercase font-bold">
@@ -1455,7 +1464,7 @@
                                         ? `openPdfVisualPlacementModal(${u.id}, '${safeName}', 'signature', ${sig.id}, '${sig.type}', '${safeComp}')`
                                         : `fetchUserSignatureAndInsert(${u.id}, &quot;${(u.name || '').replace(/"/g, '&quot;')}&quot;, ${sig.id})`;
                                     sigActionHtml = `
-                                        <div class="flex items-center gap-1.5">
+                                        <div class="flex items-center gap-1.5 shrink-0">
                                             <span class="badge badge-ghost badge-xs text-base-content/60 gap-1 py-1 px-2 font-bold uppercase">
                                                 ✓ {{ __('DIGUNAKAN') }}
                                             </span>
@@ -1468,23 +1477,29 @@
                                     const reqAction = isPdfDocument 
                                         ? `openPdfVisualPlacementModal(${u.id}, '${safeName}', 'signature', ${sig.id}, '${sig.type}', '${safeComp}')`
                                         : `fetchUserSignatureAndInsert(${u.id}, &quot;${(u.name || '').replace(/"/g, '&quot;')}&quot;, ${sig.id})`;
-                                    sigActionHtml = `<button type="button" onclick="${reqAction}" class="btn btn-xs btn-outline ${isStamp ? 'btn-secondary' : 'btn-primary'} gap-1 uppercase font-bold">${isStamp ? '{{ __("MINTA STEMPEL") }}' : '{{ __("MINTA TTD") }}'}</button>`;
+                                    sigActionHtml = `<button type="button" onclick="${reqAction}" class="btn btn-xs btn-outline ${isStamp ? 'btn-secondary' : 'btn-primary'} gap-1 uppercase font-bold shrink-0">${isStamp ? '{{ __("MINTA STEMPEL") }}' : '{{ __("MINTA TTD") }}'}</button>`;
                                 }
                                 
                                 const sigReasonHtml = (sig.request_status === 'rejected' && sig.rejected_reason)
-                                    ? `<div class="mt-1 p-1.5 rounded-lg bg-error/10 border border-error/20 text-[11px] text-error font-medium flex items-start gap-1">
-                                            <span><strong>{{ __('Alasan Ditolak:') }}</strong> ${sig.rejected_reason}</span>
+                                    ? `<div class="mt-2 p-2.5 rounded-xl bg-error/10 border border-error/20 text-xs text-error font-medium min-w-0 max-w-full overflow-hidden">
+                                            <div class="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider mb-1 text-error">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                </svg>
+                                                <span>{{ __('Alasan Ditolak:') }}</span>
+                                            </div>
+                                            <p class="text-base-content/85 dark:text-base-content/90 font-normal leading-relaxed break-words [overflow-wrap:anywhere] whitespace-pre-wrap text-[11px] max-h-36 overflow-y-auto pr-1">${escapeHtml(sig.rejected_reason)}</p>
                                        </div>`
                                     : '';
 
                                 return `
-                                    <div class="p-2 rounded-lg bg-base-100 border border-base-200">
-                                        <div class="flex items-center justify-between text-xs gap-2">
-                                            <div class="flex items-center gap-1.5 min-w-0">
+                                    <div class="p-2.5 rounded-xl bg-base-100 border border-base-200 min-w-0 max-w-full overflow-hidden shadow-xs">
+                                        <div class="flex items-center justify-between text-xs gap-2 flex-wrap sm:flex-nowrap">
+                                            <div class="flex items-center gap-1.5 min-w-0 flex-1">
                                                 <span class="badge ${typeBadgeClass} badge-outline badge-xs font-bold uppercase shrink-0">${isStamp ? 'Stempel' : 'TTD'}</span>
-                                                <span class="font-bold truncate">${typeLabel}</span>
+                                                <span class="font-bold truncate" title="${escapeHtml(typeLabel)}">${escapeHtml(typeLabel)}</span>
                                             </div>
-                                            <div class="shrink-0">${sigActionHtml}</div>
+                                            <div class="shrink-0 ml-auto">${sigActionHtml}</div>
                                         </div>
                                         ${sigReasonHtml}
                                     </div>
@@ -1496,14 +1511,14 @@
                     const isMe = u.is_me;
 
                     return `
-                        <div class="flex flex-col p-2.5 rounded-xl border border-base-200 hover:bg-base-200/40 transition-all ${isMe ? 'bg-primary/5 border-primary/20' : ''}">
-                            <div class="flex items-center justify-between">
-                                <div class="pr-2">
-                                    <div class="flex items-center gap-1.5 mb-0.5">
-                                        <p class="text-sm font-semibold leading-tight text-base-content uppercase">${u.name}</p>
-                                        ${u.is_me ? '<span class="badge badge-primary badge-xs uppercase font-bold">Saya</span>' : ''}
+                        <div class="flex flex-col p-2.5 rounded-xl border border-base-200 hover:bg-base-200/40 transition-all ${isMe ? 'bg-primary/5 border-primary/20' : ''} min-w-0 max-w-full overflow-hidden">
+                            <div class="flex items-center justify-between min-w-0">
+                                <div class="pr-2 min-w-0 flex-1">
+                                    <div class="flex items-center gap-1.5 mb-0.5 min-w-0">
+                                        <p class="text-sm font-semibold leading-tight text-base-content uppercase truncate" title="${escapeHtml(u.name || '')}">${escapeHtml(u.name || '')}</p>
+                                        ${u.is_me ? '<span class="badge badge-primary badge-xs uppercase font-bold shrink-0">Saya</span>' : ''}
                                     </div>
-                                    <p class="text-xs text-base-content/60 uppercase">${u.role} &bull; ${u.division}</p>
+                                    <p class="text-xs text-base-content/60 uppercase truncate">${escapeHtml(u.role || '')} &bull; ${escapeHtml(u.division || '')}</p>
                                 </div>
                             </div>
                             ${signaturesHtml}
@@ -1603,15 +1618,14 @@
                                     (notification.message || 'TANDA TANGAN TELAH DISETUJUI DAN DITERAPKAN PADA DOKUMEN.').toUpperCase(),
                                     true
                                 );
-                                if (isPdfDocument) {
-                                    setTimeout(() => window.location.reload(), 1200);
-                                }
+                                setTimeout(() => window.location.reload(), 1500);
                             } else if (notification.type === 'signature_request_rejected' && notification.document_id == {{ $document->id }}) {
                                 showSignatureScreenAlert(
                                     'PERMINTAAN TANDA TANGAN DITOLAK',
-                                    (notification.message || 'PERMINTAAN TANDA TANGAN TELAH DITOLAK OLEH PEMILIK TTD.').toUpperCase(),
+                                    (notification.message || 'PERMINTAAN TANDA TANGAN TELAH DITOLAK OLEH PEMILIK TTD. KOTAK PENANDA AKAN OTOMATIS DIHAPUS.').toUpperCase(),
                                     false
                                 );
+                                setTimeout(() => window.location.reload(), 1500);
                             }
                         });
                 }

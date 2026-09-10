@@ -28,17 +28,20 @@ class DocumentSharedWithBranch extends Notification
     public function toArray(object $notifiable): array
     {
         return [
-            'type'        => 'document_shared_branch',
-            'title'       => __('Akses Lintas Cabang'),
-            'message'     => __(':user membagikan dokumen ":doc" kepada cabang :branch sebagai :role.', [
+            'type'            => 'document_shared_branch',
+            'title'           => __('Akses Lintas Cabang'),
+            'message'         => __(':user membagikan dokumen ":doc" kepada cabang :branch sebagai :role.', [
                 'user'   => $this->sharedByName,
                 'doc'    => $this->document->title,
                 'branch' => $this->branchName,
                 'role'   => $this->role,
             ]),
-            'url'         => route('documents.show', $this->document, false),
-            'icon'        => 'document',
-            'document_id' => $this->document->id,
+            'url'             => route('documents.show', $this->document, false),
+            'icon'            => 'document',
+            'document_id'     => $this->document->id,
+            'document_title'  => $this->document->title,
+            'document_number' => $this->document->document_number,
+            'actor_name'      => $this->sharedByName,
         ];
     }
 

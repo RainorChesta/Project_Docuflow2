@@ -43,8 +43,11 @@ class SignatureRequestRejectedNotification extends Notification
             'url'                  => route('documents.edit', $this->document, false),
             'icon'                 => 'rejected',
             'document_id'          => $this->document->id,
+            'document_title'       => $this->document->title,
+            'document_number'      => $this->document->document_number,
             'signature_request_id' => $this->signatureRequest->id,
             'request_type'         => $isStamp ? 'stamp' : 'signature',
+            'actor_name'           => $this->rejecterName,
             'reason'               => $this->reason,
         ];
     }

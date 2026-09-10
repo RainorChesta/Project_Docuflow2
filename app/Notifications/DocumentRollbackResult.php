@@ -44,14 +44,17 @@ class DocumentRollbackResult extends Notification
             ]);
 
         return [
-            'type'        => $isApproved ? 'rollback_approved' : 'rollback_rejected',
-            'title'       => $title,
-            'message'     => $message,
-            'url'         => route('documents.show', $this->document, false),
-            'icon'        => $isApproved ? 'approval' : 'rejected',
-            'document_id' => $this->document->id,
-            'notes'       => $this->notes,
-            'reason'      => $this->notes,
+            'type'            => $isApproved ? 'rollback_approved' : 'rollback_rejected',
+            'title'           => $title,
+            'message'         => $message,
+            'url'             => route('documents.show', $this->document, false),
+            'icon'            => $isApproved ? 'approval' : 'rejected',
+            'document_id'     => $this->document->id,
+            'document_title'  => $this->document->title,
+            'document_number' => $this->document->document_number,
+            'actor_name'      => $this->reviewerName,
+            'notes'           => $this->notes,
+            'reason'          => $this->notes,
         ];
     }
 

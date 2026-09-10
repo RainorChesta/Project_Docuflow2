@@ -28,16 +28,19 @@ class DocumentRollbackRequested extends Notification
     public function toArray(object $notifiable): array
     {
         return [
-            'type'    => 'rollback_request',
-            'title'   => __('Permintaan Rollback Dokumen'),
-            'message' => __(':requester mengajukan rollback dokumen ":doc" ke versi v:ver.', [
+            'type'            => 'rollback_request',
+            'title'           => __('Permintaan Rollback Dokumen'),
+            'message'         => __(':requester mengajukan rollback dokumen ":doc" ke versi v:ver.', [
                 'requester' => $this->requesterName,
                 'doc'       => $this->document->title,
                 'ver'       => $this->targetVersion->version_number,
             ]),
-            'url'     => route('documents.show', $this->document->id, false),
-            'icon'    => 'approval',
-            'document_id' => $this->document->id
+            'url'             => route('documents.show', $this->document->id, false),
+            'icon'            => 'approval',
+            'document_id'     => $this->document->id,
+            'document_title'  => $this->document->title,
+            'document_number' => $this->document->document_number,
+            'actor_name'      => $this->requesterName,
         ];
     }
 

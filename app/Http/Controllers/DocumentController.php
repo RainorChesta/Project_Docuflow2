@@ -834,6 +834,36 @@ class DocumentController extends Controller
         // Lock out any incoming ONLYOFFICE callbacks from recreating/saving the version
         Cache::put('ignore_onlyoffice_save_' . $document->id, true, now()->addSeconds(30));
 
+        $isPendingV1 = (!$document->current_version_id && !$document->currentVersion)
+            && ($document->versions()->where('status', 'pending')->where('version_number', 1)->exists()
+                || $document->versions()->count() <= 1);
+
+        $isLeaveGuard = $request->boolean('is_leave_guard');
+
+        // When a document in Pending Approval V1 is explicitly discarded with confirmation,
+        // perform a soft delete to trash and alert the user.
+        if ($isPendingV1 && !$isLeaveGuard) {
+            $document->delete();
+
+            $this->auditService->log(auth()->user(), 'document.trashed', 'document', $document->id, [
+                'document_id' => $document->id,
+                'reason' => 'pending_v1_discarded',
+            ]);
+
+            $message = __('Dokumen telah dipindahkan ke trash.');
+
+            if ($request->expectsJson() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'discarded' => true,
+                    'trashed' => true,
+                    'message' => $message,
+                ]);
+            }
+
+            return redirect()->route('documents.index', ['type' => 'mine'])->with('success', $message);
+        }
+
         $discarded = $this->versionService->discardPending($document);
 
         // Rotate ONLYOFFICE document key and touch current version so the next editing session opens fresh
@@ -848,24 +878,19 @@ class DocumentController extends Controller
             ]);
         }
 
-        // If the document has no remaining versions and was never approved, soft delete it into Trash
-        if ($document->versions()->count() === 0 && !$document->currentVersion) {
-            $document->delete();
-        }
-
         if ($request->expectsJson() || $request->wantsJson()) {
             return response()->json([
                 'success' => true,
                 'discarded' => (bool) $discarded,
                 'message' => $discarded
-                    ? __('Versi pending v:version dibuang.', ['version' => $discarded->version_number])
-                    : __('Tidak ada versi pending untuk dibuang.')
+                    ? __('Perubahan versi pending v:version dibuang.', ['version' => $discarded->version_number])
+                    : __('Tidak ada perubahan untuk dibuang.')
             ]);
         }
 
-        return redirect()->route('documents.index', ['type' => 'mine'])->with('success', $discarded
-            ? __('Versi pending v:version dibuang.', ['version' => $discarded->version_number])
-            : __('Tidak ada versi pending untuk dibuang.'));
+        return redirect()->route('documents.show', $document)->with('success', $discarded
+            ? __('Perubahan pada dokumen berhasil dibuang.')
+            : __('Tidak ada perubahan untuk dibuang.'));
     }
 
     public function saveDraft(Request $request, Document $document): RedirectResponse
@@ -900,7 +925,7 @@ class DocumentController extends Controller
 
         $document->delete();
 
-        return redirect()->route('documents.index')->with('success', __('Dokumen berhasil dihapus.'));
+        return redirect()->route('documents.index')->with('success', __('Dokumen telah dipindahkan ke trash.'));
     }
 
     public function uploadVersion(Request $request, Document $document): RedirectResponse

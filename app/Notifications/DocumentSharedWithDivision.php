@@ -28,17 +28,20 @@ class DocumentSharedWithDivision extends Notification
     public function toArray(object $notifiable): array
     {
         return [
-            'type'        => 'document_shared',
-            'title'       => __('Akses Dokumen untuk Divisi'),
-            'message'     => __(':user membagikan dokumen ":doc" kepada divisi :division sebagai :role.', [
+            'type'            => 'document_shared',
+            'title'           => __('Akses Dokumen untuk Divisi'),
+            'message'         => __(':user membagikan dokumen ":doc" kepada divisi :division sebagai :role.', [
                 'user'     => $this->sharedByName,
                 'doc'      => $this->document->title,
                 'division' => $this->divisionName,
                 'role'     => $this->role,
             ]),
-            'url'         => route('documents.show', $this->document, false),
-            'icon'        => 'document',
-            'document_id' => $this->document->id,
+            'url'             => route('documents.show', $this->document, false),
+            'icon'            => 'document',
+            'document_id'     => $this->document->id,
+            'document_title'  => $this->document->title,
+            'document_number' => $this->document->document_number,
+            'actor_name'      => $this->sharedByName,
         ];
     }
 

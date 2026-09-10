@@ -157,17 +157,58 @@ class NotificationController extends Controller
         $rawNotifications = $request->user()->notifications()->latest()->limit(100)->get();
         $filtered = $this->filterNotifications($request->user(), $rawNotifications);
 
-        $notifications = $filtered->take(20)->map(fn($n) => [
-            'id'       => $n->id,
-            'type'     => $n->data['type'] ?? 'general',
-            'title'    => $n->data['title'] ?? '',
-            'message'  => $n->data['message'] ?? '',
-            'url'      => $this->normalizeNotificationUrl($n->data['url'] ?? '#'),
-            'icon'     => $n->data['icon'] ?? 'bell',
-            'read'     => !is_null($n->read_at),
-            'time'     => $n->created_at->diffForHumans(),
-            'reason'   => $n->data['reason'] ?? ($n->data['notes'] ?? null),
-        ])->values();
+        $docIds = [];
+        foreach ($filtered as $n) {
+            $docId = $n->data['document_id'] ?? null;
+            if (!$docId) {
+                $url = $n->data['url'] ?? '';
+                if (preg_match('/\/documents\/([0-9a-f\-]{36}|[0-9]+)/', $url, $matches)) {
+                    $docId = $matches[1];
+                }
+            }
+            if ($docId) {
+                $docIds[$n->id] = $docId;
+            }
+        }
+
+        $documents = !empty($docIds)
+            ? \App\Models\Document::withTrashed()->whereIn('id', array_unique(array_values($docIds)))->get()->keyBy('id')
+            : collect();
+
+        $notifications = $filtered->take(20)->map(function ($n) use ($docIds, $documents) {
+            $docId = $docIds[$n->id] ?? ($n->data['document_id'] ?? null);
+            $doc = $docId ? $documents->get($docId) : null;
+            $type = $n->data['type'] ?? 'general';
+            $icon = $n->data['icon'] ?? 'bell';
+
+            $status = 'info';
+            if ($icon === 'rejected' || str_contains($type, 'reject') || str_contains($type, 'revoked')) {
+                $status = 'rejected';
+            } elseif (str_contains($type, 'approved') || $icon === 'success') {
+                $status = 'approved';
+            } elseif (str_contains($type, 'request') || str_contains($type, 'expiring')) {
+                $status = 'pending';
+            }
+
+            return [
+                'id'              => $n->id,
+                'type'            => $type,
+                'title'           => $n->data['title'] ?? '',
+                'message'         => $n->data['message'] ?? '',
+                'url'             => $this->normalizeNotificationUrl($n->data['url'] ?? '#'),
+                'icon'            => $icon,
+                'status'          => $status,
+                'read'            => !is_null($n->read_at),
+                'time'            => $n->created_at->diffForHumans(),
+                'reason'          => $n->data['reason'] ?? ($n->data['notes'] ?? null),
+                'document_id'     => $docId,
+                'document_title'  => $n->data['document_title'] ?? ($doc?->title ?? null),
+                'document_number' => $n->data['document_number'] ?? ($doc?->document_number ?? null),
+                'request_type'    => $n->data['request_type'] ?? null,
+                'company_name'    => $n->data['company_name'] ?? null,
+                'actor_name'      => $n->data['actor_name'] ?? ($n->data['author'] ?? ($n->data['reviewer'] ?? ($n->data['requester_name'] ?? ($n->data['shared_by'] ?? null)))),
+            ];
+        })->values();
 
         $unreadCount = $filtered->whereNull('read_at')->count();
 

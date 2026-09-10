@@ -656,4 +656,54 @@ class DigitalSignatureTest extends TestCase
         $this->assertSame('rejected', $req2->fresh()->status);
         $this->assertSame('Bulk reject reason', $req1->fresh()->rejected_reason);
     }
+
+    public function test_signature_request_creation_sends_single_notification_to_target_user(): void
+    {
+        \Illuminate\Support\Facades\Notification::fake();
+
+        $requester = User::factory()->create(['name' => 'Author User']);
+        $targetUser = User::factory()->create(['name' => 'Signer User']);
+        
+        $filePath = 'signatures/sig_test.png';
+        Storage::disk('public')->put($filePath, 'fake content');
+        $sig = Signature::create([
+            'user_id' => $targetUser->id,
+            'file_path' => $filePath,
+            'type' => 'original',
+        ]);
+
+        $docType = DocumentType::create(['name' => 'Surat Keputusan', 'code' => 'SK']);
+        $doc = Document::create([
+            'document_number' => '099/SK/2026',
+            'title' => 'Single Notification Test Doc',
+            'document_type_id' => $docType->id,
+            'owner_id' => $requester->id,
+            'visibility' => 'general',
+        ]);
+
+        // Request signature via endpoint
+        $response = $this->actingAs($requester)->getJson(
+            route('profile.signature.show', [
+                'user_id' => $targetUser->id,
+                'document_id' => $doc->id,
+                'signature_id' => $sig->id,
+            ])
+        );
+
+        $response->assertStatus(200);
+
+        // Verify exactly one notification was sent to targetUser
+        \Illuminate\Support\Facades\Notification::assertSentToTimes(
+            $targetUser,
+            \App\Notifications\SignatureRequested::class,
+            1
+        );
+
+        // Verify requester did not receive signature request notification
+        \Illuminate\Support\Facades\Notification::assertNotSentTo(
+            $requester,
+            \App\Notifications\SignatureRequested::class
+        );
+    }
 }
+

@@ -18,7 +18,7 @@ class SignatureRequestObserver
         $document   = $signatureRequest->document;
         $requester  = $signatureRequest->requester;
 
-        if ($targetUser && $document && $requester) {
+        if ($targetUser && $document && $requester && $targetUser->id !== $requester->id) {
             $targetUser->notify(new SignatureRequested($document, $requester->name, $signatureRequest));
         }
     }

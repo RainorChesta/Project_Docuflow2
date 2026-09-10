@@ -44,14 +44,17 @@ class DocumentApprovalResult extends Notification
             ]);
 
         return [
-            'type'        => 'approval_result',
-            'title'       => $title,
-            'message'     => $message,
-            'url'         => route('documents.show', $this->document, false),
-            'icon'        => $isApproved ? 'approval' : 'rejected',
-            'document_id' => $this->document->id,
-            'notes'       => $this->notes,
-            'reason'      => $this->notes,
+            'type'            => 'approval_result',
+            'title'           => $title,
+            'message'         => $message,
+            'url'             => route('documents.show', $this->document, false),
+            'icon'            => $isApproved ? 'approval' : 'rejected',
+            'document_id'     => $this->document->id,
+            'document_title'  => $this->document->title,
+            'document_number' => $this->document->document_number,
+            'actor_name'      => $this->reviewerName,
+            'notes'           => $this->notes,
+            'reason'          => $this->notes,
         ];
     }
 
