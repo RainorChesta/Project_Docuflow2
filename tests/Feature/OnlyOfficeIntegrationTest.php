@@ -546,5 +546,59 @@ class OnlyOfficeIntegrationTest extends TestCase
             \App\Notifications\ApprovalRouteResolved::class
         );
     }
+
+    public function test_onlyoffice_save_dispatches_deferred_signature_and_stamp_request_notifications(): void
+    {
+        \Illuminate\Support\Facades\Notification::fake();
+
+        $signerUser = User::factory()->create([
+            'division_id' => $this->division->id,
+            'name' => 'Signer Person',
+        ]);
+
+        $sig = \App\Models\Signature::create([
+            'user_id' => $signerUser->id,
+            'file_path' => 'signatures/signer.png',
+            'type' => 'original',
+        ]);
+        Storage::disk('public')->put('signatures/signer.png', 'fake-png-bytes');
+
+        // 1. Create a draft signature request with notified_at = null (simulating insertion in ONLYOFFICE)
+        $sigRequest = \App\Models\SignatureRequest::create([
+            'requester_id' => $this->user->id,
+            'target_user_id' => $signerUser->id,
+            'document_id' => $this->document->id,
+            'requested_signature_id' => $sig->id,
+            'status' => 'pending',
+            'notified_at' => null,
+        ]);
+
+        // Notification is NOT sent initially
+        \Illuminate\Support\Facades\Notification::assertNotSentTo(
+            $signerUser,
+            \App\Notifications\SignatureRequested::class
+        );
+
+        // 2. ONLYOFFICE callback with status 2 (finished editing & saved)
+        \Illuminate\Support\Facades\Http::fake([
+            'http://onlyoffice-server/download/final.docx' => \Illuminate\Support\Facades\Http::response('final-content', 200),
+        ]);
+
+        $this->postJson(route('onlyoffice.callback', $this->document), [
+            'status' => 2,
+            'url' => 'http://onlyoffice-server/download/final.docx',
+            'users' => [(string) $this->user->id],
+            'key' => 'doc_test_key_final',
+        ]);
+
+        // Notification IS sent after editing finishes and document is saved
+        \Illuminate\Support\Facades\Notification::assertSentTo(
+            $signerUser,
+            \App\Notifications\SignatureRequested::class
+        );
+
+        $this->assertNotNull($sigRequest->fresh()->notified_at);
+    }
 }
+
 

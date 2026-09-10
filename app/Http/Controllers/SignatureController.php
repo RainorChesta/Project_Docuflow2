@@ -56,6 +56,9 @@ class SignatureController extends Controller
             $height = (float) $request->input('height', 18.0);
             $preset = $request->input('preset_position', 'bottom-right');
 
+            // Check if this request is directly placed on PDF with coordinates
+            $isDirectPdfPlacement = ($preset === 'custom') || ($posX !== null && $posY !== null);
+
             // Find an active pending signature request for this specific signature, or create a new pending request
             $requestRecord = SignatureRequest::where('requester_id', Auth::id())
                 ->where('target_user_id', $user->id)
@@ -99,6 +102,7 @@ class SignatureController extends Controller
                     'height' => $height,
                     'preset_position' => $preset,
                     'requested_at' => now(),
+                    'notified_at' => $isDirectPdfPlacement ? now() : null,
                 ]);
             } else {
                 $requestRecord->update([
@@ -112,13 +116,25 @@ class SignatureController extends Controller
                     'height' => $height,
                     'preset_position' => $preset,
                     'requested_at' => now(),
+                    'notified_at' => $isDirectPdfPlacement ? now() : $requestRecord->notified_at,
                 ]);
             }
 
+            // For direct PDF placement, dispatch notification immediately
+            if ($isDirectPdfPlacement) {
+                $requestRecord->sendNotification();
+            }
+
             $isStamp = $requestedSig->type === 'company_stamp';
-            $msg = $isStamp
-                ? ($user->id === Auth::id() ? 'Permintaan penggunaan stempel perusahaan telah dicatat.' : 'Permintaan penggunaan stempel perusahaan telah dikirim ke ' . $user->name . '.')
-                : ($user->id === Auth::id() ? 'Penanda tanda tangan digital telah disisipkan (menunggu persetujuan).' : 'Permintaan penggunaan tanda tangan telah dikirim ke ' . $user->name . '.');
+            if ($isDirectPdfPlacement) {
+                $msg = $isStamp
+                    ? ($user->id === Auth::id() ? 'Permintaan penggunaan stempel perusahaan telah dicatat.' : 'Permintaan penggunaan stempel perusahaan telah dikirim ke ' . $user->name . '.')
+                    : ($user->id === Auth::id() ? 'Penanda tanda tangan digital telah disisipkan (menunggu persetujuan).' : 'Permintaan penggunaan tanda tangan telah dikirim ke ' . $user->name . '.');
+            } else {
+                $msg = $isStamp
+                    ? 'Penanda stempel perusahaan telah disisipkan. Permintaan akan dikirim setelah dokumen disimpan dan selesai diedit.'
+                    : 'Penanda tanda tangan telah disisipkan. Permintaan akan dikirim setelah dokumen disimpan dan selesai diedit.';
+            }
 
             $onlyOfficeService = app(\App\Services\OnlyOfficeService::class);
             $badgeText = $isStamp 
@@ -138,6 +154,7 @@ class SignatureController extends Controller
                 'message' => $msg,
             ]);
         }
+
 
         $signatureId = $request->query('signature_id');
 
@@ -811,9 +828,13 @@ class SignatureController extends Controller
             $perPage = 15;
         }
 
-        // Base query for incoming requests
+        // Base query for incoming requests (only show requests that have been notified / finalized)
         $incomingBaseQuery = SignatureRequest::with(['requester', 'requestedSignature.company', 'document.branch', 'document.company', 'document.division'])
-            ->where('target_user_id', $user->id);
+            ->where('target_user_id', $user->id)
+            ->where(function ($q) {
+                $q->whereNotNull('notified_at')
+                  ->orWhere('status', '!=', 'pending');
+            });
 
         // Counts for tab badges
         $counts = [
@@ -853,6 +874,10 @@ class SignatureController extends Controller
         // Outgoing requests
         $outgoingRequests = SignatureRequest::with(['targetUser', 'requestedSignature.company', 'document'])
             ->where('requester_id', $user->id)
+            ->where(function ($q) {
+                $q->whereNotNull('notified_at')
+                  ->orWhere('status', '!=', 'pending');
+            })
             ->latest('requested_at')
             ->latest('id')
             ->paginate(10, ['*'], 'outgoing_page')
@@ -903,6 +928,7 @@ class SignatureController extends Controller
         $requests = SignatureRequest::whereIn('id', $requestIds)
             ->where('target_user_id', $user->id)
             ->where('status', 'pending')
+            ->whereNotNull('notified_at')
             ->get();
 
         if ($requests->isEmpty()) {
@@ -927,6 +953,7 @@ class SignatureController extends Controller
 
         $requests = SignatureRequest::where('target_user_id', $user->id)
             ->where('status', 'pending')
+            ->whereNotNull('notified_at')
             ->get();
 
         if ($requests->isEmpty()) {
@@ -980,6 +1007,7 @@ class SignatureController extends Controller
         $requests = SignatureRequest::whereIn('id', $requestIds)
             ->where('target_user_id', $user->id)
             ->where('status', 'pending')
+            ->whereNotNull('notified_at')
             ->get();
 
         if ($requests->isEmpty()) {

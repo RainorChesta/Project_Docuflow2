@@ -800,6 +800,16 @@ class DocumentController extends Controller
             'version_number' => $version->version_number,
         ]);
 
+        // Send signature and stamp request notifications for unnotified requests
+        $unnotifiedSigRequests = \App\Models\SignatureRequest::where('document_id', $document->id)
+            ->where('status', 'pending')
+            ->whereNull('notified_at')
+            ->get();
+
+        foreach ($unnotifiedSigRequests as $sigReq) {
+            $sigReq->sendNotification();
+        }
+
         // Dynamic approval routing: Head → Admin → Direktur fallback
         $resolution = $this->approvalRoutingService->resolveApprover($document, $user);
         $this->approvalRoutingService->applyToDocument($document, $resolution);
@@ -833,6 +843,12 @@ class DocumentController extends Controller
 
         // Lock out any incoming ONLYOFFICE callbacks from recreating/saving the version
         Cache::put('ignore_onlyoffice_save_' . $document->id, true, now()->addSeconds(30));
+
+        // Clean up any un-notified draft signature requests for this document
+        \App\Models\SignatureRequest::where('document_id', $document->id)
+            ->where('status', 'pending')
+            ->whereNull('notified_at')
+            ->delete();
 
         $isPendingV1 = (!$document->current_version_id && !$document->currentVersion)
             && ($document->versions()->where('status', 'pending')->where('version_number', 1)->exists()

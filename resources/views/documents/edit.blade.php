@@ -1571,8 +1571,8 @@
                                     }
                                 }
                                 showSignatureScreenAlert(
-                                    'PERMINTAAN DIKIRIM',
-                                    (data.message || ('Permintaan penggunaan tanda tangan / stempel telah berhasil dikirim ke ' + userName.toUpperCase() + '.')) + (isPdfDocument ? ' KETIKA DISETUJUI, ITEM AKAN OTOMATIS DIBUBUHKAN PADA DOKUMEN PDF.' : ' KOTAK KUNING TELAH DISISIPKAN DI POSISI KURSOR DAN AKAN OTOMATIS BERUBAH MENJADI TTD RESMI KETIKA DISETUJUI.'),
+                                    isPdfDocument ? 'PERMINTAAN DIKIRIM' : 'PENANDA DISISIPKAN',
+                                    (data.message || (isPdfDocument ? ('Permintaan penggunaan tanda tangan / stempel telah berhasil dikirim ke ' + userName.toUpperCase() + '.') : 'Penanda tanda tangan / stempel telah disisipkan.')) + (isPdfDocument ? ' KETIKA DISETUJUI, ITEM AKAN OTOMATIS DIBUBUHKAN PADA DOKUMEN PDF.' : ' PERMINTAAN AKAN DIKIRIM SECARA OTOMATIS KETIKA DOKUMEN DISIMPAN & SELESAI DIEDIT.'),
                                     true
                                 );
                             } else if (data.message) {

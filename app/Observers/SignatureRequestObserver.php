@@ -8,18 +8,13 @@ use App\Notifications\SignatureRequested;
 class SignatureRequestObserver
 {
     /**
-     * When a new signature request is created, notify the target user.
+     * When a new signature request is created, notifications are deferred until
+     * document editing is finished and saved via $signatureRequest->sendNotification().
      */
     public function created(SignatureRequest $signatureRequest): void
     {
-        $signatureRequest->loadMissing(['document', 'requester', 'requestedSignature.company']);
-
-        $targetUser = $signatureRequest->targetUser;
-        $document   = $signatureRequest->document;
-        $requester  = $signatureRequest->requester;
-
-        if ($targetUser && $document && $requester && $targetUser->id !== $requester->id) {
-            $targetUser->notify(new SignatureRequested($document, $requester->name, $signatureRequest));
-        }
+        // Notifications are sent when document editing is saved and finished.
     }
 }
+
+
