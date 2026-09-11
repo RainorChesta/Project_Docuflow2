@@ -84,6 +84,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/documents/{document}/versions/upload', [DocumentController::class, 'uploadVersion'])->name('documents.upload-version');
     Route::patch('/documents/{document}/visibility', [DocumentController::class, 'updateVisibility'])->name('documents.update-visibility');
     Route::post('/documents/{document}/discard', [DocumentController::class, 'discard'])->name('documents.discard');
+    Route::post('/documents/{document}/finish-editing', [DocumentController::class, 'finishEditing'])->name('documents.finish-editing');
     Route::post('/documents/{document}/toggle-public', [DocumentController::class, 'togglePublic'])->name('documents.toggle-public');
     Route::post('/documents/{document}/rename', [DocumentController::class, 'rename'])->name('documents.rename');
     Route::post('/documents/{document}/request-rename', [DocumentController::class, 'requestRename'])->name('documents.request-rename');

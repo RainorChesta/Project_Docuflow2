@@ -260,6 +260,7 @@
         <x-search-modal />
         <x-navigation-guard />
         <x-toast-notification />
+        <x-loading-blur />
         @stack('scripts')
     </body>
 </html>

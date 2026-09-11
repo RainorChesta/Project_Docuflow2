@@ -32,7 +32,7 @@ class SignatureController extends Controller
         // If requesting someone else's signature on a document, require approval (returns pending placeholder badge)
         if ($documentId && $user->id !== Auth::id()) {
             $signatureId = $request->query('signature_id') ?? $request->input('signature_id');
-            $requestedSig = $signatureId ? $user->signatures()->find($signatureId) : $user->signatures()->where('type', 'original')->first();
+            $requestedSig = $signatureId ? $user->signatures()->find($signatureId) : ($user->signatures()->where('type', 'original')->first() ?? $user->signatures()->first());
 
             if (!$requestedSig) {
                 return response()->json(['success' => false, 'message' => 'Tanda tangan / stempel pengguna tidak ditemukan.'], 404);
@@ -583,7 +583,7 @@ class SignatureController extends Controller
         ]);
 
         $onlyOfficeService = app(\App\Services\OnlyOfficeService::class);
-        $sig = $signatureRequest->requestedSignature ?? $targetUser->signatures()->where('type', 'original')->first();
+        $sig = $signatureRequest->requestedSignature ?? $targetUser->signatures()->where('type', 'original')->first() ?? $targetUser->signatures()->first();
 
         if (!$sig) {
             return response()->json([
@@ -1042,17 +1042,32 @@ class SignatureController extends Controller
         if ($document && $version && $targetUser) {
             $requestId = $signatureRequest->id;
             
-            // Resolve the exact requested signature or stamp (not hardcoded to targetUser->signature)
-            $sig = $signatureRequest->requestedSignature ?? $targetUser->signatures()->where('type', 'original')->first();
+            // Resolve the exact requested signature or stamp (with fallback to any available signature of the user)
+            $sig = $signatureRequest->requestedSignature 
+                ?? $targetUser->signatures()->where('type', 'original')->first()
+                ?? $targetUser->signatures()->first();
             
-            if ($sig && $sig->file_path && Storage::disk('public')->exists($sig->file_path)) {
-                $signaturePath = Storage::disk('public')->path($sig->file_path);
-                
+            $signaturePath = null;
+            if ($sig && $sig->file_path) {
+                if (Storage::disk('public')->exists($sig->file_path)) {
+                    $signaturePath = Storage::disk('public')->path($sig->file_path);
+                } elseif (file_exists(storage_path('app/public/' . ltrim($sig->file_path, '/')))) {
+                    $signaturePath = storage_path('app/public/' . ltrim($sig->file_path, '/'));
+                } elseif (file_exists(public_path('storage/' . ltrim($sig->file_path, '/')))) {
+                    $signaturePath = public_path('storage/' . ltrim($sig->file_path, '/'));
+                } elseif (file_exists($sig->file_path)) {
+                    $signaturePath = $sig->file_path;
+                }
+            }
+
+            if ($signaturePath && file_exists($signaturePath)) {
                 // Process the signature synchronously using PHPWord or FPDI
                 $processor = app(\App\Services\DocumentProcessorService::class);
                 $processor->processSignature($document, $version, $requestId, $signaturePath, $signatureRequest);
 
                 app(\App\Services\OnlyOfficeService::class)->rotateDocumentKey($document, $version);
+            } else {
+                \Illuminate\Support\Facades\Log::warning("executeApproval: Signature image not found for user {$targetUser->id}, sig ID: " . ($sig?->id ?? 'null') . ", path: " . ($sig?->file_path ?? 'null'));
             }
         }
 

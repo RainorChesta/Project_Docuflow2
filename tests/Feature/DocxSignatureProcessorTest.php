@@ -382,4 +382,80 @@ class DocxSignatureProcessorTest extends TestCase
         $zip->close();
         @unlink($tempVerify);
     }
+
+    public function test_processes_docx_and_replaces_placeholder_even_when_png_chunks_are_stripped_by_editor(): void
+    {
+        $user = User::factory()->create();
+        $docType = DocumentType::create(['name' => 'Surat', 'code' => 'SRT']);
+        $document = Document::create([
+            'document_number' => '002/SRT/2026',
+            'title' => 'Doc Test Stripped Chunk',
+            'document_type_id' => $docType->id,
+            'owner_id' => $user->id,
+            'visibility' => 'general',
+        ]);
+
+        $tempDocx = tempnam(sys_get_temp_dir(), 'docx_test_') . '.docx';
+        $zip = new \ZipArchive();
+        $zip->open($tempDocx, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+        
+        $documentXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
+            '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' .
+            '<w:body>' .
+            '<w:p><w:r><w:t>Hello World</w:t></w:r></w:p>' .
+            '<w:sectPr/>' .
+            '</w:body>' .
+            '</w:document>';
+            
+        $zip->addFromString('word/document.xml', $documentXml);
+        $zip->addFromString('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
+        $zip->addFromString('word/_rels/document.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>');
+
+        // Create 400x400 amber card image WITHOUT any DocuFlowSigReq text or tEXt chunks (simulating stripped chunk)
+        $im = imagecreatetruecolor(400, 400);
+        $amberBg = imagecolorallocate($im, 254, 243, 199);
+        imagefilledrectangle($im, 0, 0, 400, 400, $amberBg);
+        ob_start();
+        imagepng($im);
+        $rawPng = ob_get_clean();
+        imagedestroy($im);
+
+        $zip->addFromString('word/media/image1.png', $rawPng);
+        $zip->close();
+
+        $storagePath = 'documents/' . $document->id . '/v4.docx';
+        Storage::disk('local')->put($storagePath, file_get_contents($tempDocx));
+        @unlink($tempDocx);
+
+        $version = DocumentVersion::create([
+            'document_id' => $document->id,
+            'version_number' => 1,
+            'content' => '<p>test</p>',
+            'author_name' => $user->name,
+            'file_path' => $storagePath,
+            'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'created_by' => $user->id,
+            'status' => 'approved',
+        ]);
+
+        $sigPng = $this->createDummySignaturePng();
+
+        $processor = app(DocumentProcessorService::class);
+        $result = $processor->processSignature($document, $version, 303, $sigPng);
+        @unlink($sigPng);
+
+        $this->assertTrue($result);
+
+        // Verify the amber placeholder in word/media/image1.png was replaced with the signature image
+        $modifiedDocx = Storage::disk('local')->get($storagePath);
+        $tempVerify = tempnam(sys_get_temp_dir(), 'verify_') . '.docx';
+        file_put_contents($tempVerify, $modifiedDocx);
+
+        $zip = new \ZipArchive();
+        $this->assertTrue($zip->open($tempVerify));
+        $replacedBytes = $zip->getFromName('word/media/image1.png');
+        $this->assertNotEquals($rawPng, $replacedBytes);
+        $zip->close();
+        @unlink($tempVerify);
+    }
 }

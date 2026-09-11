@@ -5,17 +5,12 @@ $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
 $kernel->bootstrap();
 
 $key = config('services.groq.key');
-$model = config('services.groq.model');
-
-$system = App\AI\Prompts\DocumentSummaryPrompt::chunkSystem(30);
-$content = App\AI\Prompts\DocumentSummaryPrompt::chunkContent('PT Digital Nusantara Teknologi adalah perusahaan teknologi yang didirikan pada tahun 2010. Perusahaan ini berfokus pada pengembangan perangkat lunak untuk UMKM.');
-
-$client = new App\AI\GroqClient($key, $model);
-try {
-    $result = $client->chat($system, $content);
-    echo "SUCCESS:\n";
-    echo $result;
-} catch (\Exception $e) {
-    echo "ERROR:\n";
-    echo $e->getMessage();
+$res = Illuminate\Support\Facades\Http::withToken($key)
+    ->withoutVerifying()
+    ->get('https://api.groq.com/openai/v1/models');
+$models = collect($res->json('data'))->pluck('id')->sort()->values();
+echo "Available Groq models:\n";
+foreach ($models as $m) {
+    echo "- $m\n";
 }
+exit;

@@ -323,9 +323,24 @@ class OnlyOfficeController extends Controller
                 if ($approvedRequests->isNotEmpty()) {
                     $processor = app(\App\Services\DocumentProcessorService::class);
                     foreach ($approvedRequests as $req) {
-                        $sig = $req->requestedSignature ?? $req->targetUser?->signatures()->where('type', 'original')->first();
-                        if ($sig && $sig->file_path && Storage::disk('public')->exists($sig->file_path)) {
-                            $signaturePath = Storage::disk('public')->path($sig->file_path);
+                        $sig = $req->requestedSignature 
+                            ?? $req->targetUser?->signatures()->where('type', 'original')->first()
+                            ?? $req->targetUser?->signatures()->first();
+
+                        $signaturePath = null;
+                        if ($sig && $sig->file_path) {
+                            if (Storage::disk('public')->exists($sig->file_path)) {
+                                $signaturePath = Storage::disk('public')->path($sig->file_path);
+                            } elseif (file_exists(storage_path('app/public/' . ltrim($sig->file_path, '/')))) {
+                                $signaturePath = storage_path('app/public/' . ltrim($sig->file_path, '/'));
+                            } elseif (file_exists(public_path('storage/' . ltrim($sig->file_path, '/')))) {
+                                $signaturePath = public_path('storage/' . ltrim($sig->file_path, '/'));
+                            } elseif (file_exists($sig->file_path)) {
+                                $signaturePath = $sig->file_path;
+                            }
+                        }
+
+                        if ($signaturePath && file_exists($signaturePath)) {
                             $processor->processSignature($document, $version, $req->id, $signaturePath, $req);
                         }
                     }
@@ -364,21 +379,26 @@ class OnlyOfficeController extends Controller
                     if ($version->status === 'pending') {
                         \Illuminate\Support\Facades\Cache::forget('onlyoffice_pending_notif_' . $document->id);
 
-                        $resolution = $this->approvalRoutingService->resolveApprover($document, $author);
-                        $this->approvalRoutingService->applyToDocument($document, $resolution);
+                        $notifKey = 'approval_notified_' . $document->id . '_v' . $version->id;
+                        if (!\Illuminate\Support\Facades\Cache::has($notifKey)) {
+                            \Illuminate\Support\Facades\Cache::put($notifKey, true, now()->addMinutes(10));
 
-                        foreach ($resolution['approvers'] as $approver) {
-                            $approver->notify(new \App\Notifications\DocumentApprovalRequested($document, $version, $author->name));
-                        }
+                            $resolution = $this->approvalRoutingService->resolveApprover($document, $author);
+                            $this->approvalRoutingService->applyToDocument($document, $resolution);
 
-                        if ($resolution['role'] !== null) {
-                            $author->notify(new \App\Notifications\ApprovalRouteResolved(
-                                $document,
-                                $resolution['role'],
-                                $resolution['approvers']->pluck('name')->join(', '),
-                                $resolution['message'],
-                                $resolution['isFallback'],
-                            ));
+                            foreach ($resolution['approvers'] as $approver) {
+                                $approver->notify(new \App\Notifications\DocumentApprovalRequested($document, $version, $author->name));
+                            }
+
+                            if ($resolution['role'] !== null) {
+                                $author->notify(new \App\Notifications\ApprovalRouteResolved(
+                                    $document,
+                                    $resolution['role'],
+                                    $resolution['approvers']->pluck('name')->join(', '),
+                                    $resolution['message'],
+                                    $resolution['isFallback'],
+                                ));
+                            }
                         }
                     }
                 } elseif ($status === 6 && $version->status === 'pending') {
@@ -414,21 +434,26 @@ class OnlyOfficeController extends Controller
                 $version = \App\Models\DocumentVersion::find($pendingNotif['version_id']);
                 $author = \App\Models\User::find($pendingNotif['author_id']) ?? $document->owner;
                 if ($version && $version->status === 'pending') {
-                    $resolution = $this->approvalRoutingService->resolveApprover($document, $author);
-                    $this->approvalRoutingService->applyToDocument($document, $resolution);
+                    $notifKey = 'approval_notified_' . $document->id . '_v' . $version->id;
+                    if (!\Illuminate\Support\Facades\Cache::has($notifKey)) {
+                        \Illuminate\Support\Facades\Cache::put($notifKey, true, now()->addMinutes(10));
 
-                    foreach ($resolution['approvers'] as $approver) {
-                        $approver->notify(new \App\Notifications\DocumentApprovalRequested($document, $version, $author->name));
-                    }
+                        $resolution = $this->approvalRoutingService->resolveApprover($document, $author);
+                        $this->approvalRoutingService->applyToDocument($document, $resolution);
 
-                    if ($resolution['role'] !== null) {
-                        $author->notify(new \App\Notifications\ApprovalRouteResolved(
-                            $document,
-                            $resolution['role'],
-                            $resolution['approvers']->pluck('name')->join(', '),
-                            $resolution['message'],
-                            $resolution['isFallback'],
-                        ));
+                        foreach ($resolution['approvers'] as $approver) {
+                            $approver->notify(new \App\Notifications\DocumentApprovalRequested($document, $version, $author->name));
+                        }
+
+                        if ($resolution['role'] !== null) {
+                            $author->notify(new \App\Notifications\ApprovalRouteResolved(
+                                $document,
+                                $resolution['role'],
+                                $resolution['approvers']->pluck('name')->join(', '),
+                                $resolution['message'],
+                                $resolution['isFallback'],
+                            ));
+                        }
                     }
                 }
             }

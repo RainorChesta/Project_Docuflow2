@@ -118,6 +118,9 @@
                 }
                 
                 // Continue the intended navigation
+                if (typeof window.showLoadingBlur === 'function') {
+                    window.showLoadingBlur();
+                }
                 if (this.pendingUrl === 'history_back') {
                     history.go(-2);
                 } else if (this.pendingUrl) {

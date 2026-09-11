@@ -217,6 +217,21 @@ class DocumentProcessorService
                             $isTarget = true;
                         } elseif (str_contains($imgBytes, "DocuFlowSigReq") && !preg_match('/DocuFlowSigReq[^\d]*(\d+)/', $imgBytes)) {
                             $isTarget = true;
+                        } elseif ($size = @getimagesizefromstring($imgBytes)) {
+                            // Fallback if OnlyOffice Document Server stripped custom PNG tEXt chunks
+                            if ($size[0] >= 350 && $size[0] <= 450 && $size[1] >= 350 && $size[1] <= 450) {
+                                $im = @imagecreatefromstring($imgBytes);
+                                if ($im) {
+                                    $rgb = imagecolorat($im, 20, 20);
+                                    $r = ($rgb >> 16) & 0xFF;
+                                    $g = ($rgb >> 8) & 0xFF;
+                                    $b = $rgb & 0xFF;
+                                    imagedestroy($im);
+                                    if ($r >= 245 && $r <= 255 && $g >= 235 && $g <= 252 && $b >= 190 && $b <= 210) {
+                                        $isTarget = true;
+                                    }
+                                }
+                            }
                         }
 
                         if ($isTarget) {
@@ -369,6 +384,20 @@ class DocumentProcessorService
                             // 2. If the image is a generic DocuFlow placeholder without specific request id tag (fallback)
                             elseif (str_contains($imgBytes, "DocuFlowSigReq") && !preg_match('/DocuFlowSigReq[^\d]*(\d+)/', $imgBytes)) {
                                 $isTargetPlaceholder = true;
+                            }
+                            // 3. Visual fallback: Detect DocuFlow placeholder amber card if OnlyOffice stripped custom PNG tEXt chunks
+                            elseif (!$isTargetPlaceholder && $size && $size[0] >= 350 && $size[0] <= 450 && $size[1] >= 350 && $size[1] <= 450) {
+                                $im = @imagecreatefromstring($imgBytes);
+                                if ($im) {
+                                    $rgb = imagecolorat($im, 20, 20);
+                                    $r = ($rgb >> 16) & 0xFF;
+                                    $g = ($rgb >> 8) & 0xFF;
+                                    $b = $rgb & 0xFF;
+                                    imagedestroy($im);
+                                    if ($r >= 245 && $r <= 255 && $g >= 235 && $g <= 252 && $b >= 190 && $b <= 210) {
+                                        $isTargetPlaceholder = true;
+                                    }
+                                }
                             }
 
                             if ($isTargetPlaceholder) {

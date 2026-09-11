@@ -458,3 +458,24 @@ dialog.modal,
 .jodit-ui-button__text {
     color: #1a1a1a !important;
 }
+
+/* ─── Animated Loading Blur Overlay ────────────────────────────── */
+@keyframes loading-shimmer {
+    0% { transform: translateX(-150%); }
+    50% { transform: translateX(50%); }
+    100% { transform: translateX(250%); }
+}
+
+.loading-shimmer-bar {
+    animation: loading-shimmer 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes loading-float {
+    0%, 100% { transform: translateY(0px) scale(1); }
+    50% { transform: translateY(-3px) scale(1.02); }
+}
+
+.animate-loading-float {
+    animation: loading-float 3s ease-in-out infinite;
+}
+

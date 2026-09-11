@@ -106,7 +106,7 @@
                                         </p>
                                         <div class="modal-action">
                                             <button type="button" onclick="document.getElementById('approve-sig-modal-{{ $pendingSigRequest->id }}').close()" class="btn btn-ghost btn-sm">{{ __('Batal') }}</button>
-                                            <form method="POST" action="{{ route('signatures.requests.approve', $pendingSigRequest) }}" onsubmit="document.getElementById('loading-modal')?.showModal()" class="inline">
+                                            <form method="POST" action="{{ route('signatures.requests.approve', $pendingSigRequest) }}" onsubmit="document.getElementById('approve-sig-modal-{{ $pendingSigRequest->id }}')?.close(); document.getElementById('loading-modal')?.showModal();" class="inline">
                                                 @csrf
                                                 <button type="submit" class="btn btn-success btn-sm gap-1.5 font-semibold text-white">
                                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

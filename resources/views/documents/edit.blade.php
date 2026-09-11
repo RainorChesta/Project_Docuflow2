@@ -1673,7 +1673,7 @@
             };
 
             /**
-             * "Selesai Edit" action: saves document changes from ONLYOFFICE and redirects to show page.
+             * "Selesai Edit" action: saves document changes, notifies approver/requester, and redirects to show page.
              */
             function finishEditingDocument() {
                 window._hasSessionChanges = false;
@@ -1685,12 +1685,18 @@
                 const spinner = document.getElementById('spinner-selesai-edit');
                 const icon = document.getElementById('icon-selesai-edit');
                 const text = document.getElementById('text-selesai-edit');
-                const targetUrl = "{{ route('documents.show', ['document' => $document->id, 'saving' => 1]) }}";
 
                 if (btn) btn.disabled = true;
                 if (icon) icon.classList.add('hidden');
                 if (spinner) spinner.classList.remove('hidden');
                 if (text) text.textContent = "{{ __('MENYIMPAN...') }}";
+
+                if (typeof window.showLoadingBlur === 'function') {
+                    window.showLoadingBlur(
+                        @json(__('Menyimpan Dokumen...')),
+                        @json(__('Menyelesaikan pengeditan dan meneruskan ke approver...'))
+                    );
+                }
 
                 if (window.docEditor) {
                     try {
@@ -1700,9 +1706,22 @@
                     }
                 }
 
-                setTimeout(() => {
-                    window.location.href = targetUrl;
-                }, 1000);
+                fetch("{{ route('documents.finish-editing', $document) }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json'
+                    }
+                })
+                .then(res => res.json())
+                .then(data => {
+                    window.location.href = data.redirect_url || "{{ route('documents.show', $document) }}";
+                })
+                .catch(err => {
+                    console.warn('finish-editing request error:', err);
+                    window.location.href = "{{ route('documents.show', $document) }}";
+                });
             }
         </script>
     @endpush

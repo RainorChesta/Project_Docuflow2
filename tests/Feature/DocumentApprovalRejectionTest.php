@@ -11,6 +11,8 @@ use App\Models\DocumentVersion;
 use App\Models\User;
 use App\Notifications\DocumentApprovalResult;
 use App\Notifications\DocumentRollbackResult;
+use App\Notifications\DocumentApprovalRequested;
+use App\Notifications\ApprovalRouteResolved;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
@@ -319,5 +321,89 @@ class DocumentApprovalRejectionTest extends TestCase
         $document->refresh();
         $this->assertNull($document->pending_rollback_version_id);
         $this->assertSame($v1->id, $document->current_version_id);
+    }
+
+    public function test_finish_editing_pdf_document_triggers_approval_notifications(): void
+    {
+        Notification::fake();
+
+        $company = Company::create(['name' => 'PT Demo', 'code' => 'DEMO']);
+        $branch = Branch::create(['company_id' => $company->id, 'name' => 'Cabang Demo', 'is_pusat' => true]);
+        $division = Division::create(['name' => 'Legal', 'code' => 'LEG']);
+
+        $author = User::factory()->create(['division_id' => $division->id, 'name' => 'Legal Staff']);
+        $author->companies()->attach($company->id);
+        $author->branches()->attach($branch->id);
+
+        $head = User::factory()->create([
+            'division_id' => $division->id,
+            'name' => 'Head Legal',
+            'system_role' => 'head',
+            'is_active' => true,
+        ]);
+        $head->companies()->attach($company->id);
+        $head->branches()->attach($branch->id);
+
+        $docType = DocumentType::create(['name' => 'Kontrak', 'code' => 'KTR']);
+        $document = Document::create([
+            'document_number' => '001/LEG/KTR/2026',
+            'title' => 'Perjanjian Kerjasama PDF',
+            'document_type_id' => $docType->id,
+            'owner_id' => $author->id,
+            'division_id' => $division->id,
+            'company_id' => $company->id,
+            'branch_id' => $branch->id,
+            'visibility' => 'division',
+        ]);
+
+        $version = DocumentVersion::create([
+            'document_id' => $document->id,
+            'version_number' => 1,
+            'author_id' => $author->id,
+            'author_name' => $author->name,
+            'status' => 'pending',
+            'content' => '',
+            'file_path' => 'documents/' . $document->id . '/v1.pdf',
+            'file_original_name' => 'perjanjian.pdf',
+            'file_mime' => 'application/pdf',
+        ]);
+
+        // Prior to finishing edit, approver is not resolved on document
+        $this->assertNull($document->approver_id);
+
+        // Author finishes editing the PDF document
+        $response = $this->actingAs($author)
+            ->post(route('documents.finish-editing', $document));
+
+        $response->assertRedirect(route('documents.show', $document));
+        $response->assertSessionHas('success');
+
+        // Document approver should be resolved to the division head
+        $document->refresh();
+        $this->assertSame($head->id, $document->approver_id);
+        $this->assertSame('head', $document->approver_role);
+
+        // Notifications must be sent:
+        // 1. Head receives DocumentApprovalRequested
+        Notification::assertSentTo(
+            $head,
+            DocumentApprovalRequested::class,
+            function (DocumentApprovalRequested $notification) use ($document, $version, $author) {
+                return $notification->document->id === $document->id &&
+                       $notification->version->id === $version->id &&
+                       $notification->authorName === $author->name;
+            }
+        );
+
+        // 2. Author receives ApprovalRouteResolved
+        Notification::assertSentTo(
+            $author,
+            ApprovalRouteResolved::class,
+            function (ApprovalRouteResolved $notification) use ($document, $head) {
+                return $notification->document->id === $document->id &&
+                       $notification->approverRole === 'head' &&
+                       str_contains($notification->routingMessage, $head->name);
+            }
+        );
     }
 }

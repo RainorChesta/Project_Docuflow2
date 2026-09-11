@@ -285,7 +285,9 @@ class DocumentShareController extends Controller
                 if (!$targetUser || !$targetUser->hasSignature()) {
                     return null;
                 }
-                $sig = $req->requestedSignature ?? $targetUser->signatures()->where('type', 'original')->first();
+                $sig = $req->requestedSignature 
+                    ?? $targetUser->signatures()->where('type', 'original')->first() 
+                    ?? $targetUser->signatures()->first();
                 if (!$sig) {
                     return null;
                 }

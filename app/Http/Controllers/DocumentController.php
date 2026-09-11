@@ -43,7 +43,9 @@ class DocumentController extends Controller
                 if (!$targetUser || !$targetUser->hasSignature()) {
                     return null;
                 }
-                $sig = $req->requestedSignature ?? $targetUser->signatures()->where('type', 'original')->first();
+                $sig = $req->requestedSignature 
+                    ?? $targetUser->signatures()->where('type', 'original')->first() 
+                    ?? $targetUser->signatures()->first();
                 if (!$sig) {
                     return null;
                 }
@@ -58,6 +60,59 @@ class DocumentController extends Controller
             ->filter()
             ->values()
             ->toArray();
+    }
+
+    /**
+     * Automatically apply any approved signature requests to the DOCX file and rotate OnlyOffice cache key.
+     */
+    private function autoApplyApprovedSignatures(Document $document, ?DocumentVersion $version = null): void
+    {
+        $version = $version ?? $document->displayVersion();
+        if (!$version || !$version->file_path || !str_ends_with(strtolower($version->file_path), '.docx')) {
+            return;
+        }
+
+        $approvedRequests = \App\Models\SignatureRequest::where('document_id', $document->id)
+            ->where('status', 'approved')
+            ->with(['targetUser.signatures', 'requestedSignature'])
+            ->get();
+
+        if ($approvedRequests->isEmpty()) {
+            return;
+        }
+
+        $processor = app(\App\Services\DocumentProcessorService::class);
+        $appliedAny = false;
+
+        foreach ($approvedRequests as $req) {
+            $sig = $req->requestedSignature 
+                ?? $req->targetUser?->signatures()->where('type', 'original')->first() 
+                ?? $req->targetUser?->signatures()->first();
+
+            $signaturePath = null;
+            if ($sig && $sig->file_path) {
+                if (Storage::disk('public')->exists($sig->file_path)) {
+                    $signaturePath = Storage::disk('public')->path($sig->file_path);
+                } elseif (file_exists(storage_path('app/public/' . ltrim($sig->file_path, '/')))) {
+                    $signaturePath = storage_path('app/public/' . ltrim($sig->file_path, '/'));
+                } elseif (file_exists(public_path('storage/' . ltrim($sig->file_path, '/')))) {
+                    $signaturePath = public_path('storage/' . ltrim($sig->file_path, '/'));
+                } elseif (file_exists($sig->file_path)) {
+                    $signaturePath = $sig->file_path;
+                }
+            }
+
+            if ($signaturePath && file_exists($signaturePath)) {
+                $success = $processor->processSignature($document, $version, $req->id, $signaturePath, $req);
+                if ($success) {
+                    $appliedAny = true;
+                }
+            }
+        }
+
+        if ($appliedAny) {
+            $this->onlyOfficeService?->rotateDocumentKey($document, $version);
+        }
     }
 
     public function index(Request $request): View
@@ -546,6 +601,7 @@ class DocumentController extends Controller
         $version = $document->displayVersion();
         $onlyOfficeConfig = null;
         if ($version) {
+            $this->autoApplyApprovedSignatures($document, $version);
             $onlyOfficeConfig = $this->onlyOfficeService->generateEditorConfig(
                 $document,
                 $version,
@@ -556,6 +612,34 @@ class DocumentController extends Controller
         $companies = \App\Models\Company::with('branches')->get();
 
         $approvedSignatures = $this->getApprovedSignatures($document);
+
+        // Ensure pending document with unassigned approver has approval routing evaluated
+        if ($document->approver_id === null && $document->versions()->where('status', 'pending')->whereNull('discarded_at')->exists()) {
+            $pendingVersion = $document->versions()->where('status', 'pending')->whereNull('discarded_at')->latest('id')->first();
+            if ($pendingVersion) {
+                $notifKey = 'approval_notified_' . $document->id . '_v' . $pendingVersion->id;
+                if (!Cache::has($notifKey)) {
+                    Cache::put($notifKey, true, now()->addMinutes(10));
+                    $author = $document->owner ?? $currentUser;
+                    $resolution = $this->approvalRoutingService->resolveApprover($document, $author);
+                    $this->approvalRoutingService->applyToDocument($document, $resolution);
+
+                    foreach ($resolution['approvers'] as $approver) {
+                        $approver->notify(new \App\Notifications\DocumentApprovalRequested($document, $pendingVersion, $author?->name ?? 'User'));
+                    }
+
+                    if ($resolution['role'] !== null && $author) {
+                        $author->notify(new \App\Notifications\ApprovalRouteResolved(
+                            $document,
+                            $resolution['role'],
+                            $resolution['approvers']->pluck('name')->join(', '),
+                            $resolution['message'],
+                            $resolution['isFallback'],
+                        ));
+                    }
+                }
+            }
+        }
 
         return view('documents.show', compact('document', 'divisions', 'onlyOfficeConfig', 'version', 'approvedSignatures', 'companies'));
     }
@@ -680,6 +764,8 @@ class DocumentController extends Controller
         if (!$version) {
             abort(404, 'Document version not found.');
         }
+
+        $this->autoApplyApprovedSignatures($document, $version);
 
         $onlyOfficeConfig = $this->onlyOfficeService->generateEditorConfig(
             $document,
@@ -907,6 +993,81 @@ class DocumentController extends Controller
         return redirect()->route('documents.show', $document)->with('success', $discarded
             ? __('Perubahan pada dokumen berhasil dibuang.')
             : __('Tidak ada perubahan untuk dibuang.'));
+    }
+
+    /**
+     * Finalize editing session and submit pending version for approval routing.
+     */
+    public function finishEditing(Request $request, Document $document): RedirectResponse|JsonResponse
+    {
+        $this->authorize('update', $document);
+
+        $user = auth()->user();
+        $version = $document->displayVersion();
+
+        // 1. Send signature and stamp request notifications for any unnotified requests
+        $unnotifiedSigRequests = \App\Models\SignatureRequest::where('document_id', $document->id)
+            ->where('status', 'pending')
+            ->whereNull('notified_at')
+            ->get();
+
+        foreach ($unnotifiedSigRequests as $sigReq) {
+            $sigReq->sendNotification();
+        }
+
+        // 2. Trigger approval routing if this version is pending (or draft being finished)
+        $routingMessage = null;
+        if ($version) {
+            if ($version->status === 'draft') {
+                $version->update(['status' => 'pending']);
+            }
+
+            if ($version->status === 'pending') {
+                $notifKey = 'approval_notified_' . $document->id . '_v' . $version->id;
+
+                // Clear any OnlyOffice pending cache flag so it won't duplicate
+                \Illuminate\Support\Facades\Cache::forget('onlyoffice_pending_notif_' . $document->id);
+
+                if (!\Illuminate\Support\Facades\Cache::has($notifKey)) {
+                    \Illuminate\Support\Facades\Cache::put($notifKey, true, now()->addMinutes(10));
+
+                    $resolution = $this->approvalRoutingService->resolveApprover($document, $user);
+                    $this->approvalRoutingService->applyToDocument($document, $resolution);
+
+                    // Notify the resolved approver(s)
+                    foreach ($resolution['approvers'] as $approver) {
+                        $approver->notify(new \App\Notifications\DocumentApprovalRequested($document, $version, $user->name));
+                    }
+
+                    // Notify the requester about who will approve
+                    if ($resolution['role'] !== null) {
+                        $user->notify(new \App\Notifications\ApprovalRouteResolved(
+                            $document,
+                            $resolution['role'],
+                            $resolution['approvers']->pluck('name')->join(', '),
+                            $resolution['message'],
+                            $resolution['isFallback'],
+                        ));
+                        $routingMessage = $resolution['message'];
+                    }
+                }
+            }
+        }
+
+        $successMessage = $routingMessage ?? __('Perubahan disimpan. Menunggu persetujuan.');
+
+        // Flash to session so it displays as toast/alert on documents.show
+        session()->flash('success', $successMessage);
+
+        if ($request->expectsJson() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $successMessage,
+                'redirect_url' => route('documents.show', $document),
+            ]);
+        }
+
+        return redirect()->route('documents.show', $document)->with('success', $successMessage);
     }
 
     public function saveDraft(Request $request, Document $document): RedirectResponse

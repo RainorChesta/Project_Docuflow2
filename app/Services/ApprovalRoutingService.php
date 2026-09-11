@@ -154,7 +154,15 @@ class ApprovalRoutingService
 
             // Scope to same branch/company
             if ($document->branch_id) {
-                $query->whereHas('branches', fn($bq) => $bq->where('branches.id', $document->branch_id));
+                $query->where(function ($q) use ($document) {
+                    $q->whereHas('branches', fn($bq) => $bq->where('branches.id', $document->branch_id));
+                    if ($document->company_id) {
+                        $q->orWhere(function ($cq) use ($document) {
+                            $cq->whereHas('companies', fn($c) => $c->where('companies.id', $document->company_id))
+                               ->whereDoesntHave('branches');
+                        });
+                    }
+                });
             } elseif ($document->company_id) {
                 $query->whereHas('companies', fn($cq) => $cq->where('companies.id', $document->company_id));
             }
