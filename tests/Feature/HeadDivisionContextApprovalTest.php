@@ -280,6 +280,7 @@ class HeadDivisionContextApprovalTest extends TestCase
             'document_id' => $doc->id,
             'status' => 'pending',
             'requested_at' => now(),
+            'notified_at' => now(),
         ]);
 
         // Head viewing Company A context

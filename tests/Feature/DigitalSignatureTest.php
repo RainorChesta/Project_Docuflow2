@@ -556,6 +556,7 @@ class DigitalSignatureTest extends TestCase
             'document_id' => $doc1->id,
             'status' => 'pending',
             'requested_at' => now(),
+            'notified_at' => now(),
         ]);
         $req2 = SignatureRequest::create([
             'requester_id' => $requester2->id,
@@ -563,6 +564,7 @@ class DigitalSignatureTest extends TestCase
             'document_id' => $doc2->id,
             'status' => 'approved',
             'requested_at' => now()->subDay(),
+            'notified_at' => now()->subDay(),
             'responded_at' => now(),
         ]);
 
@@ -599,8 +601,8 @@ class DigitalSignatureTest extends TestCase
         $doc1 = Document::create(['document_number' => '001/MM/2026', 'title' => 'Doc 1', 'document_type_id' => $docType->id, 'owner_id' => $requester->id, 'visibility' => 'general']);
         $doc2 = Document::create(['document_number' => '002/MM/2026', 'title' => 'Doc 2', 'document_type_id' => $docType->id, 'owner_id' => $requester->id, 'visibility' => 'general']);
 
-        $req1 = SignatureRequest::create(['requester_id' => $requester->id, 'target_user_id' => $targetUser->id, 'document_id' => $doc1->id, 'status' => 'pending', 'requested_at' => now()]);
-        $req2 = SignatureRequest::create(['requester_id' => $requester->id, 'target_user_id' => $targetUser->id, 'document_id' => $doc2->id, 'status' => 'pending', 'requested_at' => now()]);
+        $req1 = SignatureRequest::create(['requester_id' => $requester->id, 'target_user_id' => $targetUser->id, 'document_id' => $doc1->id, 'status' => 'pending', 'requested_at' => now(), 'notified_at' => now()]);
+        $req2 = SignatureRequest::create(['requester_id' => $requester->id, 'target_user_id' => $targetUser->id, 'document_id' => $doc2->id, 'status' => 'pending', 'requested_at' => now(), 'notified_at' => now()]);
 
         $response = $this->actingAs($targetUser)->post(route('signatures.requests.bulk-approve'), [
             'request_ids' => [$req1->id, $req2->id],
@@ -625,7 +627,7 @@ class DigitalSignatureTest extends TestCase
         $docType = DocumentType::create(['name' => 'Letter', 'code' => 'LTR']);
         $doc = Document::create(['document_number' => '001/LTR/2026', 'title' => 'Pending Letter', 'document_type_id' => $docType->id, 'owner_id' => $requester->id, 'visibility' => 'general']);
 
-        $req = SignatureRequest::create(['requester_id' => $requester->id, 'target_user_id' => $targetUser->id, 'document_id' => $doc->id, 'status' => 'pending', 'requested_at' => now()]);
+        $req = SignatureRequest::create(['requester_id' => $requester->id, 'target_user_id' => $targetUser->id, 'document_id' => $doc->id, 'status' => 'pending', 'requested_at' => now(), 'notified_at' => now()]);
 
         $response = $this->actingAs($targetUser)->post(route('signatures.requests.approve-all-pending'));
 
@@ -643,8 +645,8 @@ class DigitalSignatureTest extends TestCase
         $doc1 = Document::create(['document_number' => '001/CTR/2026', 'title' => 'Contract 1', 'document_type_id' => $docType->id, 'owner_id' => $requester->id, 'visibility' => 'general']);
         $doc2 = Document::create(['document_number' => '002/CTR/2026', 'title' => 'Contract 2', 'document_type_id' => $docType->id, 'owner_id' => $requester->id, 'visibility' => 'general']);
 
-        $req1 = SignatureRequest::create(['requester_id' => $requester->id, 'target_user_id' => $targetUser->id, 'document_id' => $doc1->id, 'status' => 'pending', 'requested_at' => now()]);
-        $req2 = SignatureRequest::create(['requester_id' => $requester->id, 'target_user_id' => $targetUser->id, 'document_id' => $doc2->id, 'status' => 'pending', 'requested_at' => now()]);
+        $req1 = SignatureRequest::create(['requester_id' => $requester->id, 'target_user_id' => $targetUser->id, 'document_id' => $doc1->id, 'status' => 'pending', 'requested_at' => now(), 'notified_at' => now()]);
+        $req2 = SignatureRequest::create(['requester_id' => $requester->id, 'target_user_id' => $targetUser->id, 'document_id' => $doc2->id, 'status' => 'pending', 'requested_at' => now(), 'notified_at' => now()]);
 
         $response = $this->actingAs($targetUser)->post(route('signatures.requests.bulk-reject'), [
             'request_ids' => [$req1->id, $req2->id],
@@ -657,7 +659,7 @@ class DigitalSignatureTest extends TestCase
         $this->assertSame('Bulk reject reason', $req1->fresh()->rejected_reason);
     }
 
-    public function test_signature_request_creation_sends_single_notification_to_target_user(): void
+    public function test_signature_request_creation_in_onlyoffice_defers_notification_until_save(): void
     {
         \Illuminate\Support\Facades\Notification::fake();
 
@@ -681,7 +683,7 @@ class DigitalSignatureTest extends TestCase
             'visibility' => 'general',
         ]);
 
-        // Request signature via endpoint
+        // 1. Request signature via ONLYOFFICE placeholder endpoint (no placement coords)
         $response = $this->actingAs($requester)->getJson(
             route('profile.signature.show', [
                 'user_id' => $targetUser->id,
@@ -692,18 +694,86 @@ class DigitalSignatureTest extends TestCase
 
         $response->assertStatus(200);
 
-        // Verify exactly one notification was sent to targetUser
+        // Verify request was created with null notified_at
+        $sigRequest = SignatureRequest::where('document_id', $doc->id)->where('target_user_id', $targetUser->id)->first();
+        $this->assertNotNull($sigRequest);
+        $this->assertNull($sigRequest->notified_at);
+
+        // Verify notification is NOT sent immediately while editing
+        \Illuminate\Support\Facades\Notification::assertNotSentTo(
+            $targetUser,
+            \App\Notifications\SignatureRequested::class
+        );
+
+        // 2. Finalize editing / document save
+        $sigRequest->sendNotification();
+
+        // Verify notification is now sent after save
         \Illuminate\Support\Facades\Notification::assertSentToTimes(
             $targetUser,
             \App\Notifications\SignatureRequested::class,
             1
         );
+        $this->assertNotNull($sigRequest->fresh()->notified_at);
 
         // Verify requester did not receive signature request notification
         \Illuminate\Support\Facades\Notification::assertNotSentTo(
             $requester,
             \App\Notifications\SignatureRequested::class
         );
+    }
+
+    public function test_signature_request_direct_pdf_placement_sends_notification_immediately(): void
+    {
+        \Illuminate\Support\Facades\Notification::fake();
+
+        $requester = User::factory()->create(['name' => 'Author User']);
+        $targetUser = User::factory()->create(['name' => 'Signer User']);
+        
+        $filePath = 'signatures/sig_test_pdf.png';
+        Storage::disk('public')->put($filePath, 'fake content');
+        $sig = Signature::create([
+            'user_id' => $targetUser->id,
+            'file_path' => $filePath,
+            'type' => 'original',
+        ]);
+
+        $docType = DocumentType::create(['name' => 'Surat Keputusan', 'code' => 'SK']);
+        $doc = Document::create([
+            'document_number' => '100/SK/2026',
+            'title' => 'PDF Direct Test Doc',
+            'document_type_id' => $docType->id,
+            'owner_id' => $requester->id,
+            'visibility' => 'general',
+        ]);
+
+        // Request signature with direct PDF coordinates
+        $response = $this->actingAs($requester)->getJson(
+            route('profile.signature.show', [
+                'user_id' => $targetUser->id,
+                'document_id' => $doc->id,
+                'signature_id' => $sig->id,
+                'page_number' => 1,
+                'pos_x' => 50.0,
+                'pos_y' => 50.0,
+                'width' => 20.0,
+                'height' => 20.0,
+                'preset_position' => 'custom',
+            ])
+        );
+
+        $response->assertStatus(200);
+
+        // Verify notification is sent immediately for direct PDF placement
+        \Illuminate\Support\Facades\Notification::assertSentToTimes(
+            $targetUser,
+            \App\Notifications\SignatureRequested::class,
+            1
+        );
+
+        $sigRequest = SignatureRequest::where('document_id', $doc->id)->where('target_user_id', $targetUser->id)->first();
+        $this->assertNotNull($sigRequest);
+        $this->assertNotNull($sigRequest->notified_at);
     }
 
     public function test_user_can_recreate_original_signature_after_deletion_even_if_company_stamps_exist(): void
@@ -803,4 +873,5 @@ class DigitalSignatureTest extends TestCase
         $this->assertCount(2, $user->fresh()->signatures);
     }
 }
+
 

@@ -25,6 +25,7 @@ class SignatureRequest extends Model
         'preset_position',
         'rejected_reason',
         'requested_at',
+        'notified_at',
         'responded_at',
         'used_at',
     ];
@@ -39,6 +40,7 @@ class SignatureRequest extends Model
             'width' => 'float',
             'height' => 'float',
             'requested_at' => 'datetime',
+            'notified_at' => 'datetime',
             'responded_at' => 'datetime',
             'used_at' => 'datetime',
         ];
@@ -99,6 +101,31 @@ class SignatureRequest extends Model
         return !$this->isStamp();
     }
 
+    public function isNotified(): bool
+    {
+        return $this->notified_at !== null;
+    }
+
+    /**
+     * Dispatch notification to target user when document editing is finished and saved.
+     */
+    public function sendNotification(): void
+    {
+        $this->loadMissing(['document', 'requester', 'requestedSignature.company', 'targetUser']);
+
+        $targetUser = $this->targetUser;
+        $document   = $this->document;
+        $requester  = $this->requester;
+
+        if ($targetUser && $document && $requester && $targetUser->id !== $requester->id) {
+            $targetUser->notify(new \App\Notifications\SignatureRequested($document, $requester->name, $this));
+            $this->update([
+                'notified_at' => now(),
+                'requested_at' => now(),
+            ]);
+        }
+    }
+
     public function getTypeLabelAttribute(): string
     {
         if ($this->isStamp()) {
@@ -108,3 +135,4 @@ class SignatureRequest extends Model
         return 'Tanda Tangan Original';
     }
 }
+
