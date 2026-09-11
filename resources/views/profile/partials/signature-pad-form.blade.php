@@ -12,7 +12,7 @@
             </p>
         </div>
         <div id="ttd-status-badge">
-            @if(auth()->user()->hasSignature())
+            @if(auth()->user()->hasSignature('original'))
                 <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white shadow-xs">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
                     {{ __('TTD Original Aktif') }}
@@ -41,7 +41,7 @@
             <h3 class="font-bold text-base text-base-content">{{ __('Tambah Tanda Tangan Baru') }}</h3>
             
             @php
-                $hasSignature = auth()->user()->hasSignature();
+                $hasOriginalSignature = auth()->user()->hasSignature('original');
                 $contextService = app(\App\Services\CompanyContextService::class);
                 $availableCompanies = $contextService->getAvailableCompanies(auth()->user());
                 $activeCompanyId = (string) $contextService->getActiveCompanyId(auth()->user());
@@ -50,7 +50,7 @@
             <div class="form-control w-full space-y-1.5">
                 <label class="text-xs font-semibold text-base-content/70">{{ __('Jenis Tanda Tangan') }}</label>
                 <select id="signature-type-select" class="select select-bordered select-sm w-full font-medium rounded-lg text-sm bg-base-100">
-                    @if($hasSignature)
+                    @if($hasOriginalSignature)
                         <option value="company_stamp" selected>{{ __('Tanda Tangan + Stempel Perusahaan') }}</option>
                         <option value="original" disabled>{{ __('Tanda Tangan Original (Sudah Dibuat)') }}</option>
                     @else
@@ -59,7 +59,7 @@
                 </select>
             </div>
 
-            <div class="form-control w-full space-y-1.5 {{ $hasSignature ? '' : 'hidden' }}" id="company-select-container">
+            <div class="form-control w-full space-y-1.5 {{ $hasOriginalSignature ? '' : 'hidden' }}" id="company-select-container">
                 <label class="text-xs font-semibold text-base-content/70">{{ __('Pilih Perusahaan') }}</label>
                 <select id="signature-company-select" class="select select-bordered select-sm w-full font-medium rounded-lg text-sm bg-base-100">
                     <option value="" disabled {{ empty($activeCompanyId) ? 'selected' : '' }}>{{ __('Pilih Perusahaan...') }}</option>
@@ -74,7 +74,7 @@
             <div class="flex items-center justify-between pt-1">
                 <label class="text-sm font-semibold text-base-content">{{ __('Pilih Metode') }}</label>
                 <div class="flex items-center gap-4 text-sm font-medium" id="signature-tabs">
-                    @if($hasSignature)
+                    @if($hasOriginalSignature)
                         <button type="button" class="tab-btn pb-0.5 transition-colors opacity-40 cursor-not-allowed pointer-events-none text-base-content/40" data-target="draw" id="tab-draw" title="{{ __('Canvas dinonaktifkan karena TTD original sudah dibuat') }}">
                             {{ __('Gambar') }}
                         </button>
@@ -93,11 +93,11 @@
             </div>
 
             {{-- Draw Mode --}}
-            <div id="signature-mode-draw" class="space-y-3 {{ $hasSignature ? 'hidden' : '' }}">
+            <div id="signature-mode-draw" class="space-y-3 {{ $hasOriginalSignature ? 'hidden' : '' }}">
                 <div class="relative border-2 border-dashed border-base-300 rounded-xl bg-base-100 p-2 shadow-inner hover:border-primary/50 transition-colors">
-                    <canvas id="signature-canvas" class="w-full h-52 touch-none rounded-lg bg-white {{ $hasSignature ? 'pointer-events-none cursor-not-allowed opacity-60' : 'cursor-crosshair' }}"></canvas>
+                    <canvas id="signature-canvas" class="w-full h-52 touch-none rounded-lg bg-white {{ $hasOriginalSignature ? 'pointer-events-none cursor-not-allowed opacity-60' : 'cursor-crosshair' }}"></canvas>
                     
-                    @if($hasSignature)
+                    @if($hasOriginalSignature)
                         <div id="canvas-locked-overlay" class="absolute inset-0 bg-base-100/90 backdrop-blur-xs flex flex-col items-center justify-center text-center p-6 rounded-xl z-20">
                             <div class="w-12 h-12 rounded-full bg-base-200 flex items-center justify-center text-base-content/60 mb-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-base-content/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -106,7 +106,7 @@
                             </div>
                             <h4 class="font-bold text-sm text-base-content">{{ __('Canvas Dinonaktifkan') }}</h4>
                             <p class="text-xs text-base-content/60 mt-1 max-w-xs leading-relaxed">
-                                {{ __('Tanda tangan sudah tersimpan di profil Anda. Canvas tidak dapat digunakan lagi. Silakan hapus tanda tangan tersimpan di samping terlebih dahulu jika ingin menggambar ulang.') }}
+                                {{ __('Tanda tangan sudah tersimpan di profil Anda. Canvas tidak dapat digunakan lagi. Silakan hapus tanda tangan yang tersimpan terlebih dahulu jika ingin menggambar ulang.') }}
                             </p>
                         </div>
                     @else
@@ -120,7 +120,7 @@
                 </div>
 
                 <div class="flex items-center justify-between gap-2 pt-1">
-                    <button type="button" id="btn-clear-canvas" class="btn btn-ghost btn-sm text-base-content/70 gap-1.5" {{ $hasSignature ? 'disabled' : '' }}>
+                    <button type="button" id="btn-clear-canvas" class="btn btn-ghost btn-sm text-base-content/70 gap-1.5" {{ $hasOriginalSignature ? 'disabled' : '' }}>
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                         {{ __('Hapus Canvas') }}
                     </button>
@@ -132,7 +132,7 @@
             </div>
 
             {{-- Upload Mode --}}
-            <div id="signature-mode-upload" class="space-y-3 {{ $hasSignature ? '' : 'hidden' }}">
+            <div id="signature-mode-upload" class="space-y-3 {{ $hasOriginalSignature ? '' : 'hidden' }}">
                 <div class="relative border-2 border-dashed border-base-300 rounded-xl bg-base-100 p-6 flex flex-col items-center justify-center hover:border-primary/50 transition-colors h-[230px]">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-base-content/30 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -294,7 +294,7 @@
         const companySelect = document.getElementById('signature-company-select');
         
         const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
-        const hasOriginalSignature = @json(auth()->user()->hasSignature());
+        const hasOriginalSignature = @json(auth()->user()->hasSignature('original'));
 
         let currentMode = hasOriginalSignature ? 'upload' : 'draw';
 

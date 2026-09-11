@@ -22,7 +22,7 @@ class EnsureUserHasSignature
             return $next($request);
         }
 
-        if ($user && !$user->hasSignature()) {
+        if ($user && !$user->hasSignature('original')) {
             // Exempt routes that must be accessible even without signature
             $exemptRoutes = [
                 'profile.edit',

@@ -140,14 +140,9 @@ class SignatureController extends Controller
         }
 
         $signatureId = $request->query('signature_id');
+        $sig = $signatureId ? $user->signatures()->find($signatureId) : $user->signature;
 
-        if ($user->hasSignature()) {
-            $sig = $signatureId ? $user->signatures()->find($signatureId) : $user->signature;
-            
-            if (!$sig) {
-                 return response()->json(['success' => false, 'message' => 'TANDA TANGAN TIDAK DITEMUKAN.'], 404);
-            }
-
+        if ($sig) {
             $onlyOfficeService = app(\App\Services\OnlyOfficeService::class);
             $onlyOfficeUrl = $onlyOfficeService->getSignatureFileUrlForSignature($sig);
             $token = $onlyOfficeUrl ? $onlyOfficeService->generateInsertImageToken($onlyOfficeUrl) : null;
@@ -199,7 +194,7 @@ class SignatureController extends Controller
         $type = $request->input('type', 'original');
         $companyId = $request->input('company_id');
 
-        if ($user->hasSignature()) {
+        if ($user->hasSignature('original')) {
             if ($request->filled('signature_data')) {
                 $msg = 'Canvas tanda tangan tidak dapat digunakan lagi karena tanda tangan sudah tersimpan. Silakan hapus tanda tangan yang tersimpan terlebih dahulu jika ingin menggambar ulang.';
                 if ($request->wantsJson()) {
@@ -218,7 +213,7 @@ class SignatureController extends Controller
         }
 
         if ($type === 'company_stamp') {
-            if (!$user->hasSignature()) {
+            if (!$user->hasSignature('original')) {
                 if ($request->wantsJson()) return response()->json(['success' => false, 'message' => 'HARUS MEMBUAT TANDA TANGAN ORIGINAL TERLEBIH DAHULU.'], 422);
                 return back()->with('error', 'HARUS MEMBUAT TANDA TANGAN ORIGINAL TERLEBIH DAHULU.');
             }

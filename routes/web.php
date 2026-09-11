@@ -30,9 +30,14 @@ Route::get('/d/{token}/preview', [DocumentController::class, 'previewByHash'])->
 
 use App\Http\Controllers\SignatureController;
 
-Route::middleware(['auth', 'signature.required'])->group(function () {
 Route::middleware('auth')->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/verification-pending', [\App\Http\Controllers\Auth\AccountVerificationController::class, 'notice'])
+        ->name('verification.pending');
+    Route::get('/verification-status', [\App\Http\Controllers\Auth\AccountVerificationController::class, 'status'])
+        ->name('verification.status');
+
+    Route::middleware(['account.verified', 'signature.required'])->group(function () {
+        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // Jodit image upload
     Route::post('/jodit-upload', [JoditController::class, 'upload'])->name('jodit.upload');
@@ -185,7 +190,7 @@ Route::get('/onlyoffice/templates/{template}/file', [\App\Http\Controllers\OnlyO
 Route::match(['get', 'post'], '/onlyoffice/templates/{template}/callback', [\App\Http\Controllers\OnlyOfficeController::class, 'templateCallback'])->name('onlyoffice.templates.callback')->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class]);
 
 // Share-token link access (Google Docs model)
-Route::get('/shared/{token}', [DocumentShareController::class, 'accessByToken'])->name('documents.shared')->middleware(['auth', 'signature.required']);
+Route::get('/shared/{token}', [DocumentShareController::class, 'accessByToken'])->name('documents.shared')->middleware(['auth', 'account.verified', 'signature.required']);
 
 require __DIR__.'/auth.php';
 

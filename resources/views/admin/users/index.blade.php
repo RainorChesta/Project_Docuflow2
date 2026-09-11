@@ -31,8 +31,9 @@
 
                     <select name="status" class="select select-bordered select-sm w-full sm:w-auto">
                         <option value="">{{ __('Semua Status') }}</option>
-                        <option value="1" {{ request('status') === '1' ? 'selected' : '' }}>Aktif</option>
-                        <option value="0" {{ request('status') === '0' ? 'selected' : '' }}>Non-Aktif</option>
+                        <option value="1" {{ request('status') === '1' ? 'selected' : '' }}>{{ __('Aktif') }}</option>
+                        <option value="pending" {{ request('status') === 'pending' ? 'selected' : '' }}>{{ __('Menunggu Verifikasi') }}</option>
+                        <option value="0" {{ request('status') === '0' ? 'selected' : '' }}>{{ __('Non-Aktif') }}</option>
                     </select>
 
                     <div class="flex gap-2">
@@ -53,51 +54,98 @@
 
             <div class="card bg-base-100 border border-base-300 shadow-sm">
                 <div class="overflow-x-auto">
-                    <table class="table min-w-[640px]">
+                    <table class="table w-full min-w-[960px] text-sm">
                         <thead>
-                            <tr>
-                                <th>{{ __('Nama / NIP') }}</th>
-                                <th>{{ __('Email / Telepon') }}</th>
-                                <th>{{ __('Divisi') }}</th>
-                                <th>{{ __('Perusahaan & Cabang') }}</th>
-                                <th>{{ __('Peran') }}</th>
-                                <th>{{ __('Aktif') }}</th>
-                                <th></th>
+                            <tr class="border-b border-base-200">
+                                <th class="min-w-[180px] font-semibold text-xs text-base-content/70 uppercase tracking-wider">{{ __('Nama / NIP') }}</th>
+                                <th class="min-w-[180px] font-semibold text-xs text-base-content/70 uppercase tracking-wider">{{ __('Email / Telepon') }}</th>
+                                <th class="min-w-[150px] font-semibold text-xs text-base-content/70 uppercase tracking-wider">{{ __('Divisi') }}</th>
+                                <th class="min-w-[180px] font-semibold text-xs text-base-content/70 uppercase tracking-wider">{{ __('Perusahaan & Cabang') }}</th>
+                                <th class="min-w-[90px] font-semibold text-xs text-base-content/70 uppercase tracking-wider">{{ __('Peran') }}</th>
+                                <th class="min-w-[160px] font-semibold text-xs text-base-content/70 uppercase tracking-wider">{{ __('Status') }}</th>
+                                <th class="w-20 text-right"></th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody class="divide-y divide-base-200">
                             @foreach($users as $user)
-                                <tr>
-                                    <td>
-                                        <div class="font-medium">{{ $user->name }}</div>
+                                <tr class="hover:bg-base-200/40 transition-colors">
+                                    <td class="align-middle">
+                                        <div class="font-medium text-base-content leading-snug">{{ $user->name }}</div>
                                         @if($user->nip)
-                                            <div class="text-xs text-base-content/50">NIP: {{ $user->nip }}</div>
+                                            <div class="text-xs text-base-content/50 font-mono mt-0.5">NIP: {{ $user->nip }}</div>
                                         @endif
                                     </td>
-                                    <td>
-                                        <div>{{ $user->email }}</div>
+                                    <td class="align-middle">
+                                        <div class="text-sm text-base-content leading-snug">{{ $user->email }}</div>
                                         @if($user->phone_number)
-                                            <div class="text-xs text-base-content/50">{{ $user->phone_number }}</div>
+                                            <div class="text-xs text-base-content/50 mt-0.5">{{ $user->phone_number }}</div>
                                         @endif
                                     </td>
-                                    <td>
-                                        <div class="text-sm">
-                                            {{ $user->divisions->pluck('code')->join(', ') ?: '-' }}
+                                    <td class="align-middle">
+                                        @if($user->system_role === 'direktur')
+                                            <span class="text-xs text-base-content/40 italic font-mono">{{ __('(N/A)') }}</span>
+                                        @elseif($user->divisions->isNotEmpty())
+                                            <div class="flex flex-wrap items-center gap-1.5 max-w-[220px]">
+                                                @foreach($user->divisions as $div)
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-base-200 text-base-content border border-base-300">
+                                                        {{ $div->code ?: $div->name }}
+                                                    </span>
+                                                @endforeach
+                                            </div>
+                                        @elseif($user->division)
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-base-200 text-base-content border border-base-300">
+                                                {{ $user->division->code ?: $user->division->name }}
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30 whitespace-nowrap">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                                {{ __('Belum ditugaskan') }}
+                                            </span>
+                                        @endif
+                                    </td>
+                                    <td class="align-middle">
+                                        <div class="space-y-0.5">
+                                            @if($user->system_role === 'admin')
+                                                <span class="text-xs text-base-content/60 italic">{{ __('Semua Perusahaan') }}</span>
+                                            @elseif($user->companies->isNotEmpty())
+                                                <div class="text-xs font-semibold text-base-content leading-snug">
+                                                    {{ $user->companies->pluck('code')->join(', ') }}
+                                                </div>
+                                                <div class="text-[11px] text-base-content/60 leading-snug">
+                                                    {{ $user->branches->pluck('name')->join(', ') ?: '-' }}
+                                                </div>
+                                            @else
+                                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30 whitespace-nowrap">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                                    {{ __('Belum ditugaskan') }}
+                                                </span>
+                                            @endif
                                         </div>
                                     </td>
-                                    <td>
-                                        <div class="text-xs">
-                                            <span class="font-semibold">{{ $user->companies->pluck('code')->join(', ') ?: '-' }}</span>
-                                            <div class="text-base-content/60">{{ $user->branches->pluck('name')->join(', ') ?: '-' }}</div>
-                                        </div>
-                                    </td>
-                                    <td>
+                                    <td class="align-middle whitespace-nowrap">
                                         <span class="badge {{ $user->system_role === 'admin' ? 'badge-accent' : ($user->system_role === 'direktur' ? 'badge-info' : ($user->system_role === 'head' ? 'badge-warning' : 'badge-ghost')) }} badge-sm uppercase font-semibold">
                                             {{ $user->system_role }}
                                         </span>
                                     </td>
-                                    <td>{{ $user->is_active ? 'Yes' : 'No' }}</td>
-                                    <td class="text-right whitespace-nowrap">
+                                    <td class="align-middle whitespace-nowrap">
+                                        @if(!$user->is_active)
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/25">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                                                {{ __('Non-Aktif') }}
+                                            </span>
+                                        @elseif($user->isPendingVerification())
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                                {{ __('Menunggu Verifikasi') }}
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                                {{ __('Aktif') }}
+                                            </span>
+                                        @endif
+                                    </td>
+                                    <td class="align-middle text-right whitespace-nowrap">
                                         <a href="{{ route('admin.users.edit', $user) }}" class="btn btn-ghost btn-xs btn-square text-primary" title="{{ __('Edit') }}">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                         </a>

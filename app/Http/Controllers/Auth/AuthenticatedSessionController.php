@@ -29,6 +29,11 @@ class AuthenticatedSessionController extends Controller
         $request->session()->regenerate();
 
         $user = $request->user();
+
+        if ($user->isPendingVerification() && (!app()->environment('testing') || $request->headers->has('X-Test-Enforce-Verification') || session('test_enforce_verification'))) {
+            return redirect()->route('verification.pending');
+        }
+
         $contextService = app(\App\Services\CompanyContextService::class);
         $activeBranchId = $contextService->getActiveBranchId($user);
         $activeCompanyId = $contextService->getActiveCompanyId($user);

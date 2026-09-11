@@ -705,5 +705,102 @@ class DigitalSignatureTest extends TestCase
             \App\Notifications\SignatureRequested::class
         );
     }
+
+    public function test_user_can_recreate_original_signature_after_deletion_even_if_company_stamps_exist(): void
+    {
+        $user = User::factory()->create();
+        $company = Company::create(['name' => 'PT Jaya Bersama Makmur', 'code' => 'JBM']);
+        $user->companies()->attach($company->id);
+
+        $base64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+
+        // 1. Create original signature
+        $res1 = $this->actingAs($user)->postJson(route('profile.signature.store'), [
+            'type' => 'original',
+            'signature_data' => $base64,
+        ]);
+        $res1->assertStatus(200);
+
+        // 2. Upload company stamp
+        $file = UploadedFile::fake()->image('stamp.png', 200, 100);
+        $resStamp = $this->actingAs($user)->postJson(route('profile.signature.store'), [
+            'type' => 'company_stamp',
+            'company_id' => $company->id,
+            'signature_image' => $file,
+        ]);
+        $resStamp->assertStatus(200);
+
+        // Assert user has both signatures
+        $this->assertTrue($user->fresh()->hasSignature('original'));
+        $this->assertTrue($user->fresh()->hasSignature('company_stamp'));
+        $this->assertCount(2, $user->fresh()->signatures);
+
+        $origSig = $user->signatures()->where('type', 'original')->first();
+        $stampSig = $user->signatures()->where('type', 'company_stamp')->first();
+        $this->assertNotNull($origSig);
+        $this->assertNotNull($stampSig);
+
+        // 3. Delete original signature
+        $delRes = $this->actingAs($user)->deleteJson(route('profile.signature.destroy', $origSig));
+        $delRes->assertStatus(200);
+
+        // Assert original signature is deleted, but company stamp remains intact
+        $this->assertFalse($user->fresh()->hasSignature('original'));
+        $this->assertTrue($user->fresh()->hasSignature('company_stamp'));
+        $this->assertTrue($user->fresh()->hasSignature()); // has ANY signature is true
+        $this->assertCount(1, $user->fresh()->signatures);
+
+        // 4. Verify profile page displays unlocked canvas and prompt to create original signature
+        $pageRes = $this->actingAs($user)->get(route('profile.edit'));
+        $pageRes->assertStatus(200);
+        $pageRes->assertSee(__('Wajib Membuat TTD Original'));
+        $pageRes->assertDontSee(__('TTD Original Aktif'));
+        $pageRes->assertDontSee(__('Canvas Dinonaktifkan'));
+
+        // 5. User recreates/draws a new original signature on canvas
+        $newBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+        $resRecreate = $this->actingAs($user)->postJson(route('profile.signature.store'), [
+            'type' => 'original',
+            'signature_data' => $newBase64,
+        ]);
+
+        // Must succeed with 200 (not blocked with 422)
+        $resRecreate->assertStatus(200)->assertJson(['success' => true]);
+
+        // Assert user now has both original signature and company stamp
+        $this->assertTrue($user->fresh()->hasSignature('original'));
+        $this->assertTrue($user->fresh()->hasSignature('company_stamp'));
+        $this->assertCount(2, $user->fresh()->signatures);
+
+        // Company stamp is still intact with same company_id
+        $this->assertDatabaseHas('signatures', [
+            'id' => $stampSig->id,
+            'user_id' => $user->id,
+            'type' => 'company_stamp',
+            'company_id' => $company->id,
+        ]);
+
+        // 6. While original signature exists, drawing again without deleting is blocked
+        $resBlocked = $this->actingAs($user)->postJson(route('profile.signature.store'), [
+            'type' => 'original',
+            'signature_data' => $newBase64,
+        ]);
+        $resBlocked->assertStatus(422);
+
+        // 7. Delete original signature again and recreate via image upload
+        $newOrigSig = $user->fresh()->signatures()->where('type', 'original')->first();
+        $this->actingAs($user)->deleteJson(route('profile.signature.destroy', $newOrigSig))->assertStatus(200);
+        $this->assertFalse($user->fresh()->hasSignature('original'));
+
+        $origImageFile = UploadedFile::fake()->image('my_signature.png', 200, 100);
+        $resUploadRecreate = $this->actingAs($user)->postJson(route('profile.signature.store'), [
+            'type' => 'original',
+            'signature_image' => $origImageFile,
+        ]);
+        $resUploadRecreate->assertStatus(200)->assertJson(['success' => true]);
+        $this->assertTrue($user->fresh()->hasSignature('original'));
+        $this->assertTrue($user->fresh()->hasSignature('company_stamp'));
+        $this->assertCount(2, $user->fresh()->signatures);
+    }
 }
 
