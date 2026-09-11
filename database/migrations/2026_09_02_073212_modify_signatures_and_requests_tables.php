@@ -12,7 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('signatures', function (Blueprint $table) {
+            $table->dropForeign(['user_id']);
             $table->dropUnique(['user_id']);
+            $table->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
+            
             $table->renameColumn('signature_type', 'created_via');
             $table->string('type')->default('original')->after('user_id');
             $table->foreignId('company_id')->nullable()->after('type')->constrained()->nullOnDelete();
@@ -38,7 +41,9 @@ return new class extends Migration
             $table->dropColumn('company_id');
             $table->dropColumn('type');
             $table->renameColumn('created_via', 'signature_type');
+            $table->dropForeign(['user_id']);
             $table->unique('user_id');
+            $table->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
         });
     }
 };

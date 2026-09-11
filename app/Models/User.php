@@ -166,6 +166,48 @@ class User extends Authenticatable
     }
 
     /**
+     * Check if user account is verified by administrator.
+     * An account is verified when:
+     * - User is admin (global access)
+     * - User is direktur and assigned to at least one company and branch
+     * - User is head/staff and assigned to at least one division, company, and branch
+     */
+    public function isVerified(): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        $hasCompany = $this->relationLoaded('companies')
+            ? $this->companies->isNotEmpty()
+            : $this->companies()->exists();
+
+        $hasBranch = $this->relationLoaded('branches')
+            ? $this->branches->isNotEmpty()
+            : $this->branches()->exists();
+
+        if ($this->isDirector()) {
+            return $hasCompany && $hasBranch;
+        }
+
+        $hasDivision = !empty($this->division_id) || (
+            $this->relationLoaded('divisions')
+                ? $this->divisions->isNotEmpty()
+                : $this->divisions()->exists()
+        );
+
+        return $hasDivision && $hasCompany && $hasBranch;
+    }
+
+    /**
+     * Check if user account is pending verification by administrator.
+     */
+    public function isPendingVerification(): bool
+    {
+        return !$this->isVerified();
+    }
+
+    /**
      * Terapkan filter konteks perusahaan dan cabang pada query dokumen.
      */
     protected function applyContextFilterToDocumentQuery($query, ?int $companyId = null, ?int $branchId = null, bool $scopedToContext = true): void

@@ -38,7 +38,47 @@ class UserController extends Controller
         }
 
         if ($request->filled('status')) {
-            $query->where('is_active', $request->status);
+            if ($request->status === 'pending') {
+                $query->where('system_role', '!=', 'admin')
+                      ->where(function ($q) {
+                          $q->where(function ($sub) {
+                              $sub->where('system_role', '!=', 'direktur')
+                                  ->where(function ($missing) {
+                                      $missing->whereNull('division_id')
+                                              ->whereDoesntHave('divisions')
+                                              ->orWhereDoesntHave('companies')
+                                              ->orWhereDoesntHave('branches');
+                                  });
+                          })->orWhere(function ($sub) {
+                              $sub->where('system_role', 'direktur')
+                                  ->where(function ($missing) {
+                                      $missing->whereDoesntHave('companies')
+                                              ->orWhereDoesntHave('branches');
+                                  });
+                          });
+                      });
+            } elseif ($request->status === '1') {
+                $query->where('is_active', true)
+                      ->where(function ($q) {
+                          $q->where('system_role', 'admin')
+                            ->orWhere(function ($sub) {
+                                $sub->where('system_role', 'direktur')
+                                    ->whereHas('companies')
+                                    ->whereHas('branches');
+                            })
+                            ->orWhere(function ($sub) {
+                                $sub->whereNotIn('system_role', ['admin', 'direktur'])
+                                    ->where(function ($divQ) {
+                                        $divQ->whereNotNull('division_id')
+                                             ->orWhereHas('divisions');
+                                    })
+                                    ->whereHas('companies')
+                                    ->whereHas('branches');
+                            });
+                      });
+            } elseif ($request->status === '0') {
+                $query->where('is_active', false);
+            }
         }
 
         $users = $query->latest('id')->paginate(20)->appends($request->query());
@@ -168,6 +208,8 @@ class UserController extends Controller
         $user->companies()->sync($companyIds);
         $user->branches()->sync($branchIds);
         $user->divisions()->sync($divisionIds);
+
+        event(new \App\Events\UserVerificationUpdated($user));
 
         return redirect()->route('admin.users.index')->with('success', __('Pengguna berhasil diperbarui.'));
     }
