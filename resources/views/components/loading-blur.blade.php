@@ -1,83 +1,72 @@
+<style>
+    /* Instant zero-flash visibility during page navigation transitions */
+    html.is-page-loading #global-loading-blur {
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        visibility: visible !important;
+    }
+    html.is-page-loading #loading-blur-content {
+        opacity: 1 !important;
+        transform: scale(1) !important;
+        visibility: visible !important;
+    }
+</style>
+
+{{-- Immediate pre-paint script to activate loading blur on next page if transitioning --}}
+<script>
+    (function() {
+        try {
+            var t = sessionStorage.getItem('dokuflow:page-loading');
+            if (t && (Date.now() - parseInt(t, 10)) < 15000) {
+                document.documentElement.classList.add('is-page-loading');
+            }
+        } catch (e) {}
+    })();
+</script>
+
 <div id="global-loading-blur"
-     class="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/40 dark:bg-slate-950/70 backdrop-blur-md opacity-0 pointer-events-none transition-all duration-300 ease-out cursor-pointer"
+     class="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/40 dark:bg-slate-950/70 backdrop-blur-md opacity-0 pointer-events-none transition-all duration-300 ease-out select-none cursor-wait"
      aria-hidden="true"
      role="status"
      aria-live="polite">
 
-    {{-- Center Frosted Glass Card --}}
-    <div id="loading-blur-card"
-         class="glass-panel relative flex flex-col items-center justify-center p-6 sm:p-8 rounded-3xl border border-base-300/70 dark:border-white/10 bg-base-100/90 dark:bg-base-100/80 shadow-[0_20px_50px_rgba(0,0,0,0.25)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.5)] max-w-[320px] w-full mx-4 text-center transform scale-95 opacity-0 transition-all duration-300 ease-out cursor-default"
-         onclick="event.stopPropagation()">
+    {{-- Center Animated Logo & Pulsing Ambient Aura --}}
+    <div id="loading-blur-content"
+         class="relative flex items-center justify-center transform scale-95 opacity-0 transition-all duration-300 ease-out pointer-events-none">
         
-        {{-- Close Button for immediate manual dismissal --}}
-        <button type="button"
-                onclick="window.hideLoadingBlur()"
-                class="absolute top-3 right-3 w-7 h-7 rounded-full flex items-center justify-center text-base-content/40 hover:text-base-content hover:bg-base-200/80 transition-all cursor-pointer"
-                title="{{ __('Tutup') }}"
-                aria-label="{{ __('Tutup') }}">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-        </button>
+        {{-- Ambient Glow Aura --}}
+        <div class="absolute -inset-4 bg-gradient-to-tr from-primary/40 via-accent/30 to-primary/40 rounded-full blur-2xl animate-pulse"></div>
 
-        {{-- Animated Rotating Ring & Pulsing Logo Aura --}}
-        <div class="relative flex items-center justify-center mb-4">
-            {{-- Ambient Glow Aura --}}
-            <div class="absolute -inset-3 bg-gradient-to-tr from-primary/30 via-accent/20 to-primary/30 rounded-full blur-xl animate-pulse"></div>
-
-            {{-- Conic Rotating Spinner Ring --}}
-            <div class="relative w-16 h-16 rounded-full p-[2.5px] bg-gradient-to-tr from-primary via-accent to-primary/20 animate-spin flex items-center justify-center" style="animation-duration: 2s;">
-                <div class="w-full h-full bg-base-100 rounded-full"></div>
-            </div>
-
-            {{-- Floating Brand Logo --}}
-            <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <img src="{{ asset('logo.png') }}"
-                     alt="{{ config('app.name', 'DokuFlow') }}"
-                     class="w-8 h-8 object-contain animate-loading-float drop-shadow-sm" />
-            </div>
+        {{-- Conic Rotating Spinner Ring --}}
+        <div class="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full p-[3px] bg-gradient-to-tr from-primary via-accent to-primary/20 animate-spin flex items-center justify-center shadow-2xl shadow-primary/20" style="animation-duration: 2s;">
+            <div class="w-full h-full bg-base-100/90 dark:bg-base-100/80 backdrop-blur-sm rounded-full"></div>
         </div>
 
-        {{-- Dynamic Text --}}
-        <h3 id="loading-blur-title"
-            class="text-base sm:text-lg font-bold text-base-content tracking-tight transition-all duration-200">
-            {{ __('Memuat...') }}
-        </h3>
-        
-        <p id="loading-blur-subtitle"
-           class="text-xs sm:text-sm text-base-content/60 max-w-[240px] mt-1 leading-relaxed transition-all duration-200">
-            {{ __('Mohon tunggu sebentar...') }}
-        </p>
-
-        {{-- Animated Gradient Shimmer Progress Indicator --}}
-        <div class="w-36 h-1 bg-base-300/60 dark:bg-base-300/30 rounded-full overflow-hidden relative mt-4">
-            <div class="loading-shimmer-bar absolute inset-y-0 w-1/2 bg-gradient-to-r from-transparent via-primary to-transparent rounded-full"></div>
+        {{-- Floating Brand Logo --}}
+        <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <img src="{{ asset('logo.png') }}"
+                 alt="{{ config('app.name', 'DokuFlow') }}"
+                 class="w-10 h-10 sm:w-12 sm:h-12 object-contain animate-loading-float drop-shadow-md" />
         </div>
-
-        {{-- Subtle dismiss hint --}}
-        <button type="button"
-                onclick="window.hideLoadingBlur()"
-                class="text-[11px] text-base-content/40 hover:text-base-content/70 mt-3.5 transition-colors cursor-pointer focus:outline-none">
-            {{ __('Klik di luar area untuk menutup') }}
-        </button>
     </div>
 </div>
 
 <script>
 (function() {
     const overlay = document.getElementById('global-loading-blur');
-    const card = document.getElementById('loading-blur-card');
-    const titleEl = document.getElementById('loading-blur-title');
-    const subtitleEl = document.getElementById('loading-blur-subtitle');
-
-    const defaultTitle = @json(__('Memuat...'));
-    const defaultSubtitle = @json(__('Mohon tunggu sebentar...'));
+    const content = document.getElementById('loading-blur-content');
 
     let safetyTimer = null;
     let isShowing = false;
 
     window.showLoadingBlur = function(title, subtitle) {
-        if (!overlay || !card) return;
+        if (!overlay || !content) return;
+
+        // Persist loading state across page navigations
+        try {
+            sessionStorage.setItem('dokuflow:page-loading', Date.now().toString());
+            document.documentElement.classList.add('is-page-loading');
+        } catch(e) {}
 
         // Auto-close all open native <dialog> elements so they never conflict or hang behind
         try {
@@ -90,53 +79,54 @@
         try {
             window.dispatchEvent(new CustomEvent('close-modal'));
         } catch (e) {}
-        
-        if (titleEl) titleEl.textContent = title || defaultTitle;
-        if (subtitleEl) subtitleEl.textContent = subtitle || defaultSubtitle;
 
         overlay.classList.remove('opacity-0', 'pointer-events-none');
         overlay.classList.add('opacity-100', 'pointer-events-auto');
         overlay.setAttribute('aria-hidden', 'false');
 
-        card.classList.remove('scale-95', 'opacity-0');
-        card.classList.add('scale-100', 'opacity-100');
+        content.classList.remove('scale-95', 'opacity-0');
+        content.classList.add('scale-100', 'opacity-100');
 
         isShowing = true;
 
-        // Failsafe auto-dismiss after 8s so user is never trapped if request lags or fails
+        // Silent background failsafe timeout to prevent permanent lock if network drops
         clearTimeout(safetyTimer);
         safetyTimer = setTimeout(function() {
             window.hideLoadingBlur();
-        }, 8000);
+        }, 15000);
     };
 
     window.hideLoadingBlur = function() {
-        if (!overlay || !card) return;
+        try {
+            sessionStorage.removeItem('dokuflow:page-loading');
+            document.documentElement.classList.remove('is-page-loading');
+        } catch(e) {}
+
+        if (!overlay || !content) return;
         clearTimeout(safetyTimer);
 
         overlay.classList.remove('opacity-100', 'pointer-events-auto');
         overlay.classList.add('opacity-0', 'pointer-events-none');
         overlay.setAttribute('aria-hidden', 'true');
 
-        card.classList.remove('scale-100', 'opacity-100');
-        card.classList.add('scale-95', 'opacity-0');
+        content.classList.remove('scale-100', 'opacity-100');
+        content.classList.add('scale-95', 'opacity-0');
 
         isShowing = false;
     };
 
-    // ─── Backdrop click to dismiss ("click out of area the modal") ───
-    overlay.addEventListener('click', function(e) {
-        if (e.target === overlay) {
+    // ─── Dismiss ONLY after the page has completely finished loading ───
+    function onPageFullyLoaded() {
+        setTimeout(function() {
             window.hideLoadingBlur();
-        }
-    });
+        }, 120);
+    }
 
-    // ─── Escape key to dismiss ──────────────────────────────────────
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && isShowing) {
-            window.hideLoadingBlur();
-        }
-    });
+    if (document.readyState === 'complete') {
+        onPageFullyLoaded();
+    } else {
+        window.addEventListener('load', onPageFullyLoaded);
+    }
 
     // ─── Event-based API for Alpine / Livewire / Vanilla JS ─────────
     window.addEventListener('loading:show', function(e) {
@@ -151,12 +141,14 @@
     // ─── Page Lifecycle & Browser Refresh / bfcache ─────────────────
     // Fired on browser refresh, tab close, or navigating away via address bar / reload button
     window.addEventListener('beforeunload', function() {
-        window.showLoadingBlur(defaultTitle, defaultSubtitle);
+        window.showLoadingBlur();
     });
 
     // Handle bfcache (Back/Forward navigation restores state from memory)
     window.addEventListener('pageshow', function(e) {
-        window.hideLoadingBlur();
+        if (e.persisted) {
+            window.hideLoadingBlur();
+        }
     });
     window.addEventListener('popstate', function() {
         window.hideLoadingBlur();
@@ -204,10 +196,7 @@
             }
 
             // Instantly show loading blur
-            window.showLoadingBlur(
-                link.getAttribute('data-loading-title') || @json(__('Memuat Halaman...')),
-                link.getAttribute('data-loading-subtitle') || @json(__('Menyiapkan konten dokumen...'))
-            );
+            window.showLoadingBlur();
         } catch (err) {
             // Let standard navigation proceed
         }
@@ -240,10 +229,7 @@
             try { parentDlg.close(); } catch(err) {}
         }
 
-        const customTitle = form.getAttribute('data-loading-title') || @json(__('Memproses Permintaan...'));
-        const customSubtitle = form.getAttribute('data-loading-subtitle') || @json(__('Sedang memproses data, mohon tunggu...'));
-
-        window.showLoadingBlur(customTitle, customSubtitle);
+        window.showLoadingBlur();
     });
 
     // ─── Programmatic form.submit() Trigger (for dropdown filters, switchers, etc.) ──
@@ -258,9 +244,7 @@
                 try { parentDlg.close(); } catch(err) {}
             }
 
-            const customTitle = this.getAttribute('data-loading-title') || @json(__('Memuat Data...'));
-            const customSubtitle = this.getAttribute('data-loading-subtitle') || @json(__('Sedang memproses data, mohon tunggu...'));
-            window.showLoadingBlur(customTitle, customSubtitle);
+            window.showLoadingBlur();
         }
         return originalFormSubmit.apply(this, arguments);
     };
@@ -271,9 +255,7 @@
             legacyModal.style.display = 'none';
             legacyModal.setAttribute('aria-hidden', 'true');
             legacyModal.showModal = function() {
-                const title = legacyModal.querySelector('h3')?.textContent || @json(__('Memproses Dokumen...'));
-                const sub = legacyModal.querySelector('p')?.textContent || @json(__('Harap tunggu sebentar, sistem sedang memproses...'));
-                window.showLoadingBlur(title, sub);
+                window.showLoadingBlur();
             };
             legacyModal.close = function() {
                 window.hideLoadingBlur();
@@ -285,7 +267,7 @@
             dummy.id = 'loading-modal';
             dummy.style.display = 'none';
             dummy.showModal = function() {
-                window.showLoadingBlur(@json(__('Memproses Dokumen...')), @json(__('Harap tunggu sebentar, sistem sedang memproses...')));
+                window.showLoadingBlur();
             };
             dummy.close = function() {
                 window.hideLoadingBlur();

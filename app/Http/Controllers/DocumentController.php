@@ -1393,18 +1393,85 @@ class DocumentController extends Controller
         $oldTitle = $document->title;
         $newTitle = trim($validated['title']);
 
-        $document->update([
-            'title' => $newTitle,
-            'pending_title' => null,
-            'rename_requested_by_id' => null,
-            'rename_requested_at' => null,
-            'rename_request_notes' => null,
-        ]);
+        if ($oldTitle === $newTitle) {
+            return back()->with('info', __('Nama dokumen tidak berubah.'));
+        }
 
-        $this->auditService->log(auth()->user(), 'document.renamed', 'document', $document->id, [
+        $user = auth()->user();
+        $version = $this->versionService->renameDocument($document, $newTitle, $user);
+
+        $this->auditService->log($user, 'document.renamed', 'document', $document->id, [
             'old_title' => $oldTitle,
             'new_title' => $newTitle,
+            'version_number' => $version?->version_number,
         ]);
+
+        if ($version && $version->status === 'pending') {
+            if ($version->wasRecentlyCreated) {
+                $resolution = $this->approvalRoutingService->resolveApprover($document, $user);
+                $this->approvalRoutingService->applyToDocument($document, $resolution);
+
+                foreach ($resolution['approvers'] as $approver) {
+                    $approver->notify(new \App\Notifications\DocumentApprovalRequested($document, $version, $user->name));
+                }
+
+                if ($resolution['role'] !== null) {
+                    $user->notify(new \App\Notifications\ApprovalRouteResolved(
+                        $document,
+                        $resolution['role'],
+                        $resolution['approvers']->pluck('name')->join(', '),
+                        $resolution['message'],
+                        $resolution['isFallback'],
+                    ));
+                }
+
+                return back()->with('success', __('Nama dokumen diperbarui dan versi v:version diajukan untuk persetujuan.', [
+                    'version' => $version->version_number,
+                ]));
+            } else {
+                // Version was already pending and renamed again -> update existing database notification records
+                $authorName = $version->author_name ?? $user->name;
+                $origTitle = $version->old_title ?? $oldTitle;
+                $notifTitle = $version->isRename()
+                    ? __('Permintaan Persetujuan Perubahan Nama Dokumen')
+                    : __('Permintaan Persetujuan Dokumen');
+
+                $notifMessage = $version->isRename()
+                    ? __(':author mengajukan perubahan nama dokumen dari ":old" menjadi ":doc" (v:ver)', [
+                        'author' => $authorName,
+                        'old' => $origTitle,
+                        'doc' => $newTitle,
+                        'ver' => $version->version_number,
+                    ])
+                    : __(':author mengajukan persetujuan untuk dokumen ":doc" (v:ver)', [
+                        'author' => $authorName,
+                        'doc' => $newTitle,
+                        'ver' => $version->version_number,
+                    ]);
+
+                $existingNotifs = \Illuminate\Support\Facades\DB::table('notifications')
+                    ->where(function ($q) use ($document, $version) {
+                        $q->where('data->document_id', $document->id)
+                          ->orWhere('data->version_id', $version->id);
+                    })
+                    ->where('data->type', 'approval_request')
+                    ->get();
+
+                foreach ($existingNotifs as $row) {
+                    $payload = json_decode($row->data, true) ?: [];
+                    $payload['title'] = $notifTitle;
+                    $payload['message'] = $notifMessage;
+                    $payload['document_title'] = $newTitle;
+                    if ($version->isRename()) {
+                        $payload['old_title'] = $origTitle;
+                        $payload['is_rename'] = true;
+                    }
+                    \Illuminate\Support\Facades\DB::table('notifications')
+                        ->where('id', $row->id)
+                        ->update(['data' => json_encode($payload)]);
+                }
+            }
+        }
 
         return back()->with('success', __('Nama dokumen berhasil diubah.'));
     }

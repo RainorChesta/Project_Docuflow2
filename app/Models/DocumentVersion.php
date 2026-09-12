@@ -10,7 +10,8 @@ class DocumentVersion extends Model
     protected $fillable = [
         'document_id', 'version_number', 'content', 'file_path',
         'file_original_name', 'file_mime', 'author_id',
-        'author_name', 'status', 'reviewer_id', 'review_notes', 'reviewed_at',
+        'author_name', 'status', 'change_type', 'old_title', 'change_summary',
+        'reviewer_id', 'review_notes', 'reviewed_at',
         'discarded_at',
     ];
 
@@ -20,6 +21,24 @@ class DocumentVersion extends Model
             'reviewed_at' => 'datetime',
             'discarded_at' => 'datetime',
         ];
+    }
+
+    public function isRename(): bool
+    {
+        return $this->change_type === 'rename' || !empty($this->old_title);
+    }
+
+    public function getVersionTitleAttribute(): string
+    {
+        if ($this->file_original_name) {
+            return pathinfo($this->file_original_name, PATHINFO_FILENAME);
+        }
+
+        if ($this->isRename() && $this->old_title) {
+            return $this->old_title;
+        }
+
+        return $this->document?->title ?? 'Dokumen';
     }
 
     public function getNotesAttribute(): ?string

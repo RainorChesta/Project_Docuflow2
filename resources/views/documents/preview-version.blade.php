@@ -1,7 +1,18 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2">
-            <span class="min-w-0 font-bold break-words">{{ $document->title }} — v{{ $version->version_number }}</span>
+            <div class="min-w-0 flex items-center gap-2 flex-wrap">
+                <span class="font-bold break-words">{{ $version->version_title }}</span>
+                <span class="badge badge-neutral badge-sm font-semibold">v{{ $version->version_number }}</span>
+                @if($version->isRename())
+                    <span class="badge badge-info badge-sm font-medium gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        {{ __('Perubahan Nama') }}
+                    </span>
+                @endif
+            </div>
             @if($document->document_number)
                 <span class="text-xs sm:text-sm font-normal text-base-content/60 shrink-0 font-mono">{{ $document->document_number }}</span>
             @endif
@@ -21,12 +32,14 @@
                 </div>
             @endif
 
-
-
             <div class="card bg-base-100 border border-base-300 shadow-sm">
                 <div class="card-body">
                     <div class="flex flex-wrap justify-between items-center gap-3 mb-4 pb-4 border-b border-base-300">
-                        <div class="text-sm">
+                        <div class="text-sm space-y-0.5">
+                            <div><span class="text-base-content/60">{{ __('Judul Versi') }}:</span> <span class="font-semibold text-base-content">{{ $version->version_title }}</span></div>
+                            @if($version->isRename() && $version->old_title)
+                                <div class="text-xs text-info"><span class="text-base-content/60">{{ __('Nama Semula') }}:</span> <span class="line-through text-base-content/60">{{ $version->old_title }}</span></div>
+                            @endif
                             <div><span class="text-base-content/60">{{ __('Versi') }}:</span> v{{ $version->version_number }}</div>
                             <div><span class="text-base-content/60">{{ __('Penulis') }}:</span> {{ $version->author_name }}</div>
                             <div><span class="text-base-content/60">{{ __('Status') }}:</span>

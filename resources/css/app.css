@@ -479,3 +479,17 @@ dialog.modal,
     animation: loading-float 3s ease-in-out infinite;
 }
 
+/* Persistent Page Loading State across Navigation Transitions */
+html.is-page-loading #global-loading-blur {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    visibility: visible !important;
+}
+
+html.is-page-loading #loading-blur-content,
+html.is-page-loading #loading-blur-card {
+    opacity: 1 !important;
+    transform: scale(1) !important;
+    visibility: visible !important;
+}
+

@@ -15,8 +15,9 @@
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700&display=swap" rel="stylesheet" />
 
-        {{-- Flash-prevention: set data-theme before CSS renders. No stored choice = follow OS live --}}
-        <script>(function(){var t=sessionStorage.getItem('theme:v2'),m=window.matchMedia('(prefers-color-scheme: dark)'),d=(t==='dark')||(t!=='light'&&m.matches);document.documentElement.setAttribute('data-theme',d?'dark':'light');document.documentElement.classList.toggle('dark',d);m.addEventListener('change',function(){var s=sessionStorage.getItem('theme:v2');var isDark=s==='dark'||(s!=='light'&&m.matches);document.documentElement.setAttribute('data-theme',isDark?'dark':'light');document.documentElement.classList.toggle('dark',isDark)})})()</script>
+        {{-- Flash-prevention: set data-theme and persistent page-loading before CSS renders --}}
+        <script>(function(){var t=sessionStorage.getItem('theme:v2'),m=window.matchMedia('(prefers-color-scheme: dark)'),d=(t==='dark')||(t!=='light'&&m.matches);document.documentElement.setAttribute('data-theme',d?'dark':'light');document.documentElement.classList.toggle('dark',d);m.addEventListener('change',function(){var s=sessionStorage.getItem('theme:v2');var isDark=s==='dark'||(s!=='light'&&m.matches);document.documentElement.setAttribute('data-theme',isDark?'dark':'light');document.documentElement.classList.toggle('dark',isDark)});try{var lt=sessionStorage.getItem('dokuflow:page-loading');if(lt&&(Date.now()-parseInt(lt,10))<15000){document.documentElement.classList.add('is-page-loading');}}catch(e){}})()</script>
+        <style>html.is-page-loading #global-loading-blur{opacity:1 !important;pointer-events:auto !important;visibility:visible !important;}html.is-page-loading #loading-blur-content,html.is-page-loading #loading-blur-card{opacity:1 !important;transform:scale(1) !important;visibility:visible !important;}</style>
 
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -248,7 +249,14 @@
                     @endphp
 
                     @if(count($crumbs) > 0)
-                        <x-breadcrumbs :items="$crumbs" />
+                        <div class="flex items-center justify-between gap-3 mb-2 sm:mb-3 flex-wrap sm:flex-nowrap">
+                            <x-breadcrumbs :items="$crumbs" />
+                            @isset($breadcrumbAction)
+                                <div class="shrink-0 self-center">
+                                    {{ $breadcrumbAction }}
+                                </div>
+                            @endisset
+                        </div>
                     @endif
                     </div>
 

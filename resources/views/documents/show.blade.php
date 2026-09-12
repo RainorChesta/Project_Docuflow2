@@ -1,6 +1,15 @@
 <x-app-layout>
     <x-slot name="header">{{ __('Detail Dokumen') }}</x-slot>
 
+    <x-slot name="breadcrumbAction">
+        <a href="{{ route('documents.choose') }}" class="btn btn-primary btn-sm rounded-xl gap-1.5 shadow-xs shrink-0 font-semibold" title="{{ __('Buat Dokumen') }}">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            <span class="inline">{{ __('Buat Dokumen') }}</span>
+        </a>
+    </x-slot>
+
     @php
         $companies = $companies ?? \App\Models\Company::with('branches')->get();
         $divisions = $divisions ?? (auth()->user()?->isAdmin() ? \App\Models\Division::all() : \App\Models\Division::whereIn('id', auth()->user()?->allDivisionIds() ?? [])->get());
@@ -208,16 +217,33 @@
 
             <!-- Pending Banner (paling atas) -->
             @if($pendingVersion)
-                <div class="alert alert-warning mb-3 sm:mb-4 rounded-2xl shadow-xs print:hidden">
+                <div class="alert {{ $pendingVersion->isRename() ? 'alert-info' : 'alert-warning' }} mb-3 sm:mb-4 rounded-2xl shadow-xs print:hidden">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
                         <div class="flex items-start sm:items-center gap-3 min-w-0">
-                            <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                            </svg>
-                            <div>
-                                <p class="font-semibold text-sm">{{ __('Menunggu Persetujuan') }} (v{{ $pendingVersion->version_number }})</p>
-                                <p class="text-xs text-base-content/70">{{ __('Versi menunggu review oleh kepala divisi.') }}</p>
-                            </div>
+                            @if($pendingVersion->isRename())
+                                <div class="w-9 h-9 rounded-xl bg-info/20 text-info flex items-center justify-center shrink-0">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <p class="font-semibold text-sm">{{ __('Persetujuan Perubahan Nama Dokumen') }}</p>
+                                        <span class="badge badge-info badge-sm font-semibold">v{{ $pendingVersion->version_number }}</span>
+                                    </div>
+                                    <p class="text-xs text-base-content/70 mt-0.5">
+                                        {{ __('Perubahan nama dari') }} <span class="line-through text-base-content/60 font-medium">"{{ $pendingVersion->old_title }}"</span> {{ __('menjadi') }} <strong class="text-base-content font-semibold">"{{ $document->title }}"</strong>
+                                    </p>
+                                </div>
+                            @else
+                                <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                                <div>
+                                    <p class="font-semibold text-sm">{{ __('Menunggu Persetujuan') }} (v{{ $pendingVersion->version_number }})</p>
+                                    <p class="text-xs text-base-content/70">{{ __('Versi menunggu review oleh kepala divisi.') }}</p>
+                                </div>
+                            @endif
                         </div>
                         <div class="flex flex-wrap items-center gap-2 shrink-0">
                             @if($isPendingV1 && (auth()->id() === $document->owner_id || auth()->user()->can('update', $document) || auth()->user()->can('delete', $document)))
@@ -283,7 +309,22 @@
                                         <div class="flex items-center gap-2 flex-wrap">
                                             <span class="font-semibold text-sm text-base-content break-words">{{ $document->title }}</span>
                                             <span class="badge badge-warning badge-sm font-semibold">v{{ $pendingVersion->version_number }}</span>
+                                            @if($pendingVersion->isRename())
+                                                <span class="badge badge-info badge-sm font-medium gap-1">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                    </svg>
+                                                    {{ __('Perubahan Nama') }}
+                                                </span>
+                                            @endif
                                         </div>
+                                        @if($pendingVersion->isRename() && $pendingVersion->old_title)
+                                            <div class="text-xs bg-info/10 text-info border border-info/20 rounded-lg p-2 mt-2">
+                                                <div class="text-base-content/70"><span class="font-semibold text-base-content/80">{{ __('Nama Semula') }}:</span> {{ $pendingVersion->old_title }}</div>
+                                                <div class="text-base-content/70 mt-0.5"><span class="font-semibold text-info">{{ __('Nama Baru yang Ditolak') }}:</span> {{ $document->title }}</div>
+                                                <p class="text-[11px] text-base-content/60 mt-1 italic">{{ __('Jika ditolak, nama dokumen akan dikembalikan ke nama semula.') }}</p>
+                                            </div>
+                                        @endif
                                         @if($pendingVersion->author_name)
                                             <p class="text-xs text-base-content/60 mt-1">
                                                 {{ __('Diajukan oleh') }}: <span class="font-medium text-base-content/80">{{ $pendingVersion->author_name }}</span>
@@ -524,13 +565,13 @@
                     <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4 border-b border-base-200 pb-2.5 sm:pb-3">
                         <div class="flex items-center flex-wrap gap-2 min-w-0 flex-1">
                             <h1 class="text-lg sm:text-xl font-bold text-base-content break-words">{{ $document->title }}</h1>
-                            @if(auth()->user()->can('rename', $document) || auth()->user()->can('requestRename', $document))
-                                <button type="button" onclick="document.getElementById('rename-document-modal-{{ $document->id }}').showModal()" class="btn btn-ghost btn-xs btn-circle text-base-content/50 hover:text-primary hover:bg-base-200 shrink-0" title="{{ auth()->user()->can('rename', $document) ? __('Ubah Nama Dokumen') : __('Ajukan Ubah Nama Dokumen') }}">
+                            @can('rename', $document)
+                                <button type="button" onclick="document.getElementById('rename-document-modal-{{ $document->id }}').showModal()" class="btn btn-ghost btn-xs btn-circle text-base-content/50 hover:text-primary hover:bg-base-200 shrink-0" title="{{ __('Ubah Nama Dokumen') }}">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                     </svg>
                                 </button>
-                            @endif
+                            @endcan
                             @php
                                 $contextService = app(\App\Services\CompanyContextService::class);
                                 $activeBranchId = $contextService->getActiveBranchId(auth()->user());
@@ -686,12 +727,12 @@
                                 </button>
                             @endcan
 
-                            @if(auth()->user()->can('rename', $document) || auth()->user()->can('requestRename', $document))
-                                <button type="button" class="btn btn-ghost btn-sm border border-base-300 gap-1.5 shrink-0" onclick="document.getElementById('rename-document-modal-{{ $document->id }}').showModal()" title="{{ auth()->user()->can('rename', $document) ? __('Ubah Nama') : __('Ajukan Ubah Nama') }}">
+                            @can('rename', $document)
+                                <button type="button" class="btn btn-ghost btn-sm border border-base-300 gap-1.5 shrink-0" onclick="document.getElementById('rename-document-modal-{{ $document->id }}').showModal()" title="{{ __('Ubah Nama') }}">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                    <span class="hidden sm:inline">{{ auth()->user()->can('rename', $document) ? __('Ubah Nama') : __('Ajukan Ubah Nama') }}</span>
+                                    <span class="hidden sm:inline">{{ __('Ubah Nama') }}</span>
                                 </button>
-                            @endif
+                            @endcan
 
                             {{-- Export to PDF (hanya untuk dokumen hasil editor) --}}
                             @if(!$isFileBased)
@@ -709,13 +750,6 @@
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                                 <span class="hidden sm:inline">{{ __('Summarize Document') }}</span>
                             </button>
-
-                            <a href="{{ route('documents.choose') }}" class="btn btn-ghost btn-sm border border-base-300 gap-1.5 shrink-0" title="{{ __('Buat Dokumen') }}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-                                </svg>
-                                <span class="hidden sm:inline">{{ __('Buat Dokumen') }}</span>
-                            </a>
                         </div>
                     </div>
 
@@ -1519,81 +1553,118 @@
     </script>
 
     {{-- Version History modal --}}
-    <dialog id="version-modal" class="modal">
-        <div class="modal-box max-w-2xl max-h-[85vh] overflow-y-auto">
-            <div class="flex flex-wrap items-center justify-between mb-4">
-                <h3 class="font-semibold">Version History</h3>
-                <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('version-modal').close()">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+    <dialog id="version-modal" class="modal modal-bottom sm:modal-middle text-left backdrop-blur-xs text-base-content">
+        <div class="modal-box w-11/12 max-w-4xl max-h-[88vh] overflow-y-auto rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl p-6 sm:p-7 bg-base-100">
+            <div class="flex items-center justify-between mb-5 pb-4 border-b border-base-200">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0 ring-4 ring-primary/5">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-lg text-base-content leading-snug">{{ __('Riwayat Versi Dokumen') }}</h3>
+                        <p class="text-xs text-base-content/60 mt-0.5">{{ __('Daftar seluruh versi dokumen, status persetujuan, dan catatan perubahannya.') }}</p>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm btn-circle text-base-content/50 hover:text-base-content hover:bg-base-200" onclick="document.getElementById('version-modal').close()">
+                    ✕
                 </button>
             </div>
+
             @if($document->hasPendingRollback())
-                <div class="alert alert-warning alert-sm mb-3 text-xs">
-                    Rollback ke v{{ $document->pendingRollbackVersion->version_number }} sedang menunggu approval — opsi rollback lain dinonaktifkan sementara.
+                <div class="alert alert-warning alert-sm mb-4 rounded-xl text-xs flex items-center gap-2">
+                    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span>{{ __('Rollback ke v:version sedang menunggu approval — opsi rollback lain dinonaktifkan sementara.', ['version' => $document->pendingRollbackVersion->version_number]) }}</span>
                 </div>
             @endif
-            @forelse($document->versions->sortByDesc('version_number') as $version)
-                <div class="flex flex-wrap items-center justify-between gap-2 py-2 border-b border-base-200 text-sm">
-                    <div class="min-w-0">
-                        <span class="font-medium">v{{ $version->version_number }}</span>
-                        @if($version->file_path)
-                            <span class="badge badge-ghost badge-sm ml-1">Berkas</span>
-                        @endif
-                        <span class="text-base-content/60">by {{ $version->author_name }}</span>
-                        <span class="text-base-content/40">{{ $version->created_at->format('M d, Y H:i') }}</span>
-                        @if($version->id === $document->current_version_id)
-                            <span class="badge badge-success badge-sm ml-2">Active</span>
-                        @elseif($version->status === 'inactive')
-                            <span class="badge badge-neutral badge-sm ml-2">Inactive</span>
-                        @elseif($version->status === 'pending')
-                            <span class="badge badge-warning badge-sm ml-2">Pending</span>
-                        @elseif($version->status === 'discarded' || $version->discarded_at)
-                            <span class="badge badge-neutral badge-sm ml-2">Discarded</span>
-                        @elseif($version->status === 'rejected')
-                            <span class="badge badge-error badge-sm ml-2">Rejected</span>
-                        @endif
-                        @if($document->hasPendingRollback() && $document->pending_rollback_version_id === $version->id)
-                            <span class="badge badge-warning badge-sm ml-2">Target Rollback</span>
-                        @endif
-                        @if($version->status === 'rejected' && $version->notes)
-                            <div class="w-full mt-1.5 p-2 rounded-lg bg-error/10 border border-error/20 text-xs text-error font-medium flex items-start gap-1.5 min-w-0 max-w-full overflow-hidden">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
-                                <div class="min-w-0 flex-1 break-words [overflow-wrap:anywhere]">
-                                    <span class="font-bold">{{ __('Catatan Penolakan:') }}</span>
-                                    <span class="whitespace-pre-wrap text-base-content/85 dark:text-base-content/90 font-normal">{{ $version->notes }}</span>
-                                </div>
+
+            <div class="space-y-3">
+                @forelse($document->versions->sortByDesc('version_number') as $version)
+                    <div class="p-4 rounded-2xl bg-base-200/50 hover:bg-base-200/80 border border-base-300/60 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="font-bold text-sm text-base-content">v{{ $version->version_number }}</span>
+                                @if($version->version_title)
+                                    <span class="text-sm font-semibold text-base-content/90 truncate max-w-xs sm:max-w-md" title="{{ $version->version_title }}">{{ $version->version_title }}</span>
+                                @endif
+                                @if($version->file_path)
+                                    <span class="badge badge-ghost badge-xs">Berkas</span>
+                                @endif
+                                @if($version->isRename())
+                                    <span class="badge badge-info badge-xs font-medium gap-0.5">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        {{ __('Perubahan Nama') }}
+                                    </span>
+                                @endif
+                                @if($version->id === $document->current_version_id)
+                                    <span class="badge badge-success badge-sm font-semibold">Active</span>
+                                @elseif($version->status === 'inactive')
+                                    <span class="badge badge-neutral badge-sm">Inactive</span>
+                                @elseif($version->status === 'pending')
+                                    <span class="badge badge-warning badge-sm font-medium">Pending</span>
+                                @elseif($version->status === 'discarded' || $version->discarded_at)
+                                    <span class="badge badge-neutral badge-sm">Discarded</span>
+                                @elseif($version->status === 'rejected')
+                                    <span class="badge badge-error badge-sm font-semibold">Rejected</span>
+                                @endif
+                                @if($document->hasPendingRollback() && $document->pending_rollback_version_id === $version->id)
+                                    <span class="badge badge-warning badge-sm font-semibold">Target Rollback</span>
+                                @endif
                             </div>
-                        @endif
-                    </div>
-                    <div class="flex flex-wrap gap-2 shrink-0">
-                        <a href="{{ route('documents.preview-version', [$document, $version]) }}"
-                           class="btn btn-ghost btn-xs">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                            Preview
-                        </a>
-                        @can('update', $document)
-                            @if($version->id !== $document->current_version_id
-                                && $version->status !== 'pending'
-                                && !($version->status === 'discarded' || $version->discarded_at)
-                                && !$document->hasPendingRollback())
-                                <button type="button"
-                                        class="btn btn-outline btn-warning btn-xs"
-                                        onclick="document.getElementById('version-modal').close(); window.dispatchEvent(new CustomEvent('open-modal', { detail: 'confirm-rollback-{{ $version->id }}' }))">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                    Rollback
-                                </button>
+                            <div class="text-xs text-base-content/60 mt-1 flex items-center gap-2 flex-wrap">
+                                <span>{{ __('Diajukan oleh') }}: <strong class="font-medium text-base-content/80">{{ $version->author_name }}</strong></span>
+                                <span>•</span>
+                                <span>{{ $version->created_at->format('d M Y, H:i') }}</span>
+                                @if($version->isRename() && $version->old_title)
+                                    <span>•</span>
+                                    <span class="text-info font-medium">{{ __('Semula:') }} <span class="line-through text-base-content/50">{{ $version->old_title }}</span></span>
+                                @endif
+                            </div>
+                            @if($version->status === 'rejected' && $version->notes)
+                                <div class="w-full mt-2 p-2.5 rounded-xl bg-error/10 border border-error/20 text-xs text-error font-medium flex items-start gap-2 min-w-0 max-w-full overflow-hidden">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
+                                    <div class="min-w-0 flex-1 break-words [overflow-wrap:anywhere]">
+                                        <span class="font-bold">{{ __('Catatan Penolakan:') }}</span>
+                                        <span class="whitespace-pre-wrap text-base-content/85 dark:text-base-content/90 font-normal ml-1">{{ $version->notes }}</span>
+                                    </div>
+                                </div>
                             @endif
-                        @endcan
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0 self-start sm:self-center pt-2 sm:pt-0 border-t sm:border-t-0 border-base-200 sm:border-none w-full sm:w-auto justify-end">
+                            <a href="{{ route('documents.preview-version', [$document, $version]) }}"
+                               class="btn btn-ghost btn-sm rounded-xl gap-1.5 font-medium hover:bg-base-300/50">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                {{ __('Preview') }}
+                            </a>
+                            @can('update', $document)
+                                @if($version->id !== $document->current_version_id
+                                    && $version->status !== 'pending'
+                                    && !($version->status === 'discarded' || $version->discarded_at)
+                                    && !$document->hasPendingRollback())
+                                    <button type="button"
+                                            class="btn btn-warning btn-outline btn-sm rounded-xl gap-1.5 font-medium"
+                                            onclick="document.getElementById('version-modal').close(); window.dispatchEvent(new CustomEvent('open-modal', { detail: 'confirm-rollback-{{ $version->id }}' }))">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                        {{ __('Rollback') }}
+                                    </button>
+                                @endif
+                            @endcan
+                        </div>
                     </div>
-                </div>
-            @empty
-                <p class="text-base-content/60 text-sm">No versions yet.</p>
-            @endforelse
+                @empty
+                    <div class="text-center py-8 text-base-content/50">
+                        <p class="text-sm">{{ __('Belum ada riwayat versi.') }}</p>
+                    </div>
+                @endforelse
+            </div>
         </div>
         <form method="dialog" class="modal-backdrop">
-            <button>close</button>
+            <button>{{ __('Tutup') }}</button>
         </form>
     </dialog>
 
@@ -1856,10 +1927,7 @@
     </dialog>
 
     {{-- Rename Document Modal --}}
-    @if(auth()->user()->can('rename', $document) || auth()->user()->can('requestRename', $document))
-        @php
-            $canDirectRename = auth()->user()->can('rename', $document);
-        @endphp
+    @can('rename', $document)
         <dialog id="rename-document-modal-{{ $document->id }}" class="modal modal-bottom sm:modal-middle text-left whitespace-normal backdrop-blur-xs text-base-content">
             <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-lg text-base-content">
                 <div class="p-6 pb-4">
@@ -1872,12 +1940,10 @@
                             </div>
                             <div>
                                 <h3 class="font-bold text-lg text-base-content leading-snug">
-                                    {{ $canDirectRename ? __('Ubah Nama Dokumen') : __('Ajukan Perubahan Nama Dokumen') }}
+                                    {{ __('Ubah Nama Dokumen') }}
                                 </h3>
                                 <p class="text-xs text-base-content/60 mt-0.5">
-                                    {{ $canDirectRename 
-                                        ? __('Perbarui nama dokumen ini secara langsung.') 
-                                        : __('Perubahan nama akan diajukan untuk disetujui.') }}
+                                    {{ __('Perbarui nama dokumen ini.') }}
                                 </p>
                             </div>
                         </div>
@@ -1886,17 +1952,20 @@
                         </button>
                     </div>
 
-                    @if(!$canDirectRename)
+                    @php
+                        $isActiveDoc = $document->currentVersion && $document->currentVersion->status === 'active';
+                    @endphp
+                    @if($isActiveDoc)
                         <div class="mt-4 p-3.5 rounded-xl bg-info/10 border border-info/20 text-xs text-info flex items-start gap-2.5">
                             <svg class="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            <span class="leading-relaxed">{{ __('Permintaan perubahan nama dokumen akan dikirimkan untuk ditinjau dan disetujui.') }}</span>
+                            <span class="leading-relaxed">{{ __('Mengubah nama dokumen aktif akan membuat versi baru (v:next) yang diajukan untuk persetujuan.', ['next' => ($document->versions()->max('version_number') ?? 0) + 1]) }}</span>
                         </div>
                     @endif
                 </div>
 
-                <form method="POST" action="{{ $canDirectRename ? route('documents.rename', $document) : route('documents.request-rename', $document) }}">
+                <form method="POST" action="{{ route('documents.rename', $document) }}">
                     @csrf
                     <div class="px-6 pb-5 space-y-4">
                         <div class="space-y-1.5">
@@ -1914,24 +1983,6 @@
                                 placeholder="{{ __('Masukkan nama baru dokumen...') }}"
                             />
                         </div>
-
-                        @if(!$canDirectRename)
-                            <div class="space-y-1.5">
-                                <div class="flex items-center justify-between">
-                                    <label for="rename-input-notes-{{ $document->id }}" class="text-xs font-semibold text-base-content uppercase tracking-wider">
-                                        {{ __('Alasan Perubahan') }}
-                                    </label>
-                                    <span class="text-[11px] text-base-content/50 font-normal">({{ __('Opsional') }})</span>
-                                </div>
-                                <textarea 
-                                    id="rename-input-notes-{{ $document->id }}" 
-                                    name="notes" 
-                                    rows="3" 
-                                    class="textarea textarea-bordered w-full text-xs text-base-content rounded-xl focus:textarea-primary leading-relaxed resize-none" 
-                                    placeholder="{{ __('Jelaskan alasan pengajuan perubahan nama dokumen...') }}"
-                                ></textarea>
-                            </div>
-                        @endif
                     </div>
 
                     <div class="bg-base-200/40 px-6 py-4 border-t border-base-200 flex items-center justify-end gap-2.5">
@@ -1942,16 +1993,16 @@
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                             </svg>
-                            {{ $canDirectRename ? __('Simpan Perubahan') : __('Ajukan Permintaan') }}
+                            {{ __('Simpan Perubahan') }}
                         </button>
                     </div>
                 </form>
             </div>
             <form method="dialog" class="modal-backdrop">
-                <button>{{ __('Batal') }}</button>
+                <button type="button" onclick="document.getElementById('rename-document-modal-{{ $document->id }}').close()">{{ __('Batal') }}</button>
             </form>
         </dialog>
-    @endif
+    @endcan
 
     <script>
         @if(request('saving') == 1)

@@ -1167,6 +1167,10 @@
                     btn.innerHTML = '<span class="loading loading-spinner loading-xs mr-1"></span> {{ __("Memproses...") }}';
                 }
 
+                if (typeof window.showLoadingBlur === 'function') {
+                    window.showLoadingBlur(@json(__('Membubuhkan QR Code...')), @json(__('Sedang menyematkan QR Code verifikasi ke dokumen PDF...')));
+                }
+
                 fetch('{{ route("documents.stamp-qrcode", $document) }}', {
                     method: 'POST',
                     headers: {
@@ -1183,6 +1187,7 @@
                         showSignatureScreenAlert('BERHASIL', response.data.message || 'QR CODE VERIFIKASI BERHASIL DIBUBUHKAN SESUAI POSISI & UKURAN VISUAL.', true);
                         setTimeout(() => window.location.reload(), 1200);
                     } else {
+                        if (typeof window.hideLoadingBlur === 'function') window.hideLoadingBlur();
                         showSignatureScreenAlert('GAGAL MEMBUBUHKAN QR CODE', response.data.message || 'GAGAL MEMPROSES QR CODE.', false);
                         if (btn) {
                             btn.disabled = false;
@@ -1191,6 +1196,7 @@
                     }
                 })
                 .catch(() => {
+                    if (typeof window.hideLoadingBlur === 'function') window.hideLoadingBlur();
                     closePdfVisualPlacementModal();
                     showSignatureScreenAlert('KESALAHAN SISTEM', 'GAGAL MENGHUBUNGI SERVER.', false);
                     if (btn) {
@@ -1208,12 +1214,20 @@
                     btn.innerHTML = '<span class="loading loading-spinner loading-xs mr-1"></span> {{ __("Mengirim...") }}';
                 }
 
+                if (typeof window.showLoadingBlur === 'function') {
+                    window.showLoadingBlur(
+                        isStamp ? @json(__('Mengirim Permintaan Stempel...')) : @json(__('Mengirim Permintaan Tanda Tangan...')),
+                        @json(__('Sedang memproses pengiriman permintaan ke penerima...'))
+                    );
+                }
+
                 const sigParam = activeVisualSignatureId ? `&signature_id=${activeVisualSignatureId}` : '';
                 const queryStr = `&page_number=${visualPlacementCoords.page}&preset_position=custom&pos_x=${visualPlacementCoords.xMm}&pos_y=${visualPlacementCoords.yMm}&width=${visualPlacementCoords.wMm}&height=${visualPlacementCoords.hMm}${sigParam}`;
 
                 fetch(`/profile/signature?user_id=${userId}&document_id={{ $document->id }}${queryStr}`)
                     .then(res => res.json().then(data => ({ status: res.status, data: data })))
                     .then(response => {
+                        if (typeof window.hideLoadingBlur === 'function') window.hideLoadingBlur();
                         closePdfVisualPlacementModal();
                         if (btn) {
                             btn.disabled = false;
@@ -1235,6 +1249,7 @@
                         }
                     })
                     .catch(() => {
+                        if (typeof window.hideLoadingBlur === 'function') window.hideLoadingBlur();
                         closePdfVisualPlacementModal();
                         if (btn) {
                             btn.disabled = false;
@@ -1267,6 +1282,13 @@
                     btn.innerHTML = '<span class="loading loading-spinner loading-xs mr-1"></span> {{ __("Memproses...") }}';
                 }
 
+                if (typeof window.showLoadingBlur === 'function') {
+                    window.showLoadingBlur(
+                        isStamp ? @json(__('Membubuhkan Stempel...')) : @json(__('Membubuhkan Tanda Tangan...')),
+                        @json(__('Sedang menyematkan tanda tangan ke dalam dokumen PDF...'))
+                    );
+                }
+
                 fetch('{{ route("documents.stamp-signature", $document) }}', {
                     method: 'POST',
                     headers: {
@@ -1283,6 +1305,7 @@
                         showSignatureScreenAlert('BERHASIL', isStamp ? 'STEMPEL PERUSAHAAN BERHASIL DIBUBUHKAN SESUAI POSISI & UKURAN VISUAL.' : 'TANDA TANGAN SAYA BERHASIL DIBUBUHKAN SESUAI POSISI & UKURAN VISUAL.', true);
                         setTimeout(() => window.location.reload(), 1200);
                     } else {
+                        if (typeof window.hideLoadingBlur === 'function') window.hideLoadingBlur();
                         showSignatureScreenAlert(isStamp ? 'GAGAL MEMBUBUHKAN STEMPEL' : 'GAGAL MEMBUBUHKAN TTD', response.data.message || (isStamp ? 'GAGAL MEMPROSES STEMPEL.' : 'GAGAL MEMPROSES TANDA TANGAN.'), false);
                         if (btn) {
                             btn.disabled = false;
@@ -1291,6 +1314,7 @@
                     }
                 })
                 .catch(() => {
+                    if (typeof window.hideLoadingBlur === 'function') window.hideLoadingBlur();
                     closePdfVisualPlacementModal();
                     showSignatureScreenAlert('KESALAHAN SISTEM', 'GAGAL MENGHUBUNGI SERVER.', false);
                     if (btn) {
@@ -1303,6 +1327,13 @@
             function confirmRevertPdfSignature() {
                 if (!confirm('{{ __("Apakah Anda yakin ingin membatalkan tanda tangan yang paling terakhir ditambahkan pada dokumen PDF ini?") }}')) {
                     return;
+                }
+
+                if (typeof window.showLoadingBlur === 'function') {
+                    window.showLoadingBlur(
+                        @json(__('Membatalkan Tanda Tangan...')),
+                        @json(__('Sedang mengembalikan dokumen PDF ke status sebelumnya...'))
+                    );
                 }
 
                 fetch('{{ route("documents.revert-pdf-signature", $document) }}', {
@@ -1319,10 +1350,12 @@
                         showSignatureScreenAlert('BERHASIL', response.data.message || 'TANDA TANGAN BERHASIL DIHAPUS.', true);
                         setTimeout(() => window.location.reload(), 1200);
                     } else {
+                        if (typeof window.hideLoadingBlur === 'function') window.hideLoadingBlur();
                         showSignatureScreenAlert('GAGAL MENGHAPUS TTD', response.data.message || 'TIDAK DAPAT MENGHAPUS TANDA TANGAN.', false);
                     }
                 })
                 .catch(() => {
+                    if (typeof window.hideLoadingBlur === 'function') window.hideLoadingBlur();
                     showSignatureScreenAlert('KESALAHAN SISTEM', 'GAGAL MENGHUBUNGI SERVER.', false);
                 });
             }

@@ -172,7 +172,7 @@ class NotificationController extends Controller
         }
 
         $documents = !empty($docIds)
-            ? \App\Models\Document::withTrashed()->whereIn('id', array_unique(array_values($docIds)))->get()->keyBy('id')
+            ? \App\Models\Document::withTrashed()->with('versions')->whereIn('id', array_unique(array_values($docIds)))->get()->keyBy('id')
             : collect();
 
         $notifications = $filtered->take(20)->map(function ($n) use ($docIds, $documents) {
@@ -190,11 +190,33 @@ class NotificationController extends Controller
                 $status = 'pending';
             }
 
+            $title = $n->data['title'] ?? '';
+            $message = $n->data['message'] ?? '';
+            $documentTitle = $n->data['document_title'] ?? ($doc?->title ?? null);
+
+            // Dynamically refresh approval request notifications if document title was updated while pending
+            if ($type === 'approval_request' && $doc) {
+                $pendingVer = $doc->versions->firstWhere('status', 'pending');
+                if ($pendingVer) {
+                    $documentTitle = $doc->title;
+                    $authorName = $n->data['actor_name'] ?? ($n->data['author'] ?? ($pendingVer->author_name ?? 'Pengguna'));
+                    if ($pendingVer->isRename() && $pendingVer->old_title) {
+                        $title = __('Permintaan Persetujuan Perubahan Nama Dokumen');
+                        $message = __(':author mengajukan perubahan nama dokumen dari ":old" menjadi ":doc" (v:ver)', [
+                            'author' => $authorName,
+                            'old' => $pendingVer->old_title,
+                            'doc' => $doc->title,
+                            'ver' => $pendingVer->version_number,
+                        ]);
+                    }
+                }
+            }
+
             return [
                 'id'              => $n->id,
                 'type'            => $type,
-                'title'           => $n->data['title'] ?? '',
-                'message'         => $n->data['message'] ?? '',
+                'title'           => $title,
+                'message'         => $message,
                 'url'             => $this->normalizeNotificationUrl($n->data['url'] ?? '#'),
                 'icon'            => $icon,
                 'status'          => $status,
@@ -202,7 +224,7 @@ class NotificationController extends Controller
                 'time'            => $n->created_at->diffForHumans(),
                 'reason'          => $n->data['reason'] ?? ($n->data['notes'] ?? null),
                 'document_id'     => $docId,
-                'document_title'  => $n->data['document_title'] ?? ($doc?->title ?? null),
+                'document_title'  => $documentTitle,
                 'document_number' => $n->data['document_number'] ?? ($doc?->document_number ?? null),
                 'request_type'    => $n->data['request_type'] ?? null,
                 'company_name'    => $n->data['company_name'] ?? null,

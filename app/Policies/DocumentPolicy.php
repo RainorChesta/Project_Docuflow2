@@ -147,7 +147,11 @@ class DocumentPolicy
     public function rename(User $user, Document $document): bool
     {
         if (!$this->view($user, $document)) return false;
-        return $user->isAdmin() || $user->isDirector();
+        if ($user->id === $document->owner_id || $user->isAdmin() || $user->isDirector()) return true;
+        if ($user->isHead() && ($user->division_id === $document->division_id || in_array($document->division_id, $user->allDivisionIds(), true))) {
+            return true;
+        }
+        return $this->update($user, $document);
     }
 
     public function requestRename(User $user, Document $document): bool

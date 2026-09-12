@@ -210,6 +210,16 @@
                                         <a href="{{ route('documents.show', $version->document) }}" class="font-semibold text-sm text-base-content hover:text-primary transition-colors block break-words">
                                             {{ $version->document->title }}
                                         </a>
+                                        @if($version->isRename() && $version->old_title)
+                                            <div class="mt-1">
+                                                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-info/10 text-info border border-info/20">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                    </svg>
+                                                    <span>{{ __('Ubah Nama:') }} <span class="line-through opacity-70">{{ $version->old_title }}</span> ➔ <strong class="font-bold text-base-content">{{ $version->document->title }}</strong></span>
+                                                </span>
+                                            </div>
+                                        @endif
                                         <div class="flex items-center gap-1.5 flex-wrap mt-0.5">
                                             @if($version->document->document_number)
                                                 <span class="text-[11px] font-mono text-base-content/60 bg-base-200 px-1.5 py-0.5 rounded">{{ $version->document->document_number }}</span>
@@ -271,6 +281,16 @@
                                                                 <p class="text-xs text-base-content/60 mt-1">
                                                                     {{ __('Penulis Versi') }}: <span class="font-medium text-base-content/80">{{ $version->author_name }}</span> &bull; <span class="badge badge-sm badge-ghost font-mono">v{{ $version->version_number }}</span>
                                                                 </p>
+                                                                @if($version->isRename() && $version->old_title)
+                                                                    <div class="mt-2 p-2.5 rounded-lg bg-info/10 border border-info/20 text-xs text-info space-y-0.5">
+                                                                        <div class="font-semibold flex items-center gap-1">
+                                                                            <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                                                            <span>{{ __('Pembaruan Nama Dokumen:') }}</span>
+                                                                        </div>
+                                                                        <p class="text-base-content/70">{{ __('Nama Semula:') }} <span class="line-through font-medium">{{ $version->old_title }}</span></p>
+                                                                        <p class="text-base-content font-semibold">{{ __('Nama Baru:') }} <span class="text-primary font-bold">{{ $version->document->title }}</span></p>
+                                                                    </div>
+                                                                @endif
                                                             </div>
                                                         </div>
                                                     </div>
@@ -331,6 +351,16 @@
                                                             <p class="text-xs text-base-content/60 mt-1">
                                                                 {{ __('Penulis') }}: <span class="font-medium text-base-content/80">{{ $version->author_name }}</span> &bull; <span class="badge badge-sm badge-ghost font-mono">v{{ $version->version_number }}</span>
                                                             </p>
+                                                            @if($version->isRename() && $version->old_title)
+                                                                <div class="mt-2 p-2.5 rounded-lg bg-info/10 border border-info/20 text-xs text-info space-y-0.5">
+                                                                    <div class="font-semibold flex items-center gap-1">
+                                                                        <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                                                        <span>{{ __('Pembaruan Nama Dokumen:') }}</span>
+                                                                    </div>
+                                                                    <p class="text-base-content/70">{{ __('Nama Semula:') }} <span class="line-through font-medium">{{ $version->old_title }}</span></p>
+                                                                    <p class="text-base-content font-semibold">{{ __('Nama Baru yang Ditolak:') }} <span class="text-error font-bold">{{ $version->document->title }}</span></p>
+                                                                </div>
+                                                            @endif
                                                         </div>
                                                     </div>
 

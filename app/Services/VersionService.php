@@ -246,6 +246,10 @@ class VersionService
             ->first();
 
         if ($pending) {
+            if ($pending->isRename() && $pending->old_title) {
+                $document->update(['title' => $pending->old_title]);
+            }
+
             // Only delete the pending version if there is another version to fall back to (e.g. v1 when discarding v2).
             // If v1 is the only version, we preserve it so the document is never left without versions.
             $hasOtherVersions = $document->versions()->where('id', '!=', $pending->id)->exists();
@@ -296,6 +300,161 @@ class VersionService
         ]);
     }
 
+    /**
+     * Rename a document. If the document is active (has approved current version),
+     * a new pending version (v{n+1}) is created and submitted for version approval.
+     * If the document is draft or already pending, the title and version file name are updated in place.
+     */
+    public function renameDocument(Document $document, string $newTitle, User $author): ?DocumentVersion
+    {
+        return DB::transaction(function () use ($document, $newTitle, $author) {
+            $diskName = config('onlyoffice.storage_disk', 'local');
+            $oldTitle = $document->title;
+
+            // 1. If there's an existing pending version, update in place
+            $pending = $document->versions()->pending()
+                ->whereNull('discarded_at')
+                ->orderBy('version_number', 'desc')
+                ->first();
+
+            if ($pending) {
+                $ext = $pending->file_original_name
+                    ? pathinfo($pending->file_original_name, PATHINFO_EXTENSION)
+                    : ($pending->file_path ? pathinfo($pending->file_path, PATHINFO_EXTENSION) : null);
+
+                $updatedData = [
+                    'author_id' => $author->id,
+                    'author_name' => $author->name,
+                    'change_type' => 'rename',
+                    'old_title' => $pending->old_title ?? $oldTitle,
+                    'change_summary' => "Perubahan nama dokumen dari \"{$oldTitle}\" menjadi \"{$newTitle}\"",
+                ];
+
+                if ($ext) {
+                    $updatedData['file_original_name'] = $newTitle . '.' . $ext;
+                }
+
+                $pending->update($updatedData);
+
+                $document->update([
+                    'title' => $newTitle,
+                    'pending_title' => null,
+                    'rename_requested_by_id' => null,
+                    'rename_requested_at' => null,
+                    'rename_request_notes' => null,
+                ]);
+
+                return $pending;
+            }
+
+            // 2. If there's a draft version, update in place
+            $draft = $document->versions()->where('status', 'draft')
+                ->orderBy('version_number', 'desc')
+                ->first();
+
+            if ($draft) {
+                $ext = $draft->file_original_name
+                    ? pathinfo($draft->file_original_name, PATHINFO_EXTENSION)
+                    : ($draft->file_path ? pathinfo($draft->file_path, PATHINFO_EXTENSION) : null);
+
+                $updatedData = [
+                    'author_id' => $author->id,
+                    'author_name' => $author->name,
+                    'change_type' => 'rename',
+                    'old_title' => $draft->old_title ?? $oldTitle,
+                    'change_summary' => "Perubahan nama dokumen dari \"{$oldTitle}\" menjadi \"{$newTitle}\"",
+                ];
+
+                if ($ext) {
+                    $updatedData['file_original_name'] = $newTitle . '.' . $ext;
+                }
+
+                $draft->update($updatedData);
+
+                $document->update([
+                    'title' => $newTitle,
+                    'pending_title' => null,
+                    'rename_requested_by_id' => null,
+                    'rename_requested_at' => null,
+                    'rename_request_notes' => null,
+                ]);
+
+                return $draft;
+            }
+
+            // 3. If there is an active version, create next version (pending)
+            $active = $document->currentVersion 
+                ?? $document->versions()->where('status', 'active')->orderBy('version_number', 'desc')->first();
+
+            if ($active) {
+                // Ensure previous active version retains its historical title
+                if (empty($active->file_original_name)) {
+                    $ext = $active->file_path ? (pathinfo($active->file_path, PATHINFO_EXTENSION) ?: 'docx') : 'docx';
+                    $active->update([
+                        'file_original_name' => $oldTitle . '.' . $ext,
+                    ]);
+                }
+
+                $versionNumber = ($document->versions()->max('version_number') ?? 0) + 1;
+                $newFilePath = null;
+                $fileOriginalName = null;
+                $fileMime = $active->file_mime;
+
+                if ($active->file_path) {
+                    $ext = pathinfo($active->file_path, PATHINFO_EXTENSION) ?: 'docx';
+                    $newPath = 'documents/' . $document->id . '/v' . $versionNumber . '.' . $ext;
+
+                    if (Storage::disk($diskName)->exists($active->file_path)) {
+                        Storage::disk($diskName)->copy($active->file_path, $newPath);
+                        $newFilePath = $newPath;
+                    } elseif (Storage::disk('local')->exists($active->file_path)) {
+                        Storage::disk('local')->copy($active->file_path, $newPath);
+                        $newFilePath = $newPath;
+                    }
+
+                    $fileOriginalName = $newTitle . '.' . $ext;
+                } else {
+                    $fileOriginalName = $newTitle . '.docx';
+                }
+
+                $version = $document->versions()->create([
+                    'version_number' => $versionNumber,
+                    'content' => $active->content ?? '',
+                    'file_path' => $newFilePath,
+                    'file_original_name' => $fileOriginalName,
+                    'file_mime' => $fileMime,
+                    'author_id' => $author->id,
+                    'author_name' => $author->name,
+                    'status' => 'pending',
+                    'change_type' => 'rename',
+                    'old_title' => $oldTitle,
+                    'change_summary' => "Perubahan nama dokumen dari \"{$oldTitle}\" menjadi \"{$newTitle}\"",
+                ]);
+
+                $document->update([
+                    'title' => $newTitle,
+                    'pending_title' => null,
+                    'rename_requested_by_id' => null,
+                    'rename_requested_at' => null,
+                    'rename_request_notes' => null,
+                ]);
+
+                return $version;
+            }
+
+            // Fallback if no version exists
+            $document->update([
+                'title' => $newTitle,
+                'pending_title' => null,
+                'rename_requested_by_id' => null,
+                'rename_requested_at' => null,
+                'rename_request_notes' => null,
+            ]);
+
+            return null;
+        });
+    }
+
     public function approve(DocumentVersion $version, User $reviewer, ?string $notes = null): void
     {
         DB::transaction(function () use ($version, $reviewer, $notes) {
@@ -320,12 +479,20 @@ class VersionService
 
     public function reject(DocumentVersion $version, User $reviewer, ?string $notes = null): void
     {
-        $version->update([
-            'status' => 'rejected',
-            'reviewer_id' => $reviewer->id,
-            'review_notes' => $notes,
-            'reviewed_at' => now(),
-        ]);
+        DB::transaction(function () use ($version, $reviewer, $notes) {
+            $version->update([
+                'status' => 'rejected',
+                'reviewer_id' => $reviewer->id,
+                'review_notes' => $notes,
+                'reviewed_at' => now(),
+            ]);
+
+            if ($version->isRename() && $version->old_title) {
+                $version->document->update([
+                    'title' => $version->old_title,
+                ]);
+            }
+        });
     }
 
     /**
@@ -388,12 +555,20 @@ class VersionService
                 'discarded_at' => null,
             ]);
 
-            $document->update([
+            $restoredTitle = $targetVersion->version_title;
+
+            $documentUpdate = [
                 'current_version_id' => $targetVersion->id,
                 'pending_rollback_version_id' => null,
                 'rollback_requested_by_id' => null,
                 'rollback_requested_at' => null,
-            ]);
+            ];
+
+            if (!empty($restoredTitle)) {
+                $documentUpdate['title'] = $restoredTitle;
+            }
+
+            $document->update($documentUpdate);
 
             return $targetVersion->fresh();
         });
