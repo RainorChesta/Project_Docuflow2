@@ -70,10 +70,15 @@
                             @foreach($users as $user)
                                 <tr class="hover:bg-base-200/40 transition-colors">
                                     <td class="align-middle">
-                                        <div class="font-medium text-base-content leading-snug">{{ $user->name }}</div>
-                                        @if($user->nip)
-                                            <div class="text-xs text-base-content/50 font-mono mt-0.5">NIP: {{ $user->nip }}</div>
-                                        @endif
+                                        <div class="flex items-center gap-3">
+                                            <x-user-avatar :user="$user" size="w-9 h-9" text-size="text-xs" />
+                                            <div class="min-w-0">
+                                                <div class="font-semibold text-base-content leading-snug">{{ $user->name }}</div>
+                                                @if($user->nip)
+                                                    <div class="text-xs text-base-content/50 font-mono mt-0.5">NIP: {{ $user->nip }}</div>
+                                                @endif
+                                            </div>
+                                        </div>
                                     </td>
                                     <td class="align-middle">
                                         <div class="text-sm text-base-content leading-snug">{{ $user->email }}</div>
@@ -104,23 +109,118 @@
                                         @endif
                                     </td>
                                     <td class="align-middle">
-                                        <div class="space-y-0.5">
-                                            @if($user->system_role === 'admin')
-                                                <span class="text-xs text-base-content/60 italic">{{ __('Semua Perusahaan') }}</span>
-                                            @elseif($user->companies->isNotEmpty())
-                                                <div class="text-xs font-semibold text-base-content leading-snug">
-                                                    {{ $user->companies->pluck('code')->join(', ') }}
+                                        @if($user->system_role === 'admin')
+                                            <span class="text-xs text-base-content/60 italic">{{ __('Semua Perusahaan & Cabang') }}</span>
+                                        @elseif($user->companies->isNotEmpty())
+                                            <div class="space-y-1.5 max-w-[260px]">
+                                                {{-- Company Badges --}}
+                                                <div class="flex flex-wrap items-center gap-1">
+                                                    @foreach($user->companies->take(3) as $comp)
+                                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-primary/10 text-primary border border-primary/20" title="{{ $comp->name }}">
+                                                            {{ $comp->code ?: $comp->name }}
+                                                        </span>
+                                                    @endforeach
+                                                    @if($user->companies->count() > 3)
+                                                        <button type="button" onclick="document.getElementById('user-assignments-modal-{{ $user->id }}').showModal()" class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold bg-base-200 text-base-content/70 border border-base-300 hover:bg-base-300 transition-colors" title="{{ __('Lihat semua perusahaan') }}">
+                                                            +{{ $user->companies->count() - 3 }}
+                                                        </button>
+                                                    @endif
                                                 </div>
-                                                <div class="text-[11px] text-base-content/60 leading-snug">
-                                                    {{ $user->branches->pluck('name')->join(', ') ?: '-' }}
+
+                                                {{-- Branch Info / Pill --}}
+                                                @if($user->branches->isNotEmpty())
+                                                    @if($user->branches->count() <= 2)
+                                                        <div class="text-[11px] text-base-content/70 leading-snug truncate" title="{{ $user->branches->pluck('name')->join(', ') }}">
+                                                            {{ $user->branches->pluck('name')->join(', ') }}
+                                                        </div>
+                                                    @else
+                                                        <button type="button" onclick="document.getElementById('user-assignments-modal-{{ $user->id }}').showModal()" class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-base-200 hover:bg-primary/10 hover:text-primary hover:border-primary/30 border border-base-300 text-base-content/70 transition-all cursor-pointer group">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-base-content/40 group-hover:text-primary transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                                            </svg>
+                                                            <span>{{ $user->branches->count() }} {{ __('Cabang') }}</span>
+                                                            <span class="text-[10px] text-primary underline opacity-80 group-hover:opacity-100">{{ __('Detail') }}</span>
+                                                        </button>
+                                                    @endif
+                                                @else
+                                                    <span class="text-[11px] text-base-content/40 italic">-</span>
+                                                @endif
+                                            </div>
+
+                                            {{-- Assignments Modal --}}
+                                            <dialog id="user-assignments-modal-{{ $user->id }}" class="modal text-left whitespace-normal">
+                                                <div class="modal-box max-w-lg">
+                                                    <div class="flex items-center justify-between border-b border-base-200 pb-3">
+                                                        <div class="flex items-center gap-2.5">
+                                                            <x-user-avatar :user="$user" size="w-10 h-10" text-size="text-sm" />
+                                                            <div>
+                                                                <h3 class="font-bold text-base text-base-content">{{ $user->name }}</h3>
+                                                                <p class="text-xs text-base-content/60">{{ $user->email }} &bull; <span class="uppercase font-semibold">{{ $user->system_role }}</span></p>
+                                                            </div>
+                                                        </div>
+                                                        <button type="button" onclick="document.getElementById('user-assignments-modal-{{ $user->id }}').close()" class="btn btn-sm btn-circle btn-ghost">✕</button>
+                                                    </div>
+
+                                                    <div class="py-4 space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                                                        <div class="text-xs font-semibold text-base-content/70 uppercase tracking-wider mb-1">
+                                                            {{ __('Daftar Penugasan Perusahaan & Cabang') }}
+                                                        </div>
+
+                                                        @foreach($user->companies as $company)
+                                                            @php
+                                                                $compBranches = $user->branches->where('company_id', $company->id);
+                                                            @endphp
+                                                            <div class="rounded-xl border border-base-200 bg-base-200/30 p-3.5 space-y-2">
+                                                                <div class="flex items-center justify-between gap-2">
+                                                                    <div class="flex items-center gap-2 min-w-0">
+                                                                        <span class="badge badge-primary badge-sm font-bold shrink-0">{{ $company->code }}</span>
+                                                                        <span class="font-semibold text-sm text-base-content truncate">{{ $company->name }}</span>
+                                                                    </div>
+                                                                    <span class="text-xs text-base-content/60 font-medium shrink-0">
+                                                                        {{ $compBranches->count() }} {{ __('Cabang') }}
+                                                                    </span>
+                                                                </div>
+
+                                                                @if($compBranches->isNotEmpty())
+                                                                    <div class="flex flex-wrap gap-1.5 pt-1">
+                                                                        @foreach($compBranches as $branch)
+                                                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-base-100 text-base-content border border-base-300 shadow-2xs">
+                                                                                @if($branch->is_pusat)
+                                                                                    <span class="w-1.5 h-1.5 rounded-full bg-primary shrink-0"></span>
+                                                                                @endif
+                                                                                <span class="font-medium">{{ $branch->name }}</span>
+                                                                                @if($branch->is_pusat)
+                                                                                    <span class="text-[10px] text-primary font-semibold">({{ __('Pusat') }})</span>
+                                                                                @endif
+                                                                            </span>
+                                                                        @endforeach
+                                                                    </div>
+                                                                @else
+                                                                    <p class="text-xs text-base-content/40 italic">{{ __('Tidak ada cabang spesifik yang ditugaskan') }}</p>
+                                                                @endif
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+
+                                                    <div class="modal-action border-t border-base-200 pt-3 mt-0 flex justify-between items-center">
+                                                        <span class="text-xs text-base-content/60">
+                                                            Total: <strong class="text-base-content">{{ $user->companies->count() }}</strong> Perusahaan, <strong class="text-base-content">{{ $user->branches->count() }}</strong> Cabang
+                                                        </span>
+                                                        <button type="button" onclick="document.getElementById('user-assignments-modal-{{ $user->id }}').close()" class="btn btn-sm btn-ghost">
+                                                            {{ __('Tutup') }}
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                            @else
-                                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30 whitespace-nowrap">
-                                                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                                                    {{ __('Belum ditugaskan') }}
-                                                </span>
-                                            @endif
-                                        </div>
+                                                <form method="dialog" class="modal-backdrop">
+                                                    <button>{{ __('close') }}</button>
+                                                </form>
+                                            </dialog>
+                                        @else
+                                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30 whitespace-nowrap">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                                {{ __('Belum ditugaskan') }}
+                                            </span>
+                                        @endif
                                     </td>
                                     <td class="align-middle whitespace-nowrap">
                                         <span class="badge {{ $user->system_role === 'admin' ? 'badge-accent' : ($user->system_role === 'direktur' ? 'badge-info' : ($user->system_role === 'head' ? 'badge-warning' : 'badge-ghost')) }} badge-sm uppercase font-semibold">

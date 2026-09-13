@@ -33,7 +33,11 @@
             @elseif($doc->isPersonal()) <span class="text-info text-xs">· {{ __('Personal') }}</span>
             @else <span class="text-xs">· {{ $doc->division?->code ?? '—' }}</span>
             @endif
-            <span class="text-xs">· {{ $doc->owner->name }}</span>
+            <span class="text-xs inline-flex items-center gap-1.5 font-medium text-base-content/80">
+                <span class="text-base-content/40 font-normal">·</span>
+                <x-user-avatar :user="$doc->owner" size="w-4 h-4" text-size="text-[9px]" />
+                <span>{{ $doc->owner->name }}</span>
+            </span>
         </div>
     </div>
     <div class="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">

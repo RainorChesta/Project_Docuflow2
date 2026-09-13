@@ -141,8 +141,13 @@
                                         </div>
                                     </td>
                                     <td>
-                                        <div class="font-medium text-sm text-base-content">{{ $doc->owner?->name ?? '—' }}</div>
-                                        <div class="text-xs text-base-content/50">{{ $doc->owner?->email ?? '' }}</div>
+                                        <div class="flex items-center gap-2.5">
+                                            <x-user-avatar :user="$doc->owner" size="w-7 h-7" text-size="text-xs" />
+                                            <div class="min-w-0">
+                                                <div class="font-medium text-sm text-base-content truncate">{{ $doc->owner?->name ?? '—' }}</div>
+                                                <div class="text-xs text-base-content/50 truncate">{{ $doc->owner?->email ?? '' }}</div>
+                                            </div>
+                                        </div>
                                     </td>
                                     <td>
                                         <div class="text-sm text-base-content/80 font-medium">

@@ -626,7 +626,10 @@
                         </div>
                         <div>
                             <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Pengguna') }}</span>
-                            <p class="font-medium mt-0.5">{{ $document->owner->name }}</p>
+                            <div class="flex items-center gap-1.5 mt-0.5 min-w-0">
+                                <x-user-avatar :user="$document->owner" size="w-5 h-5" text-size="text-[10px]" />
+                                <span class="font-medium truncate">{{ $document->owner->name }}</span>
+                            </div>
                         </div>
                         <div>
                             <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Status') }}</span>
@@ -1277,19 +1280,35 @@
             const list = document.getElementById('share-list');
             const rows = [];
 
-            rows.push(`<div class="flex items-center justify-between gap-2 py-1">
-                <div class="min-w-0">
-                    <p class="font-medium truncate">${escapeHtml(shareState.owner.name)}</p>
-                    <p class="text-xs text-base-content/50">Pemilik</p>
+            const ownerInitial = (shareState.owner?.name ? shareState.owner.name.charAt(0).toUpperCase() : '?');
+            const ownerAvatar = shareState.owner?.avatar_url 
+                ? `<img src="${escapeHtml(shareState.owner.avatar_url)}" alt="${escapeHtml(shareState.owner.name || '')}" class="w-7 h-7 rounded-full object-cover shrink-0 ring-1 ring-base-content/10">`
+                : `<div class="w-7 h-7 rounded-full bg-primary/15 text-primary flex items-center justify-center font-bold text-xs shrink-0 select-none">${escapeHtml(ownerInitial)}</div>`;
+
+            rows.push(`<div class="flex items-center justify-between gap-2 py-1.5">
+                <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                    ${ownerAvatar}
+                    <div class="min-w-0 flex-1">
+                        <p class="font-medium truncate">${escapeHtml(shareState.owner.name)}</p>
+                        <p class="text-xs text-base-content/50">Pemilik</p>
+                    </div>
                 </div>
                 <span class="badge badge-primary badge-sm shrink-0">owner</span>
             </div>`);
 
             shareState.shares.forEach(s => {
-                rows.push(`<div class="flex items-center justify-between gap-2 py-1">
-                    <div class="min-w-0">
-                        <p class="font-medium truncate">${escapeHtml(s.name)}</p>
-                        <p class="text-xs text-base-content/50 truncate">${escapeHtml(s.email)}</p>
+                const sInitial = (s.name ? s.name.charAt(0).toUpperCase() : '?');
+                const sAvatar = s.avatar_url 
+                    ? `<img src="${escapeHtml(s.avatar_url)}" alt="${escapeHtml(s.name || '')}" class="w-7 h-7 rounded-full object-cover shrink-0 ring-1 ring-base-content/10">`
+                    : `<div class="w-7 h-7 rounded-full bg-primary/15 text-primary flex items-center justify-center font-bold text-xs shrink-0 select-none">${escapeHtml(sInitial)}</div>`;
+
+                rows.push(`<div class="flex items-center justify-between gap-2 py-1.5">
+                    <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                        ${sAvatar}
+                        <div class="min-w-0 flex-1">
+                            <p class="font-medium truncate">${escapeHtml(s.name)}</p>
+                            <p class="text-xs text-base-content/50 truncate">${escapeHtml(s.email)}</p>
+                        </div>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
                         <select class="select select-bordered select-xs" onchange="updateUserShare(${s.id}, this.value)">
@@ -1513,10 +1532,20 @@
         function renderSearchResults(data) {
             const items = [];
             data.users.forEach(u => {
-                items.push(`<button type="button" class="w-full text-left px-3 py-2 hover:bg-base-200 flex items-center justify-between gap-2"
+                const uInitial = (u.name ? u.name.charAt(0).toUpperCase() : '?');
+                const uAvatar = u.avatar_url 
+                    ? `<img src="${escapeHtml(u.avatar_url)}" alt="${escapeHtml(u.name || '')}" class="w-6 h-6 rounded-full object-cover shrink-0 ring-1 ring-base-content/10">`
+                    : `<div class="w-6 h-6 rounded-full bg-primary/15 text-primary flex items-center justify-center font-bold text-[10px] shrink-0 select-none">${escapeHtml(uInitial)}</div>`;
+
+                items.push(`<button type="button" class="w-full text-left px-3 py-2 hover:bg-base-200 flex items-center justify-between gap-2.5"
                     onclick="inviteUser(${u.id}, '${escapeHtml(u.name).replace(/'/g, "\\'")}')">
-                    <span class="min-w-0"><span class="font-medium">${escapeHtml(u.name)}</span>
-                    <span class="text-xs text-base-content/50 block truncate">${escapeHtml(u.email)}</span></span>
+                    <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                        ${uAvatar}
+                        <div class="min-w-0 flex-1">
+                            <span class="font-medium block truncate">${escapeHtml(u.name)}</span>
+                            <span class="text-xs text-base-content/50 block truncate">${escapeHtml(u.email)}</span>
+                        </div>
+                    </div>
                     <span class="badge badge-ghost badge-sm shrink-0">Pengguna</span>
                 </button>`);
             });
@@ -1617,7 +1646,11 @@
                                 @endif
                             </div>
                             <div class="text-xs text-base-content/60 mt-1 flex items-center gap-2 flex-wrap">
-                                <span>{{ __('Diajukan oleh') }}: <strong class="font-medium text-base-content/80">{{ $version->author_name }}</strong></span>
+                                <div class="flex items-center gap-1.5">
+                                    <span>{{ __('Diajukan oleh') }}:</span>
+                                    <x-user-avatar :user="$version->author" :name="$version->author_name" size="w-4 h-4" text-size="text-[9px]" />
+                                    <strong class="font-medium text-base-content/80">{{ $version->author_name }}</strong>
+                                </div>
                                 <span>•</span>
                                 <span>{{ $version->created_at->format('d M Y, H:i') }}</span>
                                 @if($version->isRename() && $version->old_title)

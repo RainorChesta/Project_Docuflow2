@@ -31,7 +31,7 @@
                     <div class="flex flex-wrap justify-between items-center gap-3 mb-4 pb-4 border-b border-base-300">
                         <div class="text-sm">
                             <div><span class="text-base-content/60">{{ __('Divisi') }}:</span> {{ $document->division?->code ?? '—' }}</div>
-                            <div><span class="text-base-content/60">{{ __('Pemilik') }}:</span> {{ $document->owner->name }}</div>
+                            <div class="flex items-center gap-1.5 mt-0.5"><span class="text-base-content/60">{{ __('Pemilik') }}:</span> <x-user-avatar :user="$document->owner" size="w-4 h-4" text-size="text-[9px]" /> <span class="font-medium text-base-content">{{ $document->owner->name }}</span></div>
                         </div>
                         @php
                             $isFileBased = $document->displayVersion()?->file_path;
@@ -157,9 +157,11 @@
                                                     <div class="flex items-center gap-2 flex-wrap">
                                                         <span class="font-semibold text-sm text-base-content break-words">{{ $document->title }}</span>
                                                     </div>
-                                                    <p class="text-xs text-base-content/60 mt-1">
-                                                        {{ __('Diminta oleh') }}: <span class="font-medium text-base-content/80">{{ $pendingSigRequest->requester->name }}</span>
-                                                    </p>
+                                                    <div class="flex items-center gap-1.5 text-xs text-base-content/60 mt-1">
+                                                        <span>{{ __('Diminta oleh') }}:</span>
+                                                        <x-user-avatar :user="$pendingSigRequest->requester" size="w-4 h-4" text-size="text-[9px]" />
+                                                        <span class="font-medium text-base-content/80">{{ $pendingSigRequest->requester->name }}</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>

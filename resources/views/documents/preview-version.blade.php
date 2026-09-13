@@ -41,7 +41,7 @@
                                 <div class="text-xs text-info"><span class="text-base-content/60">{{ __('Nama Semula') }}:</span> <span class="line-through text-base-content/60">{{ $version->old_title }}</span></div>
                             @endif
                             <div><span class="text-base-content/60">{{ __('Versi') }}:</span> v{{ $version->version_number }}</div>
-                            <div><span class="text-base-content/60">{{ __('Penulis') }}:</span> {{ $version->author_name }}</div>
+                            <div class="flex items-center gap-1.5 mt-0.5"><span class="text-base-content/60">{{ __('Penulis') }}:</span> <x-user-avatar :user="$version->author" :name="$version->author_name" size="w-4 h-4" text-size="text-[9px]" /> <span class="font-medium text-base-content">{{ $version->author_name }}</span></div>
                             <div><span class="text-base-content/60">{{ __('Status') }}:</span>
                                 @if($version->id === $document->current_version_id)
                                     <span class="badge badge-success badge-sm">{{ __('Aktif') }}</span>
@@ -168,9 +168,11 @@
                                                     <div class="flex items-center gap-2 flex-wrap">
                                                         <span class="font-semibold text-sm text-base-content break-words">{{ $document->title }}</span>
                                                     </div>
-                                                    <p class="text-xs text-base-content/60 mt-1">
-                                                        {{ __('Diminta oleh') }}: <span class="font-medium text-base-content/80">{{ $pendingSigRequest->requester->name }}</span>
-                                                    </p>
+                                                    <div class="flex items-center gap-1.5 text-xs text-base-content/60 mt-1">
+                                                        <span>{{ __('Diminta oleh') }}:</span>
+                                                        <x-user-avatar :user="$pendingSigRequest->requester" size="w-4 h-4" text-size="text-[9px]" />
+                                                        <span class="font-medium text-base-content/80">{{ $pendingSigRequest->requester->name }}</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>

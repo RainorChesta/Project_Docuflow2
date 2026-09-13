@@ -105,7 +105,10 @@
             @elseif($doc->isPersonal()) <span class="text-info">· {{ __('Personal') }}</span>
             @else <span>· {{ $doc->division?->code ?? '—' }}</span>
             @endif
-            · {{ $doc->owner->name }}
+        </div>
+        <div class="inline-flex items-center justify-center gap-1 mt-1 text-[10px] text-base-content/70 font-medium max-w-full">
+            <x-user-avatar :user="$doc->owner" size="w-3.5 h-3.5" text-size="text-[8px]" />
+            <span class="truncate max-w-[100px]">{{ $doc->owner->name }}</span>
         </div>
     </div>
 

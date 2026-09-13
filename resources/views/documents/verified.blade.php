@@ -42,7 +42,10 @@
                 </div>
                 <div>
                     <dt class="text-[10px] font-semibold text-base-content/50 uppercase">{{ __('Pemilik') }}</dt>
-                    <dd class="font-medium">{{ $document->owner?->name ?? '-' }}</dd>
+                    <dd class="font-medium flex items-center gap-1.5 mt-0.5">
+                        <x-user-avatar :user="$document->owner" size="w-4 h-4" text-size="text-[9px]" />
+                        <span>{{ $document->owner?->name ?? '-' }}</span>
+                    </dd>
                 </div>
                 @if($document->currentVersion)
                 <div>

@@ -594,7 +594,12 @@
                                                             <span class="text-base-content/40">—</span>
                                                         @endif
                                                     </td>
-                                                    <td>{{ $doc->owner->name }}</td>
+                                                    <td>
+                                                        <div class="flex items-center gap-2">
+                                                            <x-user-avatar :user="$doc->owner" size="w-5 h-5" text-size="text-[10px]" />
+                                                            <span>{{ $doc->owner->name }}</span>
+                                                        </div>
+                                                    </td>
                                                     <td>
                                                         @if($doc->currentVersion)
                                                             <span class="badge badge-success badge-xs font-semibold">v{{ $doc->currentVersion->version_number }}</span>

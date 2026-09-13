@@ -1542,16 +1542,23 @@
                         : (!u.has_signature ? '<p class="text-xs text-base-content/40 italic uppercase mt-1">{{ __("BELUM MEMILIKI TANDA TANGAN ATAU STEMPEL") }}</p>' : '');
 
                     const isMe = u.is_me;
+                    const initialLetter = (u.name ? u.name.charAt(0).toUpperCase() : '?');
+                    const avatarHtml = u.avatar_url 
+                        ? `<img src="${escapeHtml(u.avatar_url)}" alt="${escapeHtml(u.name || '')}" class="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-base-content/10">`
+                        : `<div class="w-8 h-8 rounded-full bg-primary/15 text-primary flex items-center justify-center font-bold text-xs shrink-0 select-none">${escapeHtml(initialLetter)}</div>`;
 
                     return `
                         <div class="flex flex-col p-2.5 rounded-xl border border-base-200 hover:bg-base-200/40 transition-all ${isMe ? 'bg-primary/5 border-primary/20' : ''} min-w-0 max-w-full overflow-hidden">
                             <div class="flex items-center justify-between min-w-0">
-                                <div class="pr-2 min-w-0 flex-1">
-                                    <div class="flex items-center gap-1.5 mb-0.5 min-w-0">
-                                        <p class="text-sm font-semibold leading-tight text-base-content uppercase truncate" title="${escapeHtml(u.name || '')}">${escapeHtml(u.name || '')}</p>
-                                        ${u.is_me ? '<span class="badge badge-primary badge-xs uppercase font-bold shrink-0">Saya</span>' : ''}
+                                <div class="flex items-center gap-2.5 pr-2 min-w-0 flex-1">
+                                    ${avatarHtml}
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex items-center gap-1.5 mb-0.5 min-w-0">
+                                            <p class="text-sm font-semibold leading-tight text-base-content uppercase truncate" title="${escapeHtml(u.name || '')}">${escapeHtml(u.name || '')}</p>
+                                            ${u.is_me ? '<span class="badge badge-primary badge-xs uppercase font-bold shrink-0">Saya</span>' : ''}
+                                        </div>
+                                        <p class="text-xs text-base-content/60 uppercase truncate">${escapeHtml(u.role || '')} &bull; ${escapeHtml(u.division || '')}</p>
                                     </div>
-                                    <p class="text-xs text-base-content/60 uppercase truncate">${escapeHtml(u.role || '')} &bull; ${escapeHtml(u.division || '')}</p>
                                 </div>
                             </div>
                             ${signaturesHtml}

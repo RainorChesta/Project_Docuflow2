@@ -256,4 +256,89 @@ class DirectorDocumentDashboardTest extends TestCase
         $gridResp->assertSee('Human Resources Department');
         $gridResp->assertSee('HRD');
     }
+
+    public function test_director_can_search_documents_globally_from_root_across_all_companies_and_branches(): void
+    {
+        $docInPusat = Document::create([
+            'title' => 'Peraturan Direksi Pusat 2026',
+            'document_number' => '001/PST/DIR/2026',
+            'company_id' => $this->company->id,
+            'branch_id' => $this->pusatBranch->id,
+            'division_id' => $this->hrdDiv->id,
+            'document_type_id' => $this->policyType->id,
+            'owner_id' => $this->director->id,
+            'visibility' => Document::VISIBILITY_DIVISION,
+        ]);
+
+        $docInManyar = Document::create([
+            'title' => 'Panduan Pasien Manyar',
+            'document_number' => '002/KMY/MED/2026',
+            'company_id' => $this->company->id,
+            'branch_id' => $this->cabangBranch->id,
+            'division_id' => $this->hrdDiv->id,
+            'document_type_id' => $this->policyType->id,
+            'owner_id' => $this->director->id,
+            'visibility' => Document::VISIBILITY_DIVISION,
+        ]);
+
+        // Global search at Root level (no company_id, no branch_id)
+        $resp = $this->actingAs($this->director)->get(route('director.documents.index', [
+            'search' => 'Peraturan Direksi',
+        ]));
+
+        $resp->assertOk();
+        $resp->assertSee('Peraturan Direksi Pusat 2026');
+        $resp->assertSee('001/PST/DIR/2026');
+        $resp->assertDontSee('Panduan Pasien Manyar');
+    }
+
+    public function test_director_can_filter_documents_globally_by_status(): void
+    {
+        $activeDoc = Document::create([
+            'title' => 'Dokumen Aktif Pusat',
+            'document_number' => '091/AKT/2026',
+            'company_id' => $this->company->id,
+            'branch_id' => $this->pusatBranch->id,
+            'division_id' => $this->hrdDiv->id,
+            'document_type_id' => $this->policyType->id,
+            'owner_id' => $this->director->id,
+            'visibility' => Document::VISIBILITY_DIVISION,
+            'is_expired' => false,
+        ]);
+        $version = \App\Models\DocumentVersion::create([
+            'document_id' => $activeDoc->id,
+            'version_number' => 1,
+            'status' => 'active',
+            'author_name' => 'Direktur Utama',
+            'content' => '<p>Active document content</p>',
+            'created_by_id' => $this->director->id,
+        ]);
+        $activeDoc->update(['current_version_id' => $version->id]);
+
+        $expiredDoc = Document::create([
+            'title' => 'Dokumen Kadaluarsa Manyar',
+            'document_number' => '092/EXP/2026',
+            'company_id' => $this->company->id,
+            'branch_id' => $this->cabangBranch->id,
+            'division_id' => $this->hrdDiv->id,
+            'document_type_id' => $this->policyType->id,
+            'owner_id' => $this->director->id,
+            'visibility' => Document::VISIBILITY_DIVISION,
+            'is_expired' => true,
+        ]);
+
+        $respActive = $this->actingAs($this->director)->get(route('director.documents.index', [
+            'status' => 'active',
+        ]));
+        $respActive->assertOk();
+        $respActive->assertSee('Dokumen Aktif Pusat');
+        $respActive->assertDontSee('Dokumen Kadaluarsa Manyar');
+
+        $respExpired = $this->actingAs($this->director)->get(route('director.documents.index', [
+            'status' => 'expired',
+        ]));
+        $respExpired->assertOk();
+        $respExpired->assertSee('Dokumen Kadaluarsa Manyar');
+        $respExpired->assertDontSee('Dokumen Aktif Pusat');
+    }
 }

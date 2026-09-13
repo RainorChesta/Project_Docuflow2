@@ -1216,5 +1216,15 @@
     "versi dokumen akan ditolak": "document versions will be rejected",
     "versi dokumen dipilih": "document versions selected",
     "wajib membuat dan menyimpan tanda tangan digital (TTD)": "must create and save a digital signature",
-    "waktu yang ditentukan": "the specified time"
+    "waktu yang ditentukan": "the specified time",
+    "Automated Approval Chains": "Automated Approval Chains",
+    "Multi-level sequential and parallel approval routing with real-time notifications and instant status updates.": "Multi-level sequential and parallel approval routing with real-time notifications and instant status updates.",
+    "Digital Signatures & QR Seal": "Digital Signatures & QR Seal",
+    "Sign documents digitally with secure cryptographically verifiable QR codes for instant public verification.": "Sign documents digitally with secure cryptographically verifiable QR codes for instant public verification.",
+    "Version History & Audit Log": "Version History & Audit Log",
+    "Complete revision timelines, safe rollback proposals, and immutable activity audit trails for total compliance.": "Complete revision timelines, safe rollback proposals, and immutable activity audit trails for total compliance.",
+    "Role-Based Access (RBAC)": "Role-Based Access (RBAC)",
+    "Tamper-Proof Audit Trail": "Tamper-Proof Audit Trail",
+    "Document Watermarking": "Document Watermarking",
+    "Multi-Branch Routing": "Multi-Branch Routing"
 }

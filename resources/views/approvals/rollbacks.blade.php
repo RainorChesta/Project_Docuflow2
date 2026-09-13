@@ -185,11 +185,16 @@
 
                                     {{-- Requester --}}
                                     <td class="py-3.5 px-4 whitespace-nowrap">
-                                        <div class="font-medium text-base-content text-xs">
-                                            {{ $doc->rollbackRequestedBy?->name ?? '—' }}
-                                        </div>
-                                        <div class="text-[11px] text-base-content/50 mt-0.5">
-                                            {{ $doc->rollbackRequestedBy?->email ?? '' }}
+                                        <div class="flex items-center gap-2.5">
+                                            <x-user-avatar :user="$doc->rollbackRequestedBy" size="w-7 h-7" text-size="text-xs" />
+                                            <div class="min-w-0">
+                                                <div class="font-medium text-base-content text-xs truncate">
+                                                    {{ $doc->rollbackRequestedBy?->name ?? '—' }}
+                                                </div>
+                                                <div class="text-[11px] text-base-content/50 mt-0.5 truncate">
+                                                    {{ $doc->rollbackRequestedBy?->email ?? '' }}
+                                                </div>
+                                            </div>
                                         </div>
                                     </td>
 

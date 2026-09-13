@@ -300,8 +300,13 @@
                                         @endif
                                     </td>
                                     <td class="px-4 py-4">
-                                        <div class="font-medium text-sm text-base-content">{{ $req->requester?->name ?? '—' }}</div>
-                                        <div class="text-xs text-base-content/50">{{ $req->requester?->email ?? '' }}</div>
+                                        <div class="flex items-center gap-2.5">
+                                            <x-user-avatar :user="$req->requester" size="w-7 h-7" text-size="text-xs" />
+                                            <div class="min-w-0">
+                                                <div class="font-medium text-sm text-base-content truncate">{{ $req->requester?->name ?? '—' }}</div>
+                                                <div class="text-xs text-base-content/50 truncate">{{ $req->requester?->email ?? '' }}</div>
+                                            </div>
+                                        </div>
                                     </td>
                                     <td class="px-4 py-4 text-xs text-base-content/60 whitespace-nowrap">
                                         <span title="{{ $req->requested_at ? $req->requested_at->format('d M Y H:i') : '' }}">
@@ -400,9 +405,11 @@
                                                                             <span class="badge badge-xs font-semibold bg-sky-100 text-sky-800 border-sky-300">{{ __('Tanda Tangan Original') }}</span>
                                                                         @endif
                                                                     </div>
-                                                                    <p class="text-xs text-base-content/60 mt-1">
-                                                                        {{ __('Diminta oleh') }}: <span class="font-medium text-base-content/80">{{ $req->requester?->name ?? '—' }}</span>
-                                                                    </p>
+                                                                    <div class="flex items-center gap-1.5 text-xs text-base-content/60 mt-1">
+                                                                        <span>{{ __('Diminta oleh') }}:</span>
+                                                                        <x-user-avatar :user="$req->requester" size="w-4 h-4" text-size="text-[9px]" />
+                                                                        <span class="font-medium text-base-content/80">{{ $req->requester?->name ?? '—' }}</span>
+                                                                    </div>
                                                                 </div>
                                                             </div>
 
@@ -478,9 +485,11 @@
                                                                             <span class="badge badge-xs font-semibold bg-sky-100 text-sky-800 border-sky-300">{{ __('Tanda Tangan Original') }}</span>
                                                                         @endif
                                                                     </div>
-                                                                    <p class="text-xs text-base-content/60 mt-1">
-                                                                        {{ __('Diminta oleh') }}: <span class="font-medium text-base-content/80">{{ $req->requester?->name ?? '—' }}</span>
-                                                                    </p>
+                                                                    <div class="flex items-center gap-1.5 text-xs text-base-content/60 mt-1">
+                                                                        <span>{{ __('Diminta oleh') }}:</span>
+                                                                        <x-user-avatar :user="$req->requester" size="w-4 h-4" text-size="text-[9px]" />
+                                                                        <span class="font-medium text-base-content/80">{{ $req->requester?->name ?? '—' }}</span>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -806,8 +815,13 @@
                                         @endif
                                     </td>
                                     <td class="px-4 py-4">
-                                        <div class="font-medium text-sm text-base-content">{{ $req->targetUser?->name ?? '—' }}</div>
-                                        <div class="text-xs text-base-content/50">{{ $req->targetUser?->email ?? '' }}</div>
+                                        <div class="flex items-center gap-2.5">
+                                            <x-user-avatar :user="$req->targetUser" size="w-7 h-7" text-size="text-xs" />
+                                            <div class="min-w-0">
+                                                <div class="font-medium text-sm text-base-content truncate">{{ $req->targetUser?->name ?? '—' }}</div>
+                                                <div class="text-xs text-base-content/50 truncate">{{ $req->targetUser?->email ?? '' }}</div>
+                                            </div>
+                                        </div>
                                     </td>
                                     <td class="px-4 py-4 text-xs text-base-content/60 whitespace-nowrap">
                                         {{ $req->requested_at ? $req->requested_at->diffForHumans() : '-' }}

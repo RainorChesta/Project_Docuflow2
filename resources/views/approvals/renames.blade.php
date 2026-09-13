@@ -165,8 +165,13 @@
                                         </div>
                                     </td>
                                     <td class="px-4 py-4">
-                                        <div class="font-medium text-sm text-base-content">{{ $doc->renameRequestedBy?->name ?? '—' }}</div>
-                                        <div class="text-xs text-base-content/50">{{ $doc->renameRequestedBy?->email ?? '' }}</div>
+                                        <div class="flex items-center gap-2.5">
+                                            <x-user-avatar :user="$doc->renameRequestedBy" size="w-7 h-7" text-size="text-xs" />
+                                            <div class="min-w-0">
+                                                <div class="font-medium text-sm text-base-content truncate">{{ $doc->renameRequestedBy?->name ?? '—' }}</div>
+                                                <div class="text-xs text-base-content/50 truncate">{{ $doc->renameRequestedBy?->email ?? '' }}</div>
+                                            </div>
+                                        </div>
                                     </td>
                                     <td class="px-4 py-4 text-xs text-base-content/70 max-w-xs break-words">
                                         {{ $doc->rename_request_notes ?? '—' }}

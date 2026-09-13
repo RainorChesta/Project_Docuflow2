@@ -1,11 +1,13 @@
-<section>
-    <header>
-        <h2 class="text-lg font-medium text-base-content">
-            {{ __('Profile Information') }}
+<section class="space-y-6">
+    <header class="border-b border-base-200 pb-3 sm:pb-4">
+        <h2 class="text-base sm:text-lg font-bold text-base-content flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4.5 h-4.5 sm:w-5 sm:h-5 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            <span>{{ __('Informasi Profil') }}</span>
         </h2>
-
-        <p class="mt-1 text-sm text-base-content/60">
-            {{ __("Update your account's profile information and email address.") }}
+        <p class="mt-0.5 sm:mt-1 text-[11px] sm:text-xs text-base-content/60">
+            {{ __('Perbarui data profil pribadi, foto akun, dan alamat email Anda.') }}
         </p>
     </header>
 
@@ -13,61 +15,64 @@
         @csrf
     </form>
 
-    <form method="post" action="{{ route('profile.update') }}" enctype="multipart/form-data" class="mt-6 space-y-6" x-data="profileInfoForm()">
+    <form method="post" action="{{ route('profile.update') }}" enctype="multipart/form-data" class="space-y-6" x-data="profileInfoForm()">
         @csrf
         @method('patch')
 
-        {{-- Profile Picture Upload --}}
-        <div class="form-control w-full">
-            <x-input-label :value="__('Profile Picture')" />
-            <div class="mt-2 flex items-center gap-4">
-                <div class="relative">
+        {{-- Profile Picture Upload Section --}}
+        <div class="rounded-2xl border border-base-200 bg-base-200/30 p-5 space-y-3">
+            <label class="text-xs font-semibold text-base-content/70 uppercase tracking-wider block">
+                {{ __('Foto Profil') }}
+            </label>
+            
+            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+                <div class="relative shrink-0 group">
                     <template x-if="avatarPreview && !removeAvatar">
-                        <img :src="avatarPreview" alt="{{ $user->name }}" class="h-16 w-16 rounded-full object-cover border-2 border-base-300 shadow-sm">
+                        <img :src="avatarPreview" alt="{{ $user->name }}" class="h-20 w-20 rounded-full object-cover border-2 border-base-300 shadow-sm ring-2 ring-primary/20">
                     </template>
                     <template x-if="!avatarPreview || removeAvatar">
-                        <div class="h-16 w-16 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xl border-2 border-base-300 shadow-sm">
-                            {{ strtoupper(substr($user->name, 0, 1)) }}
+                        <div class="h-20 w-20 rounded-full bg-gradient-to-br from-primary/20 via-primary/10 to-base-200 text-primary flex items-center justify-center font-extrabold text-2xl border-2 border-base-300 shadow-sm">
+                            {{ strtoupper(substr($user->name, 0, 2)) }}
                         </div>
                     </template>
                 </div>
 
-                <div class="space-y-1">
-                    <input type="file"
-                           name="profile_picture"
-                           id="profile_picture"
-                           accept="image/png,image/jpeg,image/jpg,image/webp"
-                           class="file-input file-input-bordered file-input-sm w-full max-w-xs"
-                           @change="handleFileChange($event)" />
-                    <input type="hidden" name="remove_profile_picture" :value="removeAvatar ? '1' : '0'">
-                    
-                    <div class="flex items-center gap-2 pt-0.5">
+                <div class="space-y-2 flex-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <input type="file"
+                               name="profile_picture"
+                               id="profile_picture"
+                               accept="image/png,image/jpeg,image/jpg,image/webp"
+                               class="file-input file-input-bordered file-input-sm w-full max-w-xs rounded-xl"
+                               @change="handleFileChange($event)" />
+                        <input type="hidden" name="remove_profile_picture" :value="removeAvatar ? '1' : '0'">
+
                         {{-- Tombol hapus foto tersimpan di database/storage --}}
                         <template x-if="savedAvatar && !hasFileSelected">
                             <button type="button"
-                                    class="btn btn-ghost btn-xs text-error gap-1"
+                                    class="btn btn-ghost btn-sm text-error gap-1.5 rounded-xl"
                                     @click="$dispatch('open-modal', 'confirm-delete-avatar')">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
-                                {{ __('Hapus Foto') }}
+                                <span>{{ __('Hapus Foto') }}</span>
                             </button>
                         </template>
 
                         {{-- Tombol batalkan pilihan file baru yang belum disimpan --}}
                         <template x-if="hasFileSelected">
                             <button type="button"
-                                    class="btn btn-ghost btn-xs text-warning gap-1"
+                                    class="btn btn-ghost btn-sm text-warning gap-1.5 rounded-xl"
                                     @click="cancelFileSelection()">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
-                                {{ __('Batalkan Pilihan') }}
+                                <span>{{ __('Batalkan Pilihan') }}</span>
                             </button>
                         </template>
                     </div>
 
-                    <p class="text-xs text-base-content/50">{{ __('Format: JPG, PNG, WEBP. Maks: 2MB.') }}</p>
+                    <p class="text-xs text-base-content/50">{{ __('Format yang didukung: JPG, PNG, WEBP. Ukuran maksimal: 2MB.') }}</p>
                     <p x-show="deleteSuccessMessage" x-text="deleteSuccessMessage" class="text-xs text-success font-medium" x-transition></p>
                     <p x-show="deleteErrorMessage" x-text="deleteErrorMessage" class="text-xs text-error font-medium" x-transition></p>
                 </div>
@@ -77,30 +82,30 @@
 
         {{-- Modal Konfirmasi Hapus Foto Profil --}}
         <x-modal name="confirm-delete-avatar" :show="false" maxWidth="sm">
-            <div class="p-4 sm:p-6">
+            <div class="p-6">
                 <div class="flex items-center gap-3">
-                    <div class="h-10 w-10 rounded-full bg-error/10 text-error flex items-center justify-center shrink-0">
+                    <div class="h-10 w-10 rounded-xl bg-error/10 text-error flex items-center justify-center shrink-0">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                     </div>
                     <div>
-                        <h3 class="text-lg font-bold text-base-content">{{ __('Hapus Foto Profil') }}</h3>
+                        <h3 class="text-base font-bold text-base-content">{{ __('Hapus Foto Profil') }}</h3>
                         <p class="text-xs text-base-content/60">{{ __('Tindakan ini tidak dapat dibatalkan.') }}</p>
                     </div>
                 </div>
 
-                <p class="mt-3 text-sm text-base-content/70">
+                <p class="mt-4 text-sm text-base-content/70">
                     {{ __('Apakah Anda yakin ingin menghapus foto profil Anda? Foto akan langsung dihapus dari informasi profil dan sistem.') }}
                 </p>
 
                 <div x-show="deleteErrorMessage" class="mt-3 alert alert-error text-xs shadow-sm" x-text="deleteErrorMessage"></div>
 
                 <div class="mt-6 flex justify-end gap-2">
-                    <button type="button" class="btn btn-ghost btn-sm" :disabled="isDeleting" x-on:click="$dispatch('close-modal', 'confirm-delete-avatar')">
+                    <button type="button" class="btn btn-ghost btn-sm rounded-xl" :disabled="isDeleting" x-on:click="$dispatch('close-modal', 'confirm-delete-avatar')">
                         {{ __('Batal') }}
                     </button>
-                    <button type="button" class="btn btn-error btn-sm gap-1.5" :disabled="isDeleting" @click="deleteSavedAvatar()">
+                    <button type="button" class="btn btn-error btn-sm rounded-xl gap-1.5" :disabled="isDeleting" @click="deleteSavedAvatar()">
                         <span x-show="isDeleting" class="loading loading-spinner loading-xs"></span>
                         <svg x-show="!isDeleting" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -111,50 +116,121 @@
             </div>
         </x-modal>
 
-        <div class="form-control w-full">
-            <x-input-label for="name" :value="__('Name')" />
-            <x-text-input id="name" name="name" type="text" class="input input-bordered w-full mt-1" :value="old('name', $user->name)" required autofocus autocomplete="name" />
-            <x-input-error class="mt-2" :messages="$errors->get('name')" />
+        {{-- Form Fields (Name & Email) --}}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div class="form-control w-full space-y-1">
+                <x-input-label for="name" :value="__('Nama Lengkap')" class="font-semibold text-xs text-base-content/80" />
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-base-content/40">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                    </span>
+                    <x-text-input id="name" name="name" type="text" class="input input-bordered w-full pl-9 rounded-xl font-medium" :value="old('name', $user->name)" required autofocus autocomplete="name" />
+                </div>
+                <x-input-error class="mt-1" :messages="$errors->get('name')" />
+            </div>
+
+            <div class="form-control w-full space-y-1">
+                <x-input-label for="email" :value="__('Alamat Email')" class="font-semibold text-xs text-base-content/80" />
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-base-content/40">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                    </span>
+                    <x-text-input id="email" name="email" type="email" class="input input-bordered w-full pl-9 rounded-xl font-medium" :value="old('email', $user->email)" required autocomplete="username" />
+                </div>
+                <x-input-error class="mt-1" :messages="$errors->get('email')" />
+
+                @if ($user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! $user->hasVerifiedEmail())
+                    <div class="mt-2 p-3 rounded-xl bg-warning/10 border border-warning/20">
+                        <p class="text-xs text-warning-content">
+                            {{ __('Alamat email Anda belum diverifikasi.') }}
+                            <button form="send-verification" class="link link-primary font-semibold text-xs ml-1">
+                                {{ __('Kirim ulang email verifikasi') }}
+                            </button>
+                        </p>
+
+                        @if (session('status') === 'verification-link-sent')
+                            <p class="mt-1 font-semibold text-xs text-success">
+                                {{ __('Tautan verifikasi baru telah dikirimkan ke alamat email Anda.') }}
+                            </p>
+                        @endif
+                    </div>
+                @endif
+            </div>
         </div>
 
-        <div class="form-control w-full">
-            <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" name="email" type="email" class="input input-bordered w-full mt-1" :value="old('email', $user->email)" required autocomplete="username" />
-            <x-input-error class="mt-2" :messages="$errors->get('email')" />
+        {{-- Organization Info Summary (Read-Only) --}}
+        <div class="rounded-2xl border border-base-200 bg-base-200/20 p-5 space-y-4">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-base-content/70 uppercase tracking-wider">
+                    {{ __('Penugasan & Hak Akses Organisasi (Hanya Lihat)') }}
+                </span>
+                <span class="text-[11px] text-base-content/40 italic">
+                    {{ __('Dikelola oleh Administrator') }}
+                </span>
+            </div>
 
-            @if ($user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! $user->hasVerifiedEmail())
-                <div>
-                    <p class="text-sm mt-2 text-base-content/70">
-                        {{ __('Your email address is unverified.') }}
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                <div class="bg-base-100 p-3.5 rounded-xl border border-base-200">
+                    <span class="text-base-content/50 block mb-1">{{ __('Peran Sistem') }}</span>
+                    <span class="badge {{ $user->system_role === 'admin' ? 'badge-accent' : ($user->system_role === 'direktur' ? 'badge-info' : ($user->system_role === 'head' ? 'badge-warning' : 'badge-ghost')) }} badge-sm uppercase font-bold">
+                        {{ $user->system_role }}
+                    </span>
+                </div>
 
-                        <button form="send-verification" class="link link-primary text-sm">
-                            {{ __('Click here to re-send the verification email.') }}
-                        </button>
-                    </p>
-
-                    @if (session('status') === 'verification-link-sent')
-                        <p class="mt-2 font-medium text-sm text-success">
-                            {{ __('A new verification link has been sent to your email address.') }}
-                        </p>
+                <div class="bg-base-100 p-3.5 rounded-xl border border-base-200">
+                    <span class="text-base-content/50 block mb-1">{{ __('Divisi') }}</span>
+                    @if($user->divisions->isNotEmpty())
+                        <div class="flex flex-wrap gap-1">
+                            @foreach($user->divisions as $div)
+                                <span class="font-semibold text-base-content bg-base-200 px-1.5 py-0.5 rounded">{{ $div->code ?: $div->name }}</span>
+                            @endforeach
+                        </div>
+                    @elseif($user->division)
+                        <span class="font-semibold text-base-content">{{ $user->division->name }}</span>
+                    @else
+                        <span class="text-base-content/40 italic">-</span>
                     @endif
                 </div>
-            @endif
+
+                <div class="bg-base-100 p-3.5 rounded-xl border border-base-200">
+                    <span class="text-base-content/50 block mb-1">{{ __('Perusahaan & Cabang') }}</span>
+                    @if($user->system_role === 'admin')
+                        <span class="font-semibold text-accent-content">{{ __('Semua Perusahaan') }}</span>
+                    @elseif($user->companies->isNotEmpty())
+                        <span class="font-semibold text-base-content">
+                            {{ $user->companies->count() }} Perusahaan ({{ $user->branches->count() }} Cabang)
+                        </span>
+                    @else
+                        <span class="text-base-content/40 italic">-</span>
+                    @endif
+                </div>
+            </div>
         </div>
 
-        <div class="flex items-center gap-4">
-            <button type="submit" class="btn btn-primary">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                {{ __('Save') }}
+        {{-- Submit Button & Feedback --}}
+        <div class="flex items-center gap-3 pt-2">
+            <button type="submit" class="btn btn-primary rounded-xl px-5 font-semibold gap-2 shadow-xs">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                <span>{{ __('Simpan Perubahan') }}</span>
             </button>
 
             @if (session('status') === 'profile-updated')
-                <p
-                    x-data="{ show: true }"
-                    x-show="show"
-                    x-transition
-                    x-init="setTimeout(() => show = false, 2000)"
-                    class="text-sm text-success"
-                >{{ __('Saved.') }}</p>
+                <div x-data="{ show: true }"
+                     x-show="show"
+                     x-transition
+                     x-init="setTimeout(() => show = false, 3000)"
+                     class="flex items-center gap-1.5 text-xs text-success font-semibold">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>{{ __('Perubahan profil berhasil disimpan.') }}</span>
+                </div>
             @endif
         </div>
     </form>

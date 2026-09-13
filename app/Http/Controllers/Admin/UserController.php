@@ -16,7 +16,7 @@ class UserController extends Controller
     public function index(Request $request): View
     {
         $this->authorize('admin');
-        $query = User::with(['divisions', 'companies', 'branches']);
+        $query = User::with(['divisions', 'companies', 'branches.company']);
 
         if ($request->filled('search')) {
             $search = $request->search;

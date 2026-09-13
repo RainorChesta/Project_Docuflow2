@@ -1,26 +1,26 @@
-<section class="space-y-6">
-    <header class="flex flex-wrap items-center justify-between gap-3">
+<section class="space-y-4 sm:space-y-6">
+    <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 pb-3 sm:pb-4 border-b border-base-200">
         <div>
-            <h2 class="text-xl font-bold text-base-content flex items-center gap-2.5">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <h2 class="text-base sm:text-lg md:text-xl font-bold text-base-content flex items-center gap-2 sm:gap-2.5">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5 sm:h-5 sm:w-5 md:h-6 md:w-6 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                 </svg>
-                {{ __('Tanda Tangan Digital (TTD)') }}
+                <span>{{ __('Tanda Tangan Digital (TTD)') }}</span>
             </h2>
-            <p class="mt-1 text-sm text-base-content/60">
+            <p class="mt-0.5 sm:mt-1 text-xs sm:text-sm text-base-content/60">
                 {{ __('Kelola tanda tangan original dan stempel perusahaan Anda.') }}
             </p>
         </div>
-        <div id="ttd-status-badge">
+        <div id="ttd-status-badge" class="self-start sm:self-auto shrink-0">
             @if(auth()->user()->hasSignature('original'))
-                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white shadow-xs">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
-                    {{ __('TTD Original Aktif') }}
+                <span class="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold bg-emerald-600 text-white shadow-xs">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 sm:h-3.5 sm:w-3.5 stroke-[2.5] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+                    <span>{{ __('TTD Original Aktif') }}</span>
                 </span>
             @else
-                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-white shadow-xs">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                    {{ __('Wajib Membuat TTD Original') }}
+                <span class="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold bg-amber-500 text-white shadow-xs">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 sm:h-3.5 sm:w-3.5 stroke-[2.5] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                    <span>{{ __('Wajib Membuat TTD Original') }}</span>
                 </span>
             @endif
         </div>

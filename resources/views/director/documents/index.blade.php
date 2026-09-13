@@ -58,25 +58,31 @@
                     </nav>
                 </div>
 
-                {{-- Search & Filter Section --}}
-                @if($selectedCompanyId && !$selectedBranchId)
-                    <div class="px-4 sm:px-5 pb-4 sm:pb-5 space-y-4 border-t border-base-200 pt-4 sm:pt-5">
-                        <div class="flex items-center gap-2">
-                            <div class="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
-                            <h3 class="font-bold text-sm text-base-content">
-                                {{ __('Cari Folder Cabang') }}
-                            </h3>
-                        </div>
-
+                {{-- Search & Filter Section (Available at all levels) --}}
+                <div class="px-4 sm:px-5 pb-4 sm:pb-5 space-y-4 border-t border-base-200 pt-4 sm:pt-5">
                     <form method="GET" action="{{ route('director.documents.index') }}" class="space-y-3">
-                        <input type="hidden" name="company_id" value="{{ $selectedCompanyId }}">
+                        @if($selectedCompanyId)<input type="hidden" name="company_id" value="{{ $selectedCompanyId }}">@endif
+                        @if($selectedBranchId)<input type="hidden" name="branch_id" value="{{ $selectedBranchId }}">@endif
+                        @if($selectedDivisionId)<input type="hidden" name="division_id" value="{{ $selectedDivisionId }}">@endif
                         <input type="hidden" name="view_mode" value="{{ $viewMode }}">
 
-                        <div class="flex flex-col sm:flex-row gap-3 w-full">
+                        <div class="flex flex-col lg:flex-row gap-2.5 w-full">
+                            {{-- Search Input with Context-Aware Placeholder --}}
                             <div class="flex-grow relative">
+                                @php
+                                    if ($selectedDivisionId) {
+                                        $searchPlaceholder = __('Search documents...');
+                                    } elseif ($selectedBranchId) {
+                                        $searchPlaceholder = __('Search division...');
+                                    } elseif ($selectedCompanyId) {
+                                        $searchPlaceholder = __('Search branch...');
+                                    } else {
+                                        $searchPlaceholder = __('Cari dokumen di semua perusahaan & cabang...');
+                                    }
+                                @endphp
                                 <input type="text" name="search" value="{{ $search }}" 
-                                       placeholder="{{ __('Search branch...') }}" 
-                                       class="input input-bordered input-sm w-full pl-9 pr-8 bg-base-100 shadow-sm focus:shadow-md focus:border-primary transition-all">
+                                       placeholder="{{ $searchPlaceholder }}" 
+                                       class="input input-bordered input-sm w-full pl-9 pr-8 bg-base-100 shadow-xs focus:shadow-md focus:border-primary transition-all">
                                 <svg class="w-4 h-4 absolute left-3 top-2.5 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
@@ -88,93 +94,36 @@
                                     </a>
                                 @endif
                             </div>
-                            <div class="shrink-0 flex items-center gap-2">
-                                <button type="submit" class="btn btn-primary btn-sm w-full sm:w-auto px-6">
-                                    {{ __('Search') }}
-                                </button>
+
+                            {{-- Document Type Filter --}}
+                            <div class="w-full sm:w-44 lg:w-44 shrink-0">
+                                <select name="document_type_id" 
+                                        class="select select-bordered select-sm w-full text-xs bg-base-100 shadow-xs focus:shadow-md focus:border-primary transition-all">
+                                    <option value="">{{ __('Semua Tipe Dokumen') }}</option>
+                                    @foreach($availableDocumentTypes as $dt)
+                                        <option value="{{ $dt->id }}" {{ $selectedDocTypeId == $dt->id ? 'selected' : '' }}>
+                                            {{ $dt->name }} ({{ $dt->code }})
+                                        </option>
+                                    @endforeach
+                                </select>
                             </div>
-                        </div>
-                    </form>
-                    
-                    @if($search)
-                        <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-base-200 text-xs">
-                            <span class="text-base-content/50 font-medium">{{ __('Filter Aktif:') }}</span>
-                            <span class="badge badge-sm badge-outline gap-1 bg-base-200/50">
-                                {{ __('Cari: ') }} "{{ $search }}"
-                                <a href="{{ request()->fullUrlWithQuery(['search' => null]) }}" class="hover:text-error">✕</a>
-                            </span>
-                        </div>
-                    @endif
-                </div>
-            @elseif($selectedBranchId)
-                <div class="px-4 sm:px-5 pb-4 sm:pb-5 space-y-4 border-t border-base-200 pt-4 sm:pt-5">
 
+                            {{-- Status Filter --}}
+                            <div class="w-full sm:w-36 lg:w-36 shrink-0">
+                                <select name="status" 
+                                        class="select select-bordered select-sm w-full text-xs bg-base-100 shadow-xs focus:shadow-md focus:border-primary transition-all">
+                                    <option value="">{{ __('Semua Status') }}</option>
+                                    <option value="active" {{ ($selectedStatus ?? '') === 'active' ? 'selected' : '' }}>{{ __('Aktif / Approved') }}</option>
+                                    <option value="pending" {{ ($selectedStatus ?? '') === 'pending' ? 'selected' : '' }}>{{ __('Pending Persetujuan') }}</option>
+                                    <option value="expired" {{ ($selectedStatus ?? '') === 'expired' ? 'selected' : '' }}>{{ __('Kadaluarsa') }}</option>
+                                </select>
+                            </div>
 
-                    {{-- Search & Filter Form --}}
-                    <form method="GET" action="{{ route('director.documents.index') }}" class="space-y-3">
-                        <input type="hidden" name="company_id" value="{{ $selectedCompanyId }}">
-                        <input type="hidden" name="branch_id" value="{{ $selectedBranchId }}">
-                        @if($selectedDivisionId)<input type="hidden" name="division_id" value="{{ $selectedDivisionId }}">@endif
-                        <input type="hidden" name="view_mode" value="{{ $viewMode }}">
-
-                        <div class="flex flex-col lg:flex-row gap-3 w-full">
-                            @if(!$selectedDivisionId)
-                                {{-- Division Search (When in Branch) --}}
-                                <div class="flex-grow relative">
-                                    <input type="text" name="search" value="{{ $search }}" 
-                                           placeholder="{{ __('Search division...') }}" 
-                                           class="input input-bordered input-sm w-full pl-9 pr-8 bg-base-100 shadow-sm focus:shadow-md focus:border-primary transition-all">
-                                    <svg class="w-4 h-4 absolute left-3 top-2.5 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                    </svg>
-                                    @if($search)
-                                        <a href="{{ request()->fullUrlWithQuery(['search' => null]) }}" 
-                                           class="absolute right-2.5 top-2 text-base-content/40 hover:text-base-content" 
-                                           title="{{ __('Hapus pencarian') }}">
-                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                        </a>
-                                    @endif
-                                </div>
-                                <div class="shrink-0 flex items-center gap-2">
-                                    <button type="submit" class="btn btn-primary btn-sm w-full lg:w-auto px-6">
-                                        {{ __('Search') }}
-                                    </button>
-                                </div>
-                            @else
-                                {{-- Document Search & Filters (When inside a Division) --}}
-                                <div class="flex-grow relative">
-                                    <input type="text" name="search" value="{{ $search }}" 
-                                           placeholder="{{ __('Search documents...') }}" 
-                                           class="input input-bordered input-sm w-full pl-9 pr-8 bg-base-100 shadow-sm focus:shadow-md focus:border-primary transition-all">
-                                    <svg class="w-4 h-4 absolute left-3 top-2.5 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                    </svg>
-                                    @if($search)
-                                        <a href="{{ request()->fullUrlWithQuery(['search' => null]) }}" 
-                                           class="absolute right-2.5 top-2 text-base-content/40 hover:text-base-content" 
-                                           title="{{ __('Hapus pencarian') }}">
-                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                        </a>
-                                    @endif
-                                </div>
-
-                                {{-- Document Type Filter --}}
-                                <div class="w-full lg:w-48 shrink-0">
-                                    <select name="document_type_id" 
-                                            class="select select-bordered select-sm w-full text-xs bg-base-100 shadow-sm focus:shadow-md focus:border-primary transition-all">
-                                        <option value="">{{ __('Semua Tipe Dokumen') }}</option>
-                                        @foreach($availableDocumentTypes as $dt)
-                                            <option value="{{ $dt->id }}" {{ $selectedDocTypeId == $dt->id ? 'selected' : '' }}>
-                                                {{ $dt->name }} ({{ $dt->code }})
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                </div>
-
-                                {{-- Created By Filter --}}
-                                <div class="w-full lg:w-48 shrink-0">
+                            {{-- Created By Filter --}}
+                            @if($availableCreators->isNotEmpty())
+                                <div class="w-full sm:w-40 lg:w-40 shrink-0">
                                     <select name="owner_id" 
-                                            class="select select-bordered select-sm w-full text-xs bg-base-100 shadow-sm focus:shadow-md focus:border-primary transition-all">
+                                            class="select select-bordered select-sm w-full text-xs bg-base-100 shadow-xs focus:shadow-md focus:border-primary transition-all">
                                         <option value="">{{ __('Semua Pembuat') }}</option>
                                         @foreach($availableCreators as $creator)
                                             <option value="{{ $creator->id }}" {{ $selectedOwnerId == $creator->id ? 'selected' : '' }}>
@@ -183,32 +132,33 @@
                                         @endforeach
                                     </select>
                                 </div>
-
-                                {{-- Format Choice Filter --}}
-                                <div class="w-full lg:w-44 shrink-0">
-                                    <select name="format_choice" 
-                                            class="select select-bordered select-sm w-full text-xs bg-base-100 shadow-sm focus:shadow-md focus:border-primary transition-all">
-                                        <option value="">{{ __('Semua Format') }}</option>
-                                        <option value="baru" {{ ($selectedFormatChoice ?? '') === 'baru' ? 'selected' : '' }}>{{ __('Format Baru') }}</option>
-                                        <option value="lama" {{ ($selectedFormatChoice ?? '') === 'lama' ? 'selected' : '' }}>{{ __('Format Lama') }}</option>
-                                    </select>
-                                </div>
-
-                                {{-- Action Buttons: Search --}}
-                                <div class="shrink-0 flex items-center gap-2">
-                                    <button type="submit" class="btn btn-primary btn-sm w-full lg:w-auto px-6">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                        </svg>
-                                    </button>
-                                </div>
                             @endif
+
+                            {{-- Format Choice Filter --}}
+                            <div class="w-full sm:w-36 lg:w-36 shrink-0">
+                                <select name="format_choice" 
+                                        class="select select-bordered select-sm w-full text-xs bg-base-100 shadow-xs focus:shadow-md focus:border-primary transition-all">
+                                    <option value="">{{ __('Semua Format') }}</option>
+                                    <option value="baru" {{ ($selectedFormatChoice ?? '') === 'baru' ? 'selected' : '' }}>{{ __('Format Baru') }}</option>
+                                    <option value="lama" {{ ($selectedFormatChoice ?? '') === 'lama' ? 'selected' : '' }}>{{ __('Format Lama') }}</option>
+                                </select>
+                            </div>
+
+                            {{-- Search Button --}}
+                            <div class="shrink-0 flex items-center gap-2">
+                                <button type="submit" class="btn btn-primary btn-sm w-full lg:w-auto px-5 gap-1.5 shadow-xs">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    </svg>
+                                    <span>{{ __('Cari') }}</span>
+                                </button>
+                            </div>
                         </div>
                     </form>
 
                     {{-- Active Filter Badges & Reset Filter button --}}
                     @php
-                        $hasActiveFilters = $search || $selectedDocTypeId || $selectedOwnerId || $selectedFormatChoice;
+                        $hasActiveFilters = $search || $selectedDocTypeId || $selectedOwnerId || $selectedFormatChoice || $selectedStatus;
                     @endphp
                     @if($hasActiveFilters || $selectedDivisionId)
                         <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-base-200 text-xs">
@@ -231,6 +181,13 @@
                                 @endif
                             @endif
 
+                            @if($selectedStatus)
+                                <span class="badge badge-sm badge-outline gap-1 bg-base-200/50">
+                                    {{ __('Status: ') }} {{ ucfirst($selectedStatus) }}
+                                    <a href="{{ request()->fullUrlWithQuery(['status' => null]) }}" class="hover:text-error">✕</a>
+                                </span>
+                            @endif
+
                             @if($selectedOwnerId)
                                 @php $activeOwner = $availableCreators->firstWhere('id', $selectedOwnerId); @endphp
                                 @if($activeOwner)
@@ -248,7 +205,7 @@
                                 </span>
                             @endif
 
-                            <a href="{{ route('director.documents.index', ['company_id' => $selectedCompanyId, 'branch_id' => $selectedBranchId]) }}" 
+                            <a href="{{ route('director.documents.index', array_filter(['company_id' => $selectedCompanyId, 'branch_id' => $selectedBranchId])) }}" 
                                class="btn btn-ghost btn-xs text-error hover:bg-error/10 ml-auto font-medium">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -258,7 +215,6 @@
                         </div>
                     @endif
                 </div>
-            @endif
             </div>
 
             {{-- 3. FOLDERS SECTION (Company / Branch / Division Folders) --}}
@@ -458,7 +414,7 @@
                         </div>
                     @endif
                 </div>
-            @elseif($search && !$selectedDivisionId)
+            @elseif(!$hasSearchOrFilter && $folders->isEmpty() && !$selectedDivisionId)
                 <div class="bg-base-100 border border-base-300 rounded-2xl p-10 text-center shadow-xs">
                     <div class="w-14 h-14 rounded-2xl bg-base-200/80 text-base-content/30 flex items-center justify-center mx-auto mb-3">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -473,16 +429,13 @@
                         <h4 class="font-bold text-base text-base-content">{{ __('No division folders found.') }}</h4>
                     @endif
                     <p class="text-xs text-base-content/60 mt-1 max-w-md mx-auto">
-                        {{ __('Tidak ada folder yang sesuai dengan kata kunci pencarian yang dimasukkan.') }}
+                        {{ __('Tidak ada folder yang tersedia pada level ini.') }}
                     </p>
-                    <a href="{{ request()->fullUrlWithQuery(['search' => null]) }}" class="btn btn-primary btn-sm mt-3">
-                        {{ __('Bersihkan Pencarian') }}
-                    </a>
                 </div>
             @endif
 
-            {{-- 4. DOCUMENT RESULTS SECTION (Rendered when in a division or when searching/filtering in a branch) --}}
-            @if($selectedDivisionId || ($selectedBranchId && $hasSearchOrFilter))
+            {{-- 4. DOCUMENT RESULTS SECTION (Rendered when in a division or when searching/filtering globally) --}}
+            @if($selectedDivisionId || $hasSearchOrFilter)
                 <div class="space-y-4 pt-2">
                     
                     {{-- Results Header with View Mode Toggle --}}
@@ -594,7 +547,12 @@
                                                             <span class="text-base-content/40">—</span>
                                                         @endif
                                                     </td>
-                                                    <td>{{ $doc->owner->name }}</td>
+                                                    <td>
+                                                        <div class="flex items-center gap-2">
+                                                            <x-user-avatar :user="$doc->owner" size="w-5 h-5" text-size="text-[10px]" />
+                                                            <span>{{ $doc->owner->name }}</span>
+                                                        </div>
+                                                    </td>
                                                     <td>
                                                         @if($doc->currentVersion)
                                                             <span class="badge badge-success badge-xs font-semibold">v{{ $doc->currentVersion->version_number }}</span>

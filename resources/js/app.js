@@ -1,6 +1,5 @@
 import Alpine from 'alpinejs';
-import './jodit';
-import { initJoditEditor, initPreviewPagination } from './jodit';
+import { initPreviewPagination } from './paper-pagination';
 
 // ─── Laravel Echo (Reverb WebSocket) ────────────────────────────
 // Only initialise if Reverb env vars are set (makes Reverb optional).
@@ -21,8 +20,6 @@ if (import.meta.env.VITE_REVERB_APP_KEY) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    initJoditEditor('#jodit-editor');
-    initJoditEditor('#editor-shared');
     // Halaman preview (show / preview-version / preview): sisipkan batas
     // antar halaman ke .doku-paper, baca ukuran kertas dari localStorage.
     initPreviewPagination('.doku-paper-scope');

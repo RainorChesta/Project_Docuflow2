@@ -221,11 +221,7 @@
                              @click="toggleUser({{ $user->id }})">
 
                             <div class="flex items-center gap-3.5 min-w-0">
-                                <div class="avatar shrink-0">
-                                    <div class="w-11 h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-base border border-primary/20">
-                                        {{ strtoupper(substr($user->name, 0, 1)) }}
-                                    </div>
-                                </div>
+                                <x-user-avatar :user="$user" size="w-11 h-11" text-size="text-base" />
 
                                 <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-center gap-2">

@@ -135,163 +135,186 @@ class DirectorDocumentController extends Controller
             ]));
         }
 
+        // Fetch available filter options
+        $availableCompanies = Company::query();
+        if (!$user->isAdmin()) {
+            $availableCompanies->whereHas('users', fn($uq) => $uq->where('users.id', $user->id));
+        }
+        $availableCompanies = $availableCompanies->orderBy('name')->get(['id', 'name', 'code']);
+
+        $availableBranches = collect();
+        if ($selectedCompanyId) {
+            $brQuery = Branch::where('company_id', $selectedCompanyId);
+            if (!$user->isAdmin() && !$user->isDirector()) {
+                $brQuery->whereHas('users', fn($uq) => $uq->where('users.id', $user->id));
+            }
+            $availableBranches = $brQuery->orderByDesc('is_pusat')->orderBy('name')->get(['id', 'name', 'code', 'company_id']);
+        }
+
+        $availableDivisions = Division::orderBy('name')->get(['id', 'name', 'code']);
+        $availableDocumentTypes = DocumentType::orderBy('name')->get(['id', 'name', 'code']);
+        $availableCreators = User::whereHas('documents', function ($q) use ($user, $selectedCompanyId, $selectedBranchId) {
+            if ($selectedBranchId) {
+                $q->where('branch_id', $selectedBranchId);
+            } elseif ($selectedCompanyId) {
+                $q->where('company_id', $selectedCompanyId);
+            }
+        })->orderBy('name')->get(['id', 'name']);
+
+        $selectedStatus = $request->get('status');
+
+        $hasSearchOrFilter = ($search !== null && trim($search) !== '') 
+            || ($selectedDocTypeId !== null && $selectedDocTypeId !== '') 
+            || ($selectedOwnerId !== null && $selectedOwnerId !== '')
+            || ($selectedFormatChoice !== null && $selectedFormatChoice !== '')
+            || ($selectedStatus !== null && $selectedStatus !== '');
+
         // Sub-Folders collection for current level
         $folders = collect();
-
-        // Level 0: Root -> Show Company folders
-        if (!$selectedCompanyId) {
-            $companiesQuery = Company::query();
-            if (!$user->isAdmin()) {
-                $companiesQuery->whereHas('users', fn($uq) => $uq->where('users.id', $user->id));
-            }
-            $companies = $companiesQuery->withCount(['branches' => function ($bq) use ($user) {
-                if (!$user->isAdmin()) {
-                    $bq->whereHas('users', fn($uq) => $uq->where('users.id', $user->id));
-                }
-            }])->withCount(['documents'])->orderBy('name')->get();
-
-            $folders = $companies->map(function ($comp) use ($viewMode) {
-                return [
-                    'id' => $comp->id,
-                    'type' => 'company',
-                    'name' => $comp->name,
-                    'code' => $comp->code,
-                    'sub_count' => $comp->branches_count,
-                    'sub_label' => 'Cabang',
-                    'doc_count' => $comp->documents_count,
-                    'url' => route('director.documents.index', array_filter([
-                        'company_id' => $comp->id,
-                        'view_mode' => $viewMode,
-                    ])),
-                ];
-            });
-        }
-        // Level 1: Inside Company -> Show Branch folders
-        elseif ($selectedCompanyId && !$selectedBranchId) {
-            $branchesQuery = Branch::where('company_id', $selectedCompanyId);
-            if (!$user->isAdmin() && !$user->isDirector()) {
-                $branchesQuery->whereHas('users', fn($uq) => $uq->where('users.id', $user->id));
-            }
-            
-            if (!empty($search)) {
-                $branchesQuery->where('name', 'like', "%{$search}%");
-            }
-            
-            $branches = $branchesQuery->withCount(['documents'])->orderByDesc('is_pusat')->orderBy('name')->get();
-
-            $folders = $branches->map(function ($br) use ($selectedCompanyId, $viewMode) {
-                return [
-                    'id' => $br->id,
-                    'type' => 'branch',
-                    'name' => $br->name,
-                    'code' => $br->effective_code,
-                    'is_pusat' => (bool) $br->is_pusat,
-                    'doc_count' => $br->documents_count,
-                    'url' => route('director.documents.index', array_filter([
-                        'company_id' => $selectedCompanyId,
-                        'branch_id' => $br->id,
-                        'view_mode' => $viewMode,
-                    ])),
-                ];
-            });
-        }
-
-        $hasSearchOrFilter = $selectedDivisionId 
-            || ($search !== null && trim($search) !== '') 
-            || ($selectedDocTypeId !== null && $selectedDocTypeId !== '') 
-            || ($selectedOwnerId !== null && $selectedOwnerId !== '');
-
-        // Level 2: Inside Branch -> Show Division folders when not actively searching/filtering
-        if ($selectedBranchId && !$selectedDivisionId && !$hasSearchOrFilter) {
-            $branchDocDivisions = Document::where('branch_id', $selectedBranchId)
-                ->whereNotNull('division_id')
-                ->select('division_id')
-                ->selectRaw('count(*) as count')
-                ->groupBy('division_id')
-                ->pluck('count', 'division_id');
-
-            $allDivisions = Division::orderBy('name')->get();
-            
-            $folders = $allDivisions->map(function ($div) use ($branchDocDivisions, $selectedCompanyId, $selectedBranchId, $viewMode) {
-                $count = $branchDocDivisions[$div->id] ?? 0;
-                return [
-                    'id' => $div->id,
-                    'type' => 'division',
-                    'name' => $div->name,
-                    'code' => strtoupper($div->code),
-                    'doc_count' => $count,
-                    'url' => route('director.documents.index', array_filter([
-                        'company_id' => $selectedCompanyId,
-                        'branch_id' => $selectedBranchId,
-                        'division_id' => $div->id,
-                        'view_mode' => $viewMode,
-                    ])),
-                ];
-            });
-        }
-
-        // Fetch Documents for current branch & filters
         $documents = collect();
-        $availableDivisions = collect();
-        $availableDocumentTypes = collect();
-        $availableCreators = collect();
 
-        // Documents are queried if inside a division OR when searching/filtering inside a branch
-        if ($selectedDivisionId || ($selectedBranchId && $hasSearchOrFilter)) {
-            // Populate filter options dynamically from documents in this selected division and branch
-            $branchDocTypes = DocumentType::whereHas('documents', function ($q) use ($selectedDivisionId, $selectedBranchId) {
-                $q->where('branch_id', $selectedBranchId);
-                if ($selectedDivisionId) {
-                    $q->where('division_id', $selectedDivisionId);
+        // When NO search/filter is active: Browse Google Drive folder structure
+        if (!$hasSearchOrFilter && !$selectedDivisionId) {
+            // Level 0: Root -> Show Company folders
+            if (!$selectedCompanyId) {
+                $companiesQuery = Company::query();
+                if (!$user->isAdmin()) {
+                    $companiesQuery->whereHas('users', fn($uq) => $uq->where('users.id', $user->id));
                 }
-            })->orderBy('name')->get();
-            $availableDocumentTypes = $branchDocTypes->isNotEmpty() ? $branchDocTypes : DocumentType::orderBy('name')->get();
+                $companies = $companiesQuery->withCount(['branches' => function ($bq) use ($user) {
+                    if (!$user->isAdmin()) {
+                        $bq->whereHas('users', fn($uq) => $uq->where('users.id', $user->id));
+                    }
+                }])->withCount(['documents'])->orderBy('name')->get();
 
-            $availableCreators = User::whereHas('documents', function ($q) use ($selectedDivisionId, $selectedBranchId) {
-                $q->where('branch_id', $selectedBranchId);
-                if ($selectedDivisionId) {
-                    $q->where('division_id', $selectedDivisionId);
+                $folders = $companies->map(function ($comp) use ($viewMode) {
+                    return [
+                        'id' => $comp->id,
+                        'type' => 'company',
+                        'name' => $comp->name,
+                        'code' => $comp->code,
+                        'sub_count' => $comp->branches_count,
+                        'sub_label' => 'Cabang',
+                        'doc_count' => $comp->documents_count,
+                        'url' => route('director.documents.index', array_filter([
+                            'company_id' => $comp->id,
+                            'view_mode' => $viewMode,
+                        ])),
+                    ];
+                });
+            }
+            // Level 1: Inside Company -> Show Branch folders
+            elseif ($selectedCompanyId && !$selectedBranchId) {
+                $branchesQuery = Branch::where('company_id', $selectedCompanyId);
+                if (!$user->isAdmin() && !$user->isDirector()) {
+                    $branchesQuery->whereHas('users', fn($uq) => $uq->where('users.id', $user->id));
                 }
-            })->orderBy('name')->get(['id', 'name']);
+                $branches = $branchesQuery->withCount(['documents'])->orderByDesc('is_pusat')->orderBy('name')->get();
 
-            $docQuery = Document::where('branch_id', $selectedBranchId)
-                ->with(['owner', 'division', 'documentType', 'currentVersion', 'versions', 'branch.company']);
+                $folders = $branches->map(function ($br) use ($selectedCompanyId, $viewMode) {
+                    return [
+                        'id' => $br->id,
+                        'type' => 'branch',
+                        'name' => $br->name,
+                        'code' => $br->effective_code,
+                        'is_pusat' => (bool) $br->is_pusat,
+                        'doc_count' => $br->documents_count,
+                        'url' => route('director.documents.index', array_filter([
+                            'company_id' => $selectedCompanyId,
+                            'branch_id' => $br->id,
+                            'view_mode' => $viewMode,
+                        ])),
+                    ];
+                });
+            }
+            // Level 2: Inside Branch -> Show Division folders
+            elseif ($selectedBranchId && !$selectedDivisionId) {
+                $branchDocDivisions = Document::where('branch_id', $selectedBranchId)
+                    ->whereNotNull('division_id')
+                    ->select('division_id')
+                    ->selectRaw('count(*) as count')
+                    ->groupBy('division_id')
+                    ->pluck('count', 'division_id');
+
+                $allDivisions = Division::orderBy('name')->get();
+                
+                $folders = $allDivisions->map(function ($div) use ($branchDocDivisions, $selectedCompanyId, $selectedBranchId, $viewMode) {
+                    $count = $branchDocDivisions[$div->id] ?? 0;
+                    return [
+                        'id' => $div->id,
+                        'type' => 'division',
+                        'name' => $div->name,
+                        'code' => strtoupper($div->code),
+                        'doc_count' => $count,
+                        'url' => route('director.documents.index', array_filter([
+                            'company_id' => $selectedCompanyId,
+                            'branch_id' => $selectedBranchId,
+                            'division_id' => $div->id,
+                            'view_mode' => $viewMode,
+                        ])),
+                    ];
+                });
+            }
+        }
+
+        // When searching, filtering, OR inside a Division -> Query Documents
+        if ($hasSearchOrFilter || $selectedDivisionId) {
+            $docQuery = Document::visibleTo($user)
+                ->with(['owner', 'division', 'documentType', 'currentVersion', 'versions', 'branch.company', 'company']);
+
+            if ($selectedCompanyId) {
+                $docQuery->where(function ($q) use ($selectedCompanyId) {
+                    $q->where('company_id', $selectedCompanyId)
+                      ->orWhereHas('branch', fn($b) => $b->where('company_id', $selectedCompanyId));
+                });
+            }
+
+            if ($selectedBranchId) {
+                $docQuery->where('branch_id', $selectedBranchId);
+            }
 
             if ($selectedDivisionId) {
                 $docQuery->where('division_id', $selectedDivisionId);
             }
 
-            // Apply search filter for documents inside division/branch
+            // Keyword Search (Title, Document Number, Pending Title)
             if (!empty($search)) {
                 $docQuery->where(function ($q) use ($search) {
                     $q->where('title', 'like', "%{$search}%")
-                      ->orWhere('document_number', 'like', "%{$search}%");
+                      ->orWhere('document_number', 'like', "%{$search}%")
+                      ->orWhere('pending_title', 'like', "%{$search}%");
                 });
             }
 
-            // Apply document type filter
+            // Document Type Filter
             if ($selectedDocTypeId) {
                 $docQuery->where('document_type_id', $selectedDocTypeId);
             }
 
-            // Apply creator filter
+            // Creator Filter
             if ($selectedOwnerId) {
                 $docQuery->where('owner_id', $selectedOwnerId);
             }
 
-            // Apply format choice filter
+            // Format Choice Filter
             if ($selectedFormatChoice && in_array($selectedFormatChoice, ['baru', 'lama'], true)) {
                 $docQuery->where('format_choice', $selectedFormatChoice);
             }
 
+            // Status Filter
+            if ($selectedStatus) {
+                if ($selectedStatus === 'active') {
+                    $docQuery->whereHas('currentVersion', fn($q) => $q->where('status', 'active'))
+                             ->where('is_expired', false);
+                } elseif ($selectedStatus === 'pending') {
+                    $docQuery->whereHas('versions', fn($q) => $q->where('status', 'pending'));
+                } elseif ($selectedStatus === 'expired') {
+                    $docQuery->where('is_expired', true);
+                }
+            }
+
             $documents = $docQuery->latest()->paginate(16)->withQueryString();
         }
-
-        $hasSearchOrFilter = $selectedDivisionId 
-            || ($search !== null && trim($search) !== '') 
-            || $selectedDocTypeId 
-            || $selectedOwnerId
-            || $selectedFormatChoice;
 
         return view('director.documents.index', compact(
             'breadcrumbs',
@@ -308,8 +331,11 @@ class DirectorDocumentController extends Controller
             'selectedDocTypeId',
             'selectedOwnerId',
             'selectedFormatChoice',
+            'selectedStatus',
             'search',
             'viewMode',
+            'availableCompanies',
+            'availableBranches',
             'availableDivisions',
             'availableDocumentTypes',
             'availableCreators'

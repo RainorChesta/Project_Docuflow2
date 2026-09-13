@@ -510,6 +510,7 @@ class SignatureController extends Controller
                     'id' => $u->id,
                     'name' => $u->name,
                     'email' => $u->email,
+                    'avatar_url' => $u->avatar_url,
                     'role' => match($u->system_role) {
                         'admin' => 'Admin',
                         'head' => 'Kepala Divisi',

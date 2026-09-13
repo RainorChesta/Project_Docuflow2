@@ -186,6 +186,7 @@ class DocumentShareController extends Controller
             'owner' => [
                 'id' => $document->owner_id,
                 'name' => $document->owner?->name,
+                'avatar_url' => $document->owner?->avatar_url,
             ],
             'general_access' => $document->general_access ?? 'restricted',
             'link_role' => $document->link_role,
@@ -196,6 +197,7 @@ class DocumentShareController extends Controller
                 'user_id' => $s->user_id,
                 'name' => $s->user?->name,
                 'email' => $s->user?->email,
+                'avatar_url' => $s->user?->avatar_url,
                 'role' => $s->role,
             ]),
             'division_shares' => $document->divisionShares->map(fn(DocumentDivisionShare $s) => [
@@ -217,7 +219,13 @@ class DocumentShareController extends Controller
                 ->where('name', 'like', "%{$term}%")
                 ->orWhere('email', 'like', "%{$term}%")))
             ->limit(10)
-            ->get(['id', 'name', 'email']);
+            ->get()
+            ->map(fn(User $u) => [
+                'id' => $u->id,
+                'name' => $u->name,
+                'email' => $u->email,
+                'avatar_url' => $u->avatar_url,
+            ]);
 
         $divisions = Division::query()
             ->when($term !== '', fn($q) => $q->where('name', 'like', "%{$term}%"))

@@ -519,13 +519,7 @@
                 @click="profileOpen = !profileOpen"
                 @click.outside="profileOpen = false">
                 
-            @if(Auth::user()->avatar_url)
-                <img src="{{ Auth::user()->avatar_url }}" alt="{{ Auth::user()->name }}" class="h-10 w-10 rounded-[10px] object-cover shrink-0 shadow-sm group-hover:scale-105 transition-transform">
-            @else
-                <div class="flex items-center justify-center h-10 w-10 rounded-[10px] bg-primary/20 text-primary text-sm font-bold shrink-0 group-hover:scale-105 transition-transform shadow-sm">
-                    {{ strtoupper(substr(Auth::user()->name, 0, 1)) }}
-                </div>
-            @endif
+            <x-user-avatar :user="Auth::user()" size="w-10 h-10" text-size="text-sm" class="group-hover:scale-105 transition-transform shadow-sm" />
             
             <div class="flex-1 min-w-0 text-left" :class="open ? '' : 'lg:hidden'">
                 <div class="font-bold text-sm text-base-content truncate leading-tight">{{ Auth::user()->name }}</div>

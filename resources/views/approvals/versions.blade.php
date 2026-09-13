@@ -236,8 +236,13 @@
                                         <span class="badge badge-warning badge-sm font-semibold">v{{ $version->version_number }}</span>
                                     </td>
                                     <td class="px-4 py-4">
-                                        <div class="font-medium text-sm text-base-content">{{ $version->author_name }}</div>
-                                        <div class="text-xs text-base-content/50">{{ $version->author?->email ?? '' }}</div>
+                                        <div class="flex items-center gap-2.5">
+                                            <x-user-avatar :user="$version->author" :name="$version->author_name" size="w-7 h-7" text-size="text-xs" />
+                                            <div class="min-w-0">
+                                                <div class="font-medium text-sm text-base-content truncate">{{ $version->author_name }}</div>
+                                                <div class="text-xs text-base-content/50 truncate">{{ $version->author?->email ?? '' }}</div>
+                                            </div>
+                                        </div>
                                     </td>
                                     <td class="px-4 py-4 text-xs text-base-content/60 whitespace-nowrap">
                                         {{ $version->created_at ? $version->created_at->diffForHumans() : '-' }}
