@@ -25,65 +25,53 @@
     }
 
     /* ---------- Base ---------- */
-    .doku-content, .doku-paper, .jodit-wysiwyg { font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5; color: #000; word-wrap: break-word; text-align: left; }
+    .doku-content, .doku-paper { font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5; color: #000; word-wrap: break-word; text-align: left; }
 
     /* ---------- Paragraf ---------- */
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) p { margin-top: 0; margin-bottom: 1em; }
+    :is(.doku-content, .doku-paper) p { margin-top: 0; margin-bottom: 1em; }
 
     /* ---------- List (ul, ol, li) ---------- */
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) ul, :is(.doku-content, .doku-paper, .jodit-wysiwyg) ol { margin-top: 0; margin-bottom: 1em; padding-left: 40px !important; }
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) ul { list-style-type: disc !important; }
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) ul ul { list-style-type: circle !important; margin-bottom: 0; }
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) ul ul ul { list-style-type: square !important; }
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) ol { list-style-type: decimal !important; }
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) ol ol { list-style-type: lower-alpha !important; margin-bottom: 0; }
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) ol ol ol { list-style-type: lower-roman !important; }
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) li { margin-bottom: 4px; display: list-item !important; text-align: match-parent; }
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) li > ul, :is(.doku-content, .doku-paper, .jodit-wysiwyg) li > ol { margin-bottom: 0; }
+    :is(.doku-content, .doku-paper) ul, :is(.doku-content, .doku-paper) ol { margin-top: 0; margin-bottom: 1em; padding-left: 40px !important; }
+    :is(.doku-content, .doku-paper) ul { list-style-type: disc !important; }
+    :is(.doku-content, .doku-paper) ul ul { list-style-type: circle !important; margin-bottom: 0; }
+    :is(.doku-content, .doku-paper) ul ul ul { list-style-type: square !important; }
+    :is(.doku-content, .doku-paper) ol { list-style-type: decimal !important; }
+    :is(.doku-content, .doku-paper) ol ol { list-style-type: lower-alpha !important; margin-bottom: 0; }
+    :is(.doku-content, .doku-paper) ol ol ol { list-style-type: lower-roman !important; }
+    :is(.doku-content, .doku-paper) li { margin-bottom: 4px; display: list-item !important; text-align: match-parent; }
+    :is(.doku-content, .doku-paper) li > ul, :is(.doku-content, .doku-paper) li > ol { margin-bottom: 0; }
 
     /* ---------- Headings ---------- */
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) h1, :is(.doku-content, .doku-paper, .jodit-wysiwyg) h2, :is(.doku-content, .doku-paper, .jodit-wysiwyg) h3, :is(.doku-content, .doku-paper, .jodit-wysiwyg) h4, :is(.doku-content, .doku-paper, .jodit-wysiwyg) h5, :is(.doku-content, .doku-paper, .jodit-wysiwyg) h6 { margin-top: 1.2em; margin-bottom: 0.5em; font-weight: bold !important; line-height: 1.2; }
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) h1 { font-size: 2em !important; }
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) h2 { font-size: 1.5em !important; }
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) h3 { font-size: 1.17em !important; }
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) h4 { font-size: 1em !important; }
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) h5 { font-size: 0.83em !important; }
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) h6 { font-size: 0.67em !important; }
+    :is(.doku-content, .doku-paper) h1, :is(.doku-content, .doku-paper) h2, :is(.doku-content, .doku-paper) h3, :is(.doku-content, .doku-paper) h4, :is(.doku-content, .doku-paper) h5, :is(.doku-content, .doku-paper) h6 { margin-top: 1.2em; margin-bottom: 0.5em; font-weight: bold !important; line-height: 1.2; }
+    :is(.doku-content, .doku-paper) h1 { font-size: 2em !important; }
+    :is(.doku-content, .doku-paper) h2 { font-size: 1.5em !important; }
+    :is(.doku-content, .doku-paper) h3 { font-size: 1.17em !important; }
+    :is(.doku-content, .doku-paper) h4 { font-size: 1em !important; }
+    :is(.doku-content, .doku-paper) h5 { font-size: 0.83em !important; }
+    :is(.doku-content, .doku-paper) h6 { font-size: 0.67em !important; }
 
-    /* FIX: Hapus !important pada border dan background agar inline style Jodit 
-       (seperti "No Border" atau highlight warna/multi-selection) bisa bekerja.
-       Untuk mencegah tertimpa default Jodit, specificity dinaikkan (body.jodit-wysiwyg). */
-    body:is(.doku-content, .doku-paper, .jodit-wysiwyg) table, :is(.doku-content, .doku-paper, .jodit-wysiwyg) table { border-collapse: collapse; width: 100%; margin-bottom: 1em; }
-    body:is(.doku-content, .doku-paper, .jodit-wysiwyg) th, body:is(.doku-content, .doku-paper, .jodit-wysiwyg) td, :is(.doku-content, .doku-paper, .jodit-wysiwyg) th, :is(.doku-content, .doku-paper, .jodit-wysiwyg) td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-    body:is(.doku-content, .doku-paper, .jodit-wysiwyg) th, :is(.doku-content, .doku-paper, .jodit-wysiwyg) th { font-weight: bold; background-color: #f9fafb; }
-    
-    /* Tampilkan garis bantu putus-putus HANYA SAAT MENGEDIT untuk elemen yang tidak memiliki border. */
-    .jodit-wysiwyg table, .jodit-wysiwyg th, .jodit-wysiwyg td { outline: 1px dashed #cbd5e1; outline-offset: -1px; }
+    /* Tables */
+    body:is(.doku-content, .doku-paper) table, :is(.doku-content, .doku-paper) table { border-collapse: collapse; width: 100%; margin-bottom: 1em; }
+    body:is(.doku-content, .doku-paper) th, body:is(.doku-content, .doku-paper) td, :is(.doku-content, .doku-paper) th, :is(.doku-content, .doku-paper) td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    body:is(.doku-content, .doku-paper) th, :is(.doku-content, .doku-paper) th { font-weight: bold; background-color: #f9fafb; }
     
     .doku-paper table.doku-table-no-border th, .doku-paper table.doku-table-no-border td { border: none !important; }
-    .jodit-wysiwyg table.doku-table-no-border th, .jodit-wysiwyg table.doku-table-no-border td { border: none !important; outline: 1px dashed #cbd5e1; outline-offset: -1px; }
 
     /* ---------- Blockquote / Pre ---------- */
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) blockquote { margin: 1em 40px; border-left: 4px solid #ccc; padding-left: 1em; color: #666; }
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) pre { background: #f4f4f4; padding: 1em; overflow-x: auto; font-family: monospace; }
+    :is(.doku-content, .doku-paper) blockquote { margin: 1em 40px; border-left: 4px solid #ccc; padding-left: 1em; color: #666; }
+    :is(.doku-content, .doku-paper) pre { background: #f4f4f4; padding: 1em; overflow-x: auto; font-family: monospace; }
 
     /* ---------- Inline formatting ---------- */
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) b, :is(.doku-content, .doku-paper, .jodit-wysiwyg) strong { font-weight: bold !important; }
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) i, :is(.doku-content, .doku-paper, .jodit-wysiwyg) em { font-style: italic !important; }
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) u { text-decoration: underline !important; }
+    :is(.doku-content, .doku-paper) b, :is(.doku-content, .doku-paper) strong { font-weight: bold !important; }
+    :is(.doku-content, .doku-paper) i, :is(.doku-content, .doku-paper) em { font-style: italic !important; }
+    :is(.doku-content, .doku-paper) u { text-decoration: underline !important; }
 
-    /* ---------- Elemen yang di-reset Tailwind Preflight tapi BELUM ditangani ---------- */
-    /* Tailwind: img { display: block } — Browser default: inline. Ini bikin
-       gambar di preview jadi block (ada gap bawah) padahal di editor inline. */
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) img { display: inline; max-width: 100%; height: auto; }
-    /* Tailwind: a { color: inherit; text-decoration: inherit } */
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) a { color: #1a0dab; text-decoration: underline; }
-    /* Tailwind: hr { height: 0; border-top-width: 1px; color: inherit } */
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) hr { margin: 1em 0; border: none; border-top: 1px solid #ccc; }
-    /* Tailwind: sub/sup { font-size: 75%; line-height: 0 } — benar, tapi kita
-       pastikan vertical-align supaya posisinya sama dengan default browser. */
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) sub { vertical-align: sub; font-size: smaller; }
-    :is(.doku-content, .doku-paper, .jodit-wysiwyg) sup { vertical-align: super; font-size: smaller; }
+    /* ---------- Elemen yang di-reset Tailwind Preflight ---------- */
+    :is(.doku-content, .doku-paper) img { display: inline; max-width: 100%; height: auto; }
+    :is(.doku-content, .doku-paper) a { color: #1a0dab; text-decoration: underline; }
+    :is(.doku-content, .doku-paper) hr { margin: 1em 0; border: none; border-top: 1px solid #ccc; }
+    :is(.doku-content, .doku-paper) sub { vertical-align: sub; font-size: smaller; }
+    :is(.doku-content, .doku-paper) sup { vertical-align: super; font-size: smaller; }
 
     /* Fix scroll hilang saat live-sync render: preview.blade.php merender
        ulang konten draft dari localStorage dengan menimpa innerHTML

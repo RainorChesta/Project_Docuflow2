@@ -734,12 +734,9 @@
                                 </button>
                             @endcan
 
-                            {{-- Export to PDF (hanya untuk dokumen hasil editor) --}}
                             @if(!$isFileBased)
-                                <button type="button" class="btn btn-ghost btn-sm border border-base-300 gap-1.5 shrink-0"
-                                        onclick="openModal('export-pdf-modal')"
-                                        title="{{ __('Export PDF') }}">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                <button type="button" onclick="document.getElementById('export-pdf-modal').showModal()" class="btn btn-ghost btn-sm border border-base-300 gap-1.5 shrink-0" title="{{ __('Export PDF') }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                                     <span class="hidden sm:inline">{{ __('Export PDF') }}</span>
                                 </button>
                             @endif
@@ -998,10 +995,17 @@
                  clampMarginToPage() di resources/js/jodit.js — logikanya
                  sengaja dibuat identik dengan PdfExportService::buildHtml()). --}}
             @if(!$isFileBased)
-                <dialog id="export-pdf-modal" class="modal">
-                <div class="modal-box max-w-sm max-h-[85vh] overflow-y-auto">
+                <dialog id="export-pdf-modal" class="modal" x-data="{ paperSize: 'F4', customWidth: '', customHeight: '', customUnit: 'cm' }">
+                    <div class="modal-box max-w-md max-h-[85vh] overflow-y-auto">
                         <div class="flex flex-wrap items-center justify-between mb-4">
-                            <h3 class="font-semibold">{{ __('Export to PDF') }}</h3>
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold text-sm">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                    </svg>
+                                </div>
+                                <h3 class="font-semibold text-base text-base-content">{{ __('Cetak / Ekspor Dokumen ke PDF') }}</h3>
+                            </div>
                             <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('export-pdf-modal').close()">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -1011,23 +1015,60 @@
                         <form method="POST" action="{{ route('documents.export-pdf', $document) }}"
                               onsubmit="this.querySelector('button[type=submit]').disabled = true;
                                         this.querySelector('button[type=submit]').classList.add('loading');
-                                        this.querySelector('button[type=submit]').innerHTML = '{{ __('Creating PDF…') }}';
+                                        this.querySelector('button[type=submit]').innerHTML = '{{ __('Membuat PDF…') }}';
                                         return true;">
                             @csrf
-                            <div class="form-control w-full mb-2">
-                                <label class="label"><span class="label-text font-medium">Ukuran Kertas</span></label>
-                                <select name="paper_size" class="select select-bordered w-full">
-                                    @foreach(['A4','A5','A3','Letter','Legal'] as $size)
-                                        <option value="{{ $size }}" {{ ($document->paper_size ?? 'A4') === $size ? 'selected' : '' }}>{{ $size }}</option>
-                                    @endforeach
+                            <div class="form-control w-full mb-3">
+                                <label class="label pb-1">
+                                    <span class="label-text font-medium text-sm">{{ __('Ukuran Kertas Cetak') }}</span>
+                                    <span class="label-text-alt text-xs text-primary font-semibold">{{ __('Default: F4') }}</span>
+                                </label>
+                                <select name="paper_size" x-model="paperSize" class="select select-bordered w-full">
+                                    <option value="F4" selected>F4 (21 x 33 cm) — {{ __('Standar Resmi') }}</option>
+                                    <option value="A4">A4 (21 x 29.7 cm)</option>
+                                    <option value="Letter">Letter (8.5" x 11" / 21.59 x 27.94 cm)</option>
+                                    <option value="Legal">Legal (8.5" x 14" / 21.59 x 35.56 cm)</option>
+                                    <option value="A5">A5 (14.8 x 21 cm)</option>
+                                    <option value="A3">A3 (29.7 x 42 cm)</option>
+                                    <option value="Custom">{{ __('Custom Size (Ukuran Khusus)') }}</option>
                                 </select>
                             </div>
-                            <p class="text-xs text-base-content/50 mb-4">
-                                {{ __('Margin follows current document margin; if it doesn\'t fit in the selected paper, the margin will be adjusted automatically.') }}
+
+                            {{-- Custom Size Inputs (Width, Height, Unit) --}}
+                            <div x-show="paperSize === 'Custom'" x-transition class="p-3 bg-base-200/60 rounded-xl border border-base-300 mb-3 space-y-2">
+                                <div class="text-xs font-semibold text-base-content/80 flex items-center justify-between">
+                                    <span>{{ __('Dimensi Ukuran Kustom') }}</span>
+                                    <div class="flex items-center gap-2">
+                                        <label class="text-xs font-normal cursor-pointer flex items-center gap-1">
+                                            <input type="radio" name="custom_unit" value="cm" x-model="customUnit" class="radio radio-primary radio-xs"> cm
+                                        </label>
+                                        <label class="text-xs font-normal cursor-pointer flex items-center gap-1">
+                                            <input type="radio" name="custom_unit" value="mm" x-model="customUnit" class="radio radio-primary radio-xs"> mm
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div class="form-control">
+                                        <label class="label py-0.5"><span class="label-text text-xs">{{ __('Lebar') }} (<span x-text="customUnit"></span>)</span></label>
+                                        <input type="number" step="0.1" min="0.1" name="custom_width" x-model="customWidth" :required="paperSize === 'Custom'" placeholder="Contoh: 21" class="input input-bordered input-sm w-full">
+                                    </div>
+                                    <div class="form-control">
+                                        <label class="label py-0.5"><span class="label-text text-xs">{{ __('Tinggi') }} (<span x-text="customUnit"></span>)</span></label>
+                                        <input type="number" step="0.1" min="0.1" name="custom_height" x-model="customHeight" :required="paperSize === 'Custom'" placeholder="Contoh: 33" class="input input-bordered input-sm w-full">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <p class="text-xs text-base-content/60 bg-base-200/40 p-2.5 rounded-lg border border-base-200 mb-4">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 inline mr-1 text-info" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                {{ __('Pilihan ukuran kertas di atas hanya berlaku untuk sesi cetak/ekspor ini dan TIDAK akan mengubah format asli dokumen Anda.') }}
                             </p>
                             <div class="flex flex-wrap justify-end gap-2">
                                 <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('export-pdf-modal').close()">{{ __('Batal') }}</button>
-                                <button type="submit" class="btn btn-primary btn-sm">{{ __('Export') }}</button>
+                                <button type="submit" class="btn btn-primary btn-sm gap-1.5 font-medium">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                    {{ __('Cetak / Ekspor') }}
+                                </button>
                             </div>
                         </form>
                     </div>

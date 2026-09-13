@@ -11,7 +11,6 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\DocumentExportController;
 use App\Http\Controllers\DocumentShareController;
-use App\Http\Controllers\JoditController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\LanguageController;
 use App\Http\Controllers\SearchController;
@@ -38,9 +37,6 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware(['account.verified', 'signature.required'])->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-
-    // Jodit image upload
-    Route::post('/jodit-upload', [JoditController::class, 'upload'])->name('jodit.upload');
 
     // Global Document Search (respects visibility)
     Route::get('/search', [SearchController::class, 'search'])->name('search');
