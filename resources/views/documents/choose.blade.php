@@ -349,7 +349,7 @@
     </div>
 
     @push('scripts')
-        <script src="{{ rtrim(config('onlyoffice.url'), '/') }}/web-apps/apps/api/documents/api.js"></script>
+        <script src="{{ rtrim(config('onlyoffice.url'), '/') }}/web-apps/apps/api/documents/api.js?v=9.4.0-f4-v2"></script>
         <script>
             window.openTemplatePreview = function(templateId, templateTitle, alpineContext) {
                 alpineContext.previewLoading = true;

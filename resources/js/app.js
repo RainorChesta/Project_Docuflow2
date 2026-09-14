@@ -21,7 +21,7 @@ if (import.meta.env.VITE_REVERB_APP_KEY) {
 
 document.addEventListener('DOMContentLoaded', () => {
     // Halaman preview (show / preview-version / preview): sisipkan batas
-    // antar halaman ke .doku-paper, baca ukuran kertas dari localStorage.
+    // antar halaman ke .doku-paper, baca ukuran kertas dari localStorage/dataset.
     initPreviewPagination('.doku-paper-scope');
 });
 

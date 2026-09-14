@@ -21,24 +21,43 @@ class DocumentExportController extends Controller
     {
         $this->authorize('view', $document);
 
-        // paper_size opsional, dikirim dari modal export di halaman show
-        // (lihat _export-pdf-modal di documents/show.blade.php). Override
-        // ukuran kertas HANYA untuk export kali ini — TIDAK mengubah
-        // paper_size yang tersimpan di dokumen. Margin tetap ikut margin
-        // dokumen; PdfExportService yang akan meng-clamp margin itu ke
-        // ukuran kertas override (kalau perlu) lewat clampMarginToPage()-nya
-        // sendiri, konsisten dengan clamp yang sama di resources/js/jodit.js.
+        // paper_size dikirim dari modal export/print di halaman show/preview.
+        // Default cetak/ekspor adalah F4 (21 x 33 cm).
+        // Override ukuran kertas HANYA untuk job ekspor/cetak kali ini —
+        // TIDAK PERNAH mengubah paper_size yang tersimpan di dokumen.
         $validated = $request->validate([
-            'paper_size' => 'nullable|string|in:A4,A5,A3,Letter,Legal',
+            'paper_size' => 'nullable|string|in:F4,A4,A5,A3,Letter,Legal,Custom',
+            'custom_width' => 'nullable|numeric|gt:0|required_if:paper_size,Custom',
+            'custom_height' => 'nullable|numeric|gt:0|required_if:paper_size,Custom',
+            'custom_unit' => 'nullable|string|in:cm,mm',
+        ], [
+            'custom_width.required_if' => __('Lebar kertas wajib diisi untuk ukuran custom.'),
+            'custom_width.gt' => __('Lebar kertas harus bernilai lebih dari 0.'),
+            'custom_width.numeric' => __('Lebar kertas harus berupa angka valid.'),
+            'custom_height.required_if' => __('Tinggi kertas wajib diisi untuk ukuran custom.'),
+            'custom_height.gt' => __('Tinggi kertas harus bernilai lebih dari 0.'),
+            'custom_height.numeric' => __('Tinggi kertas harus berupa angka valid.'),
         ]);
 
+        $paperSize = $validated['paper_size'] ?? 'F4';
+        $customDimensions = null;
+        if ($paperSize === 'Custom') {
+            $customDimensions = [
+                'width' => (float) $validated['custom_width'],
+                'height' => (float) $validated['custom_height'],
+                'unit' => $validated['custom_unit'] ?? 'cm',
+            ];
+        }
+
         try {
-            $result = $this->pdfService->export($document, auth()->user(), $validated['paper_size'] ?? null);
+            $result = $this->pdfService->export($document, auth()->user(), $paperSize, $customDimensions);
 
             $this->auditService->log(auth()->user(), 'document.exported', 'document', $document->id, [
                 'document_id' => $document->id,
                 'filename' => $result['filename'],
-                'paper_size' => $validated['paper_size'] ?? $document->paper_size ?? 'A4',
+                'paper_size' => $paperSize === 'Custom'
+                    ? "Custom ({$customDimensions['width']}x{$customDimensions['height']} {$customDimensions['unit']})"
+                    : $paperSize,
             ]);
 
             return back()->with('pdf_export', [

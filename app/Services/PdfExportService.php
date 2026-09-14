@@ -75,10 +75,10 @@ class PdfExportService
     private const MIN_PAGE_CONTENT_PX = 60;
 
     /**
-     * Ukuran kertas (px @96dpi) — SAMA PERSIS dengan PAPER_SIZES di
-     * resources/js/jodit.js.
+     * Ukuran kertas (px @96dpi).
      */
     private const PAPER_SIZES_PX = [
+        'F4' => ['width' => 794, 'height' => 1247],
         'A4' => ['width' => 794, 'height' => 1123],
         'A5' => ['width' => 559, 'height' => 794],
         'A3' => ['width' => 1123, 'height' => 1587],
@@ -100,7 +100,7 @@ class PdfExportService
      *
      * @throws BusinessLogicException if the document has no exportable content
      */
-    public function export(Document $document, User $user, ?string $paperSizeOverride = null): array
+    public function export(Document $document, User $user, ?string $paperSizeOverride = null, ?array $customDimensions = null): array
     {
         $display = $document->displayVersion();
 
@@ -114,11 +114,8 @@ class PdfExportService
         }
 
         // Hitung metrik halaman (ukuran kertas, margin ter-clamp, content
-        // width/height) SEKALI di sini — dipakai bareng untuk resize
-        // gambar (resolveImagePaths) DAN untuk membangun HTML (buildHtml),
-        // supaya keduanya selalu pakai angka yang identik, tidak dihitung
-        // dua kali secara terpisah yang berisiko drift.
-        $metrics = $this->resolvePageMetrics($document, $paperSizeOverride);
+        // width/height) SEKALI di sini — default print adalah F4.
+        $metrics = $this->resolvePageMetrics($document, $paperSizeOverride, $customDimensions);
 
         $content = app(SignatureResolverService::class)->resolve($display->content, $document, $user, true);
         $content = $this->qrCodeService->injectPlaceholder($content, $document);
@@ -356,16 +353,32 @@ class PdfExportService
 
     /**
      * Hitung SEMUA metrik halaman (ukuran kertas, margin ter-clamp,
-     * content width, content-per-page) dalam SATU tempat — dipakai
-     * bareng oleh export() (untuk resize gambar) dan buildHtml() (untuk
-     * @page CSS + script pagination), supaya kedua konsumen ini TIDAK
-     * PERNAH menghitung angka yang berbeda satu sama lain.
+     * content width, content-per-page) dalam SATU tempat.
+     * Default print size selalu F4 kecuali dioverride secara eksplisit.
      */
-    private function resolvePageMetrics(Document $document, ?string $paperSizeOverride = null): array
+    private function resolvePageMetrics(Document $document, ?string $paperSizeOverride = null, ?array $customDimensions = null): array
     {
         $margin = $this->resolveMargin($document);
-        $paperSize = $paperSizeOverride ?? $document->paper_size ?? 'A4';
-        $page = self::PAPER_SIZES_PX[$paperSize] ?? self::PAPER_SIZES_PX['A4'];
+        $paperSize = $paperSizeOverride ?? 'F4';
+
+        if ($paperSize === 'Custom' && !empty($customDimensions) && is_numeric($customDimensions['width'] ?? null) && is_numeric($customDimensions['height'] ?? null)) {
+            $unit = $customDimensions['unit'] ?? 'cm';
+            $w = (float) $customDimensions['width'];
+            $h = (float) $customDimensions['height'];
+            // Convert to mm first
+            $wMm = ($unit === 'mm') ? $w : ($w * 10);
+            $hMm = ($unit === 'mm') ? $h : ($h * 10);
+            // Convert mm to px @ 96 dpi (1 inch = 25.4 mm = 96 px)
+            $wPx = (int) round(($wMm / 25.4) * 96);
+            $hPx = (int) round(($hMm / 25.4) * 96);
+            $page = ['width' => max($wPx, 100), 'height' => max($hPx, 100)];
+            $pageSizeCss = round($wMm, 2) . 'mm ' . round($hMm, 2) . 'mm';
+        } else {
+            $page = self::PAPER_SIZES_PX[$paperSize] ?? self::PAPER_SIZES_PX['F4'];
+            $wIn = $this->pxToIn($page['width']);
+            $hIn = $this->pxToIn($page['height']);
+            $pageSizeCss = "{$wIn}in {$hIn}in";
+        }
 
         if ($margin['top'] + $margin['bottom'] > $page['height'] - self::MIN_PAGE_CONTENT_PX) {
             $margin['top'] = max(0, $page['height'] - self::MIN_PAGE_CONTENT_PX - $margin['bottom']);
@@ -376,6 +389,7 @@ class PdfExportService
 
         return [
             'paperSize' => $paperSize,
+            'pageSizeCss' => $pageSizeCss,
             'page' => $page,
             'margin' => $margin,
             'contentWidth' => $page['width'] - $margin['left'] - $margin['right'],
@@ -383,22 +397,13 @@ class PdfExportService
         ];
     }
 
-
-
     /**
      * Bangun HTML lengkap untuk headless Chrome print-to-pdf.
-     *
-     * PENTING: TIDAK ADA script pagination JavaScript di sini.
-     * Chrome menangani page-break secara native lewat @page CSS.
-     * Sebelumnya ada buildPaginationScript() yang menyisipkan
-     * `break-before: page` via JS — ini BENTROK dengan mekanisme
-     * @page Chrome sehingga elemen yang sudah natural di halaman
-     * berikutnya dipaksa break lagi → muncul halaman kosong.
      */
     private function buildHtml(string $content, array $metrics): string
     {
         $margin = $metrics['margin'];
-        $paperSize = $metrics['paperSize'];
+        $pageSizeCss = $metrics['pageSizeCss'];
         $contentWidth = $metrics['contentWidth'];
 
         $topIn = $this->pxToIn($margin['top']);
@@ -416,7 +421,7 @@ class PdfExportService
             <style>
                 *, ::before, ::after { box-sizing: border-box; }
                 @page {
-                    size: {$paperSize} portrait;
+                    size: {$pageSizeCss} portrait;
                     margin: {$topIn}in {$rightIn}in {$bottomIn}in {$leftIn}in;
                 }
                 html, body { margin: 0; padding: 0; }

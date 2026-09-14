@@ -1,10 +1,12 @@
 /**
  * Standalone Paper Pagination & Layout Utilities
- * Pure DOM pagination helper for A4/A5/Letter HTML paper views (.doku-paper).
+ * Pure DOM pagination helper for F4/A4/A5/Letter HTML paper views (.doku-paper).
  * No external editor dependencies (e.g. Jodit).
  */
 
+// Ukuran kertas (px @96dpi). key = label yang tampil di dropdown.
 export const PAPER_SIZES = {
+    'F4': { width: 794, height: 1247 },
     'A4': { width: 794, height: 1123 },
     'A5': { width: 559, height: 794 },
     'A3': { width: 1123, height: 1587 },
@@ -39,11 +41,13 @@ export function readStoredPaper(storageKey) {
     try {
         const raw = localStorage.getItem(storageKey + ':paper');
         if (!raw) return null;
-        const parsed = JSON.parse(raw);
-        const size = (typeof parsed.size === 'string' && PAPER_SIZES[parsed.size])
-            ? PAPER_SIZES[parsed.size]
-            : (parsed.size || null);
-        return { size, margin: parsed.margin || null };
+        const data = JSON.parse(raw);
+        const size = typeof data.size === 'string' && PAPER_SIZES[data.size]
+            ? PAPER_SIZES[data.size]
+            : (data.size && data.size.width ? data.size : null);
+        const margin = data.margin && data.margin.top != null ? data.margin : null;
+        if (!size && !margin) return null;
+        return { size, margin };
     } catch (e) {
         return null;
     }
@@ -221,7 +225,7 @@ export function paginateContainer(container, contentPerPage, gap, margin) {
 
 export function repaginatePreview(paperEl, size, margin) {
     if (!paperEl) return;
-    size = size || PAPER_SIZES['A4'];
+    size = size || PAPER_SIZES['F4'] || PAPER_SIZES['A4'];
     margin = clampMarginToPage(size, margin || DEFAULT_MARGIN);
     const gap = margin.top + margin.bottom;
 
@@ -238,6 +242,13 @@ export function repaginatePreview(paperEl, size, margin) {
 
     mergeSplitLists(paperEl);
     paperEl.querySelectorAll(':scope > [data-page-spacer]').forEach((el) => el.remove());
+
+    if (!paperEl.firstElementChild) {
+        paperEl.style.minHeight = size.height + 'px';
+        paperEl.style.zoom = originalZoom;
+        paperEl.style.transform = originalTransform;
+        return;
+    }
 
     const contentPerPage = Math.max(size.height - margin.top - margin.bottom, 1);
     paginateContainer(paperEl, contentPerPage, gap, margin);
@@ -279,7 +290,7 @@ export function initPreviewPagination(scopeSelector = '.doku-paper-scope') {
             if (m && m.top != null) margin = m;
         } catch (e) { /* ignore */ }
     }
-    size = size || PAPER_SIZES['A4'];
+    size = size || PAPER_SIZES['F4'] || PAPER_SIZES['A4'];
     margin = margin || DEFAULT_MARGIN;
 
     repaginatePreview(paper, size, margin);
@@ -292,7 +303,7 @@ export function initPreviewPagination(scopeSelector = '.doku-paper-scope') {
 
     const select = scope.querySelector('[data-paper-size-select]');
     if (select) {
-        select.value = findPaperKey(size) || 'A4';
+        select.value = findPaperKey(size) || 'F4';
         select.addEventListener('change', () => {
             const key = select.value;
             const newSize = PAPER_SIZES[key];

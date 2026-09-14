@@ -76,7 +76,7 @@
         </div>
     </div>
 
-    <script src="{{ rtrim(config('onlyoffice.url'), '/') }}/web-apps/apps/api/documents/api.js"
+    <script src="{{ rtrim(config('onlyoffice.url'), '/') }}/web-apps/apps/api/documents/api.js?v=9.4.0-f4-v2"
             onerror="document.getElementById('onlyoffice-fallback').classList.add('active');"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {

@@ -12,7 +12,7 @@
                 <div id="docx-preview-{{ $version->id }}" class="w-full h-full"></div>
             </div>
 
-            <script src="{{ rtrim(config('onlyoffice.url'), '/') }}/web-apps/apps/api/documents/api.js"></script>
+            <script src="{{ rtrim(config('onlyoffice.url'), '/') }}/web-apps/apps/api/documents/api.js?v=9.4.0-f4-v2"></script>
             <script>
                 document.addEventListener('DOMContentLoaded', function() {
                     if (typeof DocsAPI === 'undefined') {

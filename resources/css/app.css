@@ -1,4 +1,3 @@
-@import "jodit/es2018/jodit.min.css";
 @import "tailwindcss";
 @plugin "daisyui";
 @plugin "@tailwindcss/typography";
@@ -397,67 +396,6 @@ dialog.modal,
     height: auto;
 }
 
-/* Jodit editor — override DaisyUI base-content color leak */
-.jodit-wysiwyg,
-.jodit-wysiwyg * {
-    color: #000 !important;
-}
-.jodit-wysiwyg {
-    background: #fff !important;
-}
-.jodit-wysiwyg a {
-    color: #1a73e8 !important;
-}
-/* Keep placeholder visible */
-.jodit-wysiwyg[contenteditable]:empty:before {
-    color: #888 !important;
-}
-
-/* Kunci posisi placeholder di dalam textbox — jangan ikut bergeser saat klik/focus */
-.jodit-placeholder {
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    padding: 48px 56px !important; /* samakan dengan padding konten editor */
-    margin: 0 !important;
-    pointer-events: none !important;
-    box-sizing: border-box !important;
-}
-
-/* Jodit UI (toolbar, popup, dialog) — paksa teks gelap biar terbaca */
-.jodit-container,
-.jodit-dialog,
-.jodit-popup,
-.jodit-ui,
-.jodit-ui-button,
-.jodit-ui-group,
-.jodit-ui-input,
-.jodit-ui-select,
-.jodit-ui-tree,
-.jodit-ui-tabs {
-    color: #1a1a1a !important;
-}
-.jodit-container input,
-.jodit-container select,
-.jodit-container textarea,
-.jodit-dialog input,
-.jodit-dialog select,
-.jodit-dialog textarea,
-.jodit-ui-input input,
-.jodit-ui-select select {
-    color: #1a1a1a !important;
-    background: #fff !important;
-}
-.jodit-dialog .jodit-ui-label,
-.jodit-ui-label,
-.jodit-ui-tabs__label,
-.jodit-ui-tab,
-.jodit-ui-tree__item,
-.jodit-ui-tree__item a,
-.jodit-ui-button__text {
-    color: #1a1a1a !important;
-}
 
 /* ─── Animated Loading Blur Overlay ────────────────────────────── */
 @keyframes loading-shimmer {
