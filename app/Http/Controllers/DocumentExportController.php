@@ -22,7 +22,7 @@ class DocumentExportController extends Controller
         $this->authorize('view', $document);
 
         // paper_size dikirim dari modal export/print di halaman show/preview.
-        // Default cetak/ekspor adalah F4 (21 x 33 cm).
+        // Default cetak/ekspor mengikuti ukuran dokumen (default A4).
         // Override ukuran kertas HANYA untuk job ekspor/cetak kali ini —
         // TIDAK PERNAH mengubah paper_size yang tersimpan di dokumen.
         $validated = $request->validate([
@@ -39,7 +39,7 @@ class DocumentExportController extends Controller
             'custom_height.numeric' => __('Tinggi kertas harus berupa angka valid.'),
         ]);
 
-        $paperSize = $validated['paper_size'] ?? 'F4';
+        $paperSize = $validated['paper_size'] ?? $document->paper_size ?? 'A4';
         $customDimensions = null;
         if ($paperSize === 'Custom') {
             $customDimensions = [

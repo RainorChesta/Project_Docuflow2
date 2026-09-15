@@ -225,7 +225,7 @@ export function paginateContainer(container, contentPerPage, gap, margin) {
 
 export function repaginatePreview(paperEl, size, margin) {
     if (!paperEl) return;
-    size = size || PAPER_SIZES['F4'] || PAPER_SIZES['A4'];
+    size = size || PAPER_SIZES['A4'] || PAPER_SIZES['F4'];
     margin = clampMarginToPage(size, margin || DEFAULT_MARGIN);
     const gap = margin.top + margin.bottom;
 
@@ -290,7 +290,7 @@ export function initPreviewPagination(scopeSelector = '.doku-paper-scope') {
             if (m && m.top != null) margin = m;
         } catch (e) { /* ignore */ }
     }
-    size = size || PAPER_SIZES['F4'] || PAPER_SIZES['A4'];
+    size = size || PAPER_SIZES['A4'] || PAPER_SIZES['F4'];
     margin = margin || DEFAULT_MARGIN;
 
     repaginatePreview(paper, size, margin);
@@ -303,7 +303,7 @@ export function initPreviewPagination(scopeSelector = '.doku-paper-scope') {
 
     const select = scope.querySelector('[data-paper-size-select]');
     if (select) {
-        select.value = findPaperKey(size) || 'F4';
+        select.value = findPaperKey(size) || 'A4';
         select.addEventListener('change', () => {
             const key = select.value;
             const newSize = PAPER_SIZES[key];

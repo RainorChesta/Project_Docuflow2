@@ -80,9 +80,9 @@ class DocumentExportPdfTest extends TestCase
     }
 
     #[Test]
-    public function export_defaults_to_f4_and_preserves_document_original_paper_size(): void
+    public function export_defaults_to_document_paper_size_and_preserves_document(): void
     {
-        $this->addVersion('<h1>Konten Dokumen</h1><p>Uji coba default cetak F4.</p>');
+        $this->addVersion('<h1>Konten Dokumen</h1><p>Uji coba default cetak.</p>');
         $this->assertEquals('A4', $this->document->paper_size);
 
         $response = $this->actingAs($this->admin)
@@ -91,7 +91,31 @@ class DocumentExportPdfTest extends TestCase
         $response->assertRedirect();
         $response->assertSessionHas('pdf_export');
 
-        // Audit log shows F4 was used for the print/export job
+        // Audit log shows A4 was used for the default print/export job
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'document.exported',
+            'target_type' => 'document',
+            'target_id' => $this->document->id,
+            'details->paper_size' => 'A4',
+        ]);
+
+        // Document's stored paper_size in database MUST remain unchanged
+        $this->assertEquals('A4', $this->document->fresh()->paper_size);
+    }
+
+    #[Test]
+    public function export_with_f4_size_changes_print_output_and_preserves_document(): void
+    {
+        $this->addVersion('<h1>F4 Print</h1><p>Uji coba export F4.</p>');
+
+        $response = $this->actingAs($this->admin)
+            ->post(route('documents.export-pdf', $this->document), [
+                'paper_size' => 'F4',
+            ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('pdf_export');
+
         $this->assertDatabaseHas('audit_logs', [
             'action' => 'document.exported',
             'target_type' => 'document',
@@ -99,7 +123,6 @@ class DocumentExportPdfTest extends TestCase
             'details->paper_size' => 'F4',
         ]);
 
-        // Document's stored paper_size in database MUST remain unchanged
         $this->assertEquals('A4', $this->document->fresh()->paper_size);
     }
 

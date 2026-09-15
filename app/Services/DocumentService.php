@@ -25,8 +25,8 @@ class DocumentService
     {
         $phpWord = new PhpWord();
         $section = $phpWord->addSection([
-            'pageSizeW' => 11906, // F4 in twips (210mm x 330mm)
-            'pageSizeH' => 18710,
+            'pageSizeW' => 11906, // A4 in twips
+            'pageSizeH' => 16838,
             'marginTop' => 1440,  // 1 inch
             'marginBottom' => 1440,
             'marginLeft' => 1440,
@@ -353,7 +353,7 @@ class DocumentService
         }
         $data['visibility'] ??= Document::VISIBILITY_DIVISION;
         $data['owner_id'] = $ownerId;
-        $data['paper_size'] ??= 'F4';
+        $data['paper_size'] ??= 'A4';
 
         return DB::transaction(function () use ($data) {
             $doc = Document::create($data);
@@ -460,7 +460,7 @@ class DocumentService
         $data['visibility'] ??= Document::VISIBILITY_DIVISION;
         $data['owner_id'] = $ownerId;
         $data['template_id'] = $template->id;
-        $data['paper_size'] ??= 'F4';
+        $data['paper_size'] ??= 'A4';
 
         return DB::transaction(function () use ($data, $template) {
             $doc = Document::create($data);

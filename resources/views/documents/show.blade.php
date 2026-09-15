@@ -998,7 +998,7 @@
                  clampMarginToPage() di resources/js/jodit.js — logikanya
                  sengaja dibuat identik dengan PdfExportService::buildHtml()). --}}
             @if(!$isFileBased)
-                <dialog id="export-pdf-modal" class="modal" x-data="{ paperSize: 'F4', customWidth: '', customHeight: '', customUnit: 'cm' }">
+                <dialog id="export-pdf-modal" class="modal" x-data="{ paperSize: '{{ $document->paper_size ?? 'A4' }}', customWidth: '', customHeight: '', customUnit: 'cm' }">
                     <div class="modal-box max-w-md max-h-[85vh] overflow-y-auto">
                         <div class="flex flex-wrap items-center justify-between mb-4">
                             <div class="flex items-center gap-2">
@@ -1024,11 +1024,11 @@
                             <div class="form-control w-full mb-3">
                                 <label class="label pb-1">
                                     <span class="label-text font-medium text-sm">{{ __('Ukuran Kertas Cetak') }}</span>
-                                    <span class="label-text-alt text-xs text-primary font-semibold">{{ __('Default: F4') }}</span>
+                                    <span class="label-text-alt text-xs text-primary font-semibold">{{ __('Default: :size', ['size' => $document->paper_size ?? 'A4']) }}</span>
                                 </label>
                                 <select name="paper_size" x-model="paperSize" class="select select-bordered w-full">
-                                    <option value="F4" selected>F4 (21 x 33 cm) — {{ __('Standar Resmi') }}</option>
                                     <option value="A4">A4 (21 x 29.7 cm)</option>
+                                    <option value="F4">F4 (21 x 33 cm) — {{ __('Folio / Standar') }}</option>
                                     <option value="Letter">Letter (8.5" x 11" / 21.59 x 27.94 cm)</option>
                                     <option value="Legal">Legal (8.5" x 14" / 21.59 x 35.56 cm)</option>
                                     <option value="A5">A5 (14.8 x 21 cm)</option>

@@ -359,7 +359,7 @@ class PdfExportService
     private function resolvePageMetrics(Document $document, ?string $paperSizeOverride = null, ?array $customDimensions = null): array
     {
         $margin = $this->resolveMargin($document);
-        $paperSize = $paperSizeOverride ?? 'F4';
+        $paperSize = $paperSizeOverride ?? $document->paper_size ?? 'A4';
 
         if ($paperSize === 'Custom' && !empty($customDimensions) && is_numeric($customDimensions['width'] ?? null) && is_numeric($customDimensions['height'] ?? null)) {
             $unit = $customDimensions['unit'] ?? 'cm';
@@ -374,7 +374,7 @@ class PdfExportService
             $page = ['width' => max($wPx, 100), 'height' => max($hPx, 100)];
             $pageSizeCss = round($wMm, 2) . 'mm ' . round($hMm, 2) . 'mm';
         } else {
-            $page = self::PAPER_SIZES_PX[$paperSize] ?? self::PAPER_SIZES_PX['F4'];
+            $page = self::PAPER_SIZES_PX[$paperSize] ?? self::PAPER_SIZES_PX['A4'];
             $wIn = $this->pxToIn($page['width']);
             $hIn = $this->pxToIn($page['height']);
             $pageSizeCss = "{$wIn}in {$hIn}in";
