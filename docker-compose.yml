@@ -15,6 +15,14 @@ services:
     volumes:
       - onlyoffice_data:/var/www/onlyoffice/Data
       - onlyoffice_log:/var/log/onlyoffice
+      - ./docker/onlyoffice/app/view/PageSizeDialog.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/PageSizeDialog.js:ro
+      - ./docker/onlyoffice/app/view/PageSizeDialog.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/PageSizeDialog.js.gz:ro
+      - ./docker/onlyoffice/app/view/FileMenuPanels.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/FileMenuPanels.js:ro
+      - ./docker/onlyoffice/app/view/FileMenuPanels.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/FileMenuPanels.js.gz:ro
+      - ./docker/onlyoffice/app/controller/Main.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/controller/Main.js:ro
+      - ./docker/onlyoffice/app/controller/Main.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/controller/Main.js.gz:ro
+      - ./docker/onlyoffice/code.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/code.js:ro
+      - ./docker/onlyoffice/code.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/code.js.gz:ro
 
 volumes:
   onlyoffice_data:
