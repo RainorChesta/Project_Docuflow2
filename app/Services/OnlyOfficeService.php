@@ -334,12 +334,12 @@ class OnlyOfficeService
      */
     public function generateTemplateKey(\App\Models\DocumentTemplate $template): string
     {
-        $updatedAt = $template->updated_at ? $template->updated_at->timestamp : ($template->created_at ? $template->created_at->timestamp : time());
-        $cacheKey = 'onlyoffice_template_key_' . $template->id . '_' . $updatedAt;
-        
-        return \Illuminate\Support\Facades\Cache::remember($cacheKey, now()->addDays(1), function () use ($template, $updatedAt) {
+        $sessionCacheKey = 'onlyoffice_template_session_key_' . $template->id;
+
+        return \Illuminate\Support\Facades\Cache::remember($sessionCacheKey, now()->addHours(2), function () use ($template) {
             $timeKey = uniqid();
-            
+            $updatedAt = $template->updated_at ? $template->updated_at->timestamp : ($template->created_at ? $template->created_at->timestamp : time());
+
             $raw = sprintf(
                 'tpl_%d_%d_%s',
                 $template->id,
@@ -349,6 +349,67 @@ class OnlyOfficeService
 
             return substr(preg_replace('/[^0-9a-zA-Z_\-]/', '_', $raw), 0, 128);
         });
+    }
+
+    /**
+     * Rotate / clear cached ONLYOFFICE template keys for a template so the next session opens cleanly.
+     */
+    public function rotateTemplateKey(\App\Models\DocumentTemplate $template): void
+    {
+        \Illuminate\Support\Facades\Cache::forget('onlyoffice_template_session_key_' . $template->id);
+        \Illuminate\Support\Facades\Cache::forget('onlyoffice_template_key_' . $template->id);
+
+        if ($template->updated_at) {
+            \Illuminate\Support\Facades\Cache::forget('onlyoffice_template_key_' . $template->id . '_' . $template->updated_at->timestamp);
+        }
+    }
+
+    /**
+     * Send a forcesave command to ONLYOFFICE Command Service to flush in-memory changes immediately.
+     */
+    public function sendForcesaveCommand(string $documentKey): bool
+    {
+        try {
+            $onlyOfficeBase = rtrim(config('onlyoffice.url'), '/');
+            $commandUrl = $onlyOfficeBase . '/coauthoring/CommandService.ashx';
+
+            $payload = [
+                'c' => 'forcesave',
+                'key' => $documentKey,
+            ];
+
+            if (config('onlyoffice.jwt_enabled') && config('onlyoffice.jwt_secret')) {
+                $payload['token'] = JWT::encode($payload, config('onlyoffice.jwt_secret'), 'HS256');
+            }
+
+            $response = \Illuminate\Support\Facades\Http::timeout(5)->post($commandUrl, $payload);
+            if ($response->successful()) {
+                $data = $response->json();
+                return isset($data['error']) && $data['error'] === 0;
+            }
+        } catch (\Throwable $e) {
+            Log::debug('ONLYOFFICE forcesave command skipped/failed: ' . $e->getMessage());
+        }
+
+        return false;
+    }
+
+    /**
+     * Trigger forcesave for a template.
+     */
+    public function forceSaveTemplate(\App\Models\DocumentTemplate $template): bool
+    {
+        $key = $this->generateTemplateKey($template);
+        return $this->sendForcesaveCommand($key);
+    }
+
+    /**
+     * Trigger forcesave for a document version.
+     */
+    public function forceSaveDocument(Document $document, DocumentVersion $version): bool
+    {
+        $key = $this->generateDocumentKey($document, $version);
+        return $this->sendForcesaveCommand($key);
     }
 
     /**

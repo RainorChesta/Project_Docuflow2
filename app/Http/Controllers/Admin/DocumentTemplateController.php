@@ -175,8 +175,33 @@ class DocumentTemplateController extends Controller
 
         $template->save();
 
+        // Invalidate cached ONLYOFFICE keys so subsequent sessions load updated file
+        app(\App\Services\OnlyOfficeService::class)->rotateTemplateKey($template);
+
         return redirect()->route('admin.templates.index')
             ->with('success', __('Template berhasil diperbarui.'));
+    }
+
+    /**
+     * Finalize editing session for a template.
+     */
+    public function finishEditing(Request $request, DocumentTemplate $template, \App\Services\OnlyOfficeService $onlyOfficeService): \Illuminate\Http\RedirectResponse|\Illuminate\Http\JsonResponse
+    {
+        $onlyOfficeService->rotateTemplateKey($template);
+        $template->touch();
+
+        $successMessage = __('Template berhasil disimpan.');
+        session()->flash('success', $successMessage);
+
+        if ($request->expectsJson() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $successMessage,
+                'redirect_url' => route('admin.templates.index'),
+            ]);
+        }
+
+        return redirect()->route('admin.templates.index')->with('success', $successMessage);
     }
 
     public function destroy(DocumentTemplate $template): RedirectResponse

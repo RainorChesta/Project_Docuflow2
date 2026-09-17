@@ -424,12 +424,51 @@ class DocumentService
     }
 
     /**
+     * Save updated template binary content received from ONLYOFFICE or manual edit.
+     * Ensures atomic storage persistence, timestamp updating, and ONLYOFFICE key rotation.
+     */
+    public function saveTemplateDocx(
+        \App\Models\DocumentTemplate $template,
+        string $docxBinaryContent,
+        ?\App\Models\User $author = null
+    ): \App\Models\DocumentTemplate {
+        return DB::transaction(function () use ($template, $docxBinaryContent, $author) {
+            $diskName = config('onlyoffice.storage_disk', 'local');
+            $disk = Storage::disk($diskName);
+
+            $storedPath = $template->file_path;
+            if (empty($storedPath)) {
+                $storedPath = 'templates/' . $template->id . '_' . time() . '.docx';
+            }
+
+            $disk->put($storedPath, $docxBinaryContent);
+
+            $template->update([
+                'file_path' => $storedPath,
+                'file_original_name' => $template->file_original_name ?? ($template->title . '.docx'),
+                'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'updated_at' => now(),
+            ]);
+
+            $template->touch();
+
+            // Rotate template keys in cache so subsequent sessions load updated content
+            app(OnlyOfficeService::class)->rotateTemplateKey($template);
+
+            return $template->fresh();
+        });
+    }
+
+    /**
      * Buat dokumen baru dari template. File .docx template di-copy ke
      * storage dokumen baru, sehingga template asli tidak pernah berubah.
      * Versi pertama berstatus "draft" — user bisa langsung edit di OnlyOffice.
      */
     public function createFromTemplate(array $data, int $ownerId, \App\Models\DocumentTemplate $template): Document
     {
+        // Reload fresh template state from database
+        $template = $template->fresh() ?? $template;
+
         if (empty($data['division_id']) && $ownerId) {
             $owner = User::find($ownerId);
             if ($owner) {
@@ -465,12 +504,45 @@ class DocumentService
         return DB::transaction(function () use ($data, $template) {
             $doc = Document::create($data);
 
-            $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
+            $diskName = config('onlyoffice.storage_disk', 'local');
+            $disk = Storage::disk($diskName);
             $destDir = 'documents/' . $doc->id;
             $destPath = $destDir . '/v1.docx';
 
-            // Copy template file to new document storage
-            $disk->copy($template->file_path, $destPath);
+            $templatePath = $template->file_path;
+            $sourceDisk = $disk;
+
+            if ($templatePath && !$sourceDisk->exists($templatePath)) {
+                if (Storage::disk('local')->exists($templatePath)) {
+                    $sourceDisk = Storage::disk('local');
+                } elseif (Storage::disk('public')->exists($templatePath)) {
+                    $sourceDisk = Storage::disk('public');
+                }
+            }
+
+            if ($templatePath && $sourceDisk->exists($templatePath)) {
+                $templateBytes = $sourceDisk->get($templatePath);
+                $disk->put($destPath, $templateBytes);
+            } else {
+                // Fallback: create a blank docx if template file missing
+                $phpWord = new \PhpOffice\PhpWord\PhpWord();
+                $section = $phpWord->addSection([
+                    'pageSizeW' => 11906,
+                    'pageSizeH' => 16838,
+                    'marginTop' => 1440,
+                    'marginBottom' => 1440,
+                    'marginLeft' => 1440,
+                    'marginRight' => 1440,
+                ]);
+                $section->addText(' ', ['name' => 'Arial', 'size' => 11]);
+                $tempPath = tempnam(sys_get_temp_dir(), 'docx_');
+                $objWriter = \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007');
+                $objWriter->save($tempPath);
+                $disk->put($destPath, file_get_contents($tempPath));
+                if (file_exists($tempPath)) {
+                    @unlink($tempPath);
+                }
+            }
 
             $doc->versions()->create([
                 'version_number' => 1,
@@ -482,6 +554,9 @@ class DocumentService
                 'author_name' => User::find($data['owner_id'])->name,
                 'status' => 'draft',
             ]);
+
+            // Clear any cached key for the new document so ONLYOFFICE loads cleanly
+            app(OnlyOfficeService::class)->rotateDocumentKey($doc);
 
             return $doc;
         });

@@ -313,12 +313,12 @@ class SignatureController extends Controller
         $signature->refresh();
 
         if ($request->wantsJson()) {
-            $onlyOfficeUrl = $onlyOfficeService->getSignatureFileUrl($user);
+            $onlyOfficeUrl = $onlyOfficeService->getSignatureFileUrlForSignature($signature);
             $token = $onlyOfficeUrl ? $onlyOfficeService->generateInsertImageToken($onlyOfficeUrl) : null;
 
             return response()->json([
                 'success'        => true,
-                'message'        => 'TANDA TANGAN DIGITAL BERHASIL DISIMPAN.',
+                'message'        => $type === 'company_stamp' ? 'STEMPEL PERUSAHAAN BERHASIL DISIMPAN.' : 'TANDA TANGAN DIGITAL BERHASIL DISIMPAN.',
                 'url'            => asset('storage/' . $signature->file_path),
                 'onlyoffice_url' => $onlyOfficeUrl,
                 'token'          => $token,
@@ -900,7 +900,10 @@ class SignatureController extends Controller
 
         $this->executeApproval($signatureRequest);
 
-        return back()->with('success', __('Permintaan tanda tangan telah disetujui.'));
+        $isStamp = $signatureRequest->isStamp();
+        $msg = $isStamp ? __('Permintaan stempel perusahaan telah disetujui.') : __('Permintaan tanda tangan telah disetujui.');
+
+        return back()->with('success', $msg);
     }
 
     /**
@@ -937,7 +940,7 @@ class SignatureController extends Controller
             $count++;
         }
 
-        return back()->with('success', __(':count permintaan tanda tangan berhasil disetujui sekaligus.', ['count' => $count]));
+        return back()->with('success', __(':count permintaan tanda tangan / stempel berhasil disetujui sekaligus.', ['count' => $count]));
     }
 
     /**
@@ -962,7 +965,7 @@ class SignatureController extends Controller
             $count++;
         }
 
-        return back()->with('success', __('Semua :count permintaan tanda tangan pending berhasil disetujui.', ['count' => $count]));
+        return back()->with('success', __('Semua :count permintaan tanda tangan / stempel pending berhasil disetujui.', ['count' => $count]));
     }
 
     /**
@@ -977,7 +980,10 @@ class SignatureController extends Controller
         $reason = $request->input('reason', __('Ditolak oleh pemilik tanda tangan.'));
         $this->executeRejection($signatureRequest, $reason);
 
-        return back()->with('success', __('Permintaan tanda tangan telah ditolak.'));
+        $isStamp = $signatureRequest->isStamp();
+        $msg = $isStamp ? __('Permintaan stempel perusahaan telah ditolak.') : __('Permintaan tanda tangan telah ditolak.');
+
+        return back()->with('success', $msg);
     }
 
     /**
@@ -1016,7 +1022,7 @@ class SignatureController extends Controller
             $count++;
         }
 
-        return back()->with('success', __(':count permintaan tanda tangan berhasil ditolak.', ['count' => $count]));
+        return back()->with('success', __(':count permintaan tanda tangan / stempel berhasil ditolak.', ['count' => $count]));
     }
 
     /**
@@ -1039,9 +1045,15 @@ class SignatureController extends Controller
             $requestId = $signatureRequest->id;
             
             // Resolve the exact requested signature or stamp (with fallback to any available signature of the user)
-            $sig = $signatureRequest->requestedSignature 
-                ?? $targetUser->signatures()->where('type', 'original')->first()
-                ?? $targetUser->signatures()->first();
+            $sig = null;
+            if ($signatureRequest->isStamp() && $signatureRequest->requestedSignature) {
+                $sig = $signatureRequest->requestedSignature;
+            } elseif ($signatureRequest->requestedSignature) {
+                $sig = $signatureRequest->requestedSignature;
+            } else {
+                $sig = $targetUser->signatures()->where('type', 'original')->first()
+                    ?? $targetUser->signatures()->first();
+            }
             
             $signaturePath = null;
             if ($sig && $sig->file_path) {

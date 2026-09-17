@@ -25,6 +25,7 @@ class OnlyOfficeController extends Controller
         protected VersionService $versionService,
         protected AuditService $auditService,
         protected ApprovalRoutingService $approvalRoutingService,
+        protected \App\Services\DocumentService $documentService,
     ) {}
 
     /**
@@ -194,9 +195,21 @@ class OnlyOfficeController extends Controller
         $xF = ($width - ($fwF * strlen($footnote))) / 2;
         imagestring($image, $fontFoot, max(12, (int) $xF), 335, $footnote, $mutedColor);
 
-        $requestId = $request->query('request_id');
-        if ($requestId) {
+        $requestId = (int) $request->query('request_id', 0);
+        if ($requestId > 0) {
             imagestring($image, 1, 10, 380, "DocuFlowSigReq:" . $requestId, $bgColor);
+
+            // Steganographic metadata in top-inner border pixels (x=8..10, y=8)
+            // Pixel 0: Magic marker DF (222, 173, 190)
+            // Pixel 1: Request ID low/mid/high bytes
+            // Pixel 2: isStamp flag
+            $magicColor = imagecolorallocate($image, 222, 173, 190);
+            $reqColor   = imagecolorallocate($image, ($requestId & 0xFF), (($requestId >> 8) & 0xFF), (($requestId >> 16) & 0xFF));
+            $stampColor = imagecolorallocate($image, $isStamp ? 1 : 0, 88, 99);
+
+            imagesetpixel($image, 8, 8, $magicColor);
+            imagesetpixel($image, 9, 8, $reqColor);
+            imagesetpixel($image, 10, 8, $stampColor);
         }
 
         ob_start();
@@ -204,7 +217,7 @@ class OnlyOfficeController extends Controller
         $imageData = ob_get_clean();
         imagedestroy($image);
 
-        if ($requestId) {
+        if ($requestId > 0) {
             $keyword = "DocuFlowSigReq";
             $text = (string) $requestId;
             $chunkData = $keyword . "\0" . $text;
@@ -317,15 +330,23 @@ class OnlyOfficeController extends Controller
                 // Automatically process any approved signatures that were just saved into the document
                 $approvedRequests = \App\Models\SignatureRequest::where('document_id', $document->id)
                     ->where('status', 'approved')
+                    ->where('is_used', false)
+                    ->latest('id')
                     ->with(['targetUser', 'requestedSignature'])
                     ->get();
 
                 if ($approvedRequests->isNotEmpty()) {
                     $processor = app(\App\Services\DocumentProcessorService::class);
                     foreach ($approvedRequests as $req) {
-                        $sig = $req->requestedSignature 
-                            ?? $req->targetUser?->signatures()->where('type', 'original')->first()
-                            ?? $req->targetUser?->signatures()->first();
+                        $sig = null;
+                        if ($req->isStamp() && $req->requestedSignature) {
+                            $sig = $req->requestedSignature;
+                        } elseif ($req->requestedSignature) {
+                            $sig = $req->requestedSignature;
+                        } else {
+                            $sig = $req->targetUser?->signatures()->where('type', 'original')->first()
+                                ?? $req->targetUser?->signatures()->first();
+                        }
 
                         $signaturePath = null;
                         if ($sig && $sig->file_path) {
@@ -549,12 +570,6 @@ class OnlyOfficeController extends Controller
 
                 $fileContent = $response->body();
 
-                // Save new template content
-                $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
-                $disk->put($template->file_path, $fileContent);
-                
-                $template->touch(); // Update updated_at timestamp
-
                 // Determine author
                 $userId = null;
                 if (!empty($payload['users']) && is_array($payload['users'])) {
@@ -563,6 +578,9 @@ class OnlyOfficeController extends Controller
                     $userId = (int) ($payload['actions'][0]['userid'] ?? null);
                 }
                 $author = ($userId ? User::find($userId) : null) ?? $template->creator;
+
+                // Save template binary content atomically, touch model, and rotate key
+                $this->documentService->saveTemplateDocx($template, $fileContent, $author);
 
                 $this->auditService->log($author, 'template.saved_onlyoffice', 'document_template', $template->id, [
                     'status' => $status,
@@ -576,13 +594,14 @@ class OnlyOfficeController extends Controller
                 return response()->json(['error' => 1, 'message' => $e->getMessage()], 500);
             }
         } elseif ($status === 4) {
+            $this->onlyOfficeService->rotateTemplateKey($template);
             $template->touch(); // Rotate key
             Log::info("ONLYOFFICE closed without changes for template {$template->id}. Touched to rotate key.");
         }
 
         if (in_array($status, [2, 3, 4, 7], true)) {
             \Illuminate\Support\Facades\Cache::forget($cacheKey);
-            \Illuminate\Support\Facades\Cache::forget('onlyoffice_template_key_' . $template->id);
+            $this->onlyOfficeService->rotateTemplateKey($template);
         }
 
         return response()->json(['error' => 0]);

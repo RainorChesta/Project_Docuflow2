@@ -210,28 +210,51 @@ class DocumentProcessorService
                     $imgBytes = $zip->getFromIndex($i);
                     if ($imgBytes) {
                         $isTarget = false;
+                        // 1. Check if PNG contains the DocuFlowSigReq tag for this request
                         if (str_contains($imgBytes, "DocuFlowSigReq\0" . $requestId) || 
                             str_contains($imgBytes, "DocuFlowSigReq:" . $requestId) || 
                             str_contains($imgBytes, "request_id=" . $requestId) ||
                             str_contains($imgBytes, "PENDING_SIG_" . $requestId)) {
                             $isTarget = true;
-                        } elseif (str_contains($imgBytes, "DocuFlowSigReq") && !preg_match('/DocuFlowSigReq[^\d]*(\d+)/', $imgBytes)) {
-                            $isTarget = true;
                         } elseif ($size = @getimagesizefromstring($imgBytes)) {
-                            // Fallback if OnlyOffice Document Server stripped custom PNG tEXt chunks
+                            // Check steganographic metadata pixels or fallback
                             if ($size[0] >= 350 && $size[0] <= 450 && $size[1] >= 350 && $size[1] <= 450) {
                                 $im = @imagecreatefromstring($imgBytes);
                                 if ($im) {
-                                    $rgb = imagecolorat($im, 20, 20);
-                                    $r = ($rgb >> 16) & 0xFF;
-                                    $g = ($rgb >> 8) & 0xFF;
-                                    $b = $rgb & 0xFF;
-                                    imagedestroy($im);
-                                    if ($r >= 245 && $r <= 255 && $g >= 235 && $g <= 252 && $b >= 190 && $b <= 210) {
-                                        $isTarget = true;
+                                    $w = imagesx($im);
+                                    $h = imagesy($im);
+                                    $hasMagic = false;
+                                    if ($w >= 11 && $h >= 10) {
+                                        $magicRgb = imagecolorat($im, 8, 8);
+                                        $mr = ($magicRgb >> 16) & 0xFF;
+                                        $mg = ($magicRgb >> 8) & 0xFF;
+                                        $mb = $magicRgb & 0xFF;
+                                        if ($mr === 222 && $mg === 173 && $mb === 190) {
+                                            $hasMagic = true;
+                                            $reqRgb = imagecolorat($im, 9, 8);
+                                            $rr = ($reqRgb >> 16) & 0xFF;
+                                            $rg = ($reqRgb >> 8) & 0xFF;
+                                            $rb = $reqRgb & 0xFF;
+                                            $embeddedId = $rr | ($rg << 8) | ($rb << 16);
+                                            if ($embeddedId === $requestId) {
+                                                $isTarget = true;
+                                            }
+                                        }
                                     }
+                                    if (!$isTarget && !$hasMagic) {
+                                        $rgb = imagecolorat($im, 20, 20);
+                                        $r = ($rgb >> 16) & 0xFF;
+                                        $g = ($rgb >> 8) & 0xFF;
+                                        $b = $rgb & 0xFF;
+                                        if ($r >= 245 && $r <= 255 && $g >= 235 && $g <= 252 && $b >= 190 && $b <= 210) {
+                                            $isTarget = true;
+                                        }
+                                    }
+                                    imagedestroy($im);
                                 }
                             }
+                        } elseif (str_contains($imgBytes, "DocuFlowSigReq") && !preg_match('/DocuFlowSigReq[^\d]*(\d+)/', $imgBytes)) {
+                            $isTarget = true;
                         }
 
                         if ($isTarget) {
@@ -381,23 +404,46 @@ class DocumentProcessorService
                                 str_contains($imgBytes, "PENDING_SIG_" . $requestId)) {
                                 $isTargetPlaceholder = true;
                             }
-                            // 2. If the image is a generic DocuFlow placeholder without specific request id tag (fallback)
-                            elseif (str_contains($imgBytes, "DocuFlowSigReq") && !preg_match('/DocuFlowSigReq[^\d]*(\d+)/', $imgBytes)) {
-                                $isTargetPlaceholder = true;
-                            }
-                            // 3. Visual fallback: Detect DocuFlow placeholder amber card if OnlyOffice stripped custom PNG tEXt chunks
-                            elseif (!$isTargetPlaceholder && $size && $size[0] >= 350 && $size[0] <= 450 && $size[1] >= 350 && $size[1] <= 450) {
+                            // 2. Steganographic pixel marker embedded at (8..10, 8)
+                            elseif ($size && $size[0] >= 350 && $size[0] <= 450 && $size[1] >= 350 && $size[1] <= 450) {
                                 $im = @imagecreatefromstring($imgBytes);
                                 if ($im) {
-                                    $rgb = imagecolorat($im, 20, 20);
-                                    $r = ($rgb >> 16) & 0xFF;
-                                    $g = ($rgb >> 8) & 0xFF;
-                                    $b = $rgb & 0xFF;
-                                    imagedestroy($im);
-                                    if ($r >= 245 && $r <= 255 && $g >= 235 && $g <= 252 && $b >= 190 && $b <= 210) {
-                                        $isTargetPlaceholder = true;
+                                    $w = imagesx($im);
+                                    $h = imagesy($im);
+                                    $hasMagic = false;
+                                    if ($w >= 11 && $h >= 10) {
+                                        $magicRgb = imagecolorat($im, 8, 8);
+                                        $mr = ($magicRgb >> 16) & 0xFF;
+                                        $mg = ($magicRgb >> 8) & 0xFF;
+                                        $mb = $magicRgb & 0xFF;
+                                        if ($mr === 222 && $mg === 173 && $mb === 190) {
+                                            $hasMagic = true;
+                                            $reqRgb = imagecolorat($im, 9, 8);
+                                            $rr = ($reqRgb >> 16) & 0xFF;
+                                            $rg = ($reqRgb >> 8) & 0xFF;
+                                            $rb = $reqRgb & 0xFF;
+                                            $embeddedId = $rr | ($rg << 8) | ($rb << 16);
+                                            if ($embeddedId === $requestId) {
+                                                $isTargetPlaceholder = true;
+                                            }
+                                        }
                                     }
+                                    // 3. Fallback to amber background if no steganographic marker was found (legacy)
+                                    if (!$isTargetPlaceholder && !$hasMagic) {
+                                        $rgb = imagecolorat($im, 20, 20);
+                                        $r = ($rgb >> 16) & 0xFF;
+                                        $g = ($rgb >> 8) & 0xFF;
+                                        $b = $rgb & 0xFF;
+                                        if ($r >= 245 && $r <= 255 && $g >= 235 && $g <= 252 && $b >= 190 && $b <= 210) {
+                                            $isTargetPlaceholder = true;
+                                        }
+                                    }
+                                    imagedestroy($im);
                                 }
+                            }
+                            // 4. If the image is a generic DocuFlow placeholder without specific request id tag (fallback)
+                            elseif (str_contains($imgBytes, "DocuFlowSigReq") && !preg_match('/DocuFlowSigReq[^\d]*(\d+)/', $imgBytes)) {
+                                $isTargetPlaceholder = true;
                             }
 
                             if ($isTargetPlaceholder) {

@@ -41,6 +41,7 @@
                             $pendingSigRequest = $document->signatureRequests
                                 ->where('target_user_id', auth()->id())
                                 ->where('status', 'pending')
+                                ->sortByDesc('id')
                                 ->first();
                             $isSignatureContext = in_array(request('from'), ['signatures', 'signature_requests'], true) || (bool) $pendingSigRequest;
                             $isApprovalContext = request('from') === 'approvals';

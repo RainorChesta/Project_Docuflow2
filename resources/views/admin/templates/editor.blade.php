@@ -121,23 +121,18 @@
                             if (mainScrollContainer) mainScrollContainer.scrollTop = 0;
                         }, 50);
                     };
+                    window._hasSessionChanges = false;
                     config.events.onDocumentStateChange = function(event) {
                         const isModified = event.data;
+                        if (isModified) {
+                            window._hasSessionChanges = true;
+                        }
+
                         const btnSelesai = document.getElementById('btn-selesai-edit');
                         const textSelesai = document.getElementById('text-selesai-edit');
                         
                         if (btnSelesai && textSelesai) {
-                            if (isModified) {
-                                btnSelesai.disabled = true;
-                                btnSelesai.classList.remove('btn-primary');
-                                btnSelesai.classList.add('btn-disabled');
-                                textSelesai.textContent = "{{ __('Belum Disimpan') }}";
-                            } else {
-                                btnSelesai.disabled = false;
-                                btnSelesai.classList.remove('btn-disabled');
-                                btnSelesai.classList.add('btn-primary');
-                                textSelesai.textContent = "{{ __('Selesai Edit') }}";
-                            }
+                            textSelesai.textContent = "{{ __('Selesai Edit') }}";
                         }
                     };
                     config.events.onError = function(event) {
@@ -152,6 +147,7 @@
             });
 
             function finishEditingTemplate() {
+                window._hasSessionChanges = false;
                 const btn = document.getElementById('btn-selesai-edit');
                 const spinner = document.getElementById('spinner-selesai-edit');
                 const icon = document.getElementById('icon-selesai-edit');
@@ -171,9 +167,22 @@
                     }
                 }
 
-                setTimeout(() => {
+                fetch("{{ route('admin.templates.finish-editing', $template) }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json'
+                    }
+                })
+                .then(res => res.json())
+                .then(data => {
+                    window.location.href = data.redirect_url || targetUrl;
+                })
+                .catch(err => {
+                    console.warn('finish-editing template request error:', err);
                     window.location.href = targetUrl;
-                }, 1000);
+                });
             }
         </script>
     @endpush
