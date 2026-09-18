@@ -125,6 +125,13 @@ class SignatureController extends Controller
                 $requestRecord->sendNotification();
             }
 
+            if ($doc) {
+                $pendingVersion = $doc->versions()->where('status', 'pending')->latest('id')->first();
+                if ($pendingVersion) {
+                    app(\App\Services\ApprovalRoutingService::class)->compileWorkflowFromSignatures($doc, $pendingVersion, $doc->owner ?? Auth::user());
+                }
+            }
+
             $isStamp = $requestedSig->type === 'company_stamp';
             if ($isDirectPdfPlacement) {
                 $msg = $isStamp

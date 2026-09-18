@@ -403,23 +403,7 @@ class OnlyOfficeController extends Controller
                         $notifKey = 'approval_notified_' . $document->id . '_v' . $version->id;
                         if (!\Illuminate\Support\Facades\Cache::has($notifKey)) {
                             \Illuminate\Support\Facades\Cache::put($notifKey, true, now()->addMinutes(10));
-
-                            $resolution = $this->approvalRoutingService->resolveApprover($document, $author);
-                            $this->approvalRoutingService->applyToDocument($document, $resolution);
-
-                            foreach ($resolution['approvers'] as $approver) {
-                                $approver->notify(new \App\Notifications\DocumentApprovalRequested($document, $version, $author->name));
-                            }
-
-                            if ($resolution['role'] !== null) {
-                                $author->notify(new \App\Notifications\ApprovalRouteResolved(
-                                    $document,
-                                    $resolution['role'],
-                                    $resolution['approvers']->pluck('name')->join(', '),
-                                    $resolution['message'],
-                                    $resolution['isFallback'],
-                                ));
-                            }
+                            $this->approvalRoutingService->compileWorkflowFromSignatures($document, $version, $author);
                         }
                     }
                 } elseif ($status === 6 && $version->status === 'pending') {
@@ -458,23 +442,7 @@ class OnlyOfficeController extends Controller
                     $notifKey = 'approval_notified_' . $document->id . '_v' . $version->id;
                     if (!\Illuminate\Support\Facades\Cache::has($notifKey)) {
                         \Illuminate\Support\Facades\Cache::put($notifKey, true, now()->addMinutes(10));
-
-                        $resolution = $this->approvalRoutingService->resolveApprover($document, $author);
-                        $this->approvalRoutingService->applyToDocument($document, $resolution);
-
-                        foreach ($resolution['approvers'] as $approver) {
-                            $approver->notify(new \App\Notifications\DocumentApprovalRequested($document, $version, $author->name));
-                        }
-
-                        if ($resolution['role'] !== null) {
-                            $author->notify(new \App\Notifications\ApprovalRouteResolved(
-                                $document,
-                                $resolution['role'],
-                                $resolution['approvers']->pluck('name')->join(', '),
-                                $resolution['message'],
-                                $resolution['isFallback'],
-                            ));
-                        }
+                        $this->approvalRoutingService->compileWorkflowFromSignatures($document, $version, $author);
                     }
                 }
             }

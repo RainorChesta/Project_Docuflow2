@@ -217,6 +217,11 @@
 
             <!-- Pending Banner (paling atas) -->
             @if($pendingVersion)
+                @php
+                    $approvalSteps = $pendingVersion->approvalSteps->sortBy('step_order');
+                    $currentStep = $approvalSteps->firstWhere('status', 'pending');
+                @endphp
+
                 <div class="alert {{ $pendingVersion->isRename() ? 'alert-info' : 'alert-warning' }} mb-3 sm:mb-4 rounded-2xl shadow-xs print:hidden">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
                         <div class="flex items-start sm:items-center gap-3 min-w-0">
@@ -236,12 +241,26 @@
                                     </p>
                                 </div>
                             @else
-                                <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                </svg>
+                                <div class="w-9 h-9 rounded-xl bg-warning/20 text-warning-content flex items-center justify-center shrink-0">
+                                    <svg class="w-5 h-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                </div>
                                 <div>
-                                    <p class="font-semibold text-sm">{{ __('Menunggu Persetujuan') }} (v{{ $pendingVersion->version_number }})</p>
-                                    <p class="text-xs text-base-content/70">{{ __('Versi menunggu review oleh kepala divisi.') }}</p>
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <p class="font-bold text-sm text-base-content">{{ __('Menunggu Persetujuan') }}</p>
+                                        <span class="badge badge-warning badge-sm font-semibold">v{{ $pendingVersion->version_number }}</span>
+                                    </div>
+                                    <p class="text-xs text-base-content/70 mt-0.5">
+                                        @if($currentStep)
+                                            {{ __('Tahap Saat Ini:') }} <strong class="text-base-content font-semibold">{{ $currentStep->step_name }}</strong>
+                                            @if($currentStep->assignedUser)
+                                                — <span class="text-base-content/80">{{ $currentStep->assignedUser->name }}</span>
+                                            @endif
+                                        @else
+                                            {{ __('Versi menunggu peninjauan dan persetujuan.') }}
+                                        @endif
+                                    </p>
                                 </div>
                             @endif
                         </div>
@@ -261,19 +280,135 @@
                             @can('approve', $document)
                                 <form method="POST" action="{{ route('approvals.approve', [$document, $pendingVersion]) }}" class="inline">
                                     @csrf
-                                    <button class="btn btn-success btn-sm rounded-xl">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                                    <button class="btn btn-success btn-sm rounded-xl text-white font-semibold gap-1 px-3.5 shadow-xs hover:shadow-md transition-all">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
                                         {{ __('Approve') }}
                                     </button>
                                 </form>
-                                <button type="button" onclick="document.getElementById('reject-version-modal-{{ $pendingVersion->id }}').showModal()" class="btn btn-error btn-sm rounded-xl">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                <button type="button" onclick="document.getElementById('reject-version-modal-{{ $pendingVersion->id }}').showModal()" class="btn btn-error btn-sm rounded-xl text-white font-semibold gap-1 px-3 shadow-xs hover:shadow-md transition-all">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
                                     {{ __('Reject') }}
                                 </button>
                             @endcan
                         </div>
                     </div>
                 </div>
+
+                {{-- Dedicated Multi-Tier Approval Workflow Timeline Card --}}
+                @if(isset($approvalSteps) && $approvalSteps->isNotEmpty())
+                    <div class="card bg-base-100 border border-base-300 shadow-xs rounded-2xl mb-4 overflow-hidden print:hidden">
+                        <div class="px-5 py-3.5 bg-base-200/40 border-b border-base-200 flex items-center justify-between gap-3 flex-wrap">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-sm text-base-content leading-tight">{{ __('Alur Persetujuan & Tanda Tangan') }}</h3>
+                                    <p class="text-xs text-base-content/60">{{ __('Progres pengesahan berjenjang berdasarkan tanda tangan yang disisipkan.') }}</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="badge badge-sm badge-neutral font-medium">
+                                    {{ $approvalSteps->whereIn('status', ['approved', 'bypassed'])->count() }} / {{ $approvalSteps->count() }} {{ __('Selesai') }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="p-4 sm:p-5">
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
+                                @foreach($approvalSteps as $step)
+                                    @php
+                                        $isStepApproved = $step->status === 'approved';
+                                        $isStepBypassed = $step->status === 'bypassed';
+                                        $isStepPending = $step->status === 'pending';
+                                        $isStepRejected = $step->status === 'rejected';
+                                    @endphp
+                                    <div class="relative flex flex-col justify-between p-4 rounded-xl border transition-all duration-200 {{ $isStepPending ? 'bg-amber-500/5 dark:bg-amber-500/10 border-amber-500/40 ring-2 ring-amber-500/20 shadow-sm' : ($isStepApproved ? 'bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/30' : ($isStepBypassed ? 'bg-base-200/40 border-base-300 opacity-75' : 'bg-base-200/20 border-base-300/80')) }}">
+                                        
+                                        {{-- Top Row: Step Order & Status Badge --}}
+                                        <div class="flex items-center justify-between gap-2 mb-2.5">
+                                            <div class="flex items-center gap-2">
+                                                <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold shadow-xs {{ $isStepPending ? 'bg-amber-500 text-white animate-pulse' : ($isStepApproved ? 'bg-emerald-500 text-white' : ($isStepBypassed ? 'bg-base-300 text-base-content/70' : 'bg-base-200 text-base-content/50 border border-base-300')) }}">
+                                                    @if($isStepApproved)
+                                                        ✓
+                                                    @elseif($isStepBypassed)
+                                                        ⚡
+                                                    @elseif($isStepRejected)
+                                                        ✕
+                                                    @else
+                                                        {{ $step->step_order }}
+                                                    @endif
+                                                </div>
+                                                <span class="text-xs font-bold uppercase tracking-wider text-base-content/60">
+                                                    {{ __('Tahap :order', ['order' => $step->step_order]) }}
+                                                </span>
+                                            </div>
+
+                                            @if($isStepApproved)
+                                                <span class="badge badge-success badge-sm text-white font-semibold gap-1">
+                                                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                                                    {{ __('Disetujui') }}
+                                                </span>
+                                            @elseif($isStepBypassed)
+                                                <span class="badge badge-ghost badge-sm text-base-content/60 font-medium" title="{{ __('Dilewati otomatis karena author adalah penandatangan') }}">
+                                                    {{ __('Bypass') }}
+                                                </span>
+                                            @elseif($isStepPending)
+                                                <span class="badge badge-warning badge-sm font-bold gap-1 animate-pulse">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-warning-content"></span>
+                                                    {{ __('Menunggu') }}
+                                                </span>
+                                            @elseif($isStepRejected)
+                                                <span class="badge badge-error badge-sm text-white font-bold gap-1">
+                                                    ✕ {{ __('Ditolak') }}
+                                                </span>
+                                            @else
+                                                <span class="badge badge-ghost badge-sm text-base-content/40 font-normal">
+                                                    {{ __('Menunggu Giliran') }}
+                                                </span>
+                                            @endif
+                                        </div>
+
+                                        {{-- Middle: Step Title & Target User --}}
+                                        <div class="space-y-1 my-1">
+                                            <h4 class="font-bold text-sm text-base-content leading-snug break-words">
+                                                {{ $step->step_name }}
+                                            </h4>
+                                            
+                                            <div class="flex items-center gap-1.5 text-xs text-base-content/70 pt-0.5">
+                                                <svg class="w-3.5 h-3.5 text-base-content/40 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                                </svg>
+                                                <span class="font-medium text-base-content truncate" title="{{ $step->assignedUser?->name ?? ucfirst($step->assigned_role) }}">
+                                                    {{ $step->assignedUser?->name ?? ('Role: ' . ucfirst(str_replace('_', ' ', $step->assigned_role))) }}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {{-- Footer Info: Notes or Completed Timestamp --}}
+                                        @if($isStepApproved && $step->action_at)
+                                            <div class="mt-2.5 pt-2 border-t border-emerald-500/20 text-[11px] text-emerald-700 dark:text-emerald-400 flex items-center justify-between">
+                                                <span>{{ __('Disetujui oleh :name', ['name' => $step->actionBy?->name ?? 'Approver']) }}</span>
+                                                <span class="font-medium">{{ $step->action_at->format('d/m/Y H:i') }}</span>
+                                            </div>
+                                        @elseif($isStepBypassed)
+                                            <div class="mt-2.5 pt-2 border-t border-base-300 text-[11px] text-base-content/50 italic">
+                                                {{ __('Pembuat dokumen (Otomatis)') }}
+                                            </div>
+                                        @elseif($isStepPending)
+                                            <div class="mt-2.5 pt-2 border-t border-amber-500/20 text-[11px] text-amber-700 dark:text-amber-400 font-medium flex items-center gap-1">
+                                                <svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                <span>{{ __('Sedang ditinjau oleh pejabat terkait') }}</span>
+                                            </div>
+                                        @endif
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                @endif
 
                 @can('approve', $document)
                     {{-- Reject Version Modal --}}

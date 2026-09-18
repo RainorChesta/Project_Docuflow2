@@ -673,31 +673,12 @@ class DocumentController extends Controller
 
         $approvedSignatures = $this->getApprovedSignatures($document);
 
-        // Ensure pending document with unassigned approver has approval routing evaluated
-        if ($document->approver_id === null && $document->versions()->where('status', 'pending')->whereNull('discarded_at')->exists()) {
-            $pendingVersion = $document->versions()->where('status', 'pending')->whereNull('discarded_at')->latest('id')->first();
-            if ($pendingVersion) {
-                $notifKey = 'approval_notified_' . $document->id . '_v' . $pendingVersion->id;
-                if (!Cache::has($notifKey)) {
-                    Cache::put($notifKey, true, now()->addMinutes(10));
-                    $author = $document->owner ?? $currentUser;
-                    $resolution = $this->approvalRoutingService->resolveApprover($document, $author);
-                    $this->approvalRoutingService->applyToDocument($document, $resolution);
-
-                    foreach ($resolution['approvers'] as $approver) {
-                        $approver->notify(new \App\Notifications\DocumentApprovalRequested($document, $pendingVersion, $author?->name ?? 'User'));
-                    }
-
-                    if ($resolution['role'] !== null && $author) {
-                        $author->notify(new \App\Notifications\ApprovalRouteResolved(
-                            $document,
-                            $resolution['role'],
-                            $resolution['approvers']->pluck('name')->join(', '),
-                            $resolution['message'],
-                            $resolution['isFallback'],
-                        ));
-                    }
-                }
+        // Ensure pending document has multi-tier signature approval workflow compiled
+        $pendingVersion = $document->versions()->where('status', 'pending')->whereNull('discarded_at')->latest('id')->first();
+        if ($pendingVersion) {
+            $author = $document->owner ?? $currentUser;
+            if ($pendingVersion->approvalSteps()->count() === 0) {
+                $this->approvalRoutingService->compileWorkflowFromSignatures($document, $pendingVersion, $author);
             }
         }
 

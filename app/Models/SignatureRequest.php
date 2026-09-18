@@ -66,6 +66,39 @@ class SignatureRequest extends Model
         return $this->belongsTo(Document::class, 'document_id');
     }
 
+    public function approvalStep(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(DocumentApprovalStep::class, 'signature_request_id');
+    }
+
+    /**
+     * Role weight for hierarchical step ordering (Staff = 10, Unit PIC = 20, Kadiv/Kacab = 30, Director = 40, Admin = 50).
+     */
+    public function getRoleWeightAttribute(): int
+    {
+        $user = $this->targetUser;
+        if (!$user) {
+            return 10;
+        }
+
+        if ($user->isDirector()) {
+            return 40;
+        }
+        if ($user->isAdmin()) {
+            return 50;
+        }
+        if ($user->isHead()) {
+            return 30;
+        }
+
+        // Check if user is Unit Kerja PIC
+        if (UnitKerja::where('pic_user_id', $user->id)->exists()) {
+            return 20;
+        }
+
+        return 10; // Default Staff / Peer
+    }
+
     public function isPending(): bool
     {
         return $this->status === 'pending';

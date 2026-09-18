@@ -313,8 +313,19 @@ class DirectorDocumentController extends Controller
                 }
             }
 
+            // Tembusan Filter
+            $tab = $request->get('tab', 'all');
+            if ($tab === 'tembusan') {
+                $docQuery->whereNotNull('director_notified_at');
+            }
+
             $documents = $docQuery->latest()->paginate(16)->withQueryString();
         }
+
+        $tab = $request->get('tab', 'all');
+        $unreadTembusanCount = Document::whereNotNull('director_notified_at')
+            ->whereNull('director_read_at')
+            ->count();
 
         return view('director.documents.index', compact(
             'breadcrumbs',
@@ -334,11 +345,31 @@ class DirectorDocumentController extends Controller
             'selectedStatus',
             'search',
             'viewMode',
+            'tab',
+            'unreadTembusanCount',
             'availableCompanies',
             'availableBranches',
             'availableDivisions',
             'availableDocumentTypes',
             'availableCreators'
         ));
+    }
+
+    /**
+     * Mark a released document as acknowledged/read by Director.
+     */
+    public function acknowledgeRead(Request $request, Document $document): \Illuminate\Http\RedirectResponse
+    {
+        $user = auth()->user();
+        if (!$user->isDirector() && !$user->isAdmin()) {
+            abort(403, 'Unauthorized.');
+        }
+
+        $document->update([
+            'director_read_at' => now(),
+            'director_acknowledged_by_id' => $user->id,
+        ]);
+
+        return back()->with('success', __('Dokumen telah ditandai telah dibaca dan diketahui oleh Direktur.'));
     }
 }

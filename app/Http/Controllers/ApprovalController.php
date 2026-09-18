@@ -393,7 +393,12 @@ class ApprovalController extends Controller
                 continue;
             }
 
-            $this->versionService->approve($version, $reviewer);
+            $currentStep = $version->approvalSteps()->where('status', 'pending')->first();
+            if ($currentStep) {
+                $isFinal = $this->approvalRoutingService->advanceApproval($currentStep, $reviewer);
+            } else {
+                $this->versionService->approve($version, $reviewer);
+            }
 
             $this->auditService->log($reviewer, 'version.approved', 'document_version', $version->id, [
                 'document_id' => $document->id,
@@ -401,8 +406,8 @@ class ApprovalController extends Controller
                 'bulk' => true,
             ]);
 
-            // Notify document author
-            if ($version->author_id && $version->author_id !== $reviewer->id) {
+            // Notify document author (if not already handled by advanceApproval)
+            if (!$currentStep && $version->author_id && $version->author_id !== $reviewer->id) {
                 $version->author?->notify(new \App\Notifications\DocumentApprovalResult(
                     $document,
                     $version,
@@ -452,7 +457,12 @@ class ApprovalController extends Controller
                 continue;
             }
 
-            $this->versionService->reject($version, $reviewer, $notes);
+            $currentStep = $version->approvalSteps()->where('status', 'pending')->first();
+            if ($currentStep) {
+                $this->approvalRoutingService->rejectApproval($currentStep, $reviewer, $notes);
+            } else {
+                $this->versionService->reject($version, $reviewer, $notes);
+            }
 
             $this->auditService->log($reviewer, 'version.rejected', 'document_version', $version->id, [
                 'document_id' => $document->id,
@@ -461,8 +471,8 @@ class ApprovalController extends Controller
                 'bulk' => true,
             ]);
 
-            // Notify document author
-            if ($version->author_id && $version->author_id !== $reviewer->id) {
+            // Notify document author (if not already handled by rejectApproval)
+            if (!$currentStep && $version->author_id && $version->author_id !== $reviewer->id) {
                 $version->author?->notify(new \App\Notifications\DocumentApprovalResult(
                     $document,
                     $version,
@@ -483,54 +493,75 @@ class ApprovalController extends Controller
         $this->authorize('approve', $document);
 
         $reviewer = auth()->user();
-        $this->versionService->approve($version, $reviewer, $request->input('notes'));
+        $notes = $request->input('notes');
+        $escalateToKacab = $request->boolean('escalate_to_kacab');
+
+        $currentStep = $version->approvalSteps()->where('status', 'pending')->first();
+        if ($currentStep) {
+            $isFinal = $this->approvalRoutingService->advanceApproval($currentStep, $reviewer, $notes, $escalateToKacab);
+            $message = $isFinal
+                ? __('Versi disetujui dan disahkan secara final.')
+                : __('Persetujuan dicatat. Dokumen diteruskan ke tahap persetujuan berikutnya.');
+        } else {
+            $this->versionService->approve($version, $reviewer, $notes);
+            $message = __('Versi disetujui dan diaktifkan.');
+
+            // Notify document author
+            if ($version->author_id && $version->author_id !== $reviewer->id) {
+                $version->author?->notify(new \App\Notifications\DocumentApprovalResult(
+                    $document,
+                    $version,
+                    'approved',
+                    $reviewer->name,
+                    $notes
+                ));
+            }
+        }
 
         $this->auditService->log($reviewer, 'version.approved', 'document_version', $version->id, [
             'document_id' => $document->id,
             'version_number' => $version->version_number,
         ]);
 
-        // Notify document author
-        if ($version->author_id && $version->author_id !== $reviewer->id) {
-            $version->author?->notify(new \App\Notifications\DocumentApprovalResult(
-                $document,
-                $version,
-                'approved',
-                $reviewer->name,
-                $request->input('notes')
-            ));
-        }
-
         // Notify sibling approvers (other Admins/Direkturs) that approval is done
         $this->notifySiblingApprovers($document, $reviewer, 'approved');
 
-        return redirect()->to($request->header('referer') ?: route('approvals.index'))->with('success', __('Versi disetujui dan diaktifkan.'));
+        return redirect()->to($request->header('referer') ?: route('approvals.index'))->with('success', $message);
     }
 
     public function reject(Request $request, Document $document, DocumentVersion $version): RedirectResponse
     {
         $this->authorize('approve', $document);
 
-        $validated = $request->validate(['notes' => 'nullable|string|max:500']);
+        $validated = $request->validate([
+            'notes' => 'nullable|string|max:500',
+            'reason' => 'nullable|string|max:500',
+        ]);
         $reviewer = auth()->user();
+        $notes = $validated['notes'] ?? $validated['reason'] ?? $request->input('reason') ?? __('Ditolak oleh reviewer');
 
-        $this->versionService->reject($version, $reviewer, $validated['notes'] ?? null);
+        $currentStep = $version->approvalSteps()->where('status', 'pending')->first();
+        if ($currentStep) {
+            $this->approvalRoutingService->rejectApproval($currentStep, $reviewer, $notes);
+        } else {
+            $this->versionService->reject($version, $reviewer, $notes);
+
+            // Notify document author
+            if ($version->author_id && $version->author_id !== $reviewer->id) {
+                $version->author?->notify(new \App\Notifications\DocumentApprovalResult(
+                    $document,
+                    $version,
+                    'rejected',
+                    $reviewer->name,
+                    $notes
+                ));
+            }
+        }
 
         $this->auditService->log($reviewer, 'version.rejected', 'document_version', $version->id, [
             'document_id' => $document->id,
             'version_number' => $version->version_number,
         ]);
-
-        // Notify document author
-        if ($version->author_id && $version->author_id !== $reviewer->id) {
-            $version->author?->notify(new \App\Notifications\DocumentApprovalResult(
-                $document,
-                $version,
-                'rejected',
-                $reviewer->name,
-                $validated['notes'] ?? null
-            ));
-        }
 
         // Notify sibling approvers (other Admins/Direkturs) that rejection is done
         $this->notifySiblingApprovers($document, $reviewer, 'rejected');
