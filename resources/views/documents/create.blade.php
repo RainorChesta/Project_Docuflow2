@@ -110,50 +110,25 @@
                             @error('document_type_id') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                         </div>
 
-                        {{-- Format Choice / Format Dokumen --}}
-                        @php $currentFormatChoice = old('format_choice', 'baru'); @endphp
-                        <div class="form-control w-full mb-5" x-data="{ format: '{{ $currentFormatChoice }}' }">
-                            <label class="label">
-                                <span class="label-text font-medium">{{ __('Format Penomoran Dokumen') }}</span>
-                            </label>
-                            
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <!-- Option 1: Format Baru (Default) -->
-                                <label class="border rounded-xl p-3.5 flex items-start gap-3 cursor-pointer transition-all hover:bg-base-200/60"
-                                       :class="format === 'baru' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-base-300 bg-base-100'">
-                                    <input type="radio" name="format_choice" value="baru" x-model="format"
-                                           class="radio radio-primary radio-sm mt-0.5"
-                                           @change="$nextTick(() => window.onFormatChoiceChange('baru'))">
-                                    <div class="flex-1">
-                                        <div class="flex items-center gap-2">
-                                            <span class="font-semibold text-sm">{{ __('Format Baru') }}</span>
-                                            <span class="badge badge-primary badge-sm">{{ __('Otomatis') }}</span>
-                                        </div>
-                                        <p class="text-xs text-base-content/60 mt-1">
-                                            {{ __('Penomoran standar baru terpadu dengan kode divisi.') }}
-                                        </p>
-                                    </div>
-                                </label>
-
-                                <!-- Option 2: Format Lama -->
-                                <label class="border rounded-xl p-3.5 flex items-start gap-3 cursor-pointer transition-all hover:bg-base-200/60"
-                                       :class="format === 'lama' ? 'border-secondary bg-secondary/5 ring-1 ring-secondary' : 'border-base-300 bg-base-100'">
-                                    <input type="radio" name="format_choice" value="lama" x-model="format"
-                                           class="radio radio-secondary radio-sm mt-0.5"
-                                           @change="$nextTick(() => window.onFormatChoiceChange('lama'))">
-                                    <div class="flex-1">
-                                        <div class="flex items-center gap-2">
-                                            <span class="font-semibold text-sm">{{ __('Format Lama') }}</span>
-                                            <span class="badge badge-ghost badge-sm">{{ __('Format Lama') }}</span>
-                                        </div>
-                                        <p class="text-xs text-base-content/60 mt-1">
-                                            {{ __('Penomoran menggunakan format terdahulu (khusus SOP menggunakan unit kerja).') }}
-                                        </p>
-                                    </div>
-                                </label>
+                        {{-- Format Penomoran Dokumen (Otomatis berdasarkan Cabang Pusat / Cabang PT) --}}
+                        @php
+                            $isPusatBranch = $activeBranch ? (bool) $activeBranch->is_pusat : true;
+                        @endphp
+                        <input type="hidden" name="format_choice" id="format_choice" value="{{ $isPusatBranch ? 'baru' : 'lama' }}">
+                        <div class="mb-4 p-3.5 rounded-xl border border-base-300 bg-base-200/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div class="flex items-center gap-2.5">
+                                <span class="badge {{ $isPusatBranch ? 'badge-primary' : 'badge-secondary' }} badge-sm font-semibold" id="badge-branch-type">
+                                    {{ $isPusatBranch ? __('Cabang Pusat') : __('Cabang PT') }}
+                                </span>
+                                <span class="text-xs text-base-content/80" id="desc-branch-type">
+                                    {{ $isPusatBranch 
+                                        ? __('Penomoran Divisi: [No]/[Tipe]/[Divisi]/[Pusat]/[Bulan]/[Tahun]') 
+                                        : __('Penomoran Unit Kerja: [No]/[Tipe]-[UnitKerja]/[Cabang]/[Bulan]/[Tahun]') }}
+                                </span>
                             </div>
-
-                            @error('format_choice') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
+                            <span class="text-xs font-mono text-base-content/60" id="example-branch-type">
+                                {{ $isPusatBranch ? 'Ex: 001/SK/SKRT/JBM/IX/2026' : 'Ex: 001/SK-01/MMC/IX/2026' }}
+                            </span>
                         </div>
 
                         {{-- Document Number --}}
@@ -353,7 +328,7 @@
                         {{-- Division --}}
                         <div id="container-division" class="form-control w-full mb-4">
                             <label for="division_id" class="label">
-                                <span class="label-text font-medium">{{ __('Divisi') }}</span>
+                                <span class="label-text font-medium">{{ __('Divisi') }} <span class="text-error">*</span></span>
                             </label>
                             @php
                                 $activeDivision = $activeDivision ?? app(\App\Services\CompanyContextService::class)->getActiveDivision();
@@ -368,16 +343,26 @@
                                         </option>
                                     @endforeach
                                 </select>
-                                <p class="text-xs text-base-content/50 mt-1">{{ __('Pilih divisi dokumen.') }}</p>
+                                <p class="text-xs text-base-content/50 mt-1">{{ __('Pilih divisi pembuat dokumen.') }}</p>
                             @else
-                                <input type="text" value="{{ $activeDivision ? $activeDivision->code . ' - ' . $activeDivision->name : '—' }}" class="input input-bordered w-full bg-base-200" disabled>
-                                <input type="hidden" name="division_id" id="division_id" value="{{ $activeDivision?->id }}">
-                                <p class="text-xs text-base-content/50 mt-1">{{ __('Sesuai divisi aktif yang dipilih di switcher atas.') }}</p>
+                                <select name="division_id" id="division_id" class="select select-bordered w-full" required>
+                                    @if($divisions->count() > 1)
+                                        <option value="">{{ __('Pilih divisi...') }}</option>
+                                    @endif
+                                    @foreach($divisions as $div)
+                                        <option value="{{ $div->id }}" {{ old('division_id', $activeDivisionId ?? '') == $div->id ? 'selected' : '' }}>
+                                            {{ $div->code }} - {{ $div->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <p class="text-xs text-base-content/50 mt-1">
+                                    {{ $divisions->count() > 1 ? __('Pilih divisi penugasan Anda yang menerbitkan dokumen ini.') : __('Sesuai divisi penugasan Anda.') }}
+                                </p>
                             @endif
                             @error('division_id') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                         </div>
 
-                        {{-- Unit Kerja (Khusus SOP) --}}
+                        {{-- Unit Kerja (Cabang PT) --}}
                         <div id="container-unit-kerja" class="form-control w-full mb-4" style="display: none;">
                             <label for="unit_kerja_id" class="label">
                                 <span class="label-text font-medium">{{ __('Unit Kerja') }} <span class="text-error">*</span></span>
@@ -385,12 +370,18 @@
                             <select name="unit_kerja_id" id="unit_kerja_id" class="select select-bordered w-full">
                                 <option value="">{{ __('Pilih unit kerja...') }}</option>
                                 @foreach($unitKerjas as $uk)
-                                    <option value="{{ $uk->id }}" data-branch-id="{{ $uk->cabang_id }}" {{ old('unit_kerja_id') == $uk->id ? 'selected' : '' }}>
-                                        {{ $uk->kode_unit_kerja }} - {{ $uk->nama_unit_kerja }} ({{ $uk->cabang?->name }})
+                                    <option value="{{ $uk->id }}" {{ old('unit_kerja_id', $activeUnitKerjaId ?? $userUnitKerjaId ?? '') == $uk->id ? 'selected' : '' }}>
+                                        {{ $uk->kode_unit_kerja }} - {{ $uk->nama_unit_kerja }}
                                     </option>
                                 @endforeach
                             </select>
-                            <p class="text-xs text-base-content/50 mt-1">{{ __('Unit kerja cabang untuk penomoran dokumen SOP.') }}</p>
+                            <p class="text-xs text-base-content/50 mt-1">
+                                @if(auth()->user()->isAdmin() || auth()->user()->isDirector())
+                                    {{ __('Unit kerja cabang yang menerbitkan dokumen ini.') }}
+                                @else
+                                    {{ __('Pilih unit kerja penugasan Anda di cabang ini yang menerbitkan dokumen.') }}
+                                @endif
+                            </p>
                             @error('unit_kerja_id') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                         </div>
 
@@ -517,62 +508,92 @@
             var containerUnitKerja = document.getElementById('container-unit-kerja');
             var containerDivision = document.getElementById('container-division');
 
-            function isCurrentTypeSop() {
-                var typeId = typeSelect.value;
-                if (!typeId) return false;
-                @if($selectedTemplate)
-                    return {{ strtoupper($selectedTemplate->documentType->code) === 'SOP' ? 'true' : 'false' }};
+            window.branchMap = {
+                @foreach(\App\Models\Branch::all() as $br)
+                    '{{ $br->id }}': {
+                        id: {{ $br->id }},
+                        name: '{{ addslashes($br->name) }}',
+                        code: '{{ addslashes($br->code ?? $br->effective_code) }}',
+                        is_pusat: {{ $br->is_pusat ? 'true' : 'false' }}
+                    },
+                @endforeach
+            };
+
+            function isCurrentBranchPusat() {
+                var branchId = branchSelect ? branchSelect.value : '';
+                if (branchId && window.branchMap && window.branchMap[branchId]) {
+                    return window.branchMap[branchId].is_pusat;
+                }
+                @if($activeBranch)
+                    return {{ $activeBranch->is_pusat ? 'true' : 'false' }};
                 @else
-                    if (window.docTypeMap && window.docTypeMap[typeId]) {
-                        return window.docTypeMap[typeId].code === 'SOP';
-                    }
-                    return false;
+                    return true;
                 @endif
             }
 
-            function getFormatChoice(overrideFormat) {
-                if (overrideFormat) return overrideFormat;
-                var checkedRadio = document.querySelector('input[name="format_choice"]:checked');
-                return checkedRadio ? checkedRadio.value : 'baru';
+            function getFormatChoice() {
+                return isCurrentBranchPusat() ? 'baru' : 'lama';
             }
 
-            window.onFormatChoiceChange = function (val) {
-                updateTypeVisibility(val);
-                fetchPreview(val);
-            };
+            function updateTypeVisibility() {
+                var isPusat = isCurrentBranchPusat();
+                var format = isPusat ? 'baru' : 'lama';
 
-            function updateTypeVisibility(formatVal) {
-                var isSop = isCurrentTypeSop();
-                var format = getFormatChoice(formatVal);
-                
-                if (containerDivision) {
-                    if (format === 'lama') {
-                        containerDivision.style.display = 'none';
-                        if (divisionSelect && divisionSelect.tagName === 'SELECT') {
-                            divisionSelect.removeAttribute('required');
-                        }
-                    } else {
+                var formatChoiceInput = document.getElementById('format_choice');
+                var badgeBranchType = document.getElementById('badge-branch-type');
+                var descBranchType = document.getElementById('desc-branch-type');
+                var exampleBranchType = document.getElementById('example-branch-type');
+
+                if (formatChoiceInput) formatChoiceInput.value = format;
+
+                if (isPusat) {
+                    if (badgeBranchType) {
+                        badgeBranchType.textContent = @json(__('Cabang Pusat'));
+                        badgeBranchType.className = 'badge badge-primary badge-sm font-semibold';
+                    }
+                    if (descBranchType) {
+                        descBranchType.textContent = @json(__('Penomoran Divisi: [No]/[Tipe]/[Divisi]/[Pusat]/[Bulan]/[Tahun]'));
+                    }
+                    if (exampleBranchType) {
+                        exampleBranchType.textContent = 'Ex: 001/SK/SKRT/JBM/IX/2026';
+                    }
+                    if (containerDivision) {
                         containerDivision.style.display = 'block';
                         if (divisionSelect && divisionSelect.tagName === 'SELECT') {
                             divisionSelect.setAttribute('required', 'required');
                         }
                     }
-                }
-
-                if (containerUnitKerja) {
-                    if (format === 'lama' && isSop) {
-                        containerUnitKerja.style.display = 'block';
-                        if (unitKerjaSelect) {
-                            unitKerjaSelect.setAttribute('required', 'required');
-                        }
-                    } else {
+                    if (containerUnitKerja) {
                         containerUnitKerja.style.display = 'none';
                         if (unitKerjaSelect) {
                             unitKerjaSelect.removeAttribute('required');
                         }
                     }
+                } else {
+                    if (badgeBranchType) {
+                        badgeBranchType.textContent = @json(__('Cabang PT'));
+                        badgeBranchType.className = 'badge badge-secondary badge-sm font-semibold';
+                    }
+                    if (descBranchType) {
+                        descBranchType.textContent = @json(__('Penomoran Unit Kerja: [No]/[Tipe]-[UnitKerja]/[Cabang]/[Bulan]/[Tahun]'));
+                    }
+                    if (exampleBranchType) {
+                        exampleBranchType.textContent = 'Ex: 001/SK-01/MMC/IX/2026';
+                    }
+                    if (containerDivision) {
+                        containerDivision.style.display = 'none';
+                        if (divisionSelect && divisionSelect.tagName === 'SELECT') {
+                            divisionSelect.removeAttribute('required');
+                        }
+                    }
+                    if (containerUnitKerja) {
+                        containerUnitKerja.style.display = 'block';
+                        if (unitKerjaSelect) {
+                            unitKerjaSelect.setAttribute('required', 'required');
+                        }
+                    }
                 }
-                
+
                 syncUploadMode();
             }
 
@@ -678,34 +699,52 @@
                 if (!unitKerjaSelect) return;
                 var currentBranchId = branchSelect ? branchSelect.value : '';
 
+                var userUkId = '{{ $activeUnitKerjaId ?? $userUnitKerjaId ?? '' }}';
+                var hasUserUkMatch = false;
+
                 var options = unitKerjaSelect.querySelectorAll('option');
                 options.forEach(function(opt) {
                     if (!opt.value) return; // Skip placeholder
                     var optBranch = opt.getAttribute('data-branch-id');
                     var isVisible = !currentBranchId || !optBranch || optBranch === currentBranchId;
                     opt.hidden = !isVisible;
+                    if (isVisible && userUkId && opt.value === String(userUkId)) {
+                        hasUserUkMatch = true;
+                    }
                     if (!isVisible && opt.selected) {
                         unitKerjaSelect.value = '';
                     }
                 });
+
+                if (!unitKerjaSelect.value) {
+                    if (hasUserUkMatch) {
+                        unitKerjaSelect.value = String(userUkId);
+                    } else {
+                        for (var i = 0; i < options.length; i++) {
+                            if (options[i].value && !options[i].hidden) {
+                                unitKerjaSelect.value = options[i].value;
+                                break;
+                            }
+                        }
+                    }
+                }
             }
 
-            function fetchPreview(formatVal) {
+            function fetchPreview() {
                 var typeId = typeSelect.value;
                 if (!typeId) {
-                    if (getFormatChoice(formatVal) === 'baru') {
-                        numberField.value = @json(__('Pilih tipe dokumen dahulu...'));
-                    }
+                    numberField.value = @json(__('Pilih tipe dokumen dahulu...'));
                     lastPreview = '';
                     return;
                 }
 
-                updateTypeVisibility(formatVal);
+                updateTypeVisibility();
 
+                var isPusat = isCurrentBranchPusat();
                 var branchId = branchSelect ? branchSelect.value : '';
-                var divisionId = divisionSelect ? divisionSelect.value : '';
-                var unitKerjaId = unitKerjaSelect ? unitKerjaSelect.value : '';
-                var format = getFormatChoice(formatVal);
+                var divisionId = isPusat && divisionSelect ? divisionSelect.value : '';
+                var unitKerjaId = !isPusat && unitKerjaSelect ? unitKerjaSelect.value : '';
+                var format = isPusat ? 'baru' : 'lama';
 
                 var url = '{{ route('documents.next-number') }}?document_type_id=' + encodeURIComponent(typeId) + '&format_choice=' + encodeURIComponent(format);
                 if (branchId) {
@@ -738,19 +777,12 @@
             }
 
             typeSelect.addEventListener('change', function () {
-                updateTypeVisibility();
                 fetchPreview();
-            });
-            document.querySelectorAll('input[name="format_choice"]').forEach(function (radio) {
-                radio.addEventListener('change', function () {
-                    var val = radio.value;
-                    updateTypeVisibility(val);
-                    fetchPreview(val);
-                });
             });
             if (branchSelect) {
                 branchSelect.addEventListener('change', function () {
                     filterUnitKerjasByBranch();
+                    updateTypeVisibility();
                     fetchPreview();
                 });
             }

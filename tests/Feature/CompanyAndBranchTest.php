@@ -55,20 +55,23 @@ class CompanyAndBranchTest extends TestCase
     {
         $company = Company::create(['name' => 'PT Jaya', 'code' => 'JBM']);
         $branch = Branch::create(['company_id' => $company->id, 'name' => 'Cabang Surabaya', 'is_pusat' => false, 'code' => 'SBY']);
+        $pusat = Branch::create(['company_id' => $company->id, 'name' => 'Pusat', 'is_pusat' => true]);
         $division = Division::create(['code' => 'IT', 'name' => 'Information Tech']);
         $docType = DocumentType::create(['code' => 'S.KEL', 'name' => 'Surat Keluar']);
 
         $service = app(DocumentService::class);
-        $number = $service->generateId($division, $docType, $branch);
+        $numberCabang = $service->generateId($division, $docType, $branch);
+        $numberPusat = $service->generateId($division, $docType, $pusat);
 
-        $this->assertStringContainsString('/IT/SBY/', $number);
+        $this->assertStringContainsString('/SBY/', $numberCabang);
+        $this->assertStringContainsString('/IT/JBM/', $numberPusat);
     }
 
     public function test_sop_document_numbering_includes_unit_kerja_and_branch_code(): void
     {
         $company = Company::create(['name' => 'PT Jaya', 'code' => 'JBM']);
         $branch = Branch::create(['company_id' => $company->id, 'name' => 'CDC Diponegoro', 'is_pusat' => false, 'code' => 'CDC-DIP']);
-        $unitKerja = \App\Models\UnitKerja::create(['cabang_id' => $branch->id, 'kode_unit_kerja' => '11', 'nama_unit_kerja' => 'Unit Operasional']);
+        $unitKerja = \App\Models\UnitKerja::create(['kode_unit_kerja' => '11', 'nama_unit_kerja' => 'Unit Operasional']);
         $sopType = DocumentType::create(['code' => 'SOP', 'name' => 'Standard Operating Procedure']);
 
         $service = app(DocumentService::class);
@@ -87,7 +90,7 @@ class CompanyAndBranchTest extends TestCase
     {
         $company = Company::create(['name' => 'PT Jaya', 'code' => 'JBM']);
         $branch = Branch::create(['company_id' => $company->id, 'name' => 'CDC Diponegoro', 'is_pusat' => false, 'code' => 'CDC-DIP']);
-        $unitKerja11 = \App\Models\UnitKerja::create(['cabang_id' => $branch->id, 'kode_unit_kerja' => '11', 'nama_unit_kerja' => 'Unit Operasional']);
+        $unitKerja11 = \App\Models\UnitKerja::create(['kode_unit_kerja' => '11', 'nama_unit_kerja' => 'Unit Operasional']);
         $sopType = DocumentType::create(['code' => 'SOP', 'name' => 'Standard Operating Procedure']);
 
         $service = app(DocumentService::class);

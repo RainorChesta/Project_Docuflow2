@@ -5,6 +5,7 @@
     $activeCompanyId = (string) $contextService->getActiveCompanyId($user);
     $activeBranchId = (string) $contextService->getActiveBranchId($user);
     $activeDivisionId = (string) $contextService->getActiveDivisionId($user);
+    $activeUnitKerjaId = (string) $contextService->getActiveUnitKerjaId($user);
     $pendingApprovalsPerCompany = $user ? $user->pendingApprovalsCountByCompany() : [];
     $totalCompanyApprovals = collect($pendingApprovalsPerCompany)->sum();
     
@@ -16,12 +17,28 @@
             'name' => $c->name,
             'code' => $c->code,
             'pending_approvals_count' => $pendingCount,
-            'branches' => $cBranches->map(function ($b) {
+            'branches' => $cBranches->map(function ($b) use ($contextService, $user) {
+                $unitKerjas = (!$b->is_pusat)
+                    ? $contextService->getAvailableUnitKerjas($user, $b->id)->map(fn($u) => [
+                        'id' => (string) $u->id,
+                        'name' => $u->nama_unit_kerja,
+                        'code' => $u->kode_unit_kerja,
+                    ])->values()->all()
+                    : [];
+                $divisions = ($b->is_pusat)
+                    ? $contextService->getAvailableDivisions($user, $b->id)->map(fn($d) => [
+                        'id' => (string) $d->id,
+                        'name' => $d->name,
+                        'code' => $d->code,
+                    ])->values()->all()
+                    : [];
                 return [
                     'id' => (string) $b->id,
                     'name' => $b->name . ($b->is_pusat ? ' (' . __('Pusat') . ')' : ($b->code ? ' (' . $b->code . ')' : '')),
                     'raw_name' => $b->name,
                     'is_pusat' => (bool) $b->is_pusat,
+                    'unit_kerjas' => $unitKerjas,
+                    'divisions' => $divisions,
                 ];
             })->values()->all(),
         ];
@@ -31,8 +48,14 @@
     $activeBranches = $contextService->getAvailableBranches($user, (int) $activeCompanyId);
     $activeBranch = $activeBranches->firstWhere('id', (int) $activeBranchId);
     
-    $globalDivisions = $contextService->getAvailableDivisions($user);
+    $globalDivisions = ($activeBranch && $activeBranch->is_pusat)
+        ? $contextService->getAvailableDivisions($user, $activeBranch->id)
+        : $contextService->getAvailableDivisions($user);
     $activeDivision = $globalDivisions->firstWhere('id', (int) $activeDivisionId);
+    $activeUnitKerja = $contextService->getActiveUnitKerja($user);
+    $activeBranchUnitKerjas = ($activeBranch && !$activeBranch->is_pusat) 
+        ? $contextService->getAvailableUnitKerjas($user, $activeBranch->id) 
+        : collect();
 @endphp
 
 @if(!$user?->isDirector() && $companies->isNotEmpty())
@@ -40,12 +63,15 @@
         activeCompanyId: '{{ $activeCompanyId }}',
         activeBranchId: '{{ $activeBranchId }}',
         activeDivisionId: '{{ $activeDivisionId }}',
+        activeUnitKerjaId: '{{ $activeUnitKerjaId }}',
         selectedCompanyId: '{{ $activeCompanyId }}',
         selectedBranchId: '{{ $activeBranchId }}',
         selectedDivisionId: '{{ $activeDivisionId }}',
+        selectedUnitKerjaId: '{{ $activeUnitKerjaId }}',
         pendingCompanyId: '{{ $activeCompanyId }}',
         pendingBranchId: '{{ $activeBranchId }}',
         pendingDivisionId: '{{ $activeDivisionId }}',
+        pendingUnitKerjaId: '{{ $activeUnitKerjaId }}',
         companies: {{ Js::from($companiesData) }},
         divisions: {{ Js::from($globalDivisions->map(fn($d) => ['id' => (string) $d->id, 'name' => $d->name, 'code' => $d->code])->values()->all()) }},
         isSwitching: false,
@@ -57,6 +83,15 @@
             if (!this.currentCompany) return null;
             return this.currentCompany.branches.find(b => b.id === this.activeBranchId) || null;
         },
+        get currentUnitKerjas() {
+            if (!this.currentBranch || this.currentBranch.is_pusat) return [];
+            return this.currentBranch.unit_kerjas || [];
+        },
+        get currentUnitKerja() {
+            return this.currentUnitKerjas.find(u => u.id === this.activeUnitKerjaId) 
+                || this.currentUnitKerjas[0] 
+                || null;
+        },
         get targetCompany() {
             return this.companies.find(c => c.id === this.pendingCompanyId) || null;
         },
@@ -66,12 +101,26 @@
                 || this.targetCompany.branches[0] 
                 || null;
         },
+        get targetUnitKerjas() {
+            if (!this.targetBranch || this.targetBranch.is_pusat) return [];
+            return this.targetBranch.unit_kerjas || [];
+        },
+        get targetUnitKerja() {
+            return this.targetUnitKerjas.find(u => u.id === this.pendingUnitKerjaId) 
+                || this.targetUnitKerjas[0] 
+                || null;
+        },
         get availableSelectedBranches() {
             const comp = this.companies.find(c => c.id === this.selectedCompanyId);
             return comp ? comp.branches : [];
         },
         get availableSelectedDivisions() {
             return this.divisions;
+        },
+        get selectedBranchUnitKerjas() {
+            const br = this.availableSelectedBranches.find(b => b.id === this.selectedBranchId);
+            if (!br || br.is_pusat) return [];
+            return br.unit_kerjas || [];
         },
         get availablePendingDivisions() {
             return this.divisions;
@@ -81,17 +130,36 @@
                 || this.divisions[0] 
                 || null;
         },
+        get isCurrentBranchPusat() {
+            return this.currentBranch ? this.currentBranch.is_pusat : false;
+        },
+        get isTargetBranchPusat() {
+            return this.targetBranch ? this.targetBranch.is_pusat : false;
+        },
+        get isSelectedBranchPusat() {
+            const br = this.availableSelectedBranches.find(b => b.id === this.selectedBranchId);
+            return br ? br.is_pusat : false;
+        },
 
         onDesktopCompanyChange(newCompanyId) {
             if (newCompanyId === this.activeCompanyId) return;
             this.pendingCompanyId = newCompanyId;
             const targetComp = this.companies.find(c => c.id === newCompanyId);
             if (targetComp && targetComp.branches.length > 0) {
-                this.pendingBranchId = targetComp.branches[0].id;
+                const br = targetComp.branches[0];
+                this.pendingBranchId = br.id;
+                if (br.is_pusat) {
+                    this.pendingDivisionId = this.divisions.length > 0 ? this.divisions[0].id : '';
+                    this.pendingUnitKerjaId = '';
+                } else {
+                    this.pendingUnitKerjaId = (br.unit_kerjas && br.unit_kerjas.length > 0) ? br.unit_kerjas[0].id : '';
+                    this.pendingDivisionId = '';
+                }
             } else {
                 this.pendingBranchId = '';
+                this.pendingDivisionId = '';
+                this.pendingUnitKerjaId = '';
             }
-            this.pendingDivisionId = this.divisions.length > 0 ? this.divisions[0].id : '';
             this.openConfirmModal();
         },
 
@@ -99,7 +167,14 @@
             if (newBranchId === this.activeBranchId) return;
             this.pendingCompanyId = this.activeCompanyId;
             this.pendingBranchId = newBranchId;
-            this.pendingDivisionId = this.divisions.length > 0 ? this.divisions[0].id : '';
+            const br = this.targetBranch;
+            if (br && br.is_pusat) {
+                this.pendingDivisionId = this.divisions.length > 0 ? this.divisions[0].id : '';
+                this.pendingUnitKerjaId = '';
+            } else if (br && !br.is_pusat) {
+                this.pendingUnitKerjaId = (br.unit_kerjas && br.unit_kerjas.length > 0) ? br.unit_kerjas[0].id : '';
+                this.pendingDivisionId = '';
+            }
             this.openConfirmModal();
         },
 
@@ -108,6 +183,16 @@
             this.pendingCompanyId = this.activeCompanyId;
             this.pendingBranchId = this.activeBranchId;
             this.pendingDivisionId = newDivisionId;
+            this.pendingUnitKerjaId = '';
+            this.openConfirmModal();
+        },
+
+        onDesktopUnitKerjaChange(newUnitKerjaId) {
+            if (newUnitKerjaId === this.activeUnitKerjaId) return;
+            this.pendingCompanyId = this.activeCompanyId;
+            this.pendingBranchId = this.activeBranchId;
+            this.pendingDivisionId = '';
+            this.pendingUnitKerjaId = newUnitKerjaId;
             this.openConfirmModal();
         },
 
@@ -115,25 +200,49 @@
             this.selectedCompanyId = newCompanyId;
             const comp = this.companies.find(c => c.id === newCompanyId);
             if (comp && comp.branches.length > 0) {
-                this.selectedBranchId = comp.branches[0].id;
+                const br = comp.branches[0];
+                this.selectedBranchId = br.id;
+                if (br.is_pusat) {
+                    this.selectedDivisionId = this.divisions.length > 0 ? this.divisions[0].id : '';
+                    this.selectedUnitKerjaId = '';
+                } else {
+                    this.selectedUnitKerjaId = (br.unit_kerjas && br.unit_kerjas.length > 0) ? br.unit_kerjas[0].id : '';
+                    this.selectedDivisionId = '';
+                }
             } else {
                 this.selectedBranchId = '';
+                this.selectedDivisionId = '';
+                this.selectedUnitKerjaId = '';
             }
-            this.selectedDivisionId = this.divisions.length > 0 ? this.divisions[0].id : '';
         },
 
         onMobileBranchChange(newBranchId) {
             this.selectedBranchId = newBranchId;
+            const br = this.availableSelectedBranches.find(b => b.id === newBranchId);
+            if (br && br.is_pusat) {
+                this.selectedDivisionId = this.divisions.length > 0 ? this.divisions[0].id : '';
+                this.selectedUnitKerjaId = '';
+            } else if (br && !br.is_pusat) {
+                this.selectedUnitKerjaId = (br.unit_kerjas && br.unit_kerjas.length > 0) ? br.unit_kerjas[0].id : '';
+                this.selectedDivisionId = '';
+            }
         },
 
         applyMobileSelection() {
-            if (this.selectedCompanyId === this.activeCompanyId && this.selectedBranchId === this.activeBranchId && this.selectedDivisionId === this.activeDivisionId) {
+            const isPusat = this.isSelectedBranchPusat;
+            const isSameContext = (
+                this.selectedCompanyId === this.activeCompanyId &&
+                this.selectedBranchId === this.activeBranchId &&
+                (isPusat ? this.selectedDivisionId === this.activeDivisionId : this.selectedUnitKerjaId === this.activeUnitKerjaId)
+            );
+            if (isSameContext) {
                 this.closeMobileModal();
                 return;
             }
             this.pendingCompanyId = this.selectedCompanyId;
             this.pendingBranchId = this.selectedBranchId;
             this.pendingDivisionId = this.selectedDivisionId;
+            this.pendingUnitKerjaId = this.selectedUnitKerjaId;
             this.closeMobileModal();
             this.openConfirmModal();
         },
@@ -161,15 +270,18 @@
             this.selectedCompanyId = this.activeCompanyId;
             this.selectedBranchId = this.activeBranchId;
             this.selectedDivisionId = this.activeDivisionId;
+            this.selectedUnitKerjaId = this.activeUnitKerjaId;
             this.pendingCompanyId = this.activeCompanyId;
             this.pendingBranchId = this.activeBranchId;
             this.pendingDivisionId = this.activeDivisionId;
+            this.pendingUnitKerjaId = this.activeUnitKerjaId;
         },
 
         openMobileModal() {
             this.selectedCompanyId = this.activeCompanyId;
             this.selectedBranchId = this.activeBranchId;
             this.selectedDivisionId = this.activeDivisionId;
+            this.selectedUnitKerjaId = this.activeUnitKerjaId;
             if (this.$refs.mobileModal) {
                 this.$refs.mobileModal.showModal();
             }
@@ -187,16 +299,20 @@
 
             const finalCompany = this.pendingCompanyId;
             const finalBranch = this.targetBranch ? this.targetBranch.id : (this.pendingBranchId || '');
-            const finalDivision = this.targetDivision ? this.targetDivision.id : (this.pendingDivisionId || '');
+            const isPusat = this.targetBranch ? this.targetBranch.is_pusat : false;
+            const finalDivision = isPusat ? (this.targetDivision ? this.targetDivision.id : (this.pendingDivisionId || '')) : '';
+            const finalUnitKerja = !isPusat ? (this.targetUnitKerja ? this.targetUnitKerja.id : (this.pendingUnitKerjaId || '')) : '';
 
             const form = this.$refs.contextSwitchForm;
             if (form) {
                 const compInput = form.querySelector('input[name=company_id]');
                 const branchInput = form.querySelector('input[name=branch_id]');
                 const divInput = form.querySelector('input[name=division_id]');
+                const ukInput = form.querySelector('input[name=unit_kerja_id]');
                 if (compInput) compInput.value = finalCompany;
                 if (branchInput) branchInput.value = finalBranch;
                 if (divInput) divInput.value = finalDivision;
+                if (ukInput) ukInput.value = finalUnitKerja;
 
                 // Safety timeout to prevent permanent stuck state on network failure
                 setTimeout(() => {
@@ -214,6 +330,7 @@
             <input type="hidden" name="company_id">
             <input type="hidden" name="branch_id">
             <input type="hidden" name="division_id">
+            <input type="hidden" name="unit_kerja_id">
         </form>
 
         {{-- Desktop: inline dropdowns (visible xl+) --}}
@@ -291,9 +408,9 @@
                 </div>
             @endif
 
-            {{-- Division Dropdown --}}
-            @if($globalDivisions->count() > 1)
-                <div class="relative" x-show="availableSelectedDivisions.length > 1">
+            {{-- Division Dropdown (Only for Pusat) --}}
+            <template x-if="isCurrentBranchPusat && availableSelectedDivisions.length > 1">
+                <div class="relative">
                     <select x-model="selectedDivisionId" 
                             @change="onDesktopDivisionChange($event.target.value)" 
                             class="select select-bordered select-xs sm:select-sm text-xs bg-base-200/60 w-auto min-w-[100px] max-w-[140px] 2xl:max-w-[180px] focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer truncate"
@@ -303,7 +420,21 @@
                         </template>
                     </select>
                 </div>
-            @endif
+            </template>
+
+            {{-- Unit Kerja Dropdown (Only for Cabang PT) --}}
+            <template x-if="!isCurrentBranchPusat && currentUnitKerjas.length > 1">
+                <div class="relative">
+                    <select x-model="selectedUnitKerjaId" 
+                            @change="onDesktopUnitKerjaChange($event.target.value)" 
+                            class="select select-bordered select-xs sm:select-sm text-xs bg-base-200/60 w-auto min-w-[100px] max-w-[140px] 2xl:max-w-[180px] focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer truncate"
+                            title="{{ __('Pilih Unit Kerja Aktif') }}">
+                        <template x-for="uk in currentUnitKerjas" :key="uk.id">
+                            <option :value="uk.id" x-text="uk.code + ' - ' + uk.name"></option>
+                        </template>
+                    </select>
+                </div>
+            </template>
         </div>
 
         {{-- Tablet / Medium Screen: Compact pill button (visible sm to xl) --}}
@@ -319,9 +450,12 @@
                 <span class="font-semibold truncate text-[11px]">{{ $activeCompany?->code ?? '-' }}</span>
                 <span class="text-base-content/30">•</span>
                 <span class="truncate text-[11px] text-base-content/70">{{ $activeBranch?->name ?? '-' }}</span>
-                @if($globalDivisions->count() > 1)
+                @if($activeBranch?->is_pusat && $globalDivisions->count() > 1)
                     <span class="text-base-content/30">•</span>
                     <span class="truncate text-[11px] text-base-content/70">{{ $activeDivision?->code ?? '-' }}</span>
+                @elseif($activeBranch && !$activeBranch->is_pusat && $activeBranchUnitKerjas->count() > 1)
+                    <span class="text-base-content/30">•</span>
+                    <span class="truncate text-[11px] text-base-content/70">UK: {{ $activeUnitKerja?->kode_unit_kerja ?? '-' }}</span>
                 @endif
                 @if($totalCompanyApprovals > 0)
                     <span class="badge badge-error badge-xs font-bold text-white px-1 shadow-xs ml-0.5" title="{{ $totalCompanyApprovals }} {{ __('persetujuan menunggu') }}">{{ $totalCompanyApprovals }}</span>
@@ -412,7 +546,7 @@
                             </select>
                         </div>
 
-                        <div class="space-y-1.5" x-show="availableSelectedDivisions.length > 1">
+                        <div class="space-y-1.5" x-show="isSelectedBranchPusat && availableSelectedDivisions.length > 1">
                             <label class="text-xs font-semibold text-base-content/80 flex items-center justify-between">
                                 <span>{{ __('Divisi') }}</span>
                                 <span class="text-[10px] text-base-content/40 font-normal" x-text="availableSelectedDivisions.length + ' {{ __('tersedia') }}'"></span>
@@ -421,6 +555,19 @@
                                     class="select select-bordered select-sm w-full bg-base-100 text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary rounded-xl">
                                 <template x-for="div in availableSelectedDivisions" :key="div.id">
                                     <option :value="div.id" x-text="div.code + ' - ' + div.name"></option>
+                                </template>
+                            </select>
+                        </div>
+
+                        <div class="space-y-1.5" x-show="!isSelectedBranchPusat && selectedBranchUnitKerjas.length > 1">
+                            <label class="text-xs font-semibold text-base-content/80 flex items-center justify-between">
+                                <span>{{ __('Unit Kerja') }}</span>
+                                <span class="text-[10px] text-base-content/40 font-normal" x-text="selectedBranchUnitKerjas.length + ' {{ __('tersedia') }}'"></span>
+                            </label>
+                            <select x-model="selectedUnitKerjaId"
+                                    class="select select-bordered select-sm w-full bg-base-100 text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary rounded-xl">
+                                <template x-for="uk in selectedBranchUnitKerjas" :key="uk.id">
+                                    <option :value="uk.id" x-text="uk.code + ' - ' + uk.name"></option>
                                 </template>
                             </select>
                         </div>
@@ -519,8 +666,11 @@
                                 </div>
                                 <div class="flex items-center gap-1 shrink-0">
                                     <span class="badge badge-sm badge-primary font-semibold" x-text="targetBranch?.raw_name || targetBranch?.name || '-'"></span>
-                                    <template x-if="availablePendingDivisions.length > 1">
+                                    <template x-if="isTargetBranchPusat && availablePendingDivisions.length > 1">
                                         <span class="badge badge-sm badge-outline text-primary font-semibold" x-text="targetDivision?.code || targetDivision?.name || '-'"></span>
+                                    </template>
+                                    <template x-if="!isTargetBranchPusat && targetUnitKerjas.length > 1">
+                                        <span class="badge badge-sm badge-outline text-primary font-semibold" x-text="'UK: ' + (targetUnitKerja?.code || targetUnitKerja?.name || '-')"></span>
                                     </template>
                                 </div>
                             </div>

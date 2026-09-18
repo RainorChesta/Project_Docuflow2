@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password', 'division_id', 'system_role', 'is_active', 'profile_picture', 'nip', 'phone_number'])]
+#[Fillable(['name', 'email', 'password', 'division_id', 'unit_kerja_id', 'system_role', 'is_active', 'profile_picture', 'nip', 'phone_number'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -47,7 +47,45 @@ class User extends Authenticatable
      */
     public function divisions(): BelongsToMany
     {
-        return $this->belongsToMany(Division::class)->withTimestamps();
+        return $this->belongsToMany(Division::class)->withPivot('branch_id')->withTimestamps();
+    }
+
+    public function unitKerja(): BelongsTo
+    {
+        return $this->belongsTo(UnitKerja::class);
+    }
+
+    /**
+     * All unit kerjas the user belongs to (primary + additional via pivot).
+     */
+    public function unitKerjas(): BelongsToMany
+    {
+        return $this->belongsToMany(UnitKerja::class)->withPivot('branch_id')->withTimestamps();
+    }
+
+    /**
+     * IDs of unit kerjas assigned to the user, optionally scoped to a branch.
+     */
+    public function allUnitKerjaIds(?int $branchId = null): array
+    {
+        if ($branchId !== null) {
+            $ids = $this->unitKerjas()
+                ->wherePivot('branch_id', $branchId)
+                ->pluck('unit_kerjas.id')
+                ->all();
+
+            if (!empty($ids)) {
+                return array_values(array_unique($ids));
+            }
+        }
+
+        $ids = $this->unitKerjas()->pluck('unit_kerjas.id')->all();
+
+        if ($this->unit_kerja_id) {
+            $ids[] = $this->unit_kerja_id;
+        }
+
+        return array_values(array_unique($ids));
     }
 
     /**
@@ -67,10 +105,21 @@ class User extends Authenticatable
     }
 
     /**
-     * IDs of every division the user is a member of.
+     * IDs of divisions assigned to the user, optionally scoped to a branch (Pusat).
      */
-    public function allDivisionIds(): array
+    public function allDivisionIds(?int $branchId = null): array
     {
+        if ($branchId !== null) {
+            $ids = $this->divisions()
+                ->wherePivot('branch_id', $branchId)
+                ->pluck('divisions.id')
+                ->all();
+
+            if (!empty($ids)) {
+                return array_values(array_unique($ids));
+            }
+        }
+
         $ids = $this->divisions()->pluck('divisions.id')->all();
 
         if ($this->division_id) {
@@ -78,6 +127,36 @@ class User extends Authenticatable
         }
 
         return array_values(array_unique($ids));
+    }
+
+    /**
+     * Map of [branch_id => [division_id, ...]] for Pusat branches.
+     */
+    public function getBranchDivisionsMap(): array
+    {
+        $map = [];
+        foreach ($this->divisions as $div) {
+            $bId = $div->pivot->branch_id ?? null;
+            if ($bId) {
+                $map[$bId][] = (string) $div->id;
+            }
+        }
+        return $map;
+    }
+
+    /**
+     * Map of [branch_id => [unit_kerja_id, ...]] for Cabang branches.
+     */
+    public function getBranchUnitKerjasMap(): array
+    {
+        $map = [];
+        foreach ($this->unitKerjas as $uk) {
+            $bId = $uk->pivot->branch_id ?? null;
+            if ($bId) {
+                $map[$bId][] = (string) $uk->id;
+            }
+        }
+        return $map;
     }
 
     /**
@@ -196,7 +275,13 @@ class User extends Authenticatable
                 : $this->divisions()->exists()
         );
 
-        return $hasDivision && $hasCompany && $hasBranch;
+        $hasUnitKerja = !empty($this->unit_kerja_id) || (
+            $this->relationLoaded('unitKerjas')
+                ? $this->unitKerjas->isNotEmpty()
+                : $this->unitKerjas()->exists()
+        );
+
+        return ($hasDivision || $hasUnitKerja) && $hasCompany && $hasBranch;
     }
 
     /**

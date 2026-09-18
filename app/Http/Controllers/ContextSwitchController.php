@@ -24,6 +24,8 @@ class ContextSwitchController extends Controller
         $validated = $request->validate([
             'company_id' => 'required',
             'branch_id' => 'nullable',
+            'division_id' => 'nullable',
+            'unit_kerja_id' => 'nullable',
         ]);
 
         $companyId = (int) $validated['company_id'];
@@ -74,28 +76,28 @@ class ContextSwitchController extends Controller
             }
         }
 
-        // Division Logic
-        $divisionId = $request->input('division_id');
-        if ($activeBranchId) {
-            $availableDivisions = $this->contextService->getAvailableDivisions($user, $activeBranchId);
+        // Division / Unit Kerja Context Logic
+        $activeBranch = $activeBranchId ? Branch::find($activeBranchId) : null;
+
+        if ($activeBranch && $activeBranch->is_pusat) {
+            // Cabang Pusat PT: Division Logic
+            session()->forget('active_unit_kerja_id');
+            $divisionId = $request->input('division_id');
+            $availableDivisions = $this->contextService->getAvailableDivisions($user);
             
             if ($availableDivisions->isEmpty()) {
                 session()->forget('active_division_id');
             } elseif ($availableDivisions->count() === 1) {
-                // Auto-select if only 1 division exists
                 session(['active_division_id' => $availableDivisions->first()->id]);
             } else {
-                // More than 1 division exists
                 if (!empty($divisionId) && is_numeric($divisionId)) {
                     $division = $availableDivisions->firstWhere('id', (int) $divisionId);
                     if ($division) {
                         session(['active_division_id' => $division->id]);
                     } else {
-                        // Fallback to first if invalid
                         session(['active_division_id' => $availableDivisions->first()->id]);
                     }
                 } else {
-                    // Check if current session division is still valid in this branch
                     $currentDivisionId = session('active_division_id');
                     if ($currentDivisionId && $availableDivisions->firstWhere('id', $currentDivisionId)) {
                         // keep it
@@ -104,8 +106,36 @@ class ContextSwitchController extends Controller
                     }
                 }
             }
+        } elseif ($activeBranch && !$activeBranch->is_pusat) {
+            // Cabang PT: Unit Kerja Logic
+            session()->forget('active_division_id');
+            $unitKerjaId = $request->input('unit_kerja_id');
+            $availableUnitKerjas = $this->contextService->getAvailableUnitKerjas($user, $activeBranch->id);
+
+            if ($availableUnitKerjas->isEmpty()) {
+                session()->forget('active_unit_kerja_id');
+            } elseif ($availableUnitKerjas->count() === 1) {
+                session(['active_unit_kerja_id' => $availableUnitKerjas->first()->id]);
+            } else {
+                if (!empty($unitKerjaId) && is_numeric($unitKerjaId)) {
+                    $uk = $availableUnitKerjas->firstWhere('id', (int) $unitKerjaId);
+                    if ($uk) {
+                        session(['active_unit_kerja_id' => $uk->id]);
+                    } else {
+                        session(['active_unit_kerja_id' => $availableUnitKerjas->first()->id]);
+                    }
+                } else {
+                    $currentUkId = session('active_unit_kerja_id');
+                    if ($currentUkId && $availableUnitKerjas->firstWhere('id', $currentUkId)) {
+                        // keep it
+                    } else {
+                        session(['active_unit_kerja_id' => $availableUnitKerjas->first()->id]);
+                    }
+                }
+            }
         } else {
             session()->forget('active_division_id');
+            session()->forget('active_unit_kerja_id');
         }
 
         session()->save();
@@ -154,6 +184,8 @@ class ContextSwitchController extends Controller
                 'message' => __('Konteks perusahaan & cabang berhasil dialihkan.'),
                 'active_company_id' => session('active_company_id'),
                 'active_branch_id' => session('active_branch_id'),
+                'active_division_id' => session('active_division_id'),
+                'active_unit_kerja_id' => session('active_unit_kerja_id'),
                 'redirect' => $destination,
             ]);
         }

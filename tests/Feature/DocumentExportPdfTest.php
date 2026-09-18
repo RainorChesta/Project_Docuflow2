@@ -96,7 +96,7 @@ class DocumentExportPdfTest extends TestCase
             'action' => 'document.exported',
             'target_type' => 'document',
             'target_id' => $this->document->id,
-            'details->paper_size' => 'A4',
+            'metadata->paper_size' => 'A4',
         ]);
 
         // Document's stored paper_size in database MUST remain unchanged
@@ -120,7 +120,7 @@ class DocumentExportPdfTest extends TestCase
             'action' => 'document.exported',
             'target_type' => 'document',
             'target_id' => $this->document->id,
-            'details->paper_size' => 'F4',
+            'metadata->paper_size' => 'F4',
         ]);
 
         $this->assertEquals('A4', $this->document->fresh()->paper_size);
@@ -143,7 +143,7 @@ class DocumentExportPdfTest extends TestCase
             'action' => 'document.exported',
             'target_type' => 'document',
             'target_id' => $this->document->id,
-            'details->paper_size' => 'Legal',
+            'metadata->paper_size' => 'Legal',
         ]);
 
         // Original document unchanged
@@ -170,7 +170,7 @@ class DocumentExportPdfTest extends TestCase
             'action' => 'document.exported',
             'target_type' => 'document',
             'target_id' => $this->document->id,
-            'details->paper_size' => 'Custom (21.5x33.5 cm)',
+            'metadata->paper_size' => 'Custom (21.5x33.5 cm)',
         ]);
 
         // Original document unchanged

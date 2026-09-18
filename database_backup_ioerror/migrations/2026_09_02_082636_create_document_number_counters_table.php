@@ -1,0 +1,33 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('document_number_counters', function (Blueprint $table) {
+            $table->id();
+            $table->integer('year');
+            $table->unsignedBigInteger('branch_id')->nullable();
+            $table->unsignedBigInteger('document_type_id')->nullable();
+            $table->integer('last_sequence')->default(0);
+            $table->timestamps();
+
+            $table->unique(['year', 'branch_id', 'document_type_id'], 'doc_num_counters_unique');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('document_number_counters');
+    }
+};

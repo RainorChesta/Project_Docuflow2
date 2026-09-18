@@ -620,10 +620,17 @@
                                 {{ $document->branch?->name ?? '—' }}
                             </p>
                         </div>
+                        @if($document->unitKerja || ($document->branch && !$document->branch->is_pusat))
+                        <div>
+                            <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Unit Kerja') }}</span>
+                            <p class="font-medium mt-0.5">{{ $document->unitKerja ? ($document->unitKerja->kode_unit_kerja . ' - ' . $document->unitKerja->nama_unit_kerja) : '—' }}</p>
+                        </div>
+                        @else
                         <div>
                             <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Divisi') }}</span>
                             <p class="font-medium mt-0.5">{{ $document->division?->code ?? '—' }}</p>
                         </div>
+                        @endif
                         <div>
                             <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Pengguna') }}</span>
                             <div class="flex items-center gap-1.5 mt-0.5 min-w-0">

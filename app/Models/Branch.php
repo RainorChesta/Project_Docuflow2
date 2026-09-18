@@ -56,10 +56,6 @@ class Branch extends Model
         return $this->hasMany(Division::class);
     }
 
-    public function unitKerjas(): HasMany
-    {
-        return $this->hasMany(UnitKerja::class, 'cabang_id');
-    }
 
     /**
      * Effective branch code for document numbering.

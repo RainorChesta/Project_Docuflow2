@@ -302,18 +302,21 @@ class DocumentController extends Controller
     public function create(Request $request): View
     {
         $user = auth()->user();
-        $divisions = ($user->isAdmin() || $user->isDirector())
-            ? Division::all()
-            : Division::whereIn('id', $user->allDivisionIds())->get();
-        $documentTypes = DocumentType::all();
-
         $contextService = app(\App\Services\CompanyContextService::class);
         $activeBranchId = $contextService->getActiveBranchId($user);
         $activeBranch = $activeBranchId ? \App\Models\Branch::with('company')->find($activeBranchId) : null;
         $availableBranches = $contextService->getAvailableBranches($user);
 
+        $divisions = ($user->isAdmin() || $user->isDirector())
+            ? Division::orderBy('name')->get()
+            : $contextService->getAvailableDivisions($user, $activeBranchId);
+        $documentTypes = DocumentType::all();
+
         $activeDivisionId = $contextService->getActiveDivisionId($user);
         $activeDivision = $activeDivisionId ? Division::find($activeDivisionId) : null;
+
+        $activeUnitKerjaId = $contextService->getActiveUnitKerjaId($user);
+        $activeUnitKerja = $contextService->getActiveUnitKerja($user);
 
         $companies = ($user->isAdmin() || $user->isDirector())
             ? ($user->isAdmin()
@@ -325,23 +328,38 @@ class DocumentController extends Controller
             $companies = \App\Models\Company::with('branches')->orderBy('name')->get();
         }
 
+        $unitKerjas = ($user->isAdmin() || $user->isDirector())
+            ? \App\Models\UnitKerja::orderBy('kode_unit_kerja')->get()
+            : $contextService->getAvailableUnitKerjas($user, $activeBranchId);
+        $userUnitKerjaId = $activeUnitKerjaId ?? $user->unit_kerja_id;
+
         // If a template_id is passed via URL, load the template for auto-fill
         $selectedTemplate = null;
         $initialDocumentNumber = null;
         if ($templateId = $request->query('template_id')) {
             $selectedTemplate = DocumentTemplate::active()->with('documentType')->find($templateId);
             if ($selectedTemplate && $selectedTemplate->documentType) {
-                $userDivision = ($user->isAdmin() || $user->isDirector())
-                    ? ($request->filled('division_id') ? Division::find($request->input('division_id')) : $activeDivision)
-                    : $activeDivision;
-                $initialDocumentNumber = $this->documentService->previewNumber($userDivision, $selectedTemplate->documentType, $activeBranch);
+                $isPusat = $activeBranch ? (bool) $activeBranch->is_pusat : true;
+                $userDivision = $isPusat
+                    ? (($user->isAdmin() || $user->isDirector())
+                        ? ($request->filled('division_id') ? Division::find($request->input('division_id')) : $activeDivision)
+                        : ($activeDivision ?? $divisions->first()))
+                    : null;
+                $userUnitKerja = !$isPusat
+                    ? ($activeUnitKerja ?? $unitKerjas->first())
+                    : null;
+                $initialDocumentNumber = $this->documentService->previewNumber(
+                    $isPusat ? 'baru' : 'lama',
+                    $userDivision,
+                    $selectedTemplate->documentType,
+                    $activeBranch,
+                    $userUnitKerja
+                );
             }
         }
 
-        $unitKerjas = \App\Models\UnitKerja::with('cabang')->orderBy('kode_unit_kerja')->get();
-
         return view('documents.create', compact(
-            'divisions', 'unitKerjas', 'documentTypes', 'activeBranch', 'availableBranches', 'companies', 'selectedTemplate', 'initialDocumentNumber', 'activeDivision', 'activeDivisionId'
+            'divisions', 'unitKerjas', 'documentTypes', 'activeBranch', 'availableBranches', 'companies', 'selectedTemplate', 'initialDocumentNumber', 'activeDivision', 'activeDivisionId', 'activeUnitKerja', 'activeUnitKerjaId', 'userUnitKerjaId'
         ));
     }
 
@@ -358,20 +376,29 @@ class DocumentController extends Controller
             'format_choice' => 'nullable|in:lama,baru',
         ]);
 
-        $formatChoice = $validated['format_choice'] ?? (!empty($validated['unit_kerja_id']) ? 'lama' : 'baru');
-
         $user = auth()->user();
         $contextService = app(\App\Services\CompanyContextService::class);
-        $divisionId = $validated['division_id']
-            ?? $contextService->getActiveDivisionId($user)
-            ?? $user->division_id
-            ?? ($user->allDivisionIds()[0] ?? null);
-        $division = $divisionId ? Division::find($divisionId) : null;
-        $unitKerja = !empty($validated['unit_kerja_id']) ? \App\Models\UnitKerja::find($validated['unit_kerja_id']) : null;
-        $documentType = DocumentType::findOrFail($validated['document_type_id']);
-
         $branchId = $validated['branch_id'] ?? $contextService->getActiveBranchId($user);
         $branch = $branchId ? \App\Models\Branch::with('company')->find($branchId) : null;
+
+        $isPusat = $branch ? (bool) $branch->is_pusat : true;
+
+        $division = null;
+        $unitKerja = null;
+
+        if ($isPusat) {
+            $divisionId = $validated['division_id']
+                ?? $contextService->getActiveDivisionId($user)
+                ?? $user->division_id
+                ?? ($user->allDivisionIds()[0] ?? null);
+            $division = $divisionId ? Division::find($divisionId) : null;
+        } else {
+            $unitKerjaId = $validated['unit_kerja_id'] ?? $user->unit_kerja_id;
+            $unitKerja = $unitKerjaId ? \App\Models\UnitKerja::find($unitKerjaId) : null;
+        }
+
+        $documentType = DocumentType::findOrFail($validated['document_type_id']);
+        $formatChoice = $isPusat ? 'baru' : 'lama';
 
         return response()->json([
             'number' => $this->documentService->previewNumber($formatChoice, $division, $documentType, $branch, $unitKerja),
@@ -445,13 +472,14 @@ class DocumentController extends Controller
         $isManualNumber = $request->boolean('is_manual_number') || ($isUpload && $request->filled('document_number'));
         $templateId = $request->input('template_id');
 
-        $isSop = false;
-        if (!empty($request->input('document_type_id'))) {
-            $dt = DocumentType::find($request->input('document_type_id'));
-            $isSop = ($dt && strtoupper($dt->code) === 'SOP');
-        }
-        
-        $formatChoice = $request->input('format_choice', 'baru');
+        $contextService = app(\App\Services\CompanyContextService::class);
+        $branchIds = (array) $request->input('branch_ids', []);
+        $branchId = $request->input('branch_id')
+            ?? (!empty($branchIds) ? $branchIds[0] : null)
+            ?? $contextService->getActiveBranchId($user);
+
+        $targetBranch = $branchId ? \App\Models\Branch::find($branchId) : null;
+        $isPusat = $targetBranch ? (bool) $targetBranch->is_pusat : true;
 
         $rules = [
             'title' => 'required|string|max:255',
@@ -464,13 +492,13 @@ class DocumentController extends Controller
             'expiration_date' => 'nullable|date',
             'template_id' => 'nullable|exists:document_templates,id',
         ];
-        
-        if ($formatChoice === 'lama') {
-            $rules['division_id'] = 'nullable|exists:divisions,id';
-            $rules['unit_kerja_id'] = $isSop ? 'required|exists:unit_kerjas,id' : 'nullable|exists:unit_kerjas,id';
+
+        if ($isPusat) {
+            $rules['division_id'] = 'required|exists:divisions,id';
+            $rules['unit_kerja_id'] = 'nullable';
         } else {
-            $rules['division_id'] = 'nullable|exists:divisions,id';
-            $rules['unit_kerja_id'] = 'nullable|exists:unit_kerjas,id';
+            $rules['unit_kerja_id'] = 'required|exists:unit_kerjas,id';
+            $rules['division_id'] = 'nullable';
         }
 
         if ($isUpload) {
@@ -483,35 +511,38 @@ class DocumentController extends Controller
         $validated = $request->validate($rules, [
             'document_number.unique' => __('Nomor dokumen sudah digunakan.'),
             'document_number.required' => __('Nomor dokumen wajib diisi saat mode manual/unggah.'),
-            'unit_kerja_id.required' => __('Unit kerja wajib dipilih untuk dokumen SOP dengan format lama.'),
+            'unit_kerja_id.required' => __('Unit kerja wajib dipilih untuk dokumen di Cabang.'),
+            'division_id.required' => __('Divisi wajib dipilih untuk dokumen di Cabang Pusat.'),
         ]);
-        
-        $validated['numbering_scheme'] = $formatChoice === 'baru' ? 'new_format' : ($isSop ? 'legacy_sop' : 'legacy_general');
 
-        $branchIds = (array) $request->input('branch_ids', []);
+        $formatChoice = $isPusat ? 'baru' : 'lama';
+        $validated['format_choice'] = $formatChoice;
+        $validated['numbering_scheme'] = $isPusat ? 'new_format' : 'cabang_unit_kerja';
 
-        $contextService = app(\App\Services\CompanyContextService::class);
-        $activeDivId = $contextService->getActiveDivisionId($user);
-
-        if ($user->isAdmin() || $user->isDirector()) {
-            $validated['division_id'] = $validated['division_id'] ?? $activeDivId;
-        } else {
-            $submittedDivId = $request->input('division_id');
-            if ($submittedDivId && in_array((int) $submittedDivId, $user->allDivisionIds(), true)) {
-                $validated['division_id'] = (int) $submittedDivId;
+        if ($isPusat) {
+            $activeDivId = $contextService->getActiveDivisionId($user);
+            if ($user->isAdmin() || $user->isDirector()) {
+                $validated['division_id'] = $validated['division_id'] ?? $activeDivId;
             } else {
-                $validated['division_id'] = $activeDivId ?? $user->division_id ?? ($user->allDivisionIds()[0] ?? null);
+                $submittedDivId = $request->input('division_id');
+                if ($submittedDivId && in_array((int) $submittedDivId, $user->allDivisionIds(), true)) {
+                    $validated['division_id'] = (int) $submittedDivId;
+                } else {
+                    $validated['division_id'] = $activeDivId ?? $user->division_id ?? ($user->allDivisionIds()[0] ?? null);
+                }
             }
+            $validated['unit_kerja_id'] = null;
+        } else {
+            $validated['division_id'] = null;
+            $validated['unit_kerja_id'] = (int) $validated['unit_kerja_id'];
         }
-        $validated['unit_kerja_id'] = $validated['unit_kerja_id'] ?? null;
+
         $validated['visibility'] = Document::VISIBILITY_DIVISION;
         $validated['expiration_date'] = $validated['expiration_date'] ?? null;
 
-        $branchId = $validated['branch_id'] ?? (!empty($branchIds) ? $branchIds[0] : null) ?? $contextService->getActiveBranchId($user);
         if ($branchId) {
-            $branch = \App\Models\Branch::find($branchId);
             $validated['branch_id'] = $branchId;
-            $validated['company_id'] = $branch?->company_id;
+            $validated['company_id'] = $targetBranch?->company_id;
         }
 
         if (($user->isAdmin() || $user->isDirector()) && empty($validated['branch_id'])) {

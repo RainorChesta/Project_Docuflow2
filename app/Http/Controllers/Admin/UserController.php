@@ -9,6 +9,7 @@ use App\Models\Division;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class UserController extends Controller
@@ -16,7 +17,7 @@ class UserController extends Controller
     public function index(Request $request): View
     {
         $this->authorize('admin');
-        $query = User::with(['divisions', 'companies', 'branches.company']);
+        $query = User::with(['divisions', 'companies', 'branches.company', 'unitKerjas', 'unitKerja']);
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -28,8 +29,20 @@ class UserController extends Controller
         }
 
         if ($request->filled('division')) {
-            $query->whereHas('divisions', function($q) use ($request) {
-                $q->where('divisions.id', $request->division);
+            $query->where(function($q) use ($request) {
+                $q->where('division_id', $request->division)
+                  ->orWhereHas('divisions', function($sub) use ($request) {
+                      $sub->where('divisions.id', $request->division);
+                  });
+            });
+        }
+
+        if ($request->filled('unit_kerja')) {
+            $query->where(function($q) use ($request) {
+                $q->where('unit_kerja_id', $request->unit_kerja)
+                  ->orWhereHas('unitKerjas', function($sub) use ($request) {
+                      $sub->where('unit_kerjas.id', $request->unit_kerja);
+                  });
             });
         }
 
@@ -44,10 +57,14 @@ class UserController extends Controller
                           $q->where(function ($sub) {
                               $sub->where('system_role', '!=', 'direktur')
                                   ->where(function ($missing) {
-                                      $missing->whereNull('division_id')
-                                              ->whereDoesntHave('divisions')
-                                              ->orWhereDoesntHave('companies')
-                                              ->orWhereDoesntHave('branches');
+                                      $missing->where(function ($noDept) {
+                                          $noDept->whereNull('division_id')
+                                                 ->whereDoesntHave('divisions')
+                                                 ->whereNull('unit_kerja_id')
+                                                 ->whereDoesntHave('unitKerjas');
+                                      })
+                                      ->orWhereDoesntHave('companies')
+                                      ->orWhereDoesntHave('branches');
                                   });
                           })->orWhere(function ($sub) {
                               $sub->where('system_role', 'direktur')
@@ -70,7 +87,9 @@ class UserController extends Controller
                                 $sub->whereNotIn('system_role', ['admin', 'direktur'])
                                     ->where(function ($divQ) {
                                         $divQ->whereNotNull('division_id')
-                                             ->orWhereHas('divisions');
+                                             ->orWhereHas('divisions')
+                                             ->orWhereNotNull('unit_kerja_id')
+                                             ->orWhereHas('unitKerjas');
                                     })
                                     ->whereHas('companies')
                                     ->whereHas('branches');
@@ -83,16 +102,18 @@ class UserController extends Controller
 
         $users = $query->latest('id')->paginate(20)->appends($request->query());
         $divisions = Division::all();
+        $unitKerjas = \App\Models\UnitKerja::orderBy('kode_unit_kerja')->get();
 
-        return view('admin.users.index', compact('users', 'divisions'));
+        return view('admin.users.index', compact('users', 'divisions', 'unitKerjas'));
     }
 
     public function create(): View
     {
         $this->authorize('admin');
         $divisions = Division::all();
-        $companies = Company::with('branches')->get();
-        return view('admin.users.create', compact('divisions', 'companies'));
+        $companies = Company::with(['branches'])->orderBy('name')->get();
+        $unitKerjas = \App\Models\UnitKerja::orderBy('kode_unit_kerja')->get();
+        return view('admin.users.create', compact('divisions', 'companies', 'unitKerjas'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -107,6 +128,11 @@ class UserController extends Controller
             'division_id' => 'nullable|exists:divisions,id',
             'division_ids' => 'nullable|array',
             'division_ids.*' => 'exists:divisions,id',
+            'unit_kerja_id' => 'nullable|exists:unit_kerjas,id',
+            'unit_kerja_ids' => 'nullable|array',
+            'unit_kerja_ids.*' => 'exists:unit_kerjas,id',
+            'branch_divisions' => 'nullable|array',
+            'branch_unit_kerjas' => 'nullable|array',
             'system_role' => 'required|in:admin,direktur,head,user',
             'is_active' => 'boolean',
             'company_ids' => 'nullable|array',
@@ -119,31 +145,89 @@ class UserController extends Controller
         $companyIds = $validated['company_ids'] ?? [];
         $branchIds = $validated['branch_ids'] ?? [];
         $divisionIds = $validated['division_ids'] ?? [];
-        unset($validated['company_ids'], $validated['branch_ids'], $validated['division_ids']);
+        $unitKerjaIds = $validated['unit_kerja_ids'] ?? [];
+        $branchDivisions = $request->input('branch_divisions', []);
+        $branchUnitKerjas = $request->input('branch_unit_kerjas', []);
+        unset($validated['company_ids'], $validated['branch_ids'], $validated['division_ids'], $validated['unit_kerja_ids'], $validated['branch_divisions'], $validated['branch_unit_kerjas']);
 
         if ($validated['system_role'] === 'admin') {
             $companyIds = Company::pluck('id')->all();
             $branchIds = Branch::pluck('id')->all();
+            $validated['division_id'] = null;
+            $divisionIds = [];
+            $validated['unit_kerja_id'] = null;
+            $unitKerjaIds = [];
         } elseif ($validated['system_role'] === 'direktur') {
             $validated['nip'] = null;
             $validated['division_id'] = null;
+            $divisionIds = [];
+            $validated['unit_kerja_id'] = null;
+            $unitKerjaIds = [];
         } else {
-            $validated['division_id'] = !empty($divisionIds) ? $divisionIds[0] : null;
+            if (in_array($validated['system_role'], ['user', 'head'], true)) {
+                if (empty($branchIds)) {
+                    return back()->withInput()->withErrors(['branch_ids' => __('Pilih minimal satu cabang atau kantor pusat untuk penempatan pengguna.')]);
+                }
+
+                $assignedBranches = Branch::whereIn('id', $branchIds)->get();
+
+                // Validasi divisi per Kantor Pusat
+                $pusatBranches = $assignedBranches->where('is_pusat', true);
+                if ($pusatBranches->isNotEmpty()) {
+                    foreach ($pusatBranches as $pusat) {
+                        $divs = $branchDivisions[$pusat->id] ?? [];
+                        if (empty($divs) && !empty($divisionIds)) {
+                            $divs = $divisionIds;
+                        }
+                        if (empty($divs) && Division::exists()) {
+                            return back()->withInput()->withErrors([
+                                'branch_divisions' => __('Pilih minimal satu divisi untuk penugasan di :branch.', ['branch' => $pusat->name]),
+                                'division_ids' => __('Pilih minimal satu divisi untuk penugasan di :branch.', ['branch' => $pusat->name]),
+                            ]);
+                        }
+                    }
+                }
+
+                // Validasi unit kerja per Cabang
+                $cabangBranches = $assignedBranches->where('is_pusat', false);
+                if ($cabangBranches->isNotEmpty()) {
+                    foreach ($cabangBranches as $cabang) {
+                        $uks = $branchUnitKerjas[$cabang->id] ?? [];
+                        if (empty($uks) && !empty($unitKerjaIds)) {
+                            $uks = $unitKerjaIds;
+                        }
+                        if (empty($uks) && \App\Models\UnitKerja::exists()) {
+                            return back()->withInput()->withErrors([
+                                'branch_unit_kerjas' => __('Pilih minimal satu unit kerja untuk penugasan di :branch.', ['branch' => $cabang->name]),
+                                'unit_kerja_ids' => __('Pilih minimal satu unit kerja untuk penugasan di :branch.', ['branch' => $cabang->name]),
+                            ]);
+                        }
+                    }
+                }
+            }
+
+            // Tentukan primary division_id dan unit_kerja_id
+            $resolvedDivisions = $this->collectAllDivisionIds($branchIds, $branchDivisions, $divisionIds);
+            $resolvedUnitKerjas = $this->collectAllUnitKerjaIds($branchIds, $branchUnitKerjas, $unitKerjaIds);
+
+            $validated['division_id'] = !empty($resolvedDivisions) ? $resolvedDivisions[0] : null;
+            $validated['unit_kerja_id'] = !empty($resolvedUnitKerjas) ? $resolvedUnitKerjas[0] : null;
         }
 
         $validated['is_active'] = $request->boolean('is_active');
 
         $user = User::create($validated);
 
-        if (!empty($companyIds)) {
-            $user->companies()->sync($companyIds);
-        }
-        if (!empty($branchIds)) {
-            $user->branches()->sync($branchIds);
-        }
-        if (!empty($divisionIds)) {
-            $user->divisions()->sync($divisionIds);
-        }
+        $this->syncUserAssignments(
+            $user,
+            $validated['system_role'],
+            $companyIds,
+            $branchIds,
+            $branchDivisions,
+            $branchUnitKerjas,
+            $divisionIds,
+            $unitKerjaIds
+        );
 
         return redirect()->route('admin.users.index')->with('success', __('Pengguna berhasil dibuat.'));
     }
@@ -152,9 +236,12 @@ class UserController extends Controller
     {
         $this->authorize('admin');
         $divisions = Division::all();
-        $companies = Company::with('branches')->get();
-        $user->load(['companies', 'branches', 'divisions']);
-        return view('admin.users.edit', compact('user', 'divisions', 'companies'));
+        $companies = Company::with(['branches'])->orderBy('name')->get();
+        $unitKerjas = \App\Models\UnitKerja::orderBy('kode_unit_kerja')->get();
+        $user->load(['companies', 'branches', 'divisions', 'unitKerjas', 'unitKerja']);
+        $branchDivisionsMap = $user->getBranchDivisionsMap();
+        $branchUnitKerjasMap = $user->getBranchUnitKerjasMap();
+        return view('admin.users.edit', compact('user', 'divisions', 'companies', 'unitKerjas', 'branchDivisionsMap', 'branchUnitKerjasMap'));
     }
 
     public function update(Request $request, User $user): RedirectResponse
@@ -173,6 +260,11 @@ class UserController extends Controller
             'division_id' => 'nullable|exists:divisions,id',
             'division_ids' => 'nullable|array',
             'division_ids.*' => 'exists:divisions,id',
+            'unit_kerja_id' => 'nullable|exists:unit_kerjas,id',
+            'unit_kerja_ids' => 'nullable|array',
+            'unit_kerja_ids.*' => 'exists:unit_kerjas,id',
+            'branch_divisions' => 'nullable|array',
+            'branch_unit_kerjas' => 'nullable|array',
             'system_role' => 'required|in:' . $allowedRoles,
             'is_active' => 'boolean',
             'company_ids' => 'nullable|array',
@@ -182,6 +274,7 @@ class UserController extends Controller
         ]);
 
         unset($validated['password_confirmation']);
+
         if (empty($validated['password'])) {
             unset($validated['password']);
         }
@@ -189,29 +282,229 @@ class UserController extends Controller
         $companyIds = $validated['company_ids'] ?? [];
         $branchIds = $validated['branch_ids'] ?? [];
         $divisionIds = $validated['division_ids'] ?? [];
-        unset($validated['company_ids'], $validated['branch_ids'], $validated['division_ids']);
+        $unitKerjaIds = $validated['unit_kerja_ids'] ?? [];
+        $branchDivisions = $request->input('branch_divisions', []);
+        $branchUnitKerjas = $request->input('branch_unit_kerjas', []);
+        unset($validated['company_ids'], $validated['branch_ids'], $validated['division_ids'], $validated['unit_kerja_ids'], $validated['branch_divisions'], $validated['branch_unit_kerjas']);
 
         if ($validated['system_role'] === 'admin') {
             $companyIds = Company::pluck('id')->all();
             $branchIds = Branch::pluck('id')->all();
+            $validated['division_id'] = null;
+            $divisionIds = [];
+            $validated['unit_kerja_id'] = null;
+            $unitKerjaIds = [];
         } elseif ($validated['system_role'] === 'direktur') {
             $validated['nip'] = null;
             $validated['division_id'] = null;
+            $divisionIds = [];
+            $validated['unit_kerja_id'] = null;
+            $unitKerjaIds = [];
         } else {
-            $validated['division_id'] = !empty($divisionIds) ? $divisionIds[0] : null;
+            if (in_array($validated['system_role'], ['user', 'head'], true)) {
+                if (!empty($branchIds)) {
+                    $assignedBranches = Branch::whereIn('id', $branchIds)->get();
+
+                    // Validasi divisi per Kantor Pusat
+                    $pusatBranches = $assignedBranches->where('is_pusat', true);
+                    if ($pusatBranches->isNotEmpty()) {
+                        foreach ($pusatBranches as $pusat) {
+                            $divs = $branchDivisions[$pusat->id] ?? [];
+                            if (empty($divs) && !empty($divisionIds)) {
+                                $divs = $divisionIds;
+                            }
+                            if (empty($divs) && Division::exists()) {
+                                return back()->withInput()->withErrors([
+                                    'branch_divisions' => __('Pilih minimal satu divisi untuk penugasan di :branch.', ['branch' => $pusat->name]),
+                                    'division_ids' => __('Pilih minimal satu divisi untuk penugasan di :branch.', ['branch' => $pusat->name]),
+                                ]);
+                            }
+                        }
+                    }
+
+                    // Validasi unit kerja per Cabang
+                    $cabangBranches = $assignedBranches->where('is_pusat', false);
+                    if ($cabangBranches->isNotEmpty()) {
+                        foreach ($cabangBranches as $cabang) {
+                            $uks = $branchUnitKerjas[$cabang->id] ?? [];
+                            if (empty($uks) && !empty($unitKerjaIds)) {
+                                $uks = $unitKerjaIds;
+                            }
+                            if (empty($uks) && \App\Models\UnitKerja::exists()) {
+                                return back()->withInput()->withErrors([
+                                    'branch_unit_kerjas' => __('Pilih minimal satu unit kerja untuk penugasan di :branch.', ['branch' => $cabang->name]),
+                                    'unit_kerja_ids' => __('Pilih minimal satu unit kerja untuk penugasan di :branch.', ['branch' => $cabang->name]),
+                                ]);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Tentukan primary division_id dan unit_kerja_id
+            $resolvedDivisions = $this->collectAllDivisionIds($branchIds, $branchDivisions, $divisionIds);
+            $resolvedUnitKerjas = $this->collectAllUnitKerjaIds($branchIds, $branchUnitKerjas, $unitKerjaIds);
+
+            $validated['division_id'] = !empty($resolvedDivisions) ? $resolvedDivisions[0] : null;
+            $validated['unit_kerja_id'] = !empty($resolvedUnitKerjas) ? $resolvedUnitKerjas[0] : null;
         }
 
         $validated['is_active'] = $request->boolean('is_active');
 
         $user->update($validated);
 
-        $user->companies()->sync($companyIds);
-        $user->branches()->sync($branchIds);
-        $user->divisions()->sync($divisionIds);
+        $this->syncUserAssignments(
+            $user,
+            $validated['system_role'],
+            $companyIds,
+            $branchIds,
+            $branchDivisions,
+            $branchUnitKerjas,
+            $divisionIds,
+            $unitKerjaIds
+        );
 
         event(new \App\Events\UserVerificationUpdated($user));
 
         return redirect()->route('admin.users.index')->with('success', __('Pengguna berhasil diperbarui.'));
+    }
+
+    private function collectAllDivisionIds(array $branchIds, array $branchDivisions, array $flatDivisionIds): array
+    {
+        $collected = [];
+        $pusatBranches = Branch::whereIn('id', $branchIds)->where('is_pusat', true)->get();
+        foreach ($pusatBranches as $p) {
+            $divs = $branchDivisions[$p->id] ?? [];
+            foreach ($divs as $dId) {
+                $collected[] = (int) $dId;
+            }
+        }
+        if (empty($collected) && !empty($flatDivisionIds)) {
+            $collected = array_map('intval', $flatDivisionIds);
+        }
+        return array_values(array_unique($collected));
+    }
+
+    private function collectAllUnitKerjaIds(array $branchIds, array $branchUnitKerjas, array $flatUnitKerjaIds): array
+    {
+        $collected = [];
+        $cabangBranches = Branch::whereIn('id', $branchIds)->where('is_pusat', false)->get();
+        foreach ($cabangBranches as $c) {
+            $uks = $branchUnitKerjas[$c->id] ?? [];
+            foreach ($uks as $uId) {
+                $collected[] = (int) $uId;
+            }
+        }
+        if (empty($collected) && !empty($flatUnitKerjaIds)) {
+            $collected = array_map('intval', $flatUnitKerjaIds);
+        }
+        return array_values(array_unique($collected));
+    }
+
+    private function syncUserAssignments(
+        User $user,
+        string $systemRole,
+        array $companyIds,
+        array $branchIds,
+        array $branchDivisions,
+        array $branchUnitKerjas,
+        array $flatDivisionIds,
+        array $flatUnitKerjaIds
+    ): void {
+        if ($systemRole === 'admin') {
+            $user->companies()->sync(Company::pluck('id')->all());
+            $user->branches()->sync(Branch::pluck('id')->all());
+            DB::table('division_user')->where('user_id', $user->id)->delete();
+            DB::table('unit_kerja_user')->where('user_id', $user->id)->delete();
+            return;
+        }
+
+        if ($systemRole === 'direktur') {
+            $user->companies()->sync($companyIds);
+            $user->branches()->sync($branchIds);
+            DB::table('division_user')->where('user_id', $user->id)->delete();
+            DB::table('unit_kerja_user')->where('user_id', $user->id)->delete();
+            return;
+        }
+
+        $user->companies()->sync($companyIds);
+        $user->branches()->sync($branchIds);
+
+        $assignedBranches = Branch::whereIn('id', $branchIds)->get();
+
+        // 1. Division sync with branch_id
+        DB::table('division_user')->where('user_id', $user->id)->delete();
+        $divisionRows = [];
+        $pusatBranches = $assignedBranches->where('is_pusat', true);
+
+        if ($pusatBranches->isNotEmpty()) {
+            foreach ($pusatBranches as $pusat) {
+                $divs = $branchDivisions[$pusat->id] ?? [];
+                if (empty($divs) && !empty($flatDivisionIds)) {
+                    $divs = $flatDivisionIds;
+                }
+                foreach ($divs as $dId) {
+                    $divisionRows[] = [
+                        'user_id' => $user->id,
+                        'division_id' => (int) $dId,
+                        'branch_id' => $pusat->id,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                }
+            }
+        } elseif (!empty($flatDivisionIds)) {
+            foreach ($flatDivisionIds as $dId) {
+                $divisionRows[] = [
+                    'user_id' => $user->id,
+                    'division_id' => (int) $dId,
+                    'branch_id' => null,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+        }
+
+        if (!empty($divisionRows)) {
+            DB::table('division_user')->insert($divisionRows);
+        }
+
+        // 2. Unit Kerja sync with branch_id
+        DB::table('unit_kerja_user')->where('user_id', $user->id)->delete();
+        $unitKerjaRows = [];
+        $cabangBranches = $assignedBranches->where('is_pusat', false);
+
+        if ($cabangBranches->isNotEmpty()) {
+            foreach ($cabangBranches as $cabang) {
+                $uks = $branchUnitKerjas[$cabang->id] ?? [];
+                if (empty($uks) && !empty($flatUnitKerjaIds)) {
+                    $uks = $flatUnitKerjaIds;
+                }
+                foreach ($uks as $ukId) {
+                    $unitKerjaRows[] = [
+                        'user_id' => $user->id,
+                        'unit_kerja_id' => (int) $ukId,
+                        'branch_id' => $cabang->id,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                }
+            }
+        } elseif (!empty($flatUnitKerjaIds)) {
+            foreach ($flatUnitKerjaIds as $ukId) {
+                $unitKerjaRows[] = [
+                    'user_id' => $user->id,
+                    'unit_kerja_id' => (int) $ukId,
+                    'branch_id' => null,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+        }
+
+        if (!empty($unitKerjaRows)) {
+            DB::table('unit_kerja_user')->insert($unitKerjaRows);
+        }
     }
 
     public function destroy(User $user): RedirectResponse

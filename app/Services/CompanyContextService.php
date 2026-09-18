@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Branch;
 use App\Models\Company;
 use App\Models\Division;
+use App\Models\UnitKerja;
 use App\Models\User;
 
 class CompanyContextService
@@ -70,6 +71,7 @@ class CompanyContextService
 
     /**
      * Get active division ID from session, or resolve default.
+     * Only relevant when active branch is Pusat (is_pusat = true).
      */
     public function getActiveDivisionId(?User $user = null): ?int
     {
@@ -78,21 +80,28 @@ class CompanyContextService
             return null;
         }
 
-        $sessionDivisionId = session('active_division_id');
-        
-        if ($sessionDivisionId) {
-            $division = Division::find($sessionDivisionId);
-            if ($division) {
-                if ($user->isAdmin() || in_array($sessionDivisionId, $user->allDivisionIds())) {
-                    return (int) $sessionDivisionId;
-                }
+        $branchId = $this->getActiveBranchId($user);
+        if ($branchId) {
+            $branch = Branch::find($branchId);
+            if ($branch && !$branch->is_pusat) {
+                return null;
             }
         }
 
-        $division = $this->getDefaultDivision($user);
-        if ($division) {
-            session(['active_division_id' => $division->id]);
-            return $division->id;
+        $availableDivisions = $this->getAvailableDivisions($user, $branchId);
+        $sessionDivisionId = session('active_division_id');
+        
+        if ($sessionDivisionId) {
+            $division = $availableDivisions->firstWhere('id', (int) $sessionDivisionId);
+            if ($division) {
+                return (int) $sessionDivisionId;
+            }
+        }
+
+        $defaultDivision = $availableDivisions->first();
+        if ($defaultDivision) {
+            session(['active_division_id' => $defaultDivision->id]);
+            return $defaultDivision->id;
         }
 
         return null;
@@ -105,6 +114,85 @@ class CompanyContextService
     {
         $divisionId = $this->getActiveDivisionId($user);
         return $divisionId ? Division::find($divisionId) : null;
+    }
+
+    /**
+     * Get active unit kerja ID from session, or resolve default.
+     * Only relevant when active branch is Cabang PT (is_pusat = false).
+     */
+    public function getActiveUnitKerjaId(?User $user = null): ?int
+    {
+        $user = $user ?? auth()->user();
+        if (!$user) {
+            return null;
+        }
+
+        $branchId = $this->getActiveBranchId($user);
+        if (!$branchId) {
+            return null;
+        }
+
+        $branch = Branch::find($branchId);
+        if (!$branch || $branch->is_pusat) {
+            return null;
+        }
+
+        $sessionUnitKerjaId = session('active_unit_kerja_id');
+        $available = $this->getAvailableUnitKerjas($user, $branchId);
+
+        if ($sessionUnitKerjaId) {
+            $uk = $available->firstWhere('id', (int) $sessionUnitKerjaId);
+            if ($uk) {
+                return (int) $sessionUnitKerjaId;
+            }
+        }
+
+        $defaultUk = $available->first();
+        if ($defaultUk) {
+            session(['active_unit_kerja_id' => $defaultUk->id]);
+            return $defaultUk->id;
+        }
+
+        return null;
+    }
+
+    /**
+     * Get active unit kerja model from session, or resolve default.
+     */
+    public function getActiveUnitKerja(?User $user = null): ?UnitKerja
+    {
+        $unitKerjaId = $this->getActiveUnitKerjaId($user);
+        return $unitKerjaId ? UnitKerja::find($unitKerjaId) : null;
+    }
+
+    /**
+     * Get available unit kerjas under branch for user.
+     */
+    public function getAvailableUnitKerjas(?User $user = null, ?int $branchId = null)
+    {
+        $user = $user ?? auth()->user();
+        if (!$user) {
+            return collect();
+        }
+
+        $branchId = $branchId ?? $this->getActiveBranchId($user);
+        if (!$branchId) {
+            return collect();
+        }
+
+        $branch = Branch::find($branchId);
+        if (!$branch || $branch->is_pusat) {
+            return collect();
+        }
+
+        if ($user->isAdmin() || $user->isDirector()) {
+            return UnitKerja::orderBy('kode_unit_kerja')->get();
+        }
+
+        $allUkIds = $user->allUnitKerjaIds($branchId);
+        return UnitKerja::whereIn('id', $allUkIds)
+            ->orderBy('kode_unit_kerja')
+            ->get();
     }
 
     /**
@@ -147,20 +235,27 @@ class CompanyContextService
     }
 
     /**
-     * Get all available divisions globally for user.
+     * Get all available divisions globally or for specific Pusat branch for user.
      */
-    public function getAvailableDivisions(?User $user = null)
+    public function getAvailableDivisions(?User $user = null, ?int $branchId = null)
     {
         $user = $user ?? auth()->user();
         if (!$user) {
             return collect();
         }
 
+        if ($branchId !== null) {
+            $branch = Branch::find($branchId);
+            if ($branch && !$branch->is_pusat) {
+                return collect();
+            }
+        }
+
         if ($user->isAdmin()) {
             return Division::orderBy('name')->get();
         }
 
-        $divisionIds = $user->allDivisionIds();
+        $divisionIds = $user->allDivisionIds($branchId);
         return Division::whereIn('id', $divisionIds)->orderBy('name')->get();
     }
 

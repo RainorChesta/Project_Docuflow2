@@ -21,6 +21,15 @@
                         @endforeach
                     </select>
 
+                    <select name="unit_kerja" class="select select-bordered select-sm w-full sm:w-auto">
+                        <option value="">{{ __('Semua Unit Kerja') }}</option>
+                        @foreach($unitKerjas as $uk)
+                            <option value="{{ $uk->id }}" {{ request('unit_kerja') == $uk->id ? 'selected' : '' }}>
+                                {{ $uk->kode_unit_kerja }} - {{ $uk->nama_unit_kerja }}
+                            </option>
+                        @endforeach
+                    </select>
+
                     <select name="role" class="select select-bordered select-sm w-full sm:w-auto">
                         <option value="">{{ __('Semua Peran') }}</option>
                         <option value="admin" {{ request('role') === 'admin' ? 'selected' : '' }}>Admin</option>
@@ -38,7 +47,7 @@
 
                     <div class="flex gap-2">
                         <button type="submit" class="btn btn-primary btn-sm">{{ __('Filter') }}</button>
-                        @if(request()->anyFilled(['search', 'division', 'role', 'status']))
+                        @if(request()->anyFilled(['search', 'division', 'unit_kerja', 'role', 'status']))
                             <a href="{{ route('admin.users.index') }}" class="btn btn-ghost btn-sm">{{ __('Reset') }}</a>
                         @endif
                     </div>
@@ -59,7 +68,7 @@
                             <tr class="border-b border-base-200">
                                 <th class="min-w-[180px] font-semibold text-xs text-base-content/70 uppercase tracking-wider">{{ __('Nama / NIP') }}</th>
                                 <th class="min-w-[180px] font-semibold text-xs text-base-content/70 uppercase tracking-wider">{{ __('Email / Telepon') }}</th>
-                                <th class="min-w-[150px] font-semibold text-xs text-base-content/70 uppercase tracking-wider">{{ __('Divisi') }}</th>
+                                <th class="min-w-[150px] font-semibold text-xs text-base-content/70 uppercase tracking-wider">{{ __('Divisi / Unit Kerja') }}</th>
                                 <th class="min-w-[180px] font-semibold text-xs text-base-content/70 uppercase tracking-wider">{{ __('Perusahaan & Cabang') }}</th>
                                 <th class="min-w-[90px] font-semibold text-xs text-base-content/70 uppercase tracking-wider">{{ __('Peran') }}</th>
                                 <th class="min-w-[160px] font-semibold text-xs text-base-content/70 uppercase tracking-wider">{{ __('Status') }}</th>
@@ -89,18 +98,29 @@
                                     <td class="align-middle">
                                         @if($user->system_role === 'direktur')
                                             <span class="text-xs text-base-content/40 italic font-mono">{{ __('(N/A)') }}</span>
-                                        @elseif($user->divisions->isNotEmpty())
+                                        @elseif($user->divisions->isNotEmpty() || $user->unitKerjas->isNotEmpty() || $user->division || $user->unitKerja)
                                             <div class="flex flex-wrap items-center gap-1.5 max-w-[220px]">
                                                 @foreach($user->divisions as $div)
-                                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-base-200 text-base-content border border-base-300">
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-base-200 text-base-content border border-base-300" title="Divisi: {{ $div->name }}">
                                                         {{ $div->code ?: $div->name }}
                                                     </span>
                                                 @endforeach
+                                                @if($user->divisions->isEmpty() && $user->division)
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-base-200 text-base-content border border-base-300" title="Divisi: {{ $user->division->name }}">
+                                                        {{ $user->division->code ?: $user->division->name }}
+                                                    </span>
+                                                @endif
+                                                @foreach($user->unitKerjas as $uk)
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-primary/10 text-primary border border-primary/20" title="Unit Kerja: {{ $uk->nama_unit_kerja }} ({{ $uk->cabang?->name }})">
+                                                        UK: {{ $uk->kode_unit_kerja }}
+                                                    </span>
+                                                @endforeach
+                                                @if($user->unitKerjas->isEmpty() && $user->unitKerja)
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-primary/10 text-primary border border-primary/20" title="Unit Kerja: {{ $user->unitKerja->nama_unit_kerja }} ({{ $user->unitKerja->cabang?->name }})">
+                                                        UK: {{ $user->unitKerja->kode_unit_kerja }}
+                                                    </span>
+                                                @endif
                                             </div>
-                                        @elseif($user->division)
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-base-200 text-base-content border border-base-300">
-                                                {{ $user->division->code ?: $user->division->name }}
-                                            </span>
                                         @else
                                             <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30 whitespace-nowrap">
                                                 <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>

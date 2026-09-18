@@ -77,45 +77,23 @@ class DocumentService
             $division = null;
         }
 
-        $formatChoice = is_string($formatChoice) ? $formatChoice : (!empty($unitKerja) ? 'lama' : 'baru');
+        if ($branch) {
+            $formatChoice = $branch->is_pusat ? 'baru' : 'lama';
+        } else {
+            $formatChoice = !empty($unitKerja) ? 'lama' : (is_string($formatChoice) ? $formatChoice : 'baru');
+        }
 
         return DB::transaction(function () use ($formatChoice, $division, $documentType, $branch, $unitKerja) {
             $year = now()->year;
             $branchId = $branch?->id;
             $typeId = $documentType?->id;
 
-            if ($formatChoice === 'lama') {
-                $query = Document::withTrashed()
-                    ->where('document_type_id', $typeId)
-                    ->whereYear('created_at', $year);
+            $query = Document::withTrashed()
+                ->where('document_type_id', $typeId)
+                ->whereYear('created_at', $year);
 
-                if ($branch) {
-                    $query->where('branch_id', $branchId);
-                }
-
-                if (strtoupper($documentType?->code ?? '') === 'SOP') {
-                    if ($unitKerja) {
-                        $query->where('unit_kerja_id', $unitKerja->id);
-                    } elseif ($division) {
-                        $query->where('division_id', $division->id);
-                    }
-                } else {
-                    if ($division) {
-                        $query->where('division_id', $division->id);
-                    }
-                }
-            } else {
-                $divisionId = $division?->id;
-                $query = Document::withTrashed()
-                    ->where('document_type_id', $typeId)
-                    ->whereYear('created_at', $year);
-
-                if ($divisionId) {
-                    $query->where('division_id', $divisionId);
-                }
-                if ($branchId) {
-                    $query->where('branch_id', $branchId);
-                }
+            if ($branchId) {
+                $query->where('branch_id', $branchId);
             }
 
             // Lock the highest sequence row to serialize increments safely
@@ -195,44 +173,22 @@ class DocumentService
             $division = null;
         }
 
-        $formatChoice = is_string($formatChoice) ? $formatChoice : (!empty($unitKerja) ? 'lama' : 'baru');
+        if ($branch) {
+            $formatChoice = $branch->is_pusat ? 'baru' : 'lama';
+        } else {
+            $formatChoice = !empty($unitKerja) ? 'lama' : (is_string($formatChoice) ? $formatChoice : 'baru');
+        }
 
         $year = now()->year;
         $branchId = $branch?->id;
         $typeId = $documentType?->id;
 
-        if ($formatChoice === 'lama') {
-            $query = Document::withTrashed()
-                ->where('document_type_id', $typeId)
-                ->whereYear('created_at', $year);
+        $query = Document::withTrashed()
+            ->where('document_type_id', $typeId)
+            ->whereYear('created_at', $year);
 
-            if ($branch) {
-                $query->where('branch_id', $branchId);
-            }
-
-            if (strtoupper($documentType?->code ?? '') === 'SOP') {
-                if ($unitKerja) {
-                    $query->where('unit_kerja_id', $unitKerja->id);
-                } elseif ($division) {
-                    $query->where('division_id', $division->id);
-                }
-            } else {
-                if ($division) {
-                    $query->where('division_id', $division->id);
-                }
-            }
-        } else {
-            $divisionId = $division?->id;
-            $query = Document::withTrashed()
-                ->where('document_type_id', $typeId)
-                ->whereYear('created_at', $year);
-
-            if ($divisionId) {
-                $query->where('division_id', $divisionId);
-            }
-            if ($branchId) {
-                $query->where('branch_id', $branchId);
-            }
+        if ($branchId) {
+            $query->where('branch_id', $branchId);
         }
 
         $maxDoc = (clone $query)->orderByDesc('id')->first();
@@ -285,21 +241,9 @@ class DocumentService
     ): string {
         $typeCodeForNumber = str_replace('/', '-', $typeCode);
 
-        if ($formatChoice === 'baru') {
-            $divisionCode = $division ? $division->code : 'GEN';
-            return sprintf(
-                '%03d/%s/%s/%s/%s/%d',
-                $seq,
-                $typeCodeForNumber,
-                $divisionCode,
-                $branchCode,
-                $romanMonth,
-                $year
-            );
-        }
-
-        // Format Lama
-        if (strtoupper($typeCode) === 'SOP') {
+        // Cabang PT format: [seq]/[type]-[unit_kerja]/[branch]/[romanMonth]/[year]
+        // E.g.: 001/SK-01/MMC/IX/2026 or 001/SOP-11/CDC-DIP/IX/2026
+        if ($unitKerja !== null || $formatChoice === 'lama') {
             $unitKerjaCode = $unitKerja ? $unitKerja->kode_unit_kerja : '00';
             return sprintf(
                 '%03d/%s-%s/%s/%s/%d',
@@ -312,10 +256,14 @@ class DocumentService
             );
         }
 
+        // Cabang Pusat PT format: [seq]/[type]/[division]/[branch_pusat]/[romanMonth]/[year]
+        // E.g.: 001/SK/SKRT/JBM/IX/2026
+        $divisionCode = $division ? $division->code : 'GEN';
         return sprintf(
-            '%03d/%s/%s/%s/%d',
+            '%03d/%s/%s/%s/%s/%d',
             $seq,
             $typeCodeForNumber,
+            $divisionCode,
             $branchCode,
             $romanMonth,
             $year
@@ -340,7 +288,13 @@ class DocumentService
         $unitKerja = !empty($data['unit_kerja_id']) ? \App\Models\UnitKerja::find($data['unit_kerja_id']) : null;
         $documentType = DocumentType::findOrFail($data['document_type_id']);
         $branch = !empty($data['branch_id']) ? \App\Models\Branch::with('company')->find($data['branch_id']) : null;
-        $formatChoice = $data['format_choice'] ?? (!empty($unitKerja) ? 'lama' : 'baru');
+
+        if ($branch) {
+            $formatChoice = $branch->is_pusat ? 'baru' : 'lama';
+        } else {
+            $formatChoice = $data['format_choice'] ?? (!empty($unitKerja) ? 'lama' : 'baru');
+        }
+        $data['format_choice'] = $formatChoice;
 
         if ($branch && empty($data['company_id'])) {
             $data['company_id'] = $branch->company_id;
@@ -446,7 +400,13 @@ class DocumentService
         $unitKerja = !empty($data['unit_kerja_id']) ? \App\Models\UnitKerja::find($data['unit_kerja_id']) : null;
         $documentType = DocumentType::findOrFail($data['document_type_id']);
         $branch = !empty($data['branch_id']) ? \App\Models\Branch::with('company')->find($data['branch_id']) : null;
-        $formatChoice = $data['format_choice'] ?? (!empty($unitKerja) ? 'lama' : 'baru');
+
+        if ($branch) {
+            $formatChoice = $branch->is_pusat ? 'baru' : 'lama';
+        } else {
+            $formatChoice = $data['format_choice'] ?? (!empty($unitKerja) ? 'lama' : 'baru');
+        }
+        $data['format_choice'] = $formatChoice;
 
         if ($branch && empty($data['company_id'])) {
             $data['company_id'] = $branch->company_id;

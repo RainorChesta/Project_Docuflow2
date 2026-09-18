@@ -17,7 +17,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             DocumentTypeSeeder::class,
-            UserSeeder::class,
+            InitialMasterDataSeeder::class,
         ]);
 
         // User::factory(10)->create();

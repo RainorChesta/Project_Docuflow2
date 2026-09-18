@@ -29,9 +29,8 @@ class SopDocumentNumberingTest extends TestCase
             'code' => 'CDC-DIP',
         ]);
 
-        // Master Unit Kerja 11 in branch CDC-DIP
+        // Master Global Unit Kerja 11
         $unitKerja = UnitKerja::create([
-            'cabang_id' => $branch->id,
             'kode_unit_kerja' => '11',
             'nama_unit_kerja' => 'Unit Operasional',
         ]);
@@ -61,7 +60,7 @@ class SopDocumentNumberingTest extends TestCase
         $this->assertStringContainsString('/SOP-11/CDC-DIP/', $number);
     }
 
-    public function test_unit_kerja_can_differ_between_branches(): void
+    public function test_unit_kerja_can_be_used_across_different_branches(): void
     {
         $company = Company::create(['name' => 'PT CMH', 'code' => 'CMH']);
         
@@ -79,32 +78,23 @@ class SopDocumentNumberingTest extends TestCase
             'code' => 'CDC-SBY',
         ]);
 
-        // Branch A has Unit Kerja 11
-        $unit11A = UnitKerja::create([
-            'cabang_id' => $branchA->id,
+        // Global Unit Kerja 11 can be used across multiple branches
+        $unit11 = UnitKerja::create([
             'kode_unit_kerja' => '11',
-            'nama_unit_kerja' => 'Layanan Diponegoro',
+            'nama_unit_kerja' => 'Layanan',
         ]);
 
-        // Branch B also has Unit Kerja 11 (allowed because cabang_id is different)
-        $unit11B = UnitKerja::create([
-            'cabang_id' => $branchB->id,
-            'kode_unit_kerja' => '11',
-            'nama_unit_kerja' => 'Layanan Surabaya',
-        ]);
-
-        // Branch B has Unit Kerja 25
-        $unit25B = UnitKerja::create([
-            'cabang_id' => $branchB->id,
+        // Global Unit Kerja 25
+        $unit25 = UnitKerja::create([
             'kode_unit_kerja' => '25',
-            'nama_unit_kerja' => 'Logistik Surabaya',
+            'nama_unit_kerja' => 'Logistik',
         ]);
 
         $sopType = DocumentType::create(['code' => 'SOP', 'name' => 'SOP']);
         $service = app(DocumentService::class);
 
-        $numberA = $service->generateId(null, $sopType, $branchA, $unit11A);
-        $numberB = $service->generateId(null, $sopType, $branchB, $unit25B);
+        $numberA = $service->generateId(null, $sopType, $branchA, $unit11);
+        $numberB = $service->generateId(null, $sopType, $branchB, $unit25);
 
         $this->assertStringContainsString('/SOP-11/CDC-DIP/', $numberA);
         $this->assertStringContainsString('/SOP-25/CDC-SBY/', $numberB);
@@ -120,7 +110,6 @@ class SopDocumentNumberingTest extends TestCase
             'code' => 'CDC-DIP',
         ]);
         $unitKerja = UnitKerja::create([
-            'cabang_id' => $branch->id,
             'kode_unit_kerja' => '11',
             'nama_unit_kerja' => 'Unit Operasional',
         ]);
@@ -144,68 +133,48 @@ class SopDocumentNumberingTest extends TestCase
 
     public function test_admin_can_manage_unit_kerja(): void
     {
-        $company = Company::create(['name' => 'PT CMH', 'code' => 'CMH']);
-        $branch = Branch::create([
-            'company_id' => $company->id,
-            'name' => 'CDC Diponegoro',
-            'is_pusat' => false,
-            'code' => 'CDC-DIP',
-        ]);
-
         $admin = User::factory()->create(['system_role' => 'admin']);
 
         // Index
         $response = $this->actingAs($admin)->get(route('admin.unit-kerja.index'));
         $response->assertOk();
 
-        // View create form with cascading dropdown
+        // View create form
         $createResp = $this->actingAs($admin)->get(route('admin.unit-kerja.create'));
         $createResp->assertOk();
-        $createResp->assertSee(__('Perusahaan'));
-        $createResp->assertSee('selectedCompanyId', false);
-        $createResp->assertSee('selectedCabangId', false);
-        $createResp->assertSee($company->name);
-        $createResp->assertSee($branch->name);
+        $createResp->assertSee(__('Kode Unit Kerja'));
+        $createResp->assertSee(__('Nama Unit Kerja'));
 
         // Create
         $response = $this->actingAs($admin)->post(route('admin.unit-kerja.store'), [
-            'company_id' => $company->id,
-            'cabang_id' => $branch->id,
             'kode_unit_kerja' => '11',
             'nama_unit_kerja' => 'Unit Operasional',
         ]);
-        $response->assertRedirect(route('admin.unit-kerja.index', ['cabang_id' => $branch->id]));
+        $response->assertRedirect(route('admin.unit-kerja.index'));
         $this->assertDatabaseHas('unit_kerjas', [
-            'cabang_id' => $branch->id,
             'kode_unit_kerja' => '11',
             'nama_unit_kerja' => 'Unit Operasional',
         ]);
 
-        // Duplicate code in same branch should fail
+        // Duplicate code globally should fail
         $responseDuplicate = $this->actingAs($admin)->post(route('admin.unit-kerja.store'), [
-            'company_id' => $company->id,
-            'cabang_id' => $branch->id,
             'kode_unit_kerja' => '11',
             'nama_unit_kerja' => 'Unit Operasional Lain',
         ]);
         $responseDuplicate->assertSessionHasErrors('kode_unit_kerja');
 
-        // View edit form with cascading dropdown prefill
-        $unit = UnitKerja::where('cabang_id', $branch->id)->where('kode_unit_kerja', '11')->first();
+        // View edit form
+        $unit = UnitKerja::where('kode_unit_kerja', '11')->first();
         $editResp = $this->actingAs($admin)->get(route('admin.unit-kerja.edit', $unit));
         $editResp->assertOk();
-        $editResp->assertSee(__('Perusahaan'));
-        $editResp->assertSee($company->name);
-        $editResp->assertSee($branch->name);
         $editResp->assertSee('Unit Operasional');
 
         // Update
         $responseUpdate = $this->actingAs($admin)->put(route('admin.unit-kerja.update', $unit), [
-            'cabang_id' => $branch->id,
             'kode_unit_kerja' => '11',
             'nama_unit_kerja' => 'Unit Operasional & CS',
         ]);
-        $responseUpdate->assertRedirect(route('admin.unit-kerja.index', ['cabang_id' => $branch->id]));
+        $responseUpdate->assertRedirect(route('admin.unit-kerja.index'));
         $this->assertDatabaseHas('unit_kerjas', [
             'id' => $unit->id,
             'nama_unit_kerja' => 'Unit Operasional & CS',
@@ -213,7 +182,7 @@ class SopDocumentNumberingTest extends TestCase
 
         // Delete
         $responseDelete = $this->actingAs($admin)->delete(route('admin.unit-kerja.destroy', $unit));
-        $responseDelete->assertRedirect(route('admin.unit-kerja.index', ['cabang_id' => $branch->id]));
+        $responseDelete->assertRedirect(route('admin.unit-kerja.index'));
         $this->assertDatabaseMissing('unit_kerjas', ['id' => $unit->id]);
     }
 }

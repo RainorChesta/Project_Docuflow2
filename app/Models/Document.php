@@ -240,7 +240,7 @@ class Document extends Model
     }
 
     /**
-     * Division-scoped documents the given user may see (Dokumen Divisi tab).
+     * Division-scoped documents the given user may see (Dokumen Divisi / Unit Kerja tab).
      */
     public function scopeDivision(Builder $query, User $user): Builder
     {
@@ -250,14 +250,22 @@ class Document extends Model
         }
 
         $divisionIds = $user->allDivisionIds();
+        $unitKerjaIds = $user->allUnitKerjaIds();
 
-        if (empty($divisionIds)) {
+        if (empty($divisionIds) && empty($unitKerjaIds)) {
             return $query->whereRaw('1 = 0');
         }
 
         return $query->where('visibility', self::VISIBILITY_DIVISION)
-            ->whereIn('division_id', $divisionIds)
-            // Only approved/published documents appear in Dokumen Divisi.
+            ->where(function (Builder $q) use ($divisionIds, $unitKerjaIds) {
+                if (!empty($divisionIds)) {
+                    $q->whereIn('division_id', $divisionIds);
+                }
+                if (!empty($unitKerjaIds)) {
+                    $q->orWhereIn('unit_kerja_id', $unitKerjaIds);
+                }
+            })
+            // Only approved/published documents appear in Dokumen Divisi / Unit Kerja.
             // Pending (not yet approved) documents stay hidden until approved.
             ->whereHas('versions', fn($q) => $q->where('status', 'active'));
     }
@@ -265,7 +273,7 @@ class Document extends Model
     /**
      * Documents the given user is allowed to see (row-level visibility).
      * Admin sees everything. Regular users see: general docs within their accessible
-     * company/branch scope, own docs, division docs of any division they belong to,
+     * company/branch scope, own docs, division/unit kerja docs of any division/unit kerja they belong to,
      * and docs where they have a personal share, division share, or branch distribution.
      */
     public function scopeVisibleTo(Builder $query, User $user): Builder
@@ -277,6 +285,7 @@ class Document extends Model
         $directCompanyIds = $user->allCompanyIds();
         $directBranchIds = $user->allBranchIds();
         $divisionIds = $user->allDivisionIds();
+        $unitKerjaIds = $user->allUnitKerjaIds();
 
         // Include company IDs inferred from assigned branches
         $branchCompanyIds = !empty($directBranchIds)
@@ -305,7 +314,7 @@ class Document extends Model
             return $query;
         }
 
-        return $query->where(function (Builder $q) use ($user, $divisionIds, $branchIds, $companyIds) {
+        return $query->where(function (Builder $q) use ($user, $divisionIds, $unitKerjaIds, $branchIds, $companyIds) {
             // Explicitly shared with user or division (accessible across branches/companies)
             $q->whereHas('shares', fn(Builder $s) => $s->where('user_id', $user->id));
 
@@ -314,7 +323,7 @@ class Document extends Model
             }
 
             // Documents within the user's accessible branch/company scope
-            $q->orWhere(function (Builder $inScope) use ($user, $divisionIds, $branchIds, $companyIds) {
+            $q->orWhere(function (Builder $inScope) use ($user, $divisionIds, $unitKerjaIds, $branchIds, $companyIds) {
                 if (!empty($branchIds) || !empty($companyIds)) {
                     $inScope->where(function (Builder $b) use ($branchIds, $companyIds) {
                         if (!empty($branchIds)) {
@@ -327,12 +336,19 @@ class Document extends Model
                     });
                 }
 
-                $inScope->where(function (Builder $sub) use ($user, $divisionIds, $branchIds, $companyIds) {
+                $inScope->where(function (Builder $sub) use ($user, $divisionIds, $unitKerjaIds, $branchIds, $companyIds) {
                     $sub->where('visibility', self::VISIBILITY_GENERAL)
                         ->orWhere('owner_id', $user->id)
-                        ->orWhere(function (Builder $d) use ($divisionIds) {
+                        ->orWhere(function (Builder $d) use ($divisionIds, $unitKerjaIds) {
                             $d->where('visibility', self::VISIBILITY_DIVISION)
-                              ->whereIn('division_id', $divisionIds);
+                              ->where(function (Builder $w) use ($divisionIds, $unitKerjaIds) {
+                                  if (!empty($divisionIds)) {
+                                      $w->whereIn('division_id', $divisionIds);
+                                  }
+                                  if (!empty($unitKerjaIds)) {
+                                      $w->orWhereIn('unit_kerja_id', $unitKerjaIds);
+                                  }
+                              });
                         })
                         ->orWhereHas('distributions', fn(Builder $dist) => $dist->where(function ($dq) use ($branchIds, $companyIds) {
                             if (!empty($branchIds)) {

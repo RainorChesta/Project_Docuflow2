@@ -14,7 +14,6 @@ class UnitKerja extends Model
     protected $table = 'unit_kerjas';
 
     protected $fillable = [
-        'cabang_id',
         'kode_unit_kerja',
         'nama_unit_kerja',
     ];
@@ -26,7 +25,7 @@ class UnitKerja extends Model
 
     public function cabang(): BelongsTo
     {
-        return $this->belongsTo(Branch::class, 'cabang_id');
+        return $this->belongsTo(Branch::class, 'cabang_id')->withDefault();
     }
 
     /**
@@ -34,11 +33,21 @@ class UnitKerja extends Model
      */
     public function branch(): BelongsTo
     {
-        return $this->belongsTo(Branch::class, 'cabang_id');
+        return $this->belongsTo(Branch::class, 'cabang_id')->withDefault();
     }
 
     public function documents(): HasMany
     {
         return $this->hasMany(Document::class, 'unit_kerja_id');
+    }
+
+    public function users(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(User::class)->withTimestamps();
+    }
+
+    public function primaryUsers(): HasMany
+    {
+        return $this->hasMany(User::class, 'unit_kerja_id');
     }
 }

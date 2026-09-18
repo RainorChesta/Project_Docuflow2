@@ -25,7 +25,7 @@ class DocumentNumberAvailabilityTest extends TestCase
         parent::setUp();
 
         $company = Company::create(['name' => 'PT Test', 'code' => 'TEST']);
-        $this->branch = Branch::create(['name' => 'Branch 1', 'code' => 'B1', 'company_id' => $company->id]);
+        $this->branch = Branch::create(['name' => 'Branch 1', 'code' => 'B1', 'company_id' => $company->id, 'is_pusat' => true]);
         $this->division = Division::create(['name' => 'IT Dept', 'code' => 'IT']);
         $this->docType = DocumentType::create(['name' => 'Surat Keputusan', 'code' => 'SK']);
 
@@ -118,6 +118,7 @@ class DocumentNumberAvailabilityTest extends TestCase
             'document_number' => 'CUSTOM-999/SK/2026',
             'branch_id' => $this->branch->id,
             'branch_ids' => [$this->branch->id],
+            'division_id' => $this->division->id,
         ]);
 
         $this->assertDatabaseHas('documents', [
@@ -149,6 +150,7 @@ class DocumentNumberAvailabilityTest extends TestCase
             'document_number' => 'DUPLICATE-001',
             'branch_id' => $this->branch->id,
             'branch_ids' => [$this->branch->id],
+            'division_id' => $this->division->id,
         ]);
 
         $response->assertSessionHasErrors('document_number');
