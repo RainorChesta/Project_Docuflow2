@@ -75,6 +75,19 @@ class DocumentPolicy
         // 2. Role / Access check (only reached if in scope)
         if ($document->isGeneral()) return true;
 
+        // Cross-branch distributed documents are accessible to the target branches
+        if ($document->distributions()->where(function ($dq) use ($activeBranchId, $activeCompanyId, $user) {
+            if ($activeBranchId) {
+                $dq->where('target_branch_id', $activeBranchId);
+            } elseif ($activeCompanyId) {
+                $dq->whereHas('targetBranch', fn($b) => $b->where('company_id', $activeCompanyId));
+            } else {
+                $dq->whereIn('target_branch_id', $user->allBranchIds());
+            }
+        })->exists()) {
+            return true;
+        }
+
         if ($document->isDivision()
             && $document->division_id
             && in_array($document->division_id, $user->allDivisionIds(), true)) {
@@ -117,6 +130,21 @@ class DocumentPolicy
     {
         if (!$this->view($user, $document)) return false;
         if ($user->isAdmin() || $user->isDirector()) return true;
+
+        // Check if user is the assigned approver for the current pending step
+        $currentStep = $document->currentApprovalStep();
+        if ($currentStep) {
+            if ($currentStep->assigned_user_id === $user->id) {
+                return true;
+            }
+            if ($currentStep->assigned_role && $currentStep->assigned_role === $user->system_role) {
+                return true;
+            }
+        }
+
+        if ($document->approver_id === $user->id) {
+            return true;
+        }
 
         if ($user->isHead() && ($user->division_id === $document->division_id || in_array($document->division_id, $user->allDivisionIds(), true))) {
             $contextService = app(\App\Services\CompanyContextService::class);

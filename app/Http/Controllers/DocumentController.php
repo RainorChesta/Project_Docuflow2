@@ -74,6 +74,8 @@ class DocumentController extends Controller
 
         $approvedRequests = \App\Models\SignatureRequest::where('document_id', $document->id)
             ->where('status', 'approved')
+            ->where('is_used', false)
+            ->latest('id')
             ->with(['targetUser.signatures', 'requestedSignature'])
             ->get();
 
@@ -85,9 +87,15 @@ class DocumentController extends Controller
         $appliedAny = false;
 
         foreach ($approvedRequests as $req) {
-            $sig = $req->requestedSignature 
-                ?? $req->targetUser?->signatures()->where('type', 'original')->first() 
-                ?? $req->targetUser?->signatures()->first();
+            $sig = null;
+            if ($req->isStamp() && $req->requestedSignature) {
+                $sig = $req->requestedSignature;
+            } elseif ($req->requestedSignature) {
+                $sig = $req->requestedSignature;
+            } else {
+                $sig = $req->targetUser?->signatures()->where('type', 'original')->first() 
+                    ?? $req->targetUser?->signatures()->first();
+            }
 
             $signaturePath = null;
             if ($sig && $sig->file_path) {
@@ -165,26 +173,78 @@ class DocumentController extends Controller
         }
 
         if ($type === 'general') {
-            $query->general()->where(function ($q) use ($activeBranchId, $activeCompanyId, $user) {
+            if ($user->isAdmin()) {
                 if ($activeBranchId) {
-                    $q->where('branch_id', $activeBranchId)
-                       ->orWhere(function ($sub) use ($activeCompanyId) {
-                           $sub->whereNull('branch_id')
-                               ->where('company_id', $activeCompanyId);
-                       })
-                       ->orWhereHas('distributions', fn($dq) => $dq->where('target_branch_id', $activeBranchId));
+                    $query->where(function ($q) use ($activeBranchId, $activeCompanyId) {
+                        $q->where(function ($gq) use ($activeBranchId, $activeCompanyId) {
+                            $gq->where('visibility', Document::VISIBILITY_GENERAL)
+                               ->where(function ($bq) use ($activeBranchId, $activeCompanyId) {
+                                   $bq->where('branch_id', $activeBranchId)
+                                      ->orWhere(function ($sub) use ($activeCompanyId) {
+                                          $sub->whereNull('branch_id')
+                                              ->where('company_id', $activeCompanyId);
+                                      });
+                               });
+                        })
+                        ->orWhereHas('distributions', fn($dq) => $dq->where('target_branch_id', $activeBranchId));
+                    });
                 } elseif ($activeCompanyId) {
-                    $q->where(function ($sub) use ($activeCompanyId) {
-                        $sub->where('company_id', $activeCompanyId)
-                            ->orWhereHas('branch', fn($b) => $b->where('company_id', $activeCompanyId));
-                    })
-                    ->orWhereHas('distributions', fn($dq) => $dq->whereHas('targetBranch', fn($b) => $b->where('company_id', $activeCompanyId)));
+                    $query->where(function ($q) use ($activeCompanyId) {
+                        $q->where(function ($gq) use ($activeCompanyId) {
+                            $gq->where('visibility', Document::VISIBILITY_GENERAL)
+                               ->where(function ($sub) use ($activeCompanyId) {
+                                   $sub->where('company_id', $activeCompanyId)
+                                       ->orWhereHas('branch', fn($b) => $b->where('company_id', $activeCompanyId));
+                               });
+                        })
+                        ->orWhereHas('distributions', fn($dq) => $dq->whereHas('targetBranch', fn($b) => $b->where('company_id', $activeCompanyId)));
+                    });
                 } else {
-                    $q->whereIn('branch_id', $user->allBranchIds())
-                       ->orWhereIn('company_id', $user->allCompanyIds())
-                       ->orWhereHas('distributions', fn($dq) => $dq->whereIn('target_branch_id', $user->allBranchIds()));
+                    $query->where(function ($q) {
+                        $q->where('visibility', Document::VISIBILITY_GENERAL)
+                          ->orWhereHas('distributions');
+                    });
                 }
-            });
+            } else {
+                $query->where(function ($q) use ($activeBranchId, $activeCompanyId, $user) {
+                    if ($activeBranchId) {
+                        $q->where(function ($gq) use ($activeBranchId, $activeCompanyId) {
+                            $gq->where('visibility', Document::VISIBILITY_GENERAL)
+                               ->where(function ($bq) use ($activeBranchId, $activeCompanyId) {
+                                   $bq->where('branch_id', $activeBranchId)
+                                      ->orWhere(function ($sub) use ($activeCompanyId) {
+                                          $sub->whereNull('branch_id')
+                                              ->where('company_id', $activeCompanyId);
+                                      });
+                               });
+                        })
+                        ->orWhereHas('distributions', fn($dq) => $dq->where('target_branch_id', $activeBranchId));
+                    } elseif ($activeCompanyId) {
+                        $q->where(function ($gq) use ($activeCompanyId) {
+                            $gq->where('visibility', Document::VISIBILITY_GENERAL)
+                               ->where(function ($sub) use ($activeCompanyId) {
+                                   $sub->where('company_id', $activeCompanyId)
+                                       ->orWhereHas('branch', fn($b) => $b->where('company_id', $activeCompanyId));
+                               });
+                        })
+                        ->orWhereHas('distributions', fn($dq) => $dq->whereHas('targetBranch', fn($b) => $b->where('company_id', $activeCompanyId)));
+                    } else {
+                        $userBranchIds = $user->allBranchIds();
+                        $userCompanyIds = $user->allCompanyIds();
+                        $q->where(function ($gq) use ($userBranchIds, $userCompanyIds) {
+                            $gq->where('visibility', Document::VISIBILITY_GENERAL)
+                               ->where(function ($uq) use ($userBranchIds, $userCompanyIds) {
+                                   $uq->whereIn('branch_id', $userBranchIds)
+                                      ->orWhereIn('company_id', $userCompanyIds);
+                               });
+                        })
+                        ->orWhereHas('distributions', fn($dq) => $dq->whereIn('target_branch_id', $userBranchIds));
+                    }
+                });
+            }
+
+            // General documents must have an active version
+            $query->whereHas('versions', fn($q) => $q->where('status', 'active'));
             
             // Clear notifications
             $user->unreadNotifications()
@@ -644,31 +704,12 @@ class DocumentController extends Controller
 
         $approvedSignatures = $this->getApprovedSignatures($document);
 
-        // Ensure pending document with unassigned approver has approval routing evaluated
-        if ($document->approver_id === null && $document->versions()->where('status', 'pending')->whereNull('discarded_at')->exists()) {
-            $pendingVersion = $document->versions()->where('status', 'pending')->whereNull('discarded_at')->latest('id')->first();
-            if ($pendingVersion) {
-                $notifKey = 'approval_notified_' . $document->id . '_v' . $pendingVersion->id;
-                if (!Cache::has($notifKey)) {
-                    Cache::put($notifKey, true, now()->addMinutes(10));
-                    $author = $document->owner ?? $currentUser;
-                    $resolution = $this->approvalRoutingService->resolveApprover($document, $author);
-                    $this->approvalRoutingService->applyToDocument($document, $resolution);
-
-                    foreach ($resolution['approvers'] as $approver) {
-                        $approver->notify(new \App\Notifications\DocumentApprovalRequested($document, $pendingVersion, $author?->name ?? 'User'));
-                    }
-
-                    if ($resolution['role'] !== null && $author) {
-                        $author->notify(new \App\Notifications\ApprovalRouteResolved(
-                            $document,
-                            $resolution['role'],
-                            $resolution['approvers']->pluck('name')->join(', '),
-                            $resolution['message'],
-                            $resolution['isFallback'],
-                        ));
-                    }
-                }
+        // Ensure pending document has multi-tier signature approval workflow compiled
+        $pendingVersion = $document->versions()->where('status', 'pending')->whereNull('discarded_at')->latest('id')->first();
+        if ($pendingVersion) {
+            $author = $document->owner ?? $currentUser;
+            if ($pendingVersion->approvalSteps()->count() === 0) {
+                $this->approvalRoutingService->compileWorkflowFromSignatures($document, $pendingVersion, $author);
             }
         }
 
@@ -1326,10 +1367,11 @@ class DocumentController extends Controller
                 $distributions = [];
                 $targetBranches = \App\Models\Branch::whereIn('id', $targetBranchIds)->get()->keyBy('id');
                 
+                $sourceBranchId = $document->branch_id ?? (auth()->user()->allBranchIds()[0] ?? null);
                 foreach ($targetBranchIds as $targetBranchId) {
                     $distributions[] = [
                         'document_id' => $document->id,
-                        'source_branch_id' => $document->branch_id,
+                        'source_branch_id' => $sourceBranchId,
                         'target_branch_id' => $targetBranchId,
                         'sent_at' => now(),
                         'status' => 'unread',

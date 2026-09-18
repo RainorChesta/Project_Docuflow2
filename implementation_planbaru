@@ -1,0 +1,129 @@
+# Implementation Plan: Signature-Driven Multi-Tier Approval System (Docuflow CMH)
+
+Sistem **Signature-Driven Multi-Tier Approval** mengimplementasikan alur persetujuan dokumen berjenjang yang **100% digerakkan oleh penempatan kotak tanda tangan (*Signature Placeholders*)** di OnlyOffice, dengan 2 Aturan Emas sederhana:
+1. **Ada Kotak TTD Direktur**: Direktur menjadi tahap pengesahan akhir (*Blocking Approval*) dan wajib membubuhkan TTD untuk merilis dokumen.
+2. **Tidak Ada Kotak TTD Direktur**: Dokumen langsung rilis dan sah setelah disetujui Kadiv (Pusat) / PIC Klinik (Cabang). Direktur otomatis menerima salinan tembusan (*Only To Know*) di feed dokumen Direktur.
+
+---
+
+## Proposed Changes
+
+### 1. Database & Migrations
+
+#### [NEW] [2026_09_19_000001_create_document_approval_steps_table.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/database/migrations/2026_09_19_000001_create_document_approval_steps_table.php)
+Tabel pelacak tahapan persetujuan per versi dokumen:
+- `id`, `document_id`, `version_id`
+- `signature_request_id` (foreignId to `signature_requests`, nullable) — menghubungkan step dengan kotak TTD
+- `step_order` (1, 2, 3, 4)
+- `step_type` (`peer_review`, `pic_unit_acknowledge`, `kadiv_approval`, `pic_klinik_approval`, `director_approval`, `system_review`)
+- `step_name` ("Verifikasi Rekan Kerja", "Persetujuan Kadiv HRD", "Otorisasi Direktur PT", dll.)
+- `assigned_user_id` (foreignId to `users`, nullable)
+- `assigned_role` (`staff`, `head`, `direktur`, `admin`)
+- `status` (`waiting`, `pending`, `approved`, `rejected`, `bypassed`)
+- `action_by_id`, `action_at`, `notes`
+- `timestamps` & indeks performa
+
+#### [NEW] [2026_09_19_000002_add_director_read_receipt_and_revocation_to_documents.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/database/migrations/2026_09_19_000002_add_director_read_receipt_and_revocation_to_documents.php)
+Menambahkan kolom pelacakan tembusan Direktur ke tabel `documents`:
+- `director_notified_at` (timestamp, nullable)
+- `director_read_at` (timestamp, nullable)
+- `director_acknowledged_by_id` (foreignId to `users`, nullable)
+
+#### [NEW] [2026_09_19_000003_add_pic_columns_to_branches_and_units_tables.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/database/migrations/2026_09_19_000003_add_pic_columns_to_branches_and_units_tables.php)
+- Menambahkan `pic_klinik_id` ke tabel `branches` (Penanggung Jawab Klinik).
+- Menambahkan `pic_user_id` ke tabel `unit_kerjas` (PIC Unit Kerja Medis/Mutu/Admin di Cabang).
+
+---
+
+### 2. Model & Relasi Eloquent
+
+#### [NEW] [DocumentApprovalStep.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/app/Models/DocumentApprovalStep.php)
+- Model representasi tahapan persetujuan.
+- Relasi: `document()`, `version()`, `signatureRequest()`, `assignedUser()`, `actionBy()`.
+- Helper scopes: `scopePending()`, `scopeWaiting()`, `scopeForUser(User $user)`.
+
+#### [MODIFY] [SignatureRequest.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/app/Models/SignatureRequest.php)
+- Relasi `approvalStep(): HasOne`
+- Helper method: `getRoleWeightAttribute(): int` (Staff = 10, PIC Unit = 20, Kadiv/PIC Klinik = 30, Direktur = 40).
+
+#### [MODIFY] [Document.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/app/Models/Document.php)
+- Relasi `approvalSteps(): HasMany`
+- Helper methods:
+  - `currentApprovalStep(): ?DocumentApprovalStep`
+  - `hasDirectorSignature(): bool` (mengecek apakah ada kotak TTD Direktur)
+  - `isDirectorRead(): bool`
+
+#### [MODIFY] [Branch.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/app/Models/Branch.php) & [UnitKerja.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/app/Models/UnitKerja.php)
+- Relasi `picKlinik(): BelongsTo` pada `Branch`
+- Relasi `picUser(): BelongsTo` pada `UnitKerja`
+
+---
+
+### 3. Service Layer (Signature-Driven Workflow Engine)
+
+#### [MODIFY] [ApprovalRoutingService.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/app/Services/ApprovalRoutingService.php)
+Implementasi alur kerja:
+
+1. **`compileWorkflowFromSignatures(Document $document, DocumentVersion $version, User $creator): void`**:
+   - Membaca seluruh `SignatureRequest` aktif pada dokumen.
+   - **Jika Ada Kotak TTD**:
+     - Urutkan `signature_requests` berdasarkan `role_weight` (10 $\rightarrow$ 20 $\rightarrow$ 30 $\rightarrow$ 40).
+     - Buat record `document_approval_steps` untuk setiap kotak TTD.
+     - Lakukan *Smart Bypass* jika pembuat dokumen adalah penandatangan di step tersebut.
+   - **Jika Tanpa Kotak TTD**:
+     - Buat 1 step approval sistemik: Kadiv (di Pusat) atau PIC Klinik (di Cabang).
+   - Aktifkan Step 1 (`status = 'pending'`) dan kirim notifikasi hanya ke approver Step 1.
+
+2. **`advanceApprovalStep(DocumentApprovalStep $step, User $actor, ?string $notes = null): void`**:
+   - Tandai step aktif menjadi `approved`.
+   - Panggil prosesor stempel/tanda tangan untuk menempelkan gambar TTD pada file dokumen.
+   - Cek step berikutnya:
+     - **Jika ada step selanjutnya**: Ubah status menjadi `pending`, kirim notifikasi ke approver berikutnya.
+     - **Jika tidak ada step lagi (Selesai)**:
+       - Finalisasi dokumen via `VersionService::approve()`.
+       - Jika dokumen **tidak memiliki kotak TTD Direktur** $\rightarrow$ kirim notifikasi tembusan (*To Know*) ke Direktur PT dan set `director_notified_at = now()`.
+
+3. **`rejectApprovalStep(DocumentApprovalStep $step, User $actor, string $reason): void`**:
+   - Tandai step menjadi `rejected`, batalkan sisa step.
+   - Panggil `VersionService::reject()`.
+   - Kirim notifikasi penolakan ke Author.
+
+---
+
+### 4. Controller Layer
+
+#### [MODIFY] [ApprovalController.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/app/Http/Controllers/ApprovalController.php)
+- Penyesuaian antrean persetujuan pending berdasarkan step aktif di `document_approval_steps`.
+- Modifikasi endpoint `approve()` & `reject()`.
+
+#### [MODIFY] [DirectorDocumentController.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/app/Http/Controllers/DirectorDocumentController.php)
+- Menambahkan tab view: **"Tembusan Masuk / Dokumen Rilis (Only To Know)"**.
+- Menambahkan endpoint `acknowledgeRead(Document $document)`.
+
+#### [MODIFY] [OnlyOfficeController.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/app/Http/Controllers/OnlyOfficeController.php) / [DocumentController.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/app/Http/Controllers/DocumentController.php)
+- Saat submit persetujuan $\rightarrow$ panggil `ApprovalRoutingService::compileWorkflowFromSignatures()`.
+
+---
+
+### 5. Views & UI Layer
+
+#### [NEW] [approval-stepper.blade.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/resources/views/components/approval-stepper.blade.php)
+Komponen visual stepper di halaman detail dokumen (`documents/show.blade.php`):
+- Menampilkan status setiap kotak TTD:
+  - `[✓] Step 1: dr. Budi (Staff) - Selesai`
+  - `[⏳] Step 2: drg. Rina (Kadiv/PIC Klinik) - Menunggu`
+  - `[○] Step 3: Direktur PT - Menunggu (Jika ada kotak TTD)`
+
+#### [MODIFY] [director/documents/index.blade.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/resources/views/director/documents/index.blade.php)
+- Tab Tembusan Masuk (Only To Know) untuk Direktur membaca seluruh dokumen rilis.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+1. **Signature-Driven Ordering Test** (`tests/Feature/SignatureDrivenApprovalTest.php`):
+   - Dokumen dengan TTD Staff & Kadiv $\rightarrow$ Step 1 (Staff) $\rightarrow$ Step 2 (Kadiv) $\rightarrow$ Langsung rilis & tembusan Direktur terkirim.
+   - Dokumen dengan TTD Staff, Kadiv, dan Direktur $\rightarrow$ Step 1 $\rightarrow$ Step 2 $\rightarrow$ Step 3 (Direktur) $\rightarrow$ Rilis setelah Direktur tanda tangan.
+   - Dokumen tanpa TTD $\rightarrow$ 1 Step Kadiv/PIC Klinik $\rightarrow$ Rilis.
+2. Eksekusi: `php artisan test --filter=SignatureDrivenApprovalTest`

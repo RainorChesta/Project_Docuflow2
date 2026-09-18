@@ -1,0 +1,182 @@
+# Implementation Plan: Hierarchical Multi-Tier Approval System (Docuflow CMH)
+
+Sistem **Hierarchical Multi-Tier Approval** mentransformasikan alur persetujuan dokumen Docuflow menjadi alur kerja berjenjang (*multi-stage sequential state machine*) yang sepenuhnya mendukung struktur organisasi **PT Citra Medika Hospitalita (CMH)**:
+- **Kantor Pusat (PT)**: 6 Divisi Korporat (Kadiv $\rightarrow$ [Opsional] Direktur PT).
+- **Klinik Cabang (Branch)**: 22 Unit Kerja dalam 3 Kelompok (PIC Unit $\rightarrow$ PIC Klinik $\rightarrow$ [Opsional] Direktur PT).
+
+---
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Arsitektur & Konfigurasi Kunci yang Ditetapkan:**
+> 1. **Pemetaan Organisasi**:
+>    - **Kantor Pusat (`is_pusat = true`)**: Menggunakan tabel `divisions` (HRD, GA, Keuangan, Audit Internal, Data & IT, Kesekretariatan).
+>    - **Klinik Cabang (`is_pusat = false`)**: Menggunakan tabel `unit_kerjas` (22 Unit Kerja: 9 Pelayanan Medis, 7 Tim Mutu/Akreditasi, 6 Administrasi Cabang).
+> 2. **Multi-PIC Assignment**:
+>    - Setiap Unit Kerja di cabang memiliki PIC yang dapat ditugaskan di Master Unit Kerja / Cabang.
+>    - Saat membuat dokumen, sistem melakukan **Smart Pre-Select** PIC peninjau berdasarkan Unit Kerja yang dipilih.
+> 3. **Smart Bypass**: Jika pembuat dokumen (*Author*) adalah Kadiv atau PIC Unit, tahap *Acknowledge* dilewati otomatis untuk mencegah *self-approval*.
+> 4. **Konfigurasi Independen di Master Tipe Dokumen**:
+>    - Admin dapat mengatur tingkat persetujuan akhir (*Cukup Kadiv/PIC Klinik* vs *Wajib Direktur PT*) secara terpisah untuk Pusat dan Cabang.
+
+---
+
+## Proposed Changes
+
+### 1. Database & Migrations
+
+#### [NEW] [2026_09_19_000001_create_document_approval_steps_table.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/database/migrations/2026_09_19_000001_create_document_approval_steps_table.php)
+Tabel pencatatan antrean tahapan persetujuan per versi dokumen:
+- `id`, `document_id`, `version_id`
+- `step_order` (1, 2, 3)
+- `step_type` (`kadiv_acknowledge`, `pic_unit_acknowledge`, `pic_klinik_approval`, `director_approval`)
+- `step_name` ("Verifikasi Kadiv HRD", "Verifikasi PIC Pelayanan Farmasi", "Pengesahan Kepala Cabang", dll.)
+- `assigned_user_id` (User spesifik yang ditugaskan)
+- `assigned_role` (Role jika bersifat umum: `head`, `direktur`, `admin`)
+- `status` (`waiting`, `pending`, `approved`, `rejected`, `bypassed`)
+- `action_by_id`, `action_at`, `notes`
+- `timestamps` & indeks performa
+
+#### [NEW] [2026_09_19_000002_add_approval_matrix_to_document_types_table.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/database/migrations/2026_09_19_000002_add_approval_matrix_to_document_types_table.php)
+Menambahkan kolom konfigurasi pada tabel `document_types`:
+- `pusat_final_level` (`kadiv_only`, `director`) — default `kadiv_only`
+- `cabang_final_level` (`pic_klinik_only`, `director`) — default `pic_klinik_only`
+
+#### [NEW] [2026_09_19_000003_add_pic_columns_to_branches_and_units_tables.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/database/migrations/2026_09_19_000003_add_pic_columns_to_branches_and_units_tables.php)
+- Menambahkan `pic_klinik_id` ke tabel `branches` (Penanggung Jawab / Kepala Cabang).
+- Menambahkan `pic_user_id` ke tabel `unit_kerjas` (PIC / Koordinator Unit Kerja di Cabang).
+
+---
+
+### 2. Model & Relasi Eloquent
+
+#### [NEW] [DocumentApprovalStep.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/app/Models/DocumentApprovalStep.php)
+- Model representasi tahapan persetujuan.
+- Relasi: `document()`, `version()`, `assignedUser()`, `actionBy()`.
+- Scopes: `scopePending()`, `scopeWaiting()`, `scopeForUser($user)`.
+
+#### [MODIFY] [Branch.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/app/Models/Branch.php)
+- Relasi `picKlinik(): BelongsTo` (User penanggung jawab klinik).
+- Helper method: `availablePics(): Collection` (daftar seluruh PIC unit kerja aktif di cabang).
+
+#### [MODIFY] [UnitKerja.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/app/Models/UnitKerja.php)
+- Relasi `picUser(): BelongsTo` (User penanggung jawab unit kerja).
+
+#### [MODIFY] [DocumentType.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/app/Models/DocumentType.php)
+- Penambahan atribut `$fillable`: `pusat_final_level`, `cabang_final_level`.
+
+#### [MODIFY] [Document.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/app/Models/Document.php)
+- Relasi `approvalSteps(): HasMany`
+- Helper methods: `currentApprovalStep()`, `canBeApprovedBy(User $user)`.
+
+#### [MODIFY] [DocumentVersion.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/app/Models/DocumentVersion.php)
+- Relasi `approvalSteps(): HasMany`
+- Sinkronisasi status state machine (`draft`, `pending_acknowledge`, `pending_approval`, `pending_director`, `approved`, `rejected`).
+
+---
+
+### 3. Service Layer (Workflow Engine)
+
+#### [MODIFY] [ApprovalRoutingService.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/app/Services/ApprovalRoutingService.php)
+Implementasi logika orkestrasi alur persetujuan:
+
+1. **`initializeWorkflow(Document $document, DocumentVersion $version, User $creator, ?int $selectedPicId = null): void`**:
+   - Deteksi Lokasi: `$isPusat = $document->branch?->is_pusat ?? true;`
+   - **Alur Kantor Pusat**:
+     - Step 1: `Kadiv Pusat` (Divisi terkait). *Jika pembuat adalah Kadiv $\rightarrow$ status = `bypassed`.*
+     - Step 2: `Direktur PT` (Hanya dibuat jika `pusat_final_level === 'director'`).
+   - **Alur Klinik Cabang**:
+     - Step 1: `PIC Unit Kerja Terkait` (`$selectedPicId` atau `$unitKerja->pic_user_id`). *Jika pembuat adalah PIC Unit $\rightarrow$ status = `bypassed`.*
+     - Step 2: `PIC Klinik` (`$branch->pic_klinik_id`). *Jika pembuat adalah PIC Klinik $\rightarrow$ status = `bypassed`.*
+     - Step 3: `Direktur PT` (Hanya dibuat jika `cabang_final_level === 'director'`).
+   - Aktifkan step pertama yang belum di-bypass menjadi `status = 'pending'`.
+   - Update status dokumen/versi dan kirim notifikasi ke peninjau pertama.
+
+2. **`advanceApproval(DocumentApprovalStep $step, User $actor, ?string $notes = null): void`**:
+   - Set step saat ini menjadi `approved`, isi `action_by_id`, `action_at`, `notes`.
+   - Cari step berikutnya (`step_order > $step->step_order` & `status != 'bypassed'`):
+     - **Jika ada step selanjutnya**: Ubah status step tersebut menjadi `pending`, update status dokumen (`pending_approval` atau `pending_director`), dan kirim notifikasi ke approver berikutnya.
+     - **Jika tidak ada step lagi (Selesai)**: Panggil `VersionService::approve()` $\rightarrow$ status dokumen menjadi `approved` (Final & Sah).
+
+3. **`rejectApproval(DocumentApprovalStep $step, User $actor, string $reason): void`**:
+   - Set step menjadi `rejected`.
+   - Batalkan sisa step berikutnya (`cancelled`).
+   - Panggil `VersionService::reject()` $\rightarrow$ status dokumen & versi menjadi `rejected`.
+   - Kirim notifikasi penolakan beserta alasan ke pembuat dokumen (*Author*).
+
+---
+
+### 4. Controller Layer
+
+#### [MODIFY] [ApprovalController.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/app/Http/Controllers/ApprovalController.php)
+- Penyesuaian `getPendingVersionsQuery($user)` agar mengambil dokumen di mana user aktif sebagai `assigned_user_id` atau memenuhi `assigned_role` pada `document_approval_steps` yang berstatus `pending`.
+- Endpoint `approve()` $\rightarrow$ memanggil `ApprovalRoutingService::advanceApproval()`.
+- Endpoint `reject()` $\rightarrow$ memanggil `ApprovalRoutingService::rejectApproval()`.
+
+#### [MODIFY] [DocumentController.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/app/Http/Controllers/DocumentController.php)
+- Method `submitForApproval(Request $request, Document $document)`: Menerima request pengajuan persetujuan dan meneruskan `pic_user_id` ke `ApprovalRoutingService`.
+
+#### [MODIFY] [Admin/BranchController.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/app/Http/Controllers/Admin/BranchController.php)
+- Penanganan input `pic_klinik_id` saat create/edit cabang operasional.
+
+#### [MODIFY] [Admin/UnitKerjaController.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/app/Http/Controllers/Admin/UnitKerjaController.php)
+- Penanganan input `pic_user_id` per unit kerja di cabang.
+
+#### [MODIFY] [Admin/DocumentTypeController.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/app/Http/Controllers/Admin/DocumentTypeController.php)
+- Penanganan opsi `pusat_final_level` dan `cabang_final_level`.
+
+---
+
+### 5. Views & UI Layer
+
+#### [NEW] [approval-stepper.blade.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/resources/views/components/approval-stepper.blade.php)
+Komponen visual stepper di halaman detail dokumen (`documents.show`):
+- Menampilkan visual progress tahapan:
+  - `[✓] Step 1: drg. Maya (PIC Poli Gigi) - Disetujui (18 Sep 2026, 10:15)`
+  - `[⏳] Step 2: drg. Rina (PIC Klinik) - Menunggu Persetujuan`
+  - `[○] Step 3: Direktur PT - Menunggu Tahap Sebelumnya`
+
+#### [NEW] [submit-approval-modal.blade.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/resources/views/documents/partials/submit-approval-modal.blade.php)
+Modal pop-up interaktif saat klik "Ajukan Persetujuan":
+- Menampilkan info alur persetujuan yang akan dijalani.
+- Dropdown pemilihan PIC Unit Peninjau (otomatis ter-preselect sesuai Unit Kerja dokumen).
+- Form catatan pengajuan untuk peninjau.
+
+#### [MODIFY] [admin/document-types/create.blade.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/resources/views/admin/document-types/create.blade.php) & [edit.blade.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/resources/views/admin/document-types/edit.blade.php)
+- Radio button alur Pusat (`Cukup Kadiv` vs `Wajib Direktur PT`) dan alur Cabang (`Cukup PIC Klinik` vs `Wajib Direktur PT`).
+
+#### [MODIFY] [admin/branches/create.blade.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/resources/views/admin/branches/create.blade.php) & [edit.blade.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/resources/views/admin/branches/edit.blade.php)
+- Dropdown pemilihan PIC Klinik (hanya muncul jika bukan Pusat).
+
+#### [MODIFY] [admin/unit-kerjas/index.blade.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/resources/views/admin/unit-kerjas/index.blade.php) & [edit.blade.php](file:///d:/Project/Intern%20CMH/Project_Docuflow2/resources/views/admin/unit-kerjas/edit.blade.php)
+- Kolom & dropdown penugasan PIC per unit kerja.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+1. **Pusat Hierarchical Tests** (`tests/Feature/HierarchicalApprovalPusatTest.php`):
+   - Skenario 1: Staff Pusat $\rightarrow$ Kadiv (Cukup Kadiv) $\rightarrow$ Approved.
+   - Skenario 2: Staff Pusat $\rightarrow$ Kadiv $\rightarrow$ Direktur PT (Wajib Direktur) $\rightarrow$ Approved.
+   - Skenario 3: Kadiv membuat dokumen Pusat (Smart Bypass ke Direktur).
+2. **Cabang Hierarchical Tests** (`tests/Feature/HierarchicalApprovalCabangTest.php`):
+   - Skenario 1: Staff Cabang $\rightarrow$ PIC Unit Farmasi $\rightarrow$ PIC Klinik $\rightarrow$ Approved.
+   - Skenario 2: Staff Cabang $\rightarrow$ PIC Unit $\rightarrow$ PIC Klinik $\rightarrow$ Direktur PT $\rightarrow$ Approved.
+   - Skenario 3: Pemilihan PIC dari beberapa pilihan dalam 1 cabang.
+   - Skenario 4: Penolakan di Step 2 $\rightarrow$ Dokumen rejected & status berhenti.
+3. Eksekusi: `php artisan test --filter=HierarchicalApproval`
+
+### Manual Verification
+1. **Pengaturan Master Data Admin**:
+   - Buka `/admin/branches` dan tetapkan PIC Klinik Surabaya.
+   - Buka `/admin/unit-kerjas` dan tetapkan PIC untuk Unit Farmasi dan Unit Gigi.
+   - Buka `/admin/document-types` dan atur SOP = Cukup PIC Klinik, SK = Wajib Direktur PT.
+2. **Uji Coba Alur User Cabang**:
+   - Login sebagai Staff Farmasi Cabang Surabaya $\rightarrow$ Buat dokumen SOP Farmasi $\rightarrow$ Klik Ajukan Approval.
+   - Verifikasi dropdown otomatis mengarah ke PIC Farmasi.
+   - Login sebagai PIC Farmasi $\rightarrow$ Setujui dokumen $\rightarrow$ Verifikasi dokumen berpindah ke antrean PIC Klinik.
+   - Login sebagai PIC Klinik $\rightarrow$ Setujui dokumen $\rightarrow$ Verifikasi dokumen langsung Final Approved.
+3. **Uji Coba Penolakan**:
+   - Lakukan penolakan pada salah satu tahap dan verifikasi catatan alasan tampil pada halaman detail dokumen pembuat.

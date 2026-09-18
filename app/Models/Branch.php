@@ -17,6 +17,7 @@ class Branch extends Model
         'name',
         'is_pusat',
         'code',
+        'pic_klinik_id',
     ];
 
     public function setNameAttribute($value): void
@@ -41,6 +42,11 @@ class Branch extends Model
         return $this->belongsTo(Company::class);
     }
 
+    public function picKlinik(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'pic_klinik_id');
+    }
+
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class)->withTimestamps();
@@ -54,6 +60,24 @@ class Branch extends Model
     public function divisions(): HasMany
     {
         return $this->hasMany(Division::class);
+    }
+
+    public function unitKerjas(): HasMany
+    {
+        return $this->hasMany(UnitKerja::class, 'cabang_id');
+    }
+
+    /**
+     * Get all active PIC users belonging to unit kerjas in this branch.
+     */
+    public function availablePics()
+    {
+        return User::whereIn('id', function ($query) {
+            $query->select('pic_user_id')
+                ->from('unit_kerjas')
+                ->where('cabang_id', $this->id)
+                ->whereNotNull('pic_user_id');
+        })->get();
     }
 
 

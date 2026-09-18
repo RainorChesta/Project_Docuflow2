@@ -229,5 +229,73 @@ class ShareLinkCrossBranchTest extends TestCase
         $doc->refresh();
         $this->assertSame(Document::VISIBILITY_GENERAL, $doc->visibility);
     }
+
+    public function test_cross_branch_distributed_document_shows_in_general_documents_for_target_branch_user(): void
+    {
+        $doc = $this->createDocInCompanyA('Dokumen Lintas Cabang Alfa ke Beta');
+        
+        // Owner (User A) distributes document to Company B / Branch B
+        $response = $this->actingAs($this->userA)->patch(route('documents.update-visibility', $doc), [
+            'visibility' => 'general',
+            'target_branch_ids' => [$this->branchA->id, $this->branchB->id],
+        ]);
+        $response->assertRedirect();
+
+        // User B (in Branch B) accesses Dokumen Umum (type=general)
+        $generalResp = $this->actingAs($this->userB)
+            ->withSession([
+                'active_company_id' => $this->companyB->id,
+                'active_branch_id' => $this->branchB->id,
+            ])
+            ->get(route('documents.index', ['type' => 'general']));
+
+        $generalResp->assertOk();
+        $generalResp->assertSee('Dokumen Lintas Cabang Alfa ke Beta');
+
+        // User B can also view the document detail page
+        $showResp = $this->actingAs($this->userB)
+            ->withSession([
+                'active_company_id' => $this->companyB->id,
+                'active_branch_id' => $this->branchB->id,
+            ])
+            ->get(route('documents.show', $doc));
+
+        $showResp->assertOk();
+        $showResp->assertSee('Dokumen Lintas Cabang Alfa ke Beta');
+    }
+
+    public function test_admin_in_global_context_sees_general_documents_from_all_branches(): void
+    {
+        $admin = User::factory()->create(['system_role' => 'admin']);
+        $docA = $this->createDocInCompanyA('Dokumen Umum Cabang Alfa', Document::VISIBILITY_GENERAL);
+
+        // Admin visits General Documents without active branch (global)
+        $adminResp = $this->actingAs($admin)->get(route('documents.index', ['type' => 'general']));
+        $adminResp->assertOk();
+        $adminResp->assertSee('Dokumen Umum Cabang Alfa');
+    }
+
+    public function test_document_distributed_via_distribution_controller_appears_in_target_branch_general_documents(): void
+    {
+        $doc = $this->createDocInCompanyA('Dokumen Distribusi Langsung');
+
+        // Distribute to Branch B
+        $distResp = $this->actingAs($this->userA)->post(route('distributions.store', $doc), [
+            'target_branch_ids' => [$this->branchB->id],
+        ]);
+        $distResp->assertRedirect();
+
+        // User B sees it in General Documents
+        $generalResp = $this->actingAs($this->userB)
+            ->withSession([
+                'active_company_id' => $this->companyB->id,
+                'active_branch_id' => $this->branchB->id,
+            ])
+            ->get(route('documents.index', ['type' => 'general']));
+
+        $generalResp->assertOk();
+        $generalResp->assertSee('Dokumen Distribusi Langsung');
+    }
 }
+
 

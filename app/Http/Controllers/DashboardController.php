@@ -27,11 +27,19 @@ class DashboardController extends Controller
 
             if (!$user->isAdmin()) {
                 if ($activeBranchId) {
-                    $searchQuery->where('branch_id', $activeBranchId);
+                    $searchQuery->where(function ($q) use ($activeBranchId, $activeCompanyId) {
+                        $q->where('branch_id', $activeBranchId)
+                          ->orWhere(function ($sub) use ($activeCompanyId) {
+                              $sub->whereNull('branch_id')
+                                  ->where('company_id', $activeCompanyId);
+                          })
+                          ->orWhereHas('distributions', fn($dq) => $dq->where('target_branch_id', $activeBranchId));
+                    });
                 } elseif ($activeCompanyId) {
                     $searchQuery->where(function ($q) use ($activeCompanyId) {
                         $q->where('company_id', $activeCompanyId)
-                          ->orWhereHas('branch', fn($b) => $b->where('company_id', $activeCompanyId));
+                          ->orWhereHas('branch', fn($b) => $b->where('company_id', $activeCompanyId))
+                          ->orWhereHas('distributions', fn($dq) => $dq->whereHas('targetBranch', fn($b) => $b->where('company_id', $activeCompanyId)));
                     });
                 }
             }

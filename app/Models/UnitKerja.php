@@ -14,9 +14,16 @@ class UnitKerja extends Model
     protected $table = 'unit_kerjas';
 
     protected $fillable = [
+        'cabang_id',
         'kode_unit_kerja',
         'nama_unit_kerja',
+        'pic_user_id',
     ];
+
+    public function picUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'pic_user_id');
+    }
 
     public function setKodeUnitKerjaAttribute($value): void
     {

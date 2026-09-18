@@ -62,6 +62,7 @@
                             $pendingSigRequest = $document->signatureRequests
                                 ->where('target_user_id', auth()->id())
                                 ->where('status', 'pending')
+                                ->sortByDesc('id')
                                 ->first();
                         @endphp
                         <div class="flex flex-wrap items-center gap-2">

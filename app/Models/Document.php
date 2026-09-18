@@ -21,6 +21,7 @@ class Document extends Model
         'general_access', 'link_role', 'share_token',
         'expiration_date', 'is_expired', 'is_expiration_notified', 'expiration_notif_status',
         'approver_id', 'approver_role',
+        'director_notified_at', 'director_read_at', 'director_acknowledged_by_id',
     ];
 
     protected function casts(): array
@@ -34,6 +35,8 @@ class Document extends Model
             'summary_completed_at' => 'datetime',
             'expiration_date' => 'date',
             'paper_margin' => 'array',
+            'director_notified_at' => 'datetime',
+            'director_read_at' => 'datetime',
         ];
     }
 
@@ -213,6 +216,57 @@ class Document extends Model
         return $this->hasMany(SignatureRequest::class);
     }
 
+    public function approvalSteps(): HasMany
+    {
+        return $this->hasMany(DocumentApprovalStep::class);
+    }
+
+    public function directorAcknowledgedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'director_acknowledged_by_id');
+    }
+
+    /**
+     * Get the active pending approval step for this document's latest pending version.
+     */
+    public function currentApprovalStep(): ?DocumentApprovalStep
+    {
+        $version = $this->displayVersion();
+        if (!$version) {
+            return null;
+        }
+
+        return DocumentApprovalStep::where('version_id', $version->id)
+            ->where('status', 'pending')
+            ->first();
+    }
+
+    /**
+     * Check if this document contains a signature request assigned to a Director.
+     */
+    public function hasDirectorSignature(): bool
+    {
+        return $this->signatureRequests()
+            ->whereHas('targetUser', fn($q) => $q->where('system_role', 'direktur'))
+            ->exists();
+    }
+
+    /**
+     * Check if director has acknowledged reading this document.
+     */
+    public function isDirectorRead(): bool
+    {
+        return !is_null($this->director_read_at);
+    }
+
+    /**
+     * Check if director was notified about this released document.
+     */
+    public function isDirectorNotified(): bool
+    {
+        return !is_null($this->director_notified_at);
+    }
+
     public function divisionShares(): HasMany
     {
         return $this->hasMany(DocumentDivisionShare::class);
@@ -309,6 +363,14 @@ class Document extends Model
                         $q->orWhereIn('company_id', $companyIds)
                           ->orWhereHas('branch', fn($b) => $b->whereIn('company_id', $companyIds));
                     }
+                    $q->orWhereHas('distributions', fn(Builder $dist) => $dist->where(function ($dq) use ($branchIds, $companyIds) {
+                        if (!empty($branchIds)) {
+                            $dq->whereIn('target_branch_id', $branchIds);
+                        }
+                        if (!empty($companyIds)) {
+                            $dq->orWhereHas('targetBranch', fn($tb) => $tb->whereIn('company_id', $companyIds));
+                        }
+                    }));
                 });
             }
             return $query;
@@ -321,6 +383,16 @@ class Document extends Model
             if (!empty($divisionIds)) {
                 $q->orWhereHas('divisionShares', fn(Builder $ds) => $ds->whereIn('division_id', $divisionIds));
             }
+
+            // Cross-branch distributed documents to user's branches or companies
+            $q->orWhereHas('distributions', fn(Builder $dist) => $dist->where(function ($dq) use ($branchIds, $companyIds) {
+                if (!empty($branchIds)) {
+                    $dq->whereIn('target_branch_id', $branchIds);
+                }
+                if (!empty($companyIds)) {
+                    $dq->orWhereHas('targetBranch', fn($tb) => $tb->whereIn('company_id', $companyIds));
+                }
+            }));
 
             // Documents within the user's accessible branch/company scope
             $q->orWhere(function (Builder $inScope) use ($user, $divisionIds, $unitKerjaIds, $branchIds, $companyIds) {
@@ -336,7 +408,7 @@ class Document extends Model
                     });
                 }
 
-                $inScope->where(function (Builder $sub) use ($user, $divisionIds, $unitKerjaIds, $branchIds, $companyIds) {
+                $inScope->where(function (Builder $sub) use ($user, $divisionIds, $unitKerjaIds) {
                     $sub->where('visibility', self::VISIBILITY_GENERAL)
                         ->orWhere('owner_id', $user->id)
                         ->orWhere(function (Builder $d) use ($divisionIds, $unitKerjaIds) {
@@ -349,15 +421,7 @@ class Document extends Model
                                       $w->orWhereIn('unit_kerja_id', $unitKerjaIds);
                                   }
                               });
-                        })
-                        ->orWhereHas('distributions', fn(Builder $dist) => $dist->where(function ($dq) use ($branchIds, $companyIds) {
-                            if (!empty($branchIds)) {
-                                $dq->whereIn('target_branch_id', $branchIds);
-                            }
-                            if (!empty($companyIds)) {
-                                $dq->orWhereHas('targetBranch', fn($tb) => $tb->whereIn('company_id', $companyIds));
-                            }
-                        }));
+                        });
                 });
             });
         });

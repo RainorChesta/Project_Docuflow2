@@ -33,6 +33,14 @@ class DocumentDistributionController extends Controller
             return back()->with('error', 'Cannot determine source branch for distribution.');
         }
 
+        // When distributing a document across branches, ensure visibility is general
+        if ($document->visibility !== Document::VISIBILITY_GENERAL) {
+            $document->update([
+                'visibility' => Document::VISIBILITY_GENERAL,
+                'is_public' => true,
+            ]);
+        }
+
         foreach ($validated['target_branch_ids'] as $targetBranchId) {
             // Prevent duplicate distribution
             $exists = DocumentDistribution::where('document_id', $document->id)

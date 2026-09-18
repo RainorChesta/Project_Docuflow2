@@ -71,6 +71,11 @@ class DocumentVersion extends Model
         return $this->belongsTo(User::class, 'author_id');
     }
 
+    public function approvalSteps(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(DocumentApprovalStep::class, 'version_id');
+    }
+
     public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewer_id');

@@ -127,8 +127,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/context/switch', [\App\Http\Controllers\ContextSwitchController::class, 'switch'])->name('context.switch');
     Route::get('/companies/{company}/branches', [\App\Http\Controllers\ContextSwitchController::class, 'branchesForCompany'])->name('companies.branches');
 
-    // Director Accordion Browsing
+    // Director Accordion Browsing & Tembusan Feed
     Route::get('/director/documents', [\App\Http\Controllers\DirectorDocumentController::class, 'index'])->name('director.documents.index');
+    Route::post('/director/documents/{document}/acknowledge', [\App\Http\Controllers\DirectorDocumentController::class, 'acknowledgeRead'])->name('director.documents.acknowledge');
 
     // Trash (Sampah Dokumen) - Accessible to all roles
     Route::get('/trash', [\App\Http\Controllers\TrashController::class, 'index'])->name('trash.index');
@@ -152,6 +153,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/templates/create-manual', [DocumentTemplateController::class, 'createManual'])->name('templates.create-manual');
         Route::post('/templates/manual', [DocumentTemplateController::class, 'storeManual'])->name('templates.store-manual');
         Route::get('/templates/{template}/editor', [DocumentTemplateController::class, 'editor'])->name('templates.editor');
+        Route::post('/templates/{template}/finish-editing', [DocumentTemplateController::class, 'finishEditing'])->name('templates.finish-editing');
         Route::resource('templates', DocumentTemplateController::class)->except(['show']);
         Route::patch('/templates/{template}/toggle-status', [DocumentTemplateController::class, 'toggleStatus'])->name('templates.toggle-status');
         Route::get('/templates/{template}/download', [DocumentTemplateController::class, 'download'])->name('templates.download');

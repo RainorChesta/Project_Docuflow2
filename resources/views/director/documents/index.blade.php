@@ -4,6 +4,23 @@
     <div class="py-6 space-y-6">
         <div class="max-w-7xl mx-auto w-full space-y-6">
 
+            {{-- Tab Navigation for Director --}}
+            <div class="flex items-center gap-2 border-b border-base-300 pb-2">
+                <a href="{{ route('director.documents.index', ['tab' => 'all']) }}" 
+                   class="btn btn-sm {{ ($tab ?? 'all') === 'all' ? 'btn-primary' : 'btn-ghost' }} gap-2">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+                    {{ __('Semua Direktori Dokumen') }}
+                </a>
+                <a href="{{ route('director.documents.index', ['tab' => 'tembusan']) }}" 
+                   class="btn btn-sm {{ ($tab ?? 'all') === 'tembusan' ? 'btn-primary' : 'btn-ghost' }} gap-2">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                    {{ __('Tembusan Masuk (Only To Know)') }}
+                    @if(!empty($unreadTembusanCount) && $unreadTembusanCount > 0)
+                        <span class="badge badge-warning badge-xs font-bold">{{ $unreadTembusanCount }}</span>
+                    @endif
+                </a>
+            </div>
+
             {{-- 1 & 2. Direktori and Search/Filter Card --}}
             <div class="bg-base-100 border border-base-300 rounded-2xl shadow-sm flex flex-col">
                 {{-- Breadcrumbs Bar --}}
