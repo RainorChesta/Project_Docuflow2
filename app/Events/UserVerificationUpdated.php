@@ -43,9 +43,9 @@ class UserVerificationUpdated implements ShouldBroadcastNow
      */
     public function broadcastWith(): array
     {
-        $this->user->load(['divisions', 'companies', 'branches']);
+        $this->user->load(['unitKerjas', 'companies', 'branches']);
 
-        $hasDivision = !empty($this->user->division_id) || $this->user->divisions->isNotEmpty();
+        $hasUnitKerja = !empty($this->user->unit_kerja_id) || $this->user->unitKerjas->isNotEmpty();
         $hasCompany = $this->user->companies->isNotEmpty();
         $hasBranch = $this->user->branches->isNotEmpty();
         $isVerified = $this->user->isVerified();
@@ -53,7 +53,8 @@ class UserVerificationUpdated implements ShouldBroadcastNow
         return [
             'user_id' => $this->user->id,
             'is_verified' => $isVerified,
-            'has_division' => $hasDivision,
+            'has_unit_kerja' => $hasUnitKerja,
+            'has_division' => $hasUnitKerja,
             'has_company' => $hasCompany,
             'has_branch' => $hasBranch,
             'has_company_and_branch' => ($hasCompany && $hasBranch),

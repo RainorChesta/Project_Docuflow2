@@ -23,8 +23,8 @@
     </head>
     <body class="h-screen max-h-[100dvh] w-full bg-gradient-to-br from-primary/10 via-base-200 to-secondary/10 font-sans antialiased flex flex-col justify-between p-3 sm:p-4 md:p-6 overflow-y-auto [@media(min-height:600px)_and_(min-width:768px)]:overflow-y-hidden"
           x-data="{
-              hasDivision: {{ !empty($hasDivision) ? 'true' : 'false' }},
-              divisionNames: {{ Js::from($divisionNames ?? []) }},
+              hasUnitKerja: {{ !empty($hasUnitKerja) ? 'true' : 'false' }},
+              unitKerjaNames: {{ Js::from($unitKerjaNames ?? []) }},
               hasCompany: {{ !empty($hasCompany) ? 'true' : 'false' }},
               companyNames: {{ Js::from($companyNames ?? []) }},
               hasBranch: {{ !empty($hasBranch) ? 'true' : 'false' }},
@@ -40,7 +40,7 @@
               get progressPercent() {
                   if (this.isVerified) return 100;
                   let completed = 1; // registration done
-                  if (this.hasDivision) completed++;
+                  if (this.hasUnitKerja) completed++;
                   if (this.hasCompanyAndBranch) completed++;
                   return Math.round((completed / 3) * 100);
               },
@@ -57,11 +57,11 @@
                   })
                   .then(res => res.json())
                   .then(data => {
-                      const prevDiv = this.hasDivision;
+                      const prevUk = this.hasUnitKerja;
                       const prevCompBranch = this.hasCompanyAndBranch;
 
-                      this.hasDivision = data.has_division;
-                      this.divisionNames = data.division_names || [];
+                      this.hasUnitKerja = data.has_unit_kerja;
+                      this.unitKerjaNames = data.unit_kerja_names || [];
                       this.hasCompany = data.has_company;
                       this.companyNames = data.company_names || [];
                       this.hasBranch = data.has_branch;
@@ -69,8 +69,8 @@
                       this.isVerified = data.is_verified;
 
                       // Notifications when steps complete or on manual refresh
-                      if (!prevDiv && data.has_division) {
-                          this.statusNotice = '{{ __('Divisi Anda telah berhasil ditetapkan!') }}';
+                      if (!prevUk && data.has_unit_kerja) {
+                          this.statusNotice = '{{ __('Unit Kerja Anda telah berhasil ditetapkan!') }}';
                       } else if (!prevCompBranch && (data.has_company && data.has_branch)) {
                           this.statusNotice = '{{ __('Perusahaan & Cabang Anda telah berhasil ditugaskan!') }}';
                       } else if (manual && !data.is_verified) {
@@ -177,7 +177,7 @@
                         </span>
                         <div class="text-[11.5px] sm:text-xs text-base-content/85 leading-relaxed">
                             <span x-show="!isVerified">
-                                {!! __('Akun Anda sedang <strong class="text-base-content font-semibold">menunggu verifikasi oleh administrator sistem</strong>. Akses aplikasi dikunci sementara hingga penempatan divisi dan perusahaan/cabang disetujui.') !!}
+                                {!! __('Akun Anda sedang <strong class="text-base-content font-semibold">menunggu verifikasi oleh administrator sistem</strong>. Akses aplikasi dikunci sementara hingga penempatan unit kerja dan perusahaan/cabang disetujui.') !!}
                             </span>
                             <span x-show="isVerified">
                                 {!! __('Akun Anda telah <strong class="text-base-content font-semibold">berhasil diverifikasi</strong> oleh administrator sistem.') !!}
@@ -225,18 +225,18 @@
                         </div>
                     </div>
 
-                    <!-- Step 2: Division Assignment -->
+                    <!-- Step 2: Unit Kerja Assignment -->
                     <div class="flex items-center justify-between p-2 sm:p-2.5 px-3 rounded-xl border gap-2.5 sm:gap-3 transition-all duration-300"
-                         :class="hasDivision ? 'bg-base-100 dark:bg-base-200/60 border-base-200 dark:border-base-300/60' : 'bg-base-100 dark:bg-base-200/60 border-primary/30 ring-1 ring-primary/10'">
+                         :class="hasUnitKerja ? 'bg-base-100 dark:bg-base-200/60 border-base-200 dark:border-base-300/60' : 'bg-base-100 dark:bg-base-200/60 border-primary/30 ring-1 ring-primary/10'">
                         <div class="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
-                            <template x-if="hasDivision">
+                            <template x-if="hasUnitKerja">
                                 <div class="w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold shrink-0">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
                                         <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
                                     </svg>
                                 </div>
                             </template>
-                            <template x-if="!hasDivision">
+                            <template x-if="!hasUnitKerja">
                                 <div class="w-5 h-5 rounded-full bg-primary/15 text-primary flex items-center justify-center font-bold shrink-0">
                                     <span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
                                 </div>
@@ -244,21 +244,21 @@
 
                             <div class="min-w-0 flex-1">
                                 <div class="font-semibold text-base-content text-xs sm:text-[13px] leading-tight">
-                                    {{ __('Penugasan Divisi Kerja') }}
+                                    {{ __('Penugasan Unit Kerja') }}
                                 </div>
                                 <div class="text-[11px] truncate sm:whitespace-normal">
-                                    <template x-if="hasDivision">
-                                        <span class="text-emerald-600 dark:text-emerald-400 font-medium truncate" x-text="divisionNames.length > 0 ? '{{ __('Ditugaskan ke:') }} ' + divisionNames.join(', ') : '{{ __('Divisi telah ditetapkan') }}'"></span>
+                                    <template x-if="hasUnitKerja">
+                                        <span class="text-emerald-600 dark:text-emerald-400 font-medium truncate" x-text="unitKerjaNames.length > 0 ? '{{ __('Ditugaskan ke:') }} ' + unitKerjaNames.join(', ') : '{{ __('Unit Kerja telah ditetapkan') }}'"></span>
                                     </template>
-                                    <template x-if="!hasDivision">
-                                        <span class="text-base-content/60 truncate">{{ __('Menunggu penetapan divisi oleh Admin.') }}</span>
+                                    <template x-if="!hasUnitKerja">
+                                        <span class="text-base-content/60 truncate">{{ __('Menunggu penetapan unit kerja oleh Admin.') }}</span>
                                     </template>
                                 </div>
                             </div>
                         </div>
 
                         <div class="shrink-0">
-                            <template x-if="hasDivision">
+                            <template x-if="hasUnitKerja">
                                 <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 whitespace-nowrap">
                                     <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
                                         <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
@@ -266,7 +266,7 @@
                                     {{ __('Selesai') }}
                                 </span>
                             </template>
-                            <template x-if="!hasDivision">
+                            <template x-if="!hasUnitKerja">
                                 <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-medium bg-primary/10 text-primary border border-primary/25 whitespace-nowrap">
                                     <span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
                                     {{ __('Menunggu Admin') }}
@@ -277,7 +277,7 @@
 
                     <!-- Step 3: Company & Branch Assignment -->
                     <div class="flex items-center justify-between p-2 sm:p-2.5 px-3 rounded-xl border gap-2.5 sm:gap-3 transition-all duration-300"
-                         :class="hasCompanyAndBranch ? 'bg-base-100 dark:bg-base-200/60 border-base-200 dark:border-base-300/60' : ((hasDivision && !hasCompanyAndBranch) ? 'bg-base-100 dark:bg-base-200/60 border-primary/30 ring-1 ring-primary/10' : 'bg-base-100 dark:bg-base-200/60 border-base-200 dark:border-base-300/60')">
+                         :class="hasCompanyAndBranch ? 'bg-base-100 dark:bg-base-200/60 border-base-200 dark:border-base-300/60' : ((hasUnitKerja && !hasCompanyAndBranch) ? 'bg-base-100 dark:bg-base-200/60 border-primary/30 ring-1 ring-primary/10' : 'bg-base-100 dark:bg-base-200/60 border-base-200 dark:border-base-300/60')">
                         <div class="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
                             <template x-if="hasCompanyAndBranch">
                                 <div class="w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold shrink-0">
@@ -288,9 +288,9 @@
                             </template>
                             <template x-if="!hasCompanyAndBranch">
                                 <div class="w-5 h-5 rounded-full flex items-center justify-center font-bold shrink-0"
-                                     :class="(hasCompany || hasDivision) ? 'bg-primary/15 text-primary' : 'bg-base-200 text-base-content/40'">
+                                     :class="(hasCompany || hasUnitKerja) ? 'bg-primary/15 text-primary' : 'bg-base-200 text-base-content/40'">
                                     <span class="w-1.5 h-1.5 rounded-full"
-                                          :class="(hasCompany || hasDivision) ? 'bg-primary animate-pulse' : 'bg-base-content/40'"></span>
+                                          :class="(hasCompany || hasUnitKerja) ? 'bg-primary animate-pulse' : 'bg-base-content/40'"></span>
                                 </div>
                             </template>
 

@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Branch;
 use App\Models\Company;
-use App\Models\Division;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\UnitKerja;
@@ -38,6 +37,7 @@ class SopDocumentNumberingTest extends TestCase
         $sopType = DocumentType::create([
             'code' => 'SOP',
             'name' => 'Standard Operating Procedure',
+            'category' => 'akreditasi',
         ]);
 
         $service = app(DocumentService::class);
@@ -90,7 +90,7 @@ class SopDocumentNumberingTest extends TestCase
             'nama_unit_kerja' => 'Logistik',
         ]);
 
-        $sopType = DocumentType::create(['code' => 'SOP', 'name' => 'SOP']);
+        $sopType = DocumentType::create(['code' => 'SOP', 'name' => 'SOP', 'category' => 'akreditasi']);
         $service = app(DocumentService::class);
 
         $numberA = $service->generateId(null, $sopType, $branchA, $unit11);
@@ -113,7 +113,7 @@ class SopDocumentNumberingTest extends TestCase
             'kode_unit_kerja' => '11',
             'nama_unit_kerja' => 'Unit Operasional',
         ]);
-        $sopType = DocumentType::create(['code' => 'SOP', 'name' => 'SOP']);
+        $sopType = DocumentType::create(['code' => 'SOP', 'name' => 'SOP', 'category' => 'akreditasi']);
 
         $user = User::factory()->create([
             'system_role' => 'admin',

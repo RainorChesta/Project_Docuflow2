@@ -2,14 +2,23 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Branch;
+use App\Models\Company;
 use App\Models\Document;
+use App\Models\DocumentShare;
 use App\Models\DocumentTemplate;
 use App\Models\DocumentType;
-use App\Models\Division;
+use App\Models\DocumentUnitKerjaShare;
 use App\Models\DocumentVersion;
+use App\Models\SignatureRequest;
+use App\Models\UnitKerja;
+use App\Models\User;
 use App\Services\ApprovalRoutingService;
 use App\Services\AuditService;
+use App\Services\CompanyContextService;
+use App\Services\DocumentProcessorService;
 use App\Services\DocumentService;
+use App\Services\OnlyOfficeService;
 use App\Services\QrCodeService;
 use App\Services\VersionService;
 use Illuminate\Http\JsonResponse;
@@ -17,6 +26,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
@@ -27,13 +37,13 @@ class DocumentController extends Controller
         protected VersionService $versionService,
         protected AuditService $auditService,
         protected QrCodeService $qrCodeService,
-        protected \App\Services\OnlyOfficeService $onlyOfficeService,
+        protected OnlyOfficeService $onlyOfficeService,
         protected ApprovalRoutingService $approvalRoutingService,
     ) {}
 
     private function getApprovedSignatures(Document $document): array
     {
-        return \App\Models\SignatureRequest::where('document_id', $document->id)
+        return SignatureRequest::where('document_id', $document->id)
             ->where('status', 'approved')
             ->where('is_used', false)
             ->with(['targetUser.signatures', 'requestedSignature.company'])
@@ -72,7 +82,7 @@ class DocumentController extends Controller
             return;
         }
 
-        $approvedRequests = \App\Models\SignatureRequest::where('document_id', $document->id)
+        $approvedRequests = SignatureRequest::where('document_id', $document->id)
             ->where('status', 'approved')
             ->where('is_used', false)
             ->latest('id')
@@ -83,7 +93,7 @@ class DocumentController extends Controller
             return;
         }
 
-        $processor = app(\App\Services\DocumentProcessorService::class);
+        $processor = app(DocumentProcessorService::class);
         $appliedAny = false;
 
         foreach ($approvedRequests as $req) {
@@ -132,12 +142,15 @@ class DocumentController extends Controller
             return redirect()->route('director.documents.index');
         }
 
-        // Tab selection: general | mine | division
+        // Tab selection: general | mine | unit_kerja (or legacy 'division') | shared
         $type = $request->get('type', 'general');
+        if ($type === 'division') {
+            $type = 'unit_kerja';
+        }
 
-        $query = Document::with('owner', 'division', 'company', 'branch', 'currentVersion', 'versions');
+        $query = Document::with('owner', 'unitKerja', 'company', 'branch', 'currentVersion', 'versions');
 
-        $contextService = app(\App\Services\CompanyContextService::class);
+        $contextService = app(CompanyContextService::class);
         $activeBranchId = $contextService->getActiveBranchId($user);
         $activeCompanyId = $contextService->getActiveCompanyId($user);
         $userBranchIds = $user->allBranchIds();
@@ -147,8 +160,6 @@ class DocumentController extends Controller
         $virtualFolders = [];
         $breadcrumbs = [];
 
-        // Base query - only apply strict active branch filtering if NOT in 'general' type,
-        // or if in 'general' type, we will apply specific branch filters based on the active folder.
         if (!$user->isAdmin()) {
             if ($type !== 'general' && $type !== 'shared') {
                 if ($activeBranchId && !$user->isDirector()) {
@@ -236,45 +247,40 @@ class DocumentController extends Controller
                                ->where(function ($uq) use ($userBranchIds, $userCompanyIds) {
                                    $uq->whereIn('branch_id', $userBranchIds)
                                       ->orWhereIn('company_id', $userCompanyIds);
-                               });
+                                });
                         })
                         ->orWhereHas('distributions', fn($dq) => $dq->whereIn('target_branch_id', $userBranchIds));
                     }
                 });
             }
 
-            // General documents must have an active version
             $query->whereHas('versions', fn($q) => $q->where('status', 'active'));
             
-            // Clear notifications
             $user->unreadNotifications()
                 ->where('data->type', 'document_cross_branch_received')
                 ->update(['read_at' => now()]);
         } elseif ($type === 'mine') {
-            // My Documents — semua dokumen milik user, apapun scopenya.
             $query->ownedBy($user);
         } elseif ($type === 'shared') {
-            // Shared Documents — shared directly with user or user's division, excluding owned docs.
-            $divisionIds = $user->allDivisionIds();
+            $unitKerjaIds = $user->allUnitKerjaIds();
             $query->where('owner_id', '!=', $user->id)
-                  ->where(function ($q) use ($user, $divisionIds) {
+                  ->where(function ($q) use ($user, $unitKerjaIds) {
                       $q->whereHas('shares', fn($sq) => $sq->where('user_id', $user->id));
-                      if (!empty($divisionIds)) {
-                          $q->orWhereHas('divisionShares', fn($dq) => $dq->whereIn('division_id', $divisionIds));
+                      if (!empty($unitKerjaIds)) {
+                          $q->orWhereHas('unitKerjaShares', fn($dq) => $dq->whereIn('unit_kerja_id', $unitKerjaIds));
                       }
                   })
                   ->with([
                       'shares' => fn($q) => $q->where('user_id', $user->id),
-                      'divisionShares' => fn($q) => !empty($divisionIds) ? $q->whereIn('division_id', $divisionIds) : $q,
+                      'unitKerjaShares' => fn($q) => !empty($unitKerjaIds) ? $q->whereIn('unit_kerja_id', $unitKerjaIds) : $q,
                   ]);
 
-            // Clear unread shared document notifications when viewing the shared list
             $user->unreadNotifications()
                 ->where('data->type', 'document_shared')
                 ->update(['read_at' => now()]);
         } else {
-            // Division-scoped documents of divisions the user belongs to.
-            $query->division($user);
+            // Work Unit tab
+            $query->unitKerja($user);
         }
 
         if ($search = $request->get('search')) {
@@ -284,8 +290,8 @@ class DocumentController extends Controller
             });
         }
 
-        if ($divisionId = $request->get('division_id')) {
-            $query->where('division_id', $divisionId);
+        if ($unitKerjaId = $request->get('unit_kerja_id')) {
+            $query->where('unit_kerja_id', $unitKerjaId);
         }
 
         if ($documentTypeId = $request->get('document_type_id')) {
@@ -315,7 +321,6 @@ class DocumentController extends Controller
                 $query->where('is_expired', true);
             }
         } else {
-            // Sembunyikan dokumen kedaluwarsa secara default kecuali diminta
             $query->where('is_expired', false);
         }
 
@@ -325,29 +330,25 @@ class DocumentController extends Controller
         }
 
         $documents = $query->latest()->paginate($perPage)->withQueryString();
-        $documentTypes = DocumentType::orderBy('name')->get();
+        $documentTypes = DocumentType::orderBy('category')->orderBy('name')->get();
+        $unitKerjas = $contextService->getAvailableUnitKerjas($user, $activeBranchId);
 
         $view = match ($type) {
             'mine' => 'documents.mine',
-            'division' => 'documents.division',
+            'unit_kerja', 'division' => 'documents.unit_kerja',
             'shared' => 'documents.shared_index',
             default => 'documents.general',
         };
 
-        // General documents always shows the filter toolbar.
-        // Other types already include _search unconditionally in their views.
         $showDocuments = true;
 
-        return view($view, compact('documents', 'documentTypes', 'type', 'showDocuments', 'virtualFolders', 'breadcrumbs', 'folder'));
+        return view($view, compact('documents', 'documentTypes', 'unitKerjas', 'type', 'showDocuments', 'virtualFolders', 'breadcrumbs', 'folder'));
     }
 
-    /**
-     * MS Word-style chooser page: blank document or pick a template.
-     */
     public function choose(): View
     {
         $templates = DocumentTemplate::active()->with('documentType')->orderBy('title')->get();
-        $documentTypes = DocumentType::all();
+        $documentTypes = DocumentType::orderBy('category')->orderBy('name')->get();
         
         $frequentTemplates = DocumentTemplate::active()
             ->withCount('documents')
@@ -362,55 +363,38 @@ class DocumentController extends Controller
     public function create(Request $request): View
     {
         $user = auth()->user();
-        $contextService = app(\App\Services\CompanyContextService::class);
+        $contextService = app(CompanyContextService::class);
         $activeBranchId = $contextService->getActiveBranchId($user);
-        $activeBranch = $activeBranchId ? \App\Models\Branch::with('company')->find($activeBranchId) : null;
+        $activeBranch = $activeBranchId ? Branch::with('company')->find($activeBranchId) : null;
         $availableBranches = $contextService->getAvailableBranches($user);
 
-        $divisions = ($user->isAdmin() || $user->isDirector())
-            ? Division::orderBy('name')->get()
-            : $contextService->getAvailableDivisions($user, $activeBranchId);
-        $documentTypes = DocumentType::all();
-
-        $activeDivisionId = $contextService->getActiveDivisionId($user);
-        $activeDivision = $activeDivisionId ? Division::find($activeDivisionId) : null;
+        $documentTypes = DocumentType::orderBy('category')->orderBy('name')->get();
 
         $activeUnitKerjaId = $contextService->getActiveUnitKerjaId($user);
         $activeUnitKerja = $contextService->getActiveUnitKerja($user);
 
         $companies = ($user->isAdmin() || $user->isDirector())
             ? ($user->isAdmin()
-                ? \App\Models\Company::with('branches')->orderBy('name')->get()
+                ? Company::with('branches')->orderBy('name')->get()
                 : $user->companies()->with('branches')->orderBy('name')->get())
             : collect();
 
         if ($user->isDirector() && $companies->isEmpty()) {
-            $companies = \App\Models\Company::with('branches')->orderBy('name')->get();
+            $companies = Company::with('branches')->orderBy('name')->get();
         }
 
         $unitKerjas = ($user->isAdmin() || $user->isDirector())
-            ? \App\Models\UnitKerja::orderBy('kode_unit_kerja')->get()
+            ? UnitKerja::orderBy('kode_unit_kerja')->get()
             : $contextService->getAvailableUnitKerjas($user, $activeBranchId);
         $userUnitKerjaId = $activeUnitKerjaId ?? $user->unit_kerja_id;
 
-        // If a template_id is passed via URL, load the template for auto-fill
         $selectedTemplate = null;
         $initialDocumentNumber = null;
         if ($templateId = $request->query('template_id')) {
             $selectedTemplate = DocumentTemplate::active()->with('documentType')->find($templateId);
             if ($selectedTemplate && $selectedTemplate->documentType) {
-                $isPusat = $activeBranch ? (bool) $activeBranch->is_pusat : true;
-                $userDivision = $isPusat
-                    ? (($user->isAdmin() || $user->isDirector())
-                        ? ($request->filled('division_id') ? Division::find($request->input('division_id')) : $activeDivision)
-                        : ($activeDivision ?? $divisions->first()))
-                    : null;
-                $userUnitKerja = !$isPusat
-                    ? ($activeUnitKerja ?? $unitKerjas->first())
-                    : null;
+                $userUnitKerja = $activeUnitKerja ?? $unitKerjas->first();
                 $initialDocumentNumber = $this->documentService->previewNumber(
-                    $isPusat ? 'baru' : 'lama',
-                    $userDivision,
                     $selectedTemplate->documentType,
                     $activeBranch,
                     $userUnitKerja
@@ -419,7 +403,7 @@ class DocumentController extends Controller
         }
 
         return view('documents.create', compact(
-            'divisions', 'unitKerjas', 'documentTypes', 'activeBranch', 'availableBranches', 'companies', 'selectedTemplate', 'initialDocumentNumber', 'activeDivision', 'activeDivisionId', 'activeUnitKerja', 'activeUnitKerjaId', 'userUnitKerjaId'
+            'unitKerjas', 'documentTypes', 'activeBranch', 'availableBranches', 'companies', 'selectedTemplate', 'initialDocumentNumber', 'activeUnitKerja', 'activeUnitKerjaId', 'userUnitKerjaId'
         ));
     }
 
@@ -431,37 +415,21 @@ class DocumentController extends Controller
         $validated = $request->validate([
             'document_type_id' => 'required|exists:document_types,id',
             'branch_id' => 'nullable|exists:branches,id',
-            'division_id' => 'nullable|exists:divisions,id',
             'unit_kerja_id' => 'nullable|exists:unit_kerjas,id',
-            'format_choice' => 'nullable|in:lama,baru',
         ]);
 
         $user = auth()->user();
-        $contextService = app(\App\Services\CompanyContextService::class);
+        $contextService = app(CompanyContextService::class);
         $branchId = $validated['branch_id'] ?? $contextService->getActiveBranchId($user);
-        $branch = $branchId ? \App\Models\Branch::with('company')->find($branchId) : null;
+        $branch = $branchId ? Branch::with('company')->find($branchId) : null;
 
-        $isPusat = $branch ? (bool) $branch->is_pusat : true;
-
-        $division = null;
-        $unitKerja = null;
-
-        if ($isPusat) {
-            $divisionId = $validated['division_id']
-                ?? $contextService->getActiveDivisionId($user)
-                ?? $user->division_id
-                ?? ($user->allDivisionIds()[0] ?? null);
-            $division = $divisionId ? Division::find($divisionId) : null;
-        } else {
-            $unitKerjaId = $validated['unit_kerja_id'] ?? $user->unit_kerja_id;
-            $unitKerja = $unitKerjaId ? \App\Models\UnitKerja::find($unitKerjaId) : null;
-        }
+        $unitKerjaId = $validated['unit_kerja_id'] ?? $contextService->getActiveUnitKerjaId($user) ?? $user->unit_kerja_id;
+        $unitKerja = $unitKerjaId ? UnitKerja::find($unitKerjaId) : null;
 
         $documentType = DocumentType::findOrFail($validated['document_type_id']);
-        $formatChoice = $isPusat ? 'baru' : 'lama';
 
         return response()->json([
-            'number' => $this->documentService->previewNumber($formatChoice, $division, $documentType, $branch, $unitKerja),
+            'number' => $this->documentService->previewNumber($documentType, $branch, $unitKerja),
         ]);
     }
 
@@ -532,18 +500,17 @@ class DocumentController extends Controller
         $isManualNumber = $request->boolean('is_manual_number') || ($isUpload && $request->filled('document_number'));
         $templateId = $request->input('template_id');
 
-        $contextService = app(\App\Services\CompanyContextService::class);
+        $contextService = app(CompanyContextService::class);
         $branchIds = (array) $request->input('branch_ids', []);
         $branchId = $request->input('branch_id')
             ?? (!empty($branchIds) ? $branchIds[0] : null)
             ?? $contextService->getActiveBranchId($user);
 
-        $targetBranch = $branchId ? \App\Models\Branch::find($branchId) : null;
-        $isPusat = $targetBranch ? (bool) $targetBranch->is_pusat : true;
+        $targetBranch = $branchId ? Branch::find($branchId) : null;
+        $documentType = DocumentType::findOrFail($request->input('document_type_id'));
 
         $rules = [
             'title' => 'required|string|max:255',
-            'format_choice' => 'nullable|in:lama,baru',
             'document_type_id' => 'required|exists:document_types,id',
             'branch_id' => 'nullable|exists:branches,id',
             'branch_ids' => 'nullable|array',
@@ -553,12 +520,11 @@ class DocumentController extends Controller
             'template_id' => 'nullable|exists:document_templates,id',
         ];
 
-        if ($isPusat) {
-            $rules['division_id'] = 'required|exists:divisions,id';
-            $rules['unit_kerja_id'] = 'nullable';
-        } else {
+        // Dokumen Akreditasi requires unit_kerja_id
+        if ($documentType->isAkreditasi()) {
             $rules['unit_kerja_id'] = 'required|exists:unit_kerjas,id';
-            $rules['division_id'] = 'nullable';
+        } else {
+            $rules['unit_kerja_id'] = 'nullable|exists:unit_kerjas,id';
         }
 
         if ($isUpload) {
@@ -571,33 +537,15 @@ class DocumentController extends Controller
         $validated = $request->validate($rules, [
             'document_number.unique' => __('Nomor dokumen sudah digunakan.'),
             'document_number.required' => __('Nomor dokumen wajib diisi saat mode manual/unggah.'),
-            'unit_kerja_id.required' => __('Unit kerja wajib dipilih untuk dokumen di Cabang.'),
-            'division_id.required' => __('Divisi wajib dipilih untuk dokumen di Cabang Pusat.'),
+            'unit_kerja_id.required' => __('Unit kerja wajib dipilih untuk Dokumen Akreditasi.'),
         ]);
 
-        $formatChoice = $isPusat ? 'baru' : 'lama';
-        $validated['format_choice'] = $formatChoice;
-        $validated['numbering_scheme'] = $isPusat ? 'new_format' : 'cabang_unit_kerja';
-
-        if ($isPusat) {
-            $activeDivId = $contextService->getActiveDivisionId($user);
-            if ($user->isAdmin() || $user->isDirector()) {
-                $validated['division_id'] = $validated['division_id'] ?? $activeDivId;
-            } else {
-                $submittedDivId = $request->input('division_id');
-                if ($submittedDivId && in_array((int) $submittedDivId, $user->allDivisionIds(), true)) {
-                    $validated['division_id'] = (int) $submittedDivId;
-                } else {
-                    $validated['division_id'] = $activeDivId ?? $user->division_id ?? ($user->allDivisionIds()[0] ?? null);
-                }
-            }
-            $validated['unit_kerja_id'] = null;
-        } else {
-            $validated['division_id'] = null;
-            $validated['unit_kerja_id'] = (int) $validated['unit_kerja_id'];
+        if (empty($validated['unit_kerja_id'])) {
+            $activeUkId = $contextService->getActiveUnitKerjaId($user);
+            $validated['unit_kerja_id'] = $activeUkId ?? $user->unit_kerja_id ?? ($user->allUnitKerjaIds()[0] ?? null);
         }
 
-        $validated['visibility'] = Document::VISIBILITY_DIVISION;
+        $validated['visibility'] = Document::VISIBILITY_UNIT_KERJA;
         $validated['expiration_date'] = $validated['expiration_date'] ?? null;
 
         if ($branchId) {
@@ -621,7 +569,6 @@ class DocumentController extends Controller
             $message = 'Document created. Fill in the content.';
         }
 
-        // If multiple branches were assigned on creation, distribute to the additional branches
         if (!empty($branchIds) && count($branchIds) > 1 && !empty($validated['branch_id'])) {
             $sourceBranchId = $validated['branch_id'];
             foreach ($branchIds as $targetBranchId) {
@@ -656,38 +603,35 @@ class DocumentController extends Controller
 
         $currentUser = auth()->user();
 
-        // If the viewer is not the document owner, and has granted access to this document, notify the owner
         if ($document->owner_id && $currentUser && $currentUser->id !== $document->owner_id) {
-            $hasGrantedAccess = \App\Models\DocumentShare::where('document_id', $document->id)
+            $hasGrantedAccess = DocumentShare::where('document_id', $document->id)
                 ->where('user_id', $currentUser->id)
                 ->exists();
 
-            if (!$hasGrantedAccess && !empty($currentUser->allDivisionIds())) {
-                $hasGrantedAccess = \App\Models\DocumentDivisionShare::where('document_id', $document->id)
-                    ->whereIn('division_id', $currentUser->allDivisionIds())
+            if (!$hasGrantedAccess && !empty($currentUser->allUnitKerjaIds())) {
+                $hasGrantedAccess = \App\Models\DocumentUnitKerjaShare::where('document_id', $document->id)
+                    ->whereIn('unit_kerja_id', $currentUser->allUnitKerjaIds())
                     ->exists();
             }
 
             if ($hasGrantedAccess) {
-                // Mark unread share notification for this document as read
                 $currentUser->unreadNotifications()
                     ->where('data->type', 'document_shared')
                     ->where('data->document_id', $document->id)
                     ->update(['read_at' => now()]);
 
-                // Throttle notification per viewer & document (15 minutes) to prevent notification spam on page reload
                 $throttleKey = 'notif_doc_opened_' . $document->id . '_' . $currentUser->id;
-                if (\Illuminate\Support\Facades\Cache::add($throttleKey, true, now()->addMinutes(15))) {
+                if (Cache::add($throttleKey, true, now()->addMinutes(15))) {
                     $document->owner?->notify(new \App\Notifications\DocumentOpenedByGrantedUser($document, $currentUser->name));
                 }
             }
         }
 
-        $document->load('owner', 'division', 'documentType', 'currentVersion', 'versions.author', 'shares.user', 'divisionShares.division');
+        $document->load('owner', 'unitKerja', 'documentType', 'currentVersion', 'versions.author', 'shares.user', 'unitKerjaShares.unitKerja');
 
-        $divisions = auth()->user()->isAdmin()
-            ? Division::all()
-            : Division::whereIn('id', auth()->user()->allDivisionIds())->get();
+        $unitKerjas = auth()->user()->isAdmin()
+            ? UnitKerja::orderBy('kode_unit_kerja')->get()
+            : UnitKerja::whereIn('id', auth()->user()->allUnitKerjaIds())->get();
 
         $version = $document->displayVersion();
         $onlyOfficeConfig = null;
@@ -704,7 +648,6 @@ class DocumentController extends Controller
 
         $approvedSignatures = $this->getApprovedSignatures($document);
 
-        // Ensure pending document has multi-tier signature approval workflow compiled
         $pendingVersion = $document->versions()->where('status', 'pending')->whereNull('discarded_at')->latest('id')->first();
         if ($pendingVersion) {
             $author = $document->owner ?? $currentUser;
@@ -713,13 +656,9 @@ class DocumentController extends Controller
             }
         }
 
-        return view('documents.show', compact('document', 'divisions', 'onlyOfficeConfig', 'version', 'approvedSignatures', 'companies'));
+        return view('documents.show', compact('document', 'unitKerjas', 'onlyOfficeConfig', 'version', 'approvedSignatures', 'companies'));
     }
 
-    /**
-     * Mulai ringkasan AI secara asinkron. Request langsung balas dengan
-     * status processing — Groq dipanggil di queue job, bukan di sini.
-     */
     public function summarize(Request $request, Document $document): JsonResponse
     {
         $this->authorize('view', $document);
@@ -729,7 +668,6 @@ class DocumentController extends Controller
         $model = $request->input('model', 'auto');
         $locale = app()->getLocale();
 
-        // Sudah selesai & tidak dipaksa ringkas ulang → kirim hasil yang tersimpan.
         if ($document->isSummaryCompleted() && !$force) {
             return response()->json([
                 'status' => Document::SUMMARY_COMPLETED,
@@ -737,7 +675,6 @@ class DocumentController extends Controller
             ]);
         }
 
-        // Validasi ketersediaan konfigurasi AI sebelum dispatch
         if (!app()->environment('testing')) {
             $hasKey = match ($model) {
                 'groq' => !empty(config('services.groq.key')),
@@ -766,7 +703,6 @@ class DocumentController extends Controller
             }
         }
 
-        // Jika force ringkas ulang atau status sebelumnya failed → reset status
         if ($force || $document->summary_status === Document::SUMMARY_FAILED) {
             $document->update([
                 'summary_status' => Document::SUMMARY_PENDING,
@@ -787,19 +723,15 @@ class DocumentController extends Controller
         ]);
     }
 
-    /**
-     * Status ringkasan untuk polling frontend.
-     */
     public function summaryStatus(Document $document): JsonResponse
     {
         $this->authorize('view', $document);
 
-        // Auto-detect antrean macet / worker tidak berjalan (lebih dari 2 menit di processing)
         if ($document->summary_status === Document::SUMMARY_PROCESSING && $document->summary_started_at) {
             if ($document->summary_started_at->diffInSeconds(now()) >= 120) {
                 $document->update([
                     'summary_status' => Document::SUMMARY_FAILED,
-                    'summary_error' => 'Proses ringkasan memakan waktu terlalu lama atau antrean (queue worker) belum dijalankan. Pastikan `php artisan queue:work` aktif atau ubah QUEUE_CONNECTION=sync di .env.',
+                    'summary_error' => 'Proses ringkasan memakan waktu terlalu lama atau antrean belum dijalankan.',
                 ]);
             }
         }
@@ -811,16 +743,13 @@ class DocumentController extends Controller
         ]);
     }
 
-    /**
-     * Poll ONLYOFFICE editor state (active session or compilation state)
-     */
     public function onlyofficeStatus(Document $document): JsonResponse
     {
         $this->authorize('view', $document);
         $version = $document->displayVersion();
 
         return response()->json([
-            'active' => \Illuminate\Support\Facades\Cache::has('onlyoffice_active_' . $document->id),
+            'active' => Cache::has('onlyoffice_active_' . $document->id),
             'updated_at' => $version?->updated_at?->timestamp,
         ]);
     }
@@ -884,7 +813,7 @@ class DocumentController extends Controller
     {
         $this->authorize('view', $document);
 
-        $document->load('owner', 'division', 'documentType', 'currentVersion');
+        $document->load('owner', 'unitKerja', 'documentType', 'currentVersion');
 
         $version = $document->displayVersion();
         $onlyOfficeConfig = null;
@@ -936,20 +865,16 @@ class DocumentController extends Controller
         $validated = $request->validate([
             'content' => 'required|string',
             'paper_size' => 'nullable|string|in:A4,A5,A3,Letter,Legal',
-            // paper_margin dikirim sebagai JSON string dari hidden input
-            // (lihat insert.blade.php) — decode manual ke array.
             'paper_margin' => 'nullable|string',
         ]);
 
         $margin = $this->decodePaperMargin($validated['paper_margin'] ?? null);
 
-        // Simpan pengaturan kertas ke dokumen (dipakai preview/show).
         $document->update([
             'paper_size' => $validated['paper_size'] ?? 'A4',
             'paper_margin' => $margin,
         ]);
 
-        // savePending updates the existing pending version in place — no new version.
         $user = auth()->user();
         $version = $this->versionService->savePending($document, $validated['content'], $user);
 
@@ -958,8 +883,7 @@ class DocumentController extends Controller
             'version_number' => $version->version_number,
         ]);
 
-        // Send signature and stamp request notifications for unnotified requests
-        $unnotifiedSigRequests = \App\Models\SignatureRequest::where('document_id', $document->id)
+        $unnotifiedSigRequests = SignatureRequest::where('document_id', $document->id)
             ->where('status', 'pending')
             ->whereNull('notified_at')
             ->get();
@@ -968,16 +892,13 @@ class DocumentController extends Controller
             $sigReq->sendNotification();
         }
 
-        // Dynamic approval routing: Head → Admin → Direktur fallback
         $resolution = $this->approvalRoutingService->resolveApprover($document, $user);
         $this->approvalRoutingService->applyToDocument($document, $resolution);
 
-        // Notify the resolved approver(s)
         foreach ($resolution['approvers'] as $approver) {
             $approver->notify(new \App\Notifications\DocumentApprovalRequested($document, $version, $user->name));
         }
 
-        // Notify the requester about who will approve
         if ($resolution['role'] !== null) {
             $user->notify(new \App\Notifications\ApprovalRouteResolved(
                 $document,
@@ -999,11 +920,9 @@ class DocumentController extends Controller
     {
         $this->authorize('update', $document);
 
-        // Lock out any incoming ONLYOFFICE callbacks from recreating/saving the version
         Cache::put('ignore_onlyoffice_save_' . $document->id, true, now()->addSeconds(30));
 
-        // Clean up any un-notified draft signature requests for this document
-        \App\Models\SignatureRequest::where('document_id', $document->id)
+        SignatureRequest::where('document_id', $document->id)
             ->where('status', 'pending')
             ->whereNull('notified_at')
             ->delete();
@@ -1014,8 +933,6 @@ class DocumentController extends Controller
 
         $isLeaveGuard = $request->boolean('is_leave_guard');
 
-        // When a document in Pending Approval V1 is explicitly discarded with confirmation,
-        // perform a soft delete to trash and alert the user.
         if ($isPendingV1 && !$isLeaveGuard) {
             $document->delete();
 
@@ -1040,7 +957,6 @@ class DocumentController extends Controller
 
         $discarded = $this->versionService->discardPending($document);
 
-        // Rotate ONLYOFFICE document key and touch current version so the next editing session opens fresh
         $this->onlyOfficeService->rotateDocumentKey($document);
         $document->currentVersion?->touch();
         $document->touch();
@@ -1067,9 +983,6 @@ class DocumentController extends Controller
             : __('Tidak ada perubahan untuk dibuang.'));
     }
 
-    /**
-     * Finalize editing session and submit pending version for approval routing.
-     */
     public function finishEditing(Request $request, Document $document): RedirectResponse|JsonResponse
     {
         $this->authorize('update', $document);
@@ -1077,8 +990,7 @@ class DocumentController extends Controller
         $user = auth()->user();
         $version = $document->displayVersion();
 
-        // 1. Send signature and stamp request notifications for any unnotified requests
-        $unnotifiedSigRequests = \App\Models\SignatureRequest::where('document_id', $document->id)
+        $unnotifiedSigRequests = SignatureRequest::where('document_id', $document->id)
             ->where('status', 'pending')
             ->whereNull('notified_at')
             ->get();
@@ -1087,7 +999,6 @@ class DocumentController extends Controller
             $sigReq->sendNotification();
         }
 
-        // 2. Trigger approval routing if this version is pending (or draft being finished)
         $routingMessage = null;
         if ($version) {
             if ($version->status === 'draft') {
@@ -1097,21 +1008,18 @@ class DocumentController extends Controller
             if ($version->status === 'pending') {
                 $notifKey = 'approval_notified_' . $document->id . '_v' . $version->id;
 
-                // Clear any OnlyOffice pending cache flag so it won't duplicate
-                \Illuminate\Support\Facades\Cache::forget('onlyoffice_pending_notif_' . $document->id);
+                Cache::forget('onlyoffice_pending_notif_' . $document->id);
 
-                if (!\Illuminate\Support\Facades\Cache::has($notifKey)) {
-                    \Illuminate\Support\Facades\Cache::put($notifKey, true, now()->addMinutes(10));
+                if (!Cache::has($notifKey)) {
+                    Cache::put($notifKey, true, now()->addMinutes(10));
 
                     $resolution = $this->approvalRoutingService->resolveApprover($document, $user);
                     $this->approvalRoutingService->applyToDocument($document, $resolution);
 
-                    // Notify the resolved approver(s)
                     foreach ($resolution['approvers'] as $approver) {
                         $approver->notify(new \App\Notifications\DocumentApprovalRequested($document, $version, $user->name));
                     }
 
-                    // Notify the requester about who will approve
                     if ($resolution['role'] !== null) {
                         $user->notify(new \App\Notifications\ApprovalRouteResolved(
                             $document,
@@ -1128,7 +1036,6 @@ class DocumentController extends Controller
 
         $successMessage = $routingMessage ?? __('Perubahan disimpan. Menunggu persetujuan.');
 
-        // Flash to session so it displays as toast/alert on documents.show
         session()->flash('success', $successMessage);
 
         if ($request->expectsJson() || $request->wantsJson()) {
@@ -1154,10 +1061,6 @@ class DocumentController extends Controller
 
         $margin = $this->decodePaperMargin($validated['paper_margin'] ?? null);
 
-        // Simpan pengaturan kertas ke dokumen (dipakai preview/show).
-        // Hanya update yang benar-benar dikirim form — jangan menimpa
-        // pengaturan yang sudah ada dengan null kalau form lama tidak
-        // mengirim hidden input paper (dulu margin hilang setelah save draft).
         $document->update(array_filter([
             'paper_size' => $validated['paper_size'] ?? null,
             'paper_margin' => $margin,
@@ -1193,16 +1096,13 @@ class DocumentController extends Controller
             'version_number' => $version->version_number,
         ]);
 
-        // Dynamic approval routing: Head → Admin → Direktur fallback
         $resolution = $this->approvalRoutingService->resolveApprover($document, $user);
         $this->approvalRoutingService->applyToDocument($document, $resolution);
 
-        // Notify the resolved approver(s)
         foreach ($resolution['approvers'] as $approver) {
             $approver->notify(new \App\Notifications\DocumentApprovalRequested($document, $version, $user->name));
         }
 
-        // Notify the requester about who will approve
         if ($resolution['role'] !== null) {
             $user->notify(new \App\Notifications\ApprovalRouteResolved(
                 $document,
@@ -1216,9 +1116,6 @@ class DocumentController extends Controller
         return redirect()->route('documents.show', $document)->with('success', __('Versi baru diunggah. Menunggu persetujuan.'));
     }
 
-    /**
-     * Download the latest version of the document as DOCX, or a specific version if requested.
-     */
     public function download(Request $request, Document $document)
     {
         $this->authorize('view', $document);
@@ -1240,10 +1137,6 @@ class DocumentController extends Controller
         return $disk->download($version->file_path, $downloadName);
     }
 
-    /**
-     * Stream berkas unggahan secara privat. Akses tetap tunduk pada
-     * policy 'view' dokumen — tidak pernah lewat disk publik.
-     */
     public function file(Document $document, DocumentVersion $version)
     {
         $this->authorize('view', $document);
@@ -1258,12 +1151,6 @@ class DocumentController extends Controller
         );
     }
 
-    /**
-     * Stream gambar QR code (PNG) yang mengarah ke halaman show dokumen ini.
-     * Dipakai oleh tombol "print" di toolbar Jodit (client-side) untuk
-     * mengganti placeholder QR jadi gambar asli sebelum window.print()
-     * dipanggil — lihat getCleanValue({forPrint:true}) di resources/js/jodit.js.
-     */
     public function qrCode(Document $document)
     {
         $this->authorize('view', $document);
@@ -1273,11 +1160,6 @@ class DocumentController extends Controller
         return response($png, 200, ['Content-Type' => 'image/png']);
     }
 
-    /**
-     * Resolver QR: token terenkripsi (lihat QrCodeService::qrcodeUrl) →
-     * dokumen → redirect ke halaman show. QR di dokumen fisik menunjuk
-     * ke sini, bukan ke URL dengan ID mentah.
-     */
     public function viewByHash(string $token)
     {
         try {
@@ -1286,15 +1168,11 @@ class DocumentController extends Controller
             abort(404);
         }
 
-        $document = Document::with(['owner', 'division', 'documentType', 'currentVersion'])->findOrFail($id);
+        $document = Document::with(['owner', 'unitKerja', 'documentType', 'currentVersion'])->findOrFail($id);
 
         return view('documents.verified', compact('document', 'token'));
     }
 
-    /**
-     * Preview dokumen melalui token hash QR code.
-     * Mencegah pembocoran ID dokumen asli di URL browser & breadcrumb.
-     */
     public function previewByHash(string $token)
     {
         try {
@@ -1303,7 +1181,7 @@ class DocumentController extends Controller
             abort(404);
         }
 
-        $document = Document::with(['owner', 'division', 'documentType', 'currentVersion'])->findOrFail($id);
+        $document = Document::with(['owner', 'unitKerja', 'documentType', 'currentVersion'])->findOrFail($id);
 
         if (!auth()->check()) {
             return redirect()->guest(route('login'));
@@ -1329,43 +1207,36 @@ class DocumentController extends Controller
         return view('documents.preview', compact('document', 'onlyOfficeConfig', 'approvedSignatures'));
     }
 
-    /**
-     * Change a document's visibility scope (general / division / personal).
-     * Division is not selectable here — the document keeps its original
-     * division (division_id is NOT NULL at DB level).
-     */
     public function updateVisibility(Request $request, Document $document): RedirectResponse
     {
         $this->authorize('manageScope', $document);
 
         $validated = $request->validate([
-            'visibility' => 'required|in:general,division,personal',
+            'visibility' => 'required|in:general,unit_kerja,division,personal',
             'target_branch_ids' => 'nullable|array',
             'target_branch_ids.*' => 'exists:branches,id'
         ]);
 
-        // Division scope keeps the document's original division; fall back to
-        // the current active division or user's division if the document has none.
-        $divisionId = $document->division_id
-            ?? app(\App\Services\CompanyContextService::class)->getActiveDivisionId(auth()->user())
-            ?? auth()->user()->division_id
-            ?? (auth()->user()->allDivisionIds()[0] ?? null);
+        $vis = $validated['visibility'] === 'division' ? Document::VISIBILITY_UNIT_KERJA : $validated['visibility'];
+
+        $unitKerjaId = $document->unit_kerja_id
+            ?? app(CompanyContextService::class)->getActiveUnitKerjaId(auth()->user())
+            ?? auth()->user()->unit_kerja_id
+            ?? (auth()->user()->allUnitKerjaIds()[0] ?? null);
 
         $document->update([
-            'visibility' => $validated['visibility'],
-            'division_id' => $divisionId,
-            // Legacy derived flag stays in sync with the scope.
-            'is_public' => $validated['visibility'] === Document::VISIBILITY_GENERAL,
+            'visibility' => $vis,
+            'unit_kerja_id' => $unitKerjaId,
+            'is_public' => $vis === Document::VISIBILITY_GENERAL,
         ]);
         
-        // Sync document distributions for general visibility
-        if ($validated['visibility'] === Document::VISIBILITY_GENERAL) {
+        if ($vis === Document::VISIBILITY_GENERAL) {
             $targetBranchIds = $request->input('target_branch_ids', []);
             \App\Models\DocumentDistribution::where('document_id', $document->id)->delete();
             
             if (is_array($targetBranchIds) && count($targetBranchIds) > 0) {
                 $distributions = [];
-                $targetBranches = \App\Models\Branch::whereIn('id', $targetBranchIds)->get()->keyBy('id');
+                $targetBranches = Branch::whereIn('id', $targetBranchIds)->get()->keyBy('id');
                 
                 $sourceBranchId = $document->branch_id ?? (auth()->user()->allBranchIds()[0] ?? null);
                 foreach ($targetBranchIds as $targetBranchId) {
@@ -1380,9 +1251,8 @@ class DocumentController extends Controller
                         'updated_at' => now(),
                     ];
                     
-                    // Notify users in the target branch
                     if (isset($targetBranches[$targetBranchId])) {
-                        $branchUsers = \App\Models\User::whereHas('branches', fn($q) => $q->where('branches.id', $targetBranchId))
+                        $branchUsers = User::whereHas('branches', fn($q) => $q->where('branches.id', $targetBranchId))
                             ->where('is_active', true)
                             ->where('id', '!=', auth()->id())
                             ->get();
@@ -1398,23 +1268,17 @@ class DocumentController extends Controller
                 \App\Models\DocumentDistribution::insert($distributions);
             }
         } else {
-            // Remove all distributions if not general
             \App\Models\DocumentDistribution::where('document_id', $document->id)->delete();
         }
 
         $this->auditService->log(auth()->user(), 'document.visibility_changed', 'document', $document->id, [
-            'visibility' => $validated['visibility'],
-            'division_id' => $document->division_id,
+            'visibility' => $vis,
+            'unit_kerja_id' => $document->unit_kerja_id,
         ]);
 
         return back()->with('success', __('Visibilitas dokumen berhasil diperbarui.'));
     }
 
-    /**
-     * Decode paper_margin yang dikirim sebagai JSON string dari hidden input
-     * (lihat insert.blade.php). Kembalikan array {top,right,bottom,left} atau
-     * null kalau kosong/tidak valid.
-     */
     private function decodePaperMargin(?string $raw): ?array
     {
         if (!$raw || trim($raw) === '' || trim($raw) === 'null') {
@@ -1426,7 +1290,6 @@ class DocumentController extends Controller
             return null;
         }
 
-        // Hanya ambil 4 sisi margin, pastikan angka ≥ 0.
         $margin = [];
         foreach (['top', 'right', 'bottom', 'left'] as $side) {
             $v = $decoded[$side] ?? null;
@@ -1437,22 +1300,6 @@ class DocumentController extends Controller
         }
 
         return $margin;
-    }
-
-    /**
-     * View a document template using ONLYOFFICE.
-     */
-    public function previewTemplate(DocumentTemplate $template): View
-    {
-        $user = auth()->user();
-        
-        $config = $this->onlyOfficeService->generateTemplateEditorConfig(
-            $template, 
-            $user, 
-            'view'
-        );
-
-        return view('templates.preview', compact('template', 'config'));
     }
 
     public function rename(Request $request, Document $document): RedirectResponse
@@ -1502,7 +1349,6 @@ class DocumentController extends Controller
                     'version' => $version->version_number,
                 ]));
             } else {
-                // Version was already pending and renamed again -> update existing database notification records
                 $authorName = $version->author_name ?? $user->name;
                 $origTitle = $version->old_title ?? $oldTitle;
                 $notifTitle = $version->isRename()
@@ -1522,7 +1368,7 @@ class DocumentController extends Controller
                         'ver' => $version->version_number,
                     ]);
 
-                $existingNotifs = \Illuminate\Support\Facades\DB::table('notifications')
+                $existingNotifs = DB::table('notifications')
                     ->where(function ($q) use ($document, $version) {
                         $q->where('data->document_id', $document->id)
                           ->orWhere('data->version_id', $version->id);
@@ -1539,7 +1385,7 @@ class DocumentController extends Controller
                         $payload['old_title'] = $origTitle;
                         $payload['is_rename'] = true;
                     }
-                    \Illuminate\Support\Facades\DB::table('notifications')
+                    DB::table('notifications')
                         ->where('id', $row->id)
                         ->update(['data' => json_encode($payload)]);
                 }
@@ -1549,9 +1395,6 @@ class DocumentController extends Controller
         return back()->with('success', __('Nama dokumen berhasil diubah.'));
     }
 
-    /**
-     * Request a document rename (sent to Division Head for review).
-     */
     public function requestRename(Request $request, Document $document): RedirectResponse
     {
         $this->authorize('requestRename', $document);
@@ -1586,12 +1429,11 @@ class DocumentController extends Controller
             'notes' => $validated['notes'] ?? null,
         ]);
 
-        // Notify Division Heads about rename request
         $heads = collect();
-        if ($document->division_id) {
-            $heads = \App\Models\User::where(function ($q) use ($document) {
-                    $q->where('division_id', $document->division_id)
-                      ->orWhereHas('divisions', fn($dq) => $dq->where('divisions.id', $document->division_id));
+        if ($document->unit_kerja_id) {
+            $heads = User::where(function ($q) use ($document) {
+                    $q->where('unit_kerja_id', $document->unit_kerja_id)
+                      ->orWhereHas('unitKerjas', fn($uq) => $uq->where('unit_kerjas.id', $document->unit_kerja_id));
                 })
                 ->where('system_role', 'head')
                 ->where('id', '!=', $user->id)
@@ -1609,9 +1451,8 @@ class DocumentController extends Controller
             }
         }
 
-        // If no division heads found (e.g. requester is the head, or no head in division), notify Directors and Admins
         if ($heads->isEmpty()) {
-            $approvers = \App\Models\User::whereIn('system_role', ['admin', 'direktur'])
+            $approvers = User::whereIn('system_role', ['admin', 'direktur'])
                 ->where('id', '!=', $user->id)
                 ->get();
             foreach ($approvers as $approver) {
@@ -1622,9 +1463,6 @@ class DocumentController extends Controller
         return back()->with('success', __('Permintaan perubahan nama diajukan. Menunggu persetujuan.'));
     }
 
-    /**
-     * Cancel a pending document rename request.
-     */
     public function cancelRenameRequest(Document $document): RedirectResponse
     {
         $user = auth()->user();
@@ -1633,7 +1471,6 @@ class DocumentController extends Controller
             return back()->with('error', __('Tidak ada permintaan perubahan nama yang menunggu.'));
         }
 
-        // Must be the requester, document owner, or admin/director
         $isRequester = $document->rename_requested_by_id === $user->id;
         $isOwner = $document->owner_id === $user->id;
         if (!$isRequester && !$isOwner && !$user->isAdmin() && !$user->isDirector()) {

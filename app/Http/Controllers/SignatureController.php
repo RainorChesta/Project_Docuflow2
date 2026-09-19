@@ -416,7 +416,7 @@ class SignatureController extends Controller
 
         $availableToReplaceCount = 0;
 
-        $users = User::with(['division', 'signatures.company'])
+        $users = User::with(['unitKerjas', 'signatures.company'])
             ->where('is_active', true)
             ->get()
             ->map(function ($u) use ($currentUser, $requests, &$availableToReplaceCount, $contextCompanyId) {
@@ -513,6 +513,8 @@ class SignatureController extends Controller
                     $summaryRejectedReason = $topRejected['rejected_reason'];
                 }
 
+                $unitKerjaName = $u->unitKerjas->pluck('name')->join(', ') ?: 'Umum';
+
                 return [
                     'id' => $u->id,
                     'name' => $u->name,
@@ -520,10 +522,11 @@ class SignatureController extends Controller
                     'avatar_url' => $u->avatar_url,
                     'role' => match($u->system_role) {
                         'admin' => 'Admin',
-                        'head' => 'Kepala Divisi',
+                        'head' => 'Kepala Unit Kerja',
                         default => 'Staff',
                     },
-                    'division' => $u->division ? $u->division->name : 'Umum',
+                    'unit_kerja' => $unitKerjaName,
+                    'division' => $unitKerjaName,
                     'is_me' => $isMe,
                     'has_signature' => $hasSignature,
                     'signatures' => $mappedSignatures,
@@ -832,7 +835,7 @@ class SignatureController extends Controller
         }
 
         // Base query for incoming requests (only show requests that have been notified / finalized)
-        $incomingBaseQuery = SignatureRequest::with(['requester', 'requestedSignature.company', 'document.branch', 'document.company', 'document.division'])
+        $incomingBaseQuery = SignatureRequest::with(['requester', 'requestedSignature.company', 'document.branch', 'document.company', 'document.unitKerja'])
             ->where('target_user_id', $user->id)
             ->where(function ($q) {
                 $q->whereNotNull('notified_at')

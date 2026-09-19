@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Branch;
 use App\Models\Company;
-use App\Models\Division;
+use App\Models\UnitKerja;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\User;
@@ -18,7 +18,7 @@ class DocumentFormatFilterAndBadgeTest extends TestCase
     private User $user;
     private DocumentType $docType;
     private Branch $branch;
-    private Division $division;
+    private UnitKerja $unitKerja;
     private Document $newDoc;
     private Document $oldDoc;
 
@@ -28,26 +28,26 @@ class DocumentFormatFilterAndBadgeTest extends TestCase
 
         $company = Company::create(['name' => 'PT CMH Test', 'code' => 'CMH']);
         $this->branch = Branch::create(['name' => 'Branch Central', 'code' => 'BC', 'company_id' => $company->id]);
-        $this->division = Division::create(['name' => 'Operations', 'code' => 'OPS']);
-        $this->docType = DocumentType::create(['name' => 'Surat Keputusan', 'code' => 'SK']);
+        $this->unitKerja = UnitKerja::create(['nama_unit_kerja' => 'Operations', 'kode_unit_kerja' => '03']);
+        $this->docType = DocumentType::create(['name' => 'Surat Keputusan', 'code' => 'SK', 'category' => 'akreditasi']);
 
         $this->user = User::factory()->create([
             'system_role' => 'staff',
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'is_active' => true,
         ]);
         $this->user->branches()->attach($this->branch->id);
         $this->user->companies()->attach($company->id);
 
-        $this->user->divisions()->attach($this->division->id);
+        $this->user->unitKerjas()->attach($this->unitKerja->id, ['branch_id' => $this->branch->id]);
 
         $this->newDoc = Document::create([
             'title' => 'Dokumen Baru Standard',
-            'document_number' => '001/SK/OPS/BC/IX/2026',
+            'document_number' => '001/SK-03/BC/IX/2026',
             'format_choice' => 'baru',
-            'visibility' => Document::VISIBILITY_DIVISION,
+            'visibility' => Document::VISIBILITY_UNIT_KERJA,
             'owner_id' => $this->user->id,
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'branch_id' => $this->branch->id,
             'company_id' => $company->id,
             'document_type_id' => $this->docType->id,
@@ -65,9 +65,9 @@ class DocumentFormatFilterAndBadgeTest extends TestCase
             'title' => 'Dokumen Lama Legacy',
             'document_number' => '002/SK-OPS/BC/IX/2026',
             'format_choice' => 'lama',
-            'visibility' => Document::VISIBILITY_DIVISION,
+            'visibility' => Document::VISIBILITY_UNIT_KERJA,
             'owner_id' => $this->user->id,
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'branch_id' => $this->branch->id,
             'company_id' => $company->id,
             'document_type_id' => $this->docType->id,
@@ -100,7 +100,7 @@ class DocumentFormatFilterAndBadgeTest extends TestCase
     public function test_filter_documents_by_new_format(): void
     {
         $response = $this->actingAs($this->user)->get(route('documents.index', [
-            'type' => 'division',
+            'type' => 'unit_kerja',
             'format_choice' => 'baru',
         ]));
 
@@ -112,7 +112,7 @@ class DocumentFormatFilterAndBadgeTest extends TestCase
     public function test_filter_documents_by_old_format(): void
     {
         $response = $this->actingAs($this->user)->get(route('documents.index', [
-            'type' => 'division',
+            'type' => 'unit_kerja',
             'format_choice' => 'lama',
         ]));
 
@@ -126,7 +126,7 @@ class DocumentFormatFilterAndBadgeTest extends TestCase
         app()->setLocale('id');
 
         $response = $this->actingAs($this->user)->get(route('documents.index', [
-            'type' => 'division',
+            'type' => 'unit_kerja',
         ]));
 
         $response->assertStatus(200);

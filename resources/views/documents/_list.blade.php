@@ -31,7 +31,7 @@
             @endif
             @if($doc->isGeneral()) <span class="text-success text-xs">· {{ __('Umum') }}</span>
             @elseif($doc->isPersonal()) <span class="text-info text-xs">· {{ __('Personal') }}</span>
-            @else <span class="text-xs">· {{ $doc->division?->code ?? '—' }}</span>
+            @else <span class="text-xs">· {{ $doc->unitKerja?->kode_unit_kerja ?? '—' }}</span>
             @endif
             <span class="text-xs inline-flex items-center gap-1.5 font-medium text-base-content/80">
                 <span class="text-base-content/40 font-normal">·</span>

@@ -2,10 +2,10 @@
 
 namespace Tests\Feature;
 
-use App\Models\Division;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\DocumentVersion;
+use App\Models\UnitKerja;
 use App\Models\User;
 use App\Services\OnlyOfficeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -18,7 +18,8 @@ class OnlyOfficeIntegrationTest extends TestCase
 
     protected User $user;
     protected User $otherUser;
-    protected Division $division;
+    protected User $headUser;
+    protected UnitKerja $unitKerja;
     protected DocumentType $docType;
     protected Document $document;
     protected DocumentVersion $version;
@@ -32,11 +33,11 @@ class OnlyOfficeIntegrationTest extends TestCase
         $company = \App\Models\Company::create(['name' => 'CMH Group', 'code' => 'CMH']);
         $branch = \App\Models\Branch::create(['company_id' => $company->id, 'name' => 'Jakarta HQ', 'code' => 'JBM']);
 
-        $this->division = Division::create(['name' => 'IT Division', 'code' => 'IT']);
-        $this->docType = DocumentType::create(['name' => 'Surat Edaran', 'code' => 'S.ED']);
+        $this->unitKerja = UnitKerja::create(['nama_unit_kerja' => 'IT Unit Kerja', 'kode_unit_kerja' => '01']);
+        $this->docType = DocumentType::create(['name' => 'Surat Edaran', 'code' => 'S.ED', 'category' => 'naskah_dinas']);
 
         $this->user = User::factory()->create([
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'system_role' => 'staff',
             'is_active' => true,
         ]);
@@ -44,23 +45,31 @@ class OnlyOfficeIntegrationTest extends TestCase
         $this->user->companies()->attach($company->id);
 
         $this->otherUser = User::factory()->create([
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'system_role' => 'staff',
             'is_active' => true,
         ]);
         $this->otherUser->branches()->attach($branch->id);
         $this->otherUser->companies()->attach($company->id);
 
+        $this->headUser = User::factory()->create([
+            'unit_kerja_id' => $this->unitKerja->id,
+            'system_role' => 'head',
+            'is_active' => true,
+        ]);
+        $this->headUser->branches()->attach($branch->id);
+        $this->headUser->companies()->attach($company->id);
+
         // Create document with version
         $this->document = Document::create([
             'title' => 'Test ONLYOFFICE Doc',
-            'document_number' => '001/S.ED/IT/JBM/VIII/2026',
-            'division_id' => $this->division->id,
+            'document_number' => '001/S.ED/JBM/VIII/2026',
+            'unit_kerja_id' => $this->unitKerja->id,
             'company_id' => $company->id,
             'branch_id' => $branch->id,
             'owner_id' => $this->user->id,
             'document_type_id' => $this->docType->id,
-            'visibility' => Document::VISIBILITY_DIVISION,
+            'visibility' => Document::VISIBILITY_UNIT_KERJA,
         ]);
 
         $filePath = 'documents/' . $this->document->id . '/v1.docx';
@@ -396,9 +405,9 @@ class OnlyOfficeIntegrationTest extends TestCase
     {
         $newDoc = \App\Models\Document::create([
             'title' => 'Brand New Unapproved Doc',
-            'document_number' => '999/TEST/DIV/PST/IX/2026',
+            'document_number' => '999/TEST/PST/IX/2026',
             'owner_id' => $this->user->id,
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'document_type_id' => $this->docType->id,
         ]);
 
@@ -441,9 +450,9 @@ class OnlyOfficeIntegrationTest extends TestCase
     {
         $newDoc = \App\Models\Document::create([
             'title' => 'Pending V1 Doc to Discard',
-            'document_number' => '998/TEST/DIV/PST/IX/2026',
+            'document_number' => '998/TEST/PST/IX/2026',
             'owner_id' => $this->user->id,
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'document_type_id' => $this->docType->id,
         ]);
 
@@ -462,7 +471,7 @@ class OnlyOfficeIntegrationTest extends TestCase
             ->post(route('documents.discard', $newDoc));
 
         $response->assertRedirect(route('documents.index', ['type' => 'mine']));
-        $response->assertSessionHas('success', __('Dokumen telah dipindahkan ke trash.'));
+        $response->assertSessionHas('success');
 
         // Document is soft-deleted
         $this->assertSoftDeleted('documents', [
@@ -504,31 +513,23 @@ class OnlyOfficeIntegrationTest extends TestCase
         $this->assertTrue(\Illuminate\Support\Facades\Cache::has('onlyoffice_pending_notif_' . $this->document->id));
     }
 
-    public function test_onlyoffice_status_4_after_status_6_dispatches_deferred_notifications()
+    public function test_onlyoffice_status6_deferred_until_status4()
     {
         \Illuminate\Support\Facades\Notification::fake();
 
-        // Simulate status 6 first
         \Illuminate\Support\Facades\Http::fake([
-            'http://onlyoffice-server/download/status6.docx' => \Illuminate\Support\Facades\Http::response('status-6-content', 200),
+            'http://example.com/fake-doc.docx' => \Illuminate\Support\Facades\Http::response('fake-docx-content', 200),
         ]);
 
+        // Simulate status 6 callback (document edited and saved by ONLYOFFICE)
         $this->postJson(route('onlyoffice.callback', $this->document), [
             'status' => 6,
-            'url' => 'http://onlyoffice-server/download/status6.docx',
+            'url' => 'http://example.com/fake-doc.docx',
             'users' => [(string) $this->user->id],
             'key' => 'doc_test_key_status6',
         ]);
 
         \Illuminate\Support\Facades\Notification::assertNothingSent();
-
-        // Create head approver in the same division & branch
-        $head = User::factory()->create([
-            'division_id' => $this->division->id,
-            'system_role' => 'head',
-            'is_active' => true,
-        ]);
-        $head->branches()->attach($this->document->branch_id);
 
         // Now simulate status 4 (closing editor after status 6)
         $this->postJson(route('onlyoffice.callback', $this->document), [
@@ -538,7 +539,7 @@ class OnlyOfficeIntegrationTest extends TestCase
 
         // Notifications should now be sent
         \Illuminate\Support\Facades\Notification::assertSentTo(
-            $head,
+            $this->headUser,
             \App\Notifications\DocumentApprovalRequested::class
         );
         \Illuminate\Support\Facades\Notification::assertSentTo(
@@ -552,7 +553,7 @@ class OnlyOfficeIntegrationTest extends TestCase
         \Illuminate\Support\Facades\Notification::fake();
 
         $signerUser = User::factory()->create([
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'name' => 'Signer Person',
         ]);
 

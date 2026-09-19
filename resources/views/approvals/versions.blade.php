@@ -227,8 +227,8 @@
                                             @if($version->document->branch)
                                                 <span class="text-[11px] text-base-content/60 bg-base-200/80 px-1.5 py-0.5 rounded">{{ $version->document->branch->name }}</span>
                                             @endif
-                                            @if($version->document->division)
-                                                <span class="text-[11px] text-base-content/60 bg-base-200/80 px-1.5 py-0.5 rounded">{{ $version->document->division->name }}</span>
+                                            @if($version->document->unitKerja)
+                                                <span class="text-[11px] text-base-content/60 bg-base-200/80 px-1.5 py-0.5 rounded">{{ $version->document->unitKerja->nama_unit_kerja }}</span>
                                             @endif
                                         </div>
                                     </td>

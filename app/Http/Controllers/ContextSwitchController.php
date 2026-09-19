@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Branch;
 use App\Models\Company;
+use App\Models\Document;
 use App\Services\CompanyContextService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -16,7 +17,7 @@ class ContextSwitchController extends Controller
     ) {}
 
     /**
-     * Switch active company and/or branch.
+     * Switch active company, branch, and unit kerja context.
      */
     public function switch(Request $request): RedirectResponse|JsonResponse
     {
@@ -24,7 +25,6 @@ class ContextSwitchController extends Controller
         $validated = $request->validate([
             'company_id' => 'required',
             'branch_id' => 'nullable',
-            'division_id' => 'nullable',
             'unit_kerja_id' => 'nullable',
         ]);
 
@@ -66,7 +66,6 @@ class ContextSwitchController extends Controller
                 }
             }
         } else {
-            // Auto select default branch for that company
             $defaultBranch = $this->contextService->getAvailableBranches($user, $companyId)->first();
             if ($defaultBranch) {
                 session(['active_branch_id' => $defaultBranch->id]);
@@ -76,72 +75,37 @@ class ContextSwitchController extends Controller
             }
         }
 
-        // Division / Unit Kerja Context Logic
+        // Unit Kerja Context Logic
         $activeBranch = $activeBranchId ? Branch::find($activeBranchId) : null;
+        $unitKerjaId = $request->input('unit_kerja_id');
+        $availableUnitKerjas = $this->contextService->getAvailableUnitKerjas($user, $activeBranch?->id);
 
-        if ($activeBranch && $activeBranch->is_pusat) {
-            // Cabang Pusat PT: Division Logic
+        if ($availableUnitKerjas->isEmpty()) {
             session()->forget('active_unit_kerja_id');
-            $divisionId = $request->input('division_id');
-            $availableDivisions = $this->contextService->getAvailableDivisions($user);
-            
-            if ($availableDivisions->isEmpty()) {
-                session()->forget('active_division_id');
-            } elseif ($availableDivisions->count() === 1) {
-                session(['active_division_id' => $availableDivisions->first()->id]);
-            } else {
-                if (!empty($divisionId) && is_numeric($divisionId)) {
-                    $division = $availableDivisions->firstWhere('id', (int) $divisionId);
-                    if ($division) {
-                        session(['active_division_id' => $division->id]);
-                    } else {
-                        session(['active_division_id' => $availableDivisions->first()->id]);
-                    }
-                } else {
-                    $currentDivisionId = session('active_division_id');
-                    if ($currentDivisionId && $availableDivisions->firstWhere('id', $currentDivisionId)) {
-                        // keep it
-                    } else {
-                        session(['active_division_id' => $availableDivisions->first()->id]);
-                    }
-                }
-            }
-        } elseif ($activeBranch && !$activeBranch->is_pusat) {
-            // Cabang PT: Unit Kerja Logic
-            session()->forget('active_division_id');
-            $unitKerjaId = $request->input('unit_kerja_id');
-            $availableUnitKerjas = $this->contextService->getAvailableUnitKerjas($user, $activeBranch->id);
-
-            if ($availableUnitKerjas->isEmpty()) {
-                session()->forget('active_unit_kerja_id');
-            } elseif ($availableUnitKerjas->count() === 1) {
-                session(['active_unit_kerja_id' => $availableUnitKerjas->first()->id]);
-            } else {
-                if (!empty($unitKerjaId) && is_numeric($unitKerjaId)) {
-                    $uk = $availableUnitKerjas->firstWhere('id', (int) $unitKerjaId);
-                    if ($uk) {
-                        session(['active_unit_kerja_id' => $uk->id]);
-                    } else {
-                        session(['active_unit_kerja_id' => $availableUnitKerjas->first()->id]);
-                    }
-                } else {
-                    $currentUkId = session('active_unit_kerja_id');
-                    if ($currentUkId && $availableUnitKerjas->firstWhere('id', $currentUkId)) {
-                        // keep it
-                    } else {
-                        session(['active_unit_kerja_id' => $availableUnitKerjas->first()->id]);
-                    }
-                }
-            }
+        } elseif ($availableUnitKerjas->count() === 1) {
+            session(['active_unit_kerja_id' => $availableUnitKerjas->first()->id]);
         } else {
-            session()->forget('active_division_id');
-            session()->forget('active_unit_kerja_id');
+            if (!empty($unitKerjaId) && is_numeric($unitKerjaId)) {
+                $uk = $availableUnitKerjas->firstWhere('id', (int) $unitKerjaId);
+                if ($uk) {
+                    session(['active_unit_kerja_id' => $uk->id]);
+                } else {
+                    session(['active_unit_kerja_id' => $availableUnitKerjas->first()->id]);
+                }
+            } else {
+                $currentUkId = session('active_unit_kerja_id');
+                if ($currentUkId && $availableUnitKerjas->firstWhere('id', $currentUkId)) {
+                    // keep it
+                } else {
+                    session(['active_unit_kerja_id' => $availableUnitKerjas->first()->id]);
+                }
+            }
         }
 
+        session()->forget('active_division_id');
         session()->save();
 
-        // If switching while viewing/editing a document not belonging to the new context,
-        // redirect to documents index instead of throwing a 403 error.
+        // Redirect logic
         $referer = $request->headers->get('referer');
         $destination = null;
 
@@ -149,7 +113,7 @@ class ContextSwitchController extends Controller
             $refererPath = parse_url($referer, PHP_URL_PATH) ?? '';
             if (preg_match('#/documents/(\d+)(/edit|/preview)?#', $refererPath, $matches)) {
                 $docId = (int) $matches[1];
-                $doc = \App\Models\Document::find($docId);
+                $doc = Document::find($docId);
                 if ($doc) {
                     $activeBranchId = session('active_branch_id');
                     $activeCompanyId = session('active_company_id');
@@ -181,16 +145,15 @@ class ContextSwitchController extends Controller
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json([
                 'success' => true,
-                'message' => __('Konteks perusahaan & cabang berhasil dialihkan.'),
+                'message' => __('Konteks perusahaan, cabang & unit kerja berhasil dialihkan.'),
                 'active_company_id' => session('active_company_id'),
                 'active_branch_id' => session('active_branch_id'),
-                'active_division_id' => session('active_division_id'),
                 'active_unit_kerja_id' => session('active_unit_kerja_id'),
                 'redirect' => $destination,
             ]);
         }
 
-        return redirect()->to($destination)->with('success', __('Konteks perusahaan & cabang berhasil dialihkan.'));
+        return redirect()->to($destination)->with('success', __('Konteks perusahaan, cabang & unit kerja berhasil dialihkan.'));
     }
 
     /**

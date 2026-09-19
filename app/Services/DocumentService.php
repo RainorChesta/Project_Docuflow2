@@ -3,18 +3,19 @@
 namespace App\Services;
 
 use App\Jobs\SummarizeDocumentJob;
+use App\Models\Branch;
 use App\Models\Document;
+use App\Models\DocumentTemplate;
 use App\Models\DocumentType;
-use App\Models\Division;
+use App\Models\UnitKerja;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-
-use PhpOffice\PhpWord\PhpWord;
-use PhpOffice\PhpWord\IOFactory;
 use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpWord\IOFactory;
+use PhpOffice\PhpWord\PhpWord;
 
 class DocumentService
 {
@@ -56,34 +57,16 @@ class DocumentService
      * Generate the final, authoritative document number. Locks the row
      * range to avoid duplicate sequences under concurrent submissions.
      */
-    public function generateId($formatChoice = null, $division = null, $documentType = null, $branch = null, $unitKerja = null): string
-    {
-        if ($formatChoice instanceof Division) {
-            $unitKerja = $branch instanceof \App\Models\UnitKerja ? $branch : ($documentType instanceof \App\Models\UnitKerja ? $documentType : $unitKerja);
-            $branch = $branch instanceof \App\Models\Branch ? $branch : ($documentType instanceof \App\Models\Branch ? $documentType : null);
-            $documentType = $division instanceof \App\Models\DocumentType ? $division : ($documentType instanceof \App\Models\DocumentType ? $documentType : null);
-            $division = $formatChoice;
-            $formatChoice = !empty($unitKerja) ? 'lama' : 'baru';
-        } elseif ($formatChoice instanceof DocumentType) {
-            $unitKerja = $branch instanceof \App\Models\UnitKerja ? $branch : $unitKerja;
-            $branch = $division instanceof \App\Models\Branch ? $division : null;
-            $documentType = $formatChoice;
-            $division = null;
-            $formatChoice = !empty($unitKerja) ? 'lama' : 'baru';
-        } elseif ($division instanceof DocumentType) {
-            $unitKerja = $branch instanceof \App\Models\UnitKerja ? $branch : $unitKerja;
-            $branch = $documentType instanceof \App\Models\Branch ? $documentType : null;
-            $documentType = $division;
-            $division = null;
-        }
+    public function generateId(
+        $arg1 = null,
+        $arg2 = null,
+        $arg3 = null,
+        $arg4 = null,
+        $arg5 = null
+    ): string {
+        [$documentType, $branch, $unitKerja] = $this->resolveArguments($arg1, $arg2, $arg3, $arg4, $arg5);
 
-        if ($branch) {
-            $formatChoice = $branch->is_pusat ? 'baru' : 'lama';
-        } else {
-            $formatChoice = !empty($unitKerja) ? 'lama' : (is_string($formatChoice) ? $formatChoice : 'baru');
-        }
-
-        return DB::transaction(function () use ($formatChoice, $division, $documentType, $branch, $unitKerja) {
+        return DB::transaction(function () use ($documentType, $branch, $unitKerja) {
             $year = now()->year;
             $branchId = $branch?->id;
             $typeId = $documentType?->id;
@@ -103,7 +86,7 @@ class DocumentService
             if ($maxDoc && $maxDoc->document_number) {
                 $parts = explode('/', $maxDoc->document_number);
                 if (!empty($parts[0]) && is_numeric($parts[0])) {
-                    $seq = (int)$parts[0] + 1;
+                    $seq = (int) $parts[0] + 1;
                 } else {
                     $seq = (clone $query)->count() + 1;
                 }
@@ -114,10 +97,8 @@ class DocumentService
             $romanMonth = $this->toRoman(now()->month);
 
             $formattedNumber = $this->formatNumber(
-                $formatChoice,
                 $seq,
-                $typeCode,
-                $division,
+                $documentType,
                 $branchCode,
                 $romanMonth,
                 $year,
@@ -130,10 +111,8 @@ class DocumentService
                 $attempt++;
                 $seq++;
                 $formattedNumber = $this->formatNumber(
-                    $formatChoice,
                     $seq,
-                    $typeCode,
-                    $division,
+                    $documentType,
                     $branchCode,
                     $romanMonth,
                     $year,
@@ -152,32 +131,14 @@ class DocumentService
      * Non-locking preview of the next number, purely indicative for the
      * create form.
      */
-    public function previewNumber($formatChoice = null, $division = null, $documentType = null, $branch = null, $unitKerja = null): string
-    {
-        if ($formatChoice instanceof Division) {
-            $unitKerja = $branch instanceof \App\Models\UnitKerja ? $branch : ($documentType instanceof \App\Models\UnitKerja ? $documentType : $unitKerja);
-            $branch = $branch instanceof \App\Models\Branch ? $branch : ($documentType instanceof \App\Models\Branch ? $documentType : null);
-            $documentType = $division instanceof \App\Models\DocumentType ? $division : ($documentType instanceof \App\Models\DocumentType ? $documentType : null);
-            $division = $formatChoice;
-            $formatChoice = !empty($unitKerja) ? 'lama' : 'baru';
-        } elseif ($formatChoice instanceof DocumentType) {
-            $unitKerja = $branch instanceof \App\Models\UnitKerja ? $branch : $unitKerja;
-            $branch = $division instanceof \App\Models\Branch ? $division : null;
-            $documentType = $formatChoice;
-            $division = null;
-            $formatChoice = !empty($unitKerja) ? 'lama' : 'baru';
-        } elseif ($division instanceof DocumentType) {
-            $unitKerja = $branch instanceof \App\Models\UnitKerja ? $branch : $unitKerja;
-            $branch = $documentType instanceof \App\Models\Branch ? $documentType : null;
-            $documentType = $division;
-            $division = null;
-        }
-
-        if ($branch) {
-            $formatChoice = $branch->is_pusat ? 'baru' : 'lama';
-        } else {
-            $formatChoice = !empty($unitKerja) ? 'lama' : (is_string($formatChoice) ? $formatChoice : 'baru');
-        }
+    public function previewNumber(
+        $arg1 = null,
+        $arg2 = null,
+        $arg3 = null,
+        $arg4 = null,
+        $arg5 = null
+    ): string {
+        [$documentType, $branch, $unitKerja] = $this->resolveArguments($arg1, $arg2, $arg3, $arg4, $arg5);
 
         $year = now()->year;
         $branchId = $branch?->id;
@@ -197,7 +158,7 @@ class DocumentService
         if ($maxDoc && $maxDoc->document_number) {
             $parts = explode('/', $maxDoc->document_number);
             if (!empty($parts[0]) && is_numeric($parts[0])) {
-                $seq = (int)$parts[0] + 1;
+                $seq = (int) $parts[0] + 1;
             } else {
                 $seq = (clone $query)->count() + 1;
             }
@@ -208,15 +169,37 @@ class DocumentService
         $romanMonth = $this->toRoman(now()->month);
 
         return $this->formatNumber(
-            $formatChoice,
             $seq,
-            $typeCode,
-            $division,
+            $documentType,
             $branchCode,
             $romanMonth,
             $year,
             $unitKerja
         );
+    }
+
+    /**
+     * Helper to resolve polymorph/flexible arguments for generateId and previewNumber.
+     *
+     * @return array{0: ?DocumentType, 1: ?Branch, 2: ?UnitKerja}
+     */
+    private function resolveArguments(...$args): array
+    {
+        $documentType = null;
+        $branch = null;
+        $unitKerja = null;
+
+        foreach ($args as $arg) {
+            if ($arg instanceof DocumentType) {
+                $documentType = $arg;
+            } elseif ($arg instanceof Branch) {
+                $branch = $arg;
+            } elseif ($arg instanceof UnitKerja) {
+                $unitKerja = $arg;
+            }
+        }
+
+        return [$documentType, $branch, $unitKerja];
     }
 
     private function toRoman(int $month): string
@@ -229,26 +212,32 @@ class DocumentService
         return $map[$month] ?? 'I';
     }
 
-    private function formatNumber(
-        string $formatChoice,
+    /**
+     * Format document number according to official rules:
+     *
+     * 1. Official Correspondence (Naskah Dinas):
+     *    sequenceNumber/documentTypeCode/branchCode/month/year
+     *
+     * 2. Accreditation Documents (Dokumen Akreditasi):
+     *    sequenceNumber/documentTypeCode-workUnitCode/branchCode/month/year
+     */
+    public function formatNumber(
         int $seq,
-        string $typeCode,
-        ?Division $division,
+        ?DocumentType $documentType,
         string $branchCode,
         string $romanMonth,
         int $year,
-        ?\App\Models\UnitKerja $unitKerja = null
+        ?UnitKerja $unitKerja = null
     ): string {
-        $typeCodeForNumber = str_replace('/', '-', $typeCode);
+        $typeCode = $documentType ? $documentType->code : 'DOC';
+        $isAkreditasi = $documentType ? $documentType->isAkreditasi() : ($unitKerja !== null);
 
-        // Cabang PT format: [seq]/[type]-[unit_kerja]/[branch]/[romanMonth]/[year]
-        // E.g.: 001/SK-01/MMC/IX/2026 or 001/SOP-11/CDC-DIP/IX/2026
-        if ($unitKerja !== null || $formatChoice === 'lama') {
+        if ($isAkreditasi) {
             $unitKerjaCode = $unitKerja ? $unitKerja->kode_unit_kerja : '00';
             return sprintf(
                 '%03d/%s-%s/%s/%s/%d',
                 $seq,
-                $typeCodeForNumber,
+                $typeCode,
                 $unitKerjaCode,
                 $branchCode,
                 $romanMonth,
@@ -256,14 +245,11 @@ class DocumentService
             );
         }
 
-        // Cabang Pusat PT format: [seq]/[type]/[division]/[branch_pusat]/[romanMonth]/[year]
-        // E.g.: 001/SK/SKRT/JBM/IX/2026
-        $divisionCode = $division ? $division->code : 'GEN';
+        // Naskah Dinas format (does not include unit kerja code)
         return sprintf(
-            '%03d/%s/%s/%s/%s/%d',
+            '%03d/%s/%s/%s/%d',
             $seq,
-            $typeCodeForNumber,
-            $divisionCode,
+            $typeCode,
             $branchCode,
             $romanMonth,
             $year
@@ -272,40 +258,19 @@ class DocumentService
 
     public function create(array $data, int $ownerId): Document
     {
-        if (empty($data['division_id']) && $ownerId) {
-            $owner = User::find($ownerId);
-            if ($owner) {
-                $activeDivId = app(\App\Services\CompanyContextService::class)->getActiveDivisionId($owner)
-                    ?? $owner->division_id
-                    ?? ($owner->allDivisionIds()[0] ?? null);
-                if ($activeDivId) {
-                    $data['division_id'] = $activeDivId;
-                }
-            }
-        }
-
-        $division = !empty($data['division_id']) ? Division::find($data['division_id']) : null;
-        $unitKerja = !empty($data['unit_kerja_id']) ? \App\Models\UnitKerja::find($data['unit_kerja_id']) : null;
+        $unitKerja = !empty($data['unit_kerja_id']) ? UnitKerja::find($data['unit_kerja_id']) : null;
         $documentType = DocumentType::findOrFail($data['document_type_id']);
-        $branch = !empty($data['branch_id']) ? \App\Models\Branch::with('company')->find($data['branch_id']) : null;
-
-        if ($branch) {
-            $formatChoice = $branch->is_pusat ? 'baru' : 'lama';
-        } else {
-            $formatChoice = $data['format_choice'] ?? (!empty($unitKerja) ? 'lama' : 'baru');
-        }
-        $data['format_choice'] = $formatChoice;
+        $branch = !empty($data['branch_id']) ? Branch::with('company')->find($data['branch_id']) : null;
 
         if ($branch && empty($data['company_id'])) {
             $data['company_id'] = $branch->company_id;
         }
 
         if (empty($data['document_number'])) {
-            if ($formatChoice === 'baru' || $formatChoice === 'lama') {
-                $data['document_number'] = $this->generateId($formatChoice, $division, $documentType, $branch, $unitKerja);
-            }
+            $data['document_number'] = $this->generateId($documentType, $branch, $unitKerja);
         }
-        $data['visibility'] ??= Document::VISIBILITY_DIVISION;
+
+        $data['visibility'] ??= Document::VISIBILITY_UNIT_KERJA;
         $data['owner_id'] = $ownerId;
         $data['paper_size'] ??= 'A4';
 
@@ -330,27 +295,12 @@ class DocumentService
     }
 
     /**
-     * Dokumen dari berkas fisik yang sudah diunggah (bukan ditulis di Jodit).
-     * Nomor sudah divalidasi manual oleh controller (mengikuti format resmi),
-     * jadi tidak di-generate di sini. Versi pertama langsung berstatus
-     * "pending" — skip draft, langsung minta approval kepala divisi.
+     * Dokumen dari berkas fisik yang sudah diunggah.
      */
     public function createFromUpload(array $data, int $ownerId, UploadedFile $file): Document
     {
-        if (empty($data['division_id']) && $ownerId) {
-            $owner = User::find($ownerId);
-            if ($owner) {
-                $activeDivId = app(\App\Services\CompanyContextService::class)->getActiveDivisionId($owner)
-                    ?? $owner->division_id
-                    ?? ($owner->allDivisionIds()[0] ?? null);
-                if ($activeDivId) {
-                    $data['division_id'] = $activeDivId;
-                }
-            }
-        }
-
         return DB::transaction(function () use ($data, $ownerId, $file) {
-            $data['visibility'] ??= Document::VISIBILITY_DIVISION;
+            $data['visibility'] ??= Document::VISIBILITY_UNIT_KERJA;
             $data['owner_id'] = $ownerId;
 
             $doc = Document::create($data);
@@ -379,13 +329,12 @@ class DocumentService
 
     /**
      * Save updated template binary content received from ONLYOFFICE or manual edit.
-     * Ensures atomic storage persistence, timestamp updating, and ONLYOFFICE key rotation.
      */
     public function saveTemplateDocx(
-        \App\Models\DocumentTemplate $template,
+        DocumentTemplate $template,
         string $docxBinaryContent,
-        ?\App\Models\User $author = null
-    ): \App\Models\DocumentTemplate {
+        ?User $author = null
+    ): DocumentTemplate {
         return DB::transaction(function () use ($template, $docxBinaryContent, $author) {
             $diskName = config('onlyoffice.storage_disk', 'local');
             $disk = Storage::disk($diskName);
@@ -416,47 +365,24 @@ class DocumentService
     /**
      * Buat dokumen baru dari template. File .docx template di-copy ke
      * storage dokumen baru, sehingga template asli tidak pernah berubah.
-     * Versi pertama berstatus "draft" — user bisa langsung edit di OnlyOffice.
      */
-    public function createFromTemplate(array $data, int $ownerId, \App\Models\DocumentTemplate $template): Document
+    public function createFromTemplate(array $data, int $ownerId, DocumentTemplate $template): Document
     {
-        // Reload fresh template state from database
         $template = $template->fresh() ?? $template;
 
-        if (empty($data['division_id']) && $ownerId) {
-            $owner = User::find($ownerId);
-            if ($owner) {
-                $activeDivId = app(\App\Services\CompanyContextService::class)->getActiveDivisionId($owner)
-                    ?? $owner->division_id
-                    ?? ($owner->allDivisionIds()[0] ?? null);
-                if ($activeDivId) {
-                    $data['division_id'] = $activeDivId;
-                }
-            }
-        }
-
-        $division = !empty($data['division_id']) ? Division::find($data['division_id']) : null;
-        $unitKerja = !empty($data['unit_kerja_id']) ? \App\Models\UnitKerja::find($data['unit_kerja_id']) : null;
+        $unitKerja = !empty($data['unit_kerja_id']) ? UnitKerja::find($data['unit_kerja_id']) : null;
         $documentType = DocumentType::findOrFail($data['document_type_id']);
-        $branch = !empty($data['branch_id']) ? \App\Models\Branch::with('company')->find($data['branch_id']) : null;
-
-        if ($branch) {
-            $formatChoice = $branch->is_pusat ? 'baru' : 'lama';
-        } else {
-            $formatChoice = $data['format_choice'] ?? (!empty($unitKerja) ? 'lama' : 'baru');
-        }
-        $data['format_choice'] = $formatChoice;
+        $branch = !empty($data['branch_id']) ? Branch::with('company')->find($data['branch_id']) : null;
 
         if ($branch && empty($data['company_id'])) {
             $data['company_id'] = $branch->company_id;
         }
 
         if (empty($data['document_number'])) {
-            if ($formatChoice === 'baru' || $formatChoice === 'lama') {
-                $data['document_number'] = $this->generateId($formatChoice, $division, $documentType, $branch, $unitKerja);
-            }
+            $data['document_number'] = $this->generateId($documentType, $branch, $unitKerja);
         }
-        $data['visibility'] ??= Document::VISIBILITY_DIVISION;
+
+        $data['visibility'] ??= Document::VISIBILITY_UNIT_KERJA;
         $data['owner_id'] = $ownerId;
         $data['template_id'] = $template->id;
         $data['paper_size'] ??= 'A4';
@@ -485,7 +411,7 @@ class DocumentService
                 $disk->put($destPath, $templateBytes);
             } else {
                 // Fallback: create a blank docx if template file missing
-                $phpWord = new \PhpOffice\PhpWord\PhpWord();
+                $phpWord = new PhpWord();
                 $section = $phpWord->addSection([
                     'pageSizeW' => 11906,
                     'pageSizeH' => 16838,
@@ -496,7 +422,7 @@ class DocumentService
                 ]);
                 $section->addText(' ', ['name' => 'Arial', 'size' => 11]);
                 $tempPath = tempnam(sys_get_temp_dir(), 'docx_');
-                $objWriter = \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007');
+                $objWriter = IOFactory::createWriter($phpWord, 'Word2007');
                 $objWriter->save($tempPath);
                 $disk->put($destPath, file_get_contents($tempPath));
                 if (file_exists($tempPath)) {
@@ -523,12 +449,10 @@ class DocumentService
     }
 
     /**
-     * Kirim job ringkasan AI ke antrian. Job hanya membawa document id —
-     * payload kecil, dan request web tidak menunggu Groq selesai.
+     * Kirim job ringkasan AI ke antrian.
      */
     public function dispatchSummary(Document $document, int $percentage = 30, string $model = 'auto', string $locale = 'id'): void
     {
-        // Lepas kunci lama (kalau ada) supaya job baru tidak di-skip.
         Cache::lock('summarize:' . $document->id)->forceRelease();
 
         $document->update([
@@ -538,16 +462,5 @@ class DocumentService
         ]);
 
         SummarizeDocumentJob::dispatch($document->id, $percentage, $model, $locale);
-    }
-
-    private function toRomanMonth(int $month): string
-    {
-        $romans = [
-            1 => 'I', 2 => 'II', 3 => 'III', 4 => 'IV',
-            5 => 'V', 6 => 'VI', 7 => 'VII', 8 => 'VIII',
-            9 => 'IX', 10 => 'X', 11 => 'XI', 12 => 'XII',
-        ];
-
-        return $romans[$month];
     }
 }

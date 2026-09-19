@@ -4,7 +4,7 @@ namespace Tests\Feature\Auth;
 
 use App\Models\Branch;
 use App\Models\Company;
-use App\Models\Division;
+use App\Models\UnitKerja;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -37,7 +37,7 @@ class AccountVerificationTest extends TestCase
         $user = User::factory()->create([
             'email' => 'unverified@example.com',
             'password' => Hash::make('password123'),
-            'division_id' => null,
+            'unit_kerja_id' => null,
             'system_role' => 'user',
             'is_active' => true,
         ]);
@@ -55,7 +55,7 @@ class AccountVerificationTest extends TestCase
     public function test_unverified_user_is_locked_out_of_dashboard_and_features(): void
     {
         $user = User::factory()->create([
-            'division_id' => null,
+            'unit_kerja_id' => null,
             'system_role' => 'user',
             'is_active' => true,
         ]);
@@ -88,7 +88,7 @@ class AccountVerificationTest extends TestCase
     public function test_unverified_user_can_view_verification_pending_screen_and_logout(): void
     {
         $user = User::factory()->create([
-            'division_id' => null,
+            'unit_kerja_id' => null,
             'system_role' => 'user',
             'is_active' => true,
         ]);
@@ -123,16 +123,16 @@ class AccountVerificationTest extends TestCase
     {
         $company = Company::create(['name' => 'PT Test', 'code' => 'TEST']);
         $branch = Branch::create(['company_id' => $company->id, 'name' => 'Pusat', 'is_pusat' => true]);
-        $division = Division::create(['name' => 'IT Dept', 'code' => 'IT']);
+        $unitKerja = UnitKerja::create(['nama_unit_kerja' => 'IT Dept', 'kode_unit_kerja' => 'IT']);
 
         $user = User::factory()->create([
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'system_role' => 'user',
             'is_active' => true,
         ]);
         $user->companies()->attach($company->id);
         $user->branches()->attach($branch->id);
-        $user->divisions()->attach($division->id);
+        $user->unitKerjas()->attach($unitKerja->id);
 
         $this->assertTrue($user->isVerified());
         $this->assertFalse($user->isPendingVerification());
@@ -164,12 +164,12 @@ class AccountVerificationTest extends TestCase
 
         $company = Company::create(['name' => 'PT Sukses', 'code' => 'SKS']);
         $branch = Branch::create(['company_id' => $company->id, 'name' => 'Pusat', 'is_pusat' => true]);
-        $division = Division::create(['name' => 'HR Dept', 'code' => 'HR']);
+        $unitKerja = UnitKerja::create(['nama_unit_kerja' => 'HR Dept', 'kode_unit_kerja' => 'HR']);
 
         // Verified user
         $verifiedUser = User::factory()->create([
             'name' => 'Verified Karyawan',
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'system_role' => 'user',
             'is_active' => true,
         ]);
@@ -179,7 +179,7 @@ class AccountVerificationTest extends TestCase
         // Unverified user
         $unverifiedUser = User::factory()->create([
             'name' => 'Pending Karyawan',
-            'division_id' => null,
+            'unit_kerja_id' => null,
             'system_role' => 'user',
             'is_active' => true,
         ]);
@@ -201,7 +201,7 @@ class AccountVerificationTest extends TestCase
         $responseActive->assertDontSee('Pending Karyawan');
     }
 
-    public function test_admin_verifying_user_by_assigning_division_and_company_branch_unlocks_account(): void
+    public function test_admin_verifying_user_by_assigning_unit_kerja_and_company_branch_unlocks_account(): void
     {
         $admin = User::factory()->create([
             'system_role' => 'admin',
@@ -210,25 +210,25 @@ class AccountVerificationTest extends TestCase
 
         $company = Company::create(['name' => 'PT Maju', 'code' => 'MJU']);
         $branch = Branch::create(['company_id' => $company->id, 'name' => 'Cabang', 'is_pusat' => false, 'code' => 'CBG']);
-        $division = Division::create(['name' => 'Finance', 'code' => 'FIN']);
+        $unitKerja = UnitKerja::create(['nama_unit_kerja' => 'Finance', 'kode_unit_kerja' => 'FIN']);
 
         $user = User::factory()->create([
             'name' => 'Budi Santoso',
             'email' => 'budi@example.com',
-            'division_id' => null,
+            'unit_kerja_id' => null,
             'system_role' => 'user',
             'is_active' => true,
         ]);
 
         $this->assertFalse($user->isVerified());
 
-        // Admin updates user, assigning division, company, branch
+        // Admin updates user, assigning unit kerja, company, branch
         $response = $this->actingAs($admin)->put("/admin/users/{$user->id}", [
             'name' => 'Budi Santoso',
             'email' => 'budi@example.com',
             'system_role' => 'user',
             'is_active' => 1,
-            'division_ids' => [$division->id],
+            'unit_kerja_ids' => [$unitKerja->id],
             'company_ids' => [$company->id],
             'branch_ids' => [$branch->id],
         ]);
@@ -238,7 +238,7 @@ class AccountVerificationTest extends TestCase
         $user->refresh();
         $this->assertTrue($user->isVerified());
         $this->assertFalse($user->isPendingVerification());
-        $this->assertEquals($division->id, $user->division_id);
+        $this->assertEquals($unitKerja->id, $user->unit_kerja_id);
         $this->assertTrue($user->companies->contains($company->id));
         $this->assertTrue($user->branches->contains($branch->id));
 
@@ -261,36 +261,36 @@ class AccountVerificationTest extends TestCase
             'is_active' => true,
         ]);
 
-        $division = Division::create(['name' => 'IT Engineering', 'code' => 'IT']);
+        $unitKerja = UnitKerja::create(['nama_unit_kerja' => 'IT Engineering', 'kode_unit_kerja' => 'IT']);
         $company = Company::create(['name' => 'PT Doku Tech', 'code' => 'DOKU']);
         $branch = Branch::create(['company_id' => $company->id, 'name' => 'Pusat', 'is_pusat' => true]);
 
         $user = User::factory()->create([
             'name' => 'Rian Pratama',
             'email' => 'rian@example.com',
-            'division_id' => null,
+            'unit_kerja_id' => null,
             'system_role' => 'user',
             'is_active' => true,
         ]);
 
-        // 1. Initial State: Unverified, no division, no company/branch
+        // 1. Initial State: Unverified, no unit_kerja, no company/branch
         $statusResp = $this->actingAs($user)->getJson('/verification-status');
         $statusResp->assertStatus(200)
             ->assertJson([
                 'is_verified' => false,
-                'has_division' => false,
+                'has_unit_kerja' => false,
                 'has_company' => false,
                 'has_branch' => false,
                 'has_company_and_branch' => false,
             ]);
 
-        // 2. Admin only assigns Division without assigning Company and Branch
+        // 2. Admin only assigns Unit Kerja without assigning Company and Branch
         $this->actingAs($admin)->put("/admin/users/{$user->id}", [
             'name' => 'Rian Pratama',
             'email' => 'rian@example.com',
             'system_role' => 'user',
             'is_active' => 1,
-            'division_ids' => [$division->id],
+            'unit_kerja_ids' => [$unitKerja->id],
             'company_ids' => [],
             'branch_ids' => [],
         ]);
@@ -299,26 +299,26 @@ class AccountVerificationTest extends TestCase
 
         $user->refresh();
 
-        // Verification status endpoint now reflects division assigned, but company & branch still pending
+        // Verification status endpoint now reflects unit kerja assigned, but company & branch still pending
         $statusResp2 = $this->actingAs($user)->getJson('/verification-status');
         $statusResp2->assertStatus(200)
             ->assertJson([
                 'is_verified' => false,
-                'has_division' => true,
+                'has_unit_kerja' => true,
                 'has_company' => false,
                 'has_branch' => false,
                 'has_company_and_branch' => false,
-                'division_names' => ['IT Engineering'],
+                'unit_kerja_names' => ['IT Engineering'],
             ]);
 
-        // Verification pending blade view reflects Division step completed while Company & Branch pending
+        // Verification pending blade view reflects Unit Kerja step completed while Company & Branch pending
         $pageResp = $this->actingAs($user)
             ->withHeader('X-Test-Enforce-Verification', '1')
             ->get('/verification-pending');
 
         $pageResp->assertStatus(200);
         $pageResp->assertSee('IT Engineering');
-        $pageResp->assertSee('hasDivision: true', false);
+        $pageResp->assertSee('hasUnitKerja: true', false);
         $pageResp->assertSee('hasCompany: false', false);
         $pageResp->assertSee('hasBranch: false', false);
 
@@ -328,7 +328,7 @@ class AccountVerificationTest extends TestCase
             'email' => 'rian@example.com',
             'system_role' => 'user',
             'is_active' => 1,
-            'division_ids' => [$division->id],
+            'unit_kerja_ids' => [$unitKerja->id],
             'company_ids' => [$company->id],
             'branch_ids' => [$branch->id],
         ]);
@@ -337,7 +337,7 @@ class AccountVerificationTest extends TestCase
         $statusResp3->assertStatus(200)
             ->assertJson([
                 'is_verified' => true,
-                'has_division' => true,
+                'has_unit_kerja' => true,
                 'has_company' => true,
                 'has_branch' => true,
                 'has_company_and_branch' => true,

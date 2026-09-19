@@ -12,15 +12,6 @@
                 <form method="GET" action="{{ route('admin.users.index') }}" class="flex flex-col sm:flex-row flex-wrap gap-2 w-full md:w-auto justify-end">
                     <input type="text" name="search" value="{{ request('search') }}" placeholder="{{ __('Cari Nama, Email, NIP...') }}" class="input input-bordered input-sm w-full sm:w-auto" />
                     
-                    <select name="division" class="select select-bordered select-sm w-full sm:w-auto">
-                        <option value="">{{ __('Semua Divisi') }}</option>
-                        @foreach($divisions as $division)
-                            <option value="{{ $division->id }}" {{ request('division') == $division->id ? 'selected' : '' }}>
-                                {{ $division->name ?? $division->code }}
-                            </option>
-                        @endforeach
-                    </select>
-
                     <select name="unit_kerja" class="select select-bordered select-sm w-full sm:w-auto">
                         <option value="">{{ __('Semua Unit Kerja') }}</option>
                         @foreach($unitKerjas as $uk)
@@ -47,7 +38,7 @@
 
                     <div class="flex gap-2">
                         <button type="submit" class="btn btn-primary btn-sm">{{ __('Filter') }}</button>
-                        @if(request()->anyFilled(['search', 'division', 'unit_kerja', 'role', 'status']))
+                        @if(request()->anyFilled(['search', 'unit_kerja', 'role', 'status']))
                             <a href="{{ route('admin.users.index') }}" class="btn btn-ghost btn-sm">{{ __('Reset') }}</a>
                         @endif
                     </div>
@@ -68,7 +59,7 @@
                             <tr class="border-b border-base-200">
                                 <th class="min-w-[180px] font-semibold text-xs text-base-content/70 uppercase tracking-wider">{{ __('Nama / NIP') }}</th>
                                 <th class="min-w-[180px] font-semibold text-xs text-base-content/70 uppercase tracking-wider">{{ __('Email / Telepon') }}</th>
-                                <th class="min-w-[150px] font-semibold text-xs text-base-content/70 uppercase tracking-wider">{{ __('Divisi / Unit Kerja') }}</th>
+                                <th class="min-w-[150px] font-semibold text-xs text-base-content/70 uppercase tracking-wider">{{ __('Unit Kerja') }}</th>
                                 <th class="min-w-[180px] font-semibold text-xs text-base-content/70 uppercase tracking-wider">{{ __('Perusahaan & Cabang') }}</th>
                                 <th class="min-w-[90px] font-semibold text-xs text-base-content/70 uppercase tracking-wider">{{ __('Peran') }}</th>
                                 <th class="min-w-[160px] font-semibold text-xs text-base-content/70 uppercase tracking-wider">{{ __('Status') }}</th>
@@ -98,18 +89,8 @@
                                     <td class="align-middle">
                                         @if($user->system_role === 'direktur')
                                             <span class="text-xs text-base-content/40 italic font-mono">{{ __('(N/A)') }}</span>
-                                        @elseif($user->divisions->isNotEmpty() || $user->unitKerjas->isNotEmpty() || $user->division || $user->unitKerja)
+                                        @elseif($user->unitKerjas->isNotEmpty() || $user->unitKerja)
                                             <div class="flex flex-wrap items-center gap-1.5 max-w-[220px]">
-                                                @foreach($user->divisions as $div)
-                                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-base-200 text-base-content border border-base-300" title="Divisi: {{ $div->name }}">
-                                                        {{ $div->code ?: $div->name }}
-                                                    </span>
-                                                @endforeach
-                                                @if($user->divisions->isEmpty() && $user->division)
-                                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-base-200 text-base-content border border-base-300" title="Divisi: {{ $user->division->name }}">
-                                                        {{ $user->division->code ?: $user->division->name }}
-                                                    </span>
-                                                @endif
                                                 @foreach($user->unitKerjas as $uk)
                                                     <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-primary/10 text-primary border border-primary/20" title="Unit Kerja: {{ $uk->nama_unit_kerja }} ({{ $uk->cabang?->name }})">
                                                         UK: {{ $uk->kode_unit_kerja }}

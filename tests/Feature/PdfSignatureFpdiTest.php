@@ -3,12 +3,12 @@
 namespace Tests\Feature;
 
 use App\Models\Company;
-use App\Models\Division;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\DocumentVersion;
 use App\Models\Signature;
 use App\Models\SignatureRequest;
+use App\Models\UnitKerja;
 use App\Models\User;
 use App\Services\PdfSignatureProcessorService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -71,7 +71,7 @@ class PdfSignatureFpdiTest extends TestCase
             'title' => 'Sample PDF Doc',
             'document_type_id' => $docType->id,
             'owner_id' => $owner->id,
-            'visibility' => 'division',
+            'visibility' => 'unit_kerja',
         ]);
 
         $pdfPath = 'documents/' . $document->id . '/v1.pdf';
@@ -134,7 +134,7 @@ class PdfSignatureFpdiTest extends TestCase
             'title' => 'My PDF Doc',
             'document_type_id' => $docType->id,
             'owner_id' => $user->id,
-            'visibility' => 'division',
+            'visibility' => 'unit_kerja',
         ]);
 
         $pdfPath = 'documents/' . $document->id . '/v1.pdf';
@@ -185,7 +185,7 @@ class PdfSignatureFpdiTest extends TestCase
             'title' => 'My PDF Stamp Doc',
             'document_type_id' => $docType->id,
             'owner_id' => $user->id,
-            'visibility' => 'division',
+            'visibility' => 'unit_kerja',
         ]);
 
         $pdfPath = 'documents/' . $document->id . '/v1.pdf';
@@ -230,7 +230,7 @@ class PdfSignatureFpdiTest extends TestCase
             'title' => 'Approval PDF Doc',
             'document_type_id' => $docType->id,
             'owner_id' => $requester->id,
-            'visibility' => 'division',
+            'visibility' => 'unit_kerja',
         ]);
 
         $pdfPath = 'documents/' . $document->id . '/v1.pdf';
@@ -298,7 +298,7 @@ class PdfSignatureFpdiTest extends TestCase
             'title' => 'Visual Custom Placement PDF',
             'document_type_id' => $docType->id,
             'owner_id' => $user->id,
-            'visibility' => 'division',
+            'visibility' => 'unit_kerja',
         ]);
 
         $pdfPath = 'documents/' . $document->id . '/v1.pdf';
@@ -348,7 +348,7 @@ class PdfSignatureFpdiTest extends TestCase
             'title' => 'Manager Approval Custom PDF',
             'document_type_id' => $docType->id,
             'owner_id' => $requester->id,
-            'visibility' => 'division',
+            'visibility' => 'unit_kerja',
         ]);
 
         $pdfPath = 'documents/' . $document->id . '/v1.pdf';
@@ -422,7 +422,7 @@ class PdfSignatureFpdiTest extends TestCase
             'title' => 'Revert PDF Doc',
             'document_type_id' => $docType->id,
             'owner_id' => $user->id,
-            'visibility' => 'division',
+            'visibility' => 'unit_kerja',
         ]);
 
         $pdfPath = 'documents/' . $document->id . '/v1.pdf';
@@ -476,7 +476,7 @@ class PdfSignatureFpdiTest extends TestCase
             'title' => 'QR PDF Doc',
             'document_type_id' => $docType->id,
             'owner_id' => $user->id,
-            'visibility' => 'division',
+            'visibility' => 'unit_kerja',
         ]);
 
         $pdfPath = 'documents/' . $document->id . '/v1.pdf';
@@ -522,7 +522,7 @@ class PdfSignatureFpdiTest extends TestCase
             'title' => 'Word Doc',
             'document_type_id' => $docType->id,
             'owner_id' => $user->id,
-            'visibility' => 'division',
+            'visibility' => 'unit_kerja',
         ]);
 
         $docxPath = 'documents/' . $document->id . '/v1.docx';
@@ -582,7 +582,7 @@ class PdfSignatureFpdiTest extends TestCase
             'title' => 'Stamp Only PDF Doc',
             'document_type_id' => $docType->id,
             'owner_id' => $requester->id,
-            'visibility' => 'division',
+            'visibility' => 'unit_kerja',
         ]);
 
         $pdfPath = 'documents/' . $document->id . '/v1.pdf';
@@ -657,7 +657,7 @@ class PdfSignatureFpdiTest extends TestCase
             'title' => 'Consume Stamp PDF Doc',
             'document_type_id' => $docType->id,
             'owner_id' => $requester->id,
-            'visibility' => 'division',
+            'visibility' => 'unit_kerja',
         ]);
 
         $pdfPath = 'documents/' . $document->id . '/v1.pdf';
@@ -736,7 +736,7 @@ class PdfSignatureFpdiTest extends TestCase
             'title' => 'Independent Request PDF Doc',
             'document_type_id' => $docType->id,
             'owner_id' => $requester->id,
-            'visibility' => 'division',
+            'visibility' => 'unit_kerja',
         ]);
 
         $pdfPath = 'documents/' . $document->id . '/v1.pdf';

@@ -48,6 +48,7 @@ class DocumentTypeController extends Controller
         $validated = $request->validate([
             'code' => 'required|string|max:20|unique:document_types,code',
             'name' => 'required|string|max:255',
+            'category' => 'required|in:naskah_dinas,akreditasi',
         ]);
 
         DocumentType::create($validated);
@@ -67,6 +68,7 @@ class DocumentTypeController extends Controller
         $validated = $request->validate([
             'code' => 'required|string|max:20|unique:document_types,code,' . $documentType->id,
             'name' => 'required|string|max:255',
+            'category' => 'required|in:naskah_dinas,akreditasi',
         ]);
 
         $documentType->update($validated);

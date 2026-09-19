@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password', 'division_id', 'unit_kerja_id', 'system_role', 'is_active', 'profile_picture', 'nip', 'phone_number'])]
+#[Fillable(['name', 'email', 'password', 'unit_kerja_id', 'system_role', 'is_active', 'profile_picture', 'nip', 'phone_number'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -37,22 +37,9 @@ class User extends Authenticatable
         ];
     }
 
-    public function division(): BelongsTo
-    {
-        return $this->belongsTo(Division::class);
-    }
-
-    /**
-     * All divisions the user belongs to (primary + additional via pivot).
-     */
-    public function divisions(): BelongsToMany
-    {
-        return $this->belongsToMany(Division::class)->withPivot('branch_id')->withTimestamps();
-    }
-
     public function unitKerja(): BelongsTo
     {
-        return $this->belongsTo(UnitKerja::class);
+        return $this->belongsTo(UnitKerja::class, 'unit_kerja_id');
     }
 
     /**
@@ -60,7 +47,7 @@ class User extends Authenticatable
      */
     public function unitKerjas(): BelongsToMany
     {
-        return $this->belongsToMany(UnitKerja::class)->withPivot('branch_id')->withTimestamps();
+        return $this->belongsToMany(UnitKerja::class, 'unit_kerja_user')->withPivot('branch_id')->withTimestamps();
     }
 
     /**
@@ -70,7 +57,10 @@ class User extends Authenticatable
     {
         if ($branchId !== null) {
             $ids = $this->unitKerjas()
-                ->wherePivot('branch_id', $branchId)
+                ->where(function ($q) use ($branchId) {
+                    $q->wherePivot('branch_id', $branchId)
+                      ->orWhereNull('unit_kerja_user.branch_id');
+                })
                 ->pluck('unit_kerjas.id')
                 ->all();
 
@@ -105,47 +95,7 @@ class User extends Authenticatable
     }
 
     /**
-     * IDs of divisions assigned to the user, optionally scoped to a branch (Pusat).
-     */
-    public function allDivisionIds(?int $branchId = null): array
-    {
-        if ($branchId !== null) {
-            $ids = $this->divisions()
-                ->wherePivot('branch_id', $branchId)
-                ->pluck('divisions.id')
-                ->all();
-
-            if (!empty($ids)) {
-                return array_values(array_unique($ids));
-            }
-        }
-
-        $ids = $this->divisions()->pluck('divisions.id')->all();
-
-        if ($this->division_id) {
-            $ids[] = $this->division_id;
-        }
-
-        return array_values(array_unique($ids));
-    }
-
-    /**
-     * Map of [branch_id => [division_id, ...]] for Pusat branches.
-     */
-    public function getBranchDivisionsMap(): array
-    {
-        $map = [];
-        foreach ($this->divisions as $div) {
-            $bId = $div->pivot->branch_id ?? null;
-            if ($bId) {
-                $map[$bId][] = (string) $div->id;
-            }
-        }
-        return $map;
-    }
-
-    /**
-     * Map of [branch_id => [unit_kerja_id, ...]] for Cabang branches.
+     * Map of [branch_id => [unit_kerja_id, ...]] for branches.
      */
     public function getBranchUnitKerjasMap(): array
     {
@@ -249,7 +199,7 @@ class User extends Authenticatable
      * An account is verified when:
      * - User is admin (global access)
      * - User is direktur and assigned to at least one company and branch
-     * - User is head/staff and assigned to at least one division, company, and branch
+     * - User is head/staff and assigned to at least one unit kerja, company, and branch
      */
     public function isVerified(): bool
     {
@@ -269,19 +219,13 @@ class User extends Authenticatable
             return $hasCompany && $hasBranch;
         }
 
-        $hasDivision = !empty($this->division_id) || (
-            $this->relationLoaded('divisions')
-                ? $this->divisions->isNotEmpty()
-                : $this->divisions()->exists()
-        );
-
         $hasUnitKerja = !empty($this->unit_kerja_id) || (
             $this->relationLoaded('unitKerjas')
                 ? $this->unitKerjas->isNotEmpty()
                 : $this->unitKerjas()->exists()
         );
 
-        return ($hasDivision || $hasUnitKerja) && $hasCompany && $hasBranch;
+        return $hasUnitKerja && $hasCompany && $hasBranch;
     }
 
     /**
@@ -378,8 +322,8 @@ class User extends Authenticatable
             return $versionsQuery->count();
         }
 
-        $divisionIds = $this->allDivisionIds();
-        if (empty($divisionIds)) {
+        $unitKerjaIds = $this->allUnitKerjaIds($branchId);
+        if (empty($unitKerjaIds)) {
             return 0;
         }
 
@@ -390,8 +334,8 @@ class User extends Authenticatable
 
         return DocumentVersion::where('status', 'pending')
             ->whereNull('discarded_at')
-            ->whereHas('document', function ($q) use ($divisionIds, $roleFilter, $companyId, $branchId, $scopedToContext) {
-                $q->whereIn('division_id', $divisionIds)
+            ->whereHas('document', function ($q) use ($unitKerjaIds, $roleFilter, $companyId, $branchId, $scopedToContext) {
+                $q->whereIn('unit_kerja_id', $unitKerjaIds)
                   ->visibleTo($this)
                   ->where($roleFilter);
 
@@ -441,8 +385,8 @@ class User extends Authenticatable
             return $renamesQuery->count();
         }
 
-        $divisionIds = $this->allDivisionIds();
-        if (empty($divisionIds)) {
+        $unitKerjaIds = $this->allUnitKerjaIds($branchId);
+        if (empty($unitKerjaIds)) {
             return 0;
         }
 
@@ -451,7 +395,7 @@ class User extends Authenticatable
               ->orWhereNull('approver_role');
         };
 
-        $renamesQuery = Document::whereIn('division_id', $divisionIds)
+        $renamesQuery = Document::whereIn('unit_kerja_id', $unitKerjaIds)
             ->visibleTo($this)
             ->whereNotNull('pending_title')
             ->where('pending_title', '!=', '')
@@ -502,8 +446,8 @@ class User extends Authenticatable
             return $rollbacksQuery->count();
         }
 
-        $divisionIds = $this->allDivisionIds();
-        if (empty($divisionIds)) {
+        $unitKerjaIds = $this->allUnitKerjaIds($branchId);
+        if (empty($unitKerjaIds)) {
             return 0;
         }
 
@@ -512,7 +456,7 @@ class User extends Authenticatable
               ->orWhereNull('approver_role');
         };
 
-        $rollbacksQuery = Document::whereIn('division_id', $divisionIds)
+        $rollbacksQuery = Document::whereIn('unit_kerja_id', $unitKerjaIds)
             ->visibleTo($this)
             ->whereNotNull('pending_rollback_version_id')
             ->where($roleFilter);
@@ -560,8 +504,6 @@ class User extends Authenticatable
 
     /**
      * Hitung total dokumen baru yang dibagikan kepada pengguna yang belum dibuka / dibaca.
-     * Hanya muncul pada pengguna yang diberi/menerima akses, bukan pemilik.
-     * Dihitung per dokumen (meskipun pengguna diberi akses bertahap/berganda seperti viewer lalu editor).
      */
     public function sharedDocumentsCount(): int
     {

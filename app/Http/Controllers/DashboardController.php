@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Division;
 use App\Models\Document;
 use App\Models\DocumentType;
+use App\Models\UnitKerja;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -22,7 +22,7 @@ class DashboardController extends Controller
         // Search across every document the user may see.
         $results = null;
         if ($request->filled('search') || $request->filled('document_type_id')) {
-            $searchQuery = Document::with('owner', 'division', 'currentVersion')
+            $searchQuery = Document::with('owner', 'unitKerja', 'currentVersion')
                 ->visibleTo($user);
 
             if (!$user->isAdmin()) {
@@ -59,7 +59,7 @@ class DashboardController extends Controller
 
         // Admin dashboard = General Dokumen list (tab removed from navbar for admin).
         if ($user->isAdmin()) {
-            $query = Document::with('owner', 'division', 'currentVersion', 'versions')
+            $query = Document::with('owner', 'unitKerja', 'currentVersion', 'versions')
                 ->general();
 
             if ($search = $request->get('search')) {
@@ -69,8 +69,8 @@ class DashboardController extends Controller
                 });
             }
 
-            if ($divisionId = $request->get('division_id')) {
-                $query->where('division_id', $divisionId);
+            if ($unitKerjaId = ($request->get('unit_kerja_id') ?? $request->get('division_id'))) {
+                $query->where('unit_kerja_id', $unitKerjaId);
             }
 
             if ($documentTypeId = $request->get('document_type_id')) {
@@ -90,10 +90,10 @@ class DashboardController extends Controller
 
             $documents = $query->latest()->paginate(15)->withQueryString();
 
-            $divisions = Division::all();
+            $unitKerjas = UnitKerja::orderBy('code')->get();
             $documentTypes = DocumentType::orderBy('name')->get();
 
-            return view('dashboard', compact('results', 'documents', 'divisions', 'documentTypes'));
+            return view('dashboard', compact('results', 'documents', 'unitKerjas', 'documentTypes'));
         }
 
         $baseDocQuery = $user->documents();
@@ -120,10 +120,10 @@ class DashboardController extends Controller
         $activeDocsCount = (clone $baseDocQuery)->whereHas('currentVersion', fn($q) => $q->where('status', 'active'))->count();
         $pendingDocsCount = (clone $baseDocQuery)->whereHas('versions', fn($q) => $q->where('status', 'pending'))->count();
 
-        $recent = (clone $baseDocQuery)->with('division', 'currentVersion')->latest()->take(5)->get();
+        $recent = (clone $baseDocQuery)->with('unitKerja', 'currentVersion')->latest()->take(5)->get();
 
         $expiringQuery = (clone $baseDocQuery)
-            ->with('division')
+            ->with('unitKerja')
             ->where('is_expired', false)
             ->whereHas('currentVersion', fn($q) => $q->where('status', 'active'));
 

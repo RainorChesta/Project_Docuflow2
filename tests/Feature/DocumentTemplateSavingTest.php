@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Company;
 use App\Models\Branch;
-use App\Models\Division;
+use App\Models\UnitKerja;
 use App\Models\Document;
 use App\Models\DocumentTemplate;
 use App\Models\DocumentType;
@@ -26,7 +26,7 @@ class DocumentTemplateSavingTest extends TestCase
     protected User $user;
     protected Company $company;
     protected Branch $branch;
-    protected Division $division;
+    protected UnitKerja $unitKerja;
     protected DocumentType $docType;
     protected DocumentTemplate $template;
 
@@ -51,21 +51,20 @@ class DocumentTemplateSavingTest extends TestCase
             'is_active' => true,
         ]);
 
-        $this->division = Division::create([
-            'name' => 'Divisi Teknologi',
-            'code' => 'DIV',
-            'company_id' => $this->company->id,
+        $this->unitKerja = UnitKerja::create([
+            'nama_unit_kerja' => 'Divisi Teknologi',
+            'kode_unit_kerja' => '01',
         ]);
 
         $this->admin = User::factory()->create([
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'system_role' => 'admin',
             'is_active' => true,
         ]);
         $this->admin->branches()->attach($this->branch->id);
 
         $this->user = User::factory()->create([
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'system_role' => 'staff',
             'is_active' => true,
         ]);
@@ -183,7 +182,7 @@ class DocumentTemplateSavingTest extends TestCase
         $response = $this->actingAs($this->user)->post(route('documents.store'), [
             'title' => 'Dokumen Baru Pengguna',
             'document_type_id' => $this->docType->id,
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'branch_id' => $this->branch->id,
             'template_id' => $this->template->id,
         ]);

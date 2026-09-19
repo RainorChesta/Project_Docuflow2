@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Branch;
 use App\Models\Company;
-use App\Models\Division;
+use App\Models\UnitKerja;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\DocumentVersion;
@@ -21,7 +21,7 @@ class DocumentRenameTest extends TestCase
 
     private Company $company;
     private Branch $branch;
-    private Division $division;
+    private UnitKerja $unitKerja;
     private User $head;
     private User $staff;
     private DocumentType $docType;
@@ -33,10 +33,10 @@ class DocumentRenameTest extends TestCase
 
         $this->company = Company::create(['name' => 'PT Test', 'code' => 'TEST']);
         $this->branch = Branch::create(['company_id' => $this->company->id, 'name' => 'Pusat', 'is_pusat' => true]);
-        $this->division = Division::create(['name' => 'IT Department', 'code' => 'IT']);
+        $this->unitKerja = UnitKerja::create(['nama_unit_kerja' => 'IT Department', 'kode_unit_kerja' => '01']);
 
         $this->head = User::factory()->create([
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'name' => 'Head of IT',
             'system_role' => 'head',
         ]);
@@ -44,21 +44,21 @@ class DocumentRenameTest extends TestCase
         $this->head->branches()->attach($this->branch->id);
 
         $this->staff = User::factory()->create([
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'name' => 'Staff IT',
             'system_role' => 'staff',
         ]);
         $this->staff->companies()->attach($this->company->id);
         $this->staff->branches()->attach($this->branch->id);
 
-        $this->docType = DocumentType::create(['name' => 'Policy Doc', 'code' => 'POL']);
+        $this->docType = DocumentType::create(['name' => 'Policy Doc', 'code' => 'POL', 'category' => 'akreditasi']);
 
         $this->document = Document::create([
-            'document_number' => '001/IT/POL/2026',
+            'document_number' => '001/POL-01/TEST/IX/2026',
             'title' => 'Original Document Title',
             'document_type_id' => $this->docType->id,
             'owner_id' => $this->staff->id,
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'company_id' => $this->company->id,
             'branch_id' => $this->branch->id,
             'visibility' => 'general',
@@ -123,7 +123,7 @@ class DocumentRenameTest extends TestCase
         });
     }
 
-    public function test_head_of_division_can_reject_renamed_document_version_and_reverts_title(): void
+    public function test_head_of_unit_kerja_can_reject_renamed_document_version_and_reverts_title(): void
     {
         Notification::fake();
 
@@ -181,7 +181,7 @@ class DocumentRenameTest extends TestCase
         $this->assertEquals('Original Document Title', $this->document->fresh()->title);
     }
 
-    public function test_head_of_division_can_approve_renamed_document_version(): void
+    public function test_head_of_unit_kerja_can_approve_renamed_document_version(): void
     {
         Notification::fake();
 
@@ -255,7 +255,7 @@ class DocumentRenameTest extends TestCase
             'title' => 'Draft Document Title',
             'document_type_id' => $this->docType->id,
             'owner_id' => $this->staff->id,
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'company_id' => $this->company->id,
             'branch_id' => $this->branch->id,
             'visibility' => 'general',
@@ -398,9 +398,9 @@ class DocumentRenameTest extends TestCase
 
     public function test_unauthorized_user_cannot_rename_document(): void
     {
-        $otherDivision = Division::create(['name' => 'HR Department', 'code' => 'HR']);
+        $otherUnitKerja = UnitKerja::create(['nama_unit_kerja' => 'HR Department', 'kode_unit_kerja' => '02']);
         $otherUser = User::factory()->create([
-            'division_id' => $otherDivision->id,
+            'unit_kerja_id' => $otherUnitKerja->id,
             'name' => 'Other Staff',
             'system_role' => 'staff',
         ]);

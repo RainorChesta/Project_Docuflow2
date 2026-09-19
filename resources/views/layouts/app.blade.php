@@ -152,14 +152,14 @@
                         if (!$docType && $route && in_array($name, ['documents.edit', 'documents.show', 'documents.preview', 'documents.preview-version'])) {
                             $docType = match (request()->route('document')?->visibility) {
                                 'personal' => 'mine',
-                                'division' => 'division',
+                                'unit_kerja' => 'unit_kerja',
                                 default => 'general',
                             };
                         }
                         $docType = $docType ?: 'general';
                         $docTypeLabel = match ($docType) {
                             'mine' => __('Dokumen Saya'),
-                            'division' => __('Dokumen Divisi'),
+                            'unit_kerja' => __('Dokumen Unit Kerja'),
                             default => __('Dokumen Umum'),
                         };
                         $docTypeRoute = route('documents.index', ['type' => $docType]);
@@ -209,7 +209,7 @@
                                 $crumbs[] = ['label' => __('Semua Dokumen'), 'url' => null];
                             } elseif (str_starts_with($name, 'admin.')) {
                                 $section = match (true) {
-                                    str_contains($name, 'divisions') => __('Divisi'),
+                                    str_contains($name, 'unit-kerja') => __('Unit Kerja'),
                                     str_contains($name, 'document-types') => __('Tipe Dokumen'),
                                     str_contains($name, 'users') => __('Pengguna'),
                                     str_contains($name, 'retention') => __('Retensi'),

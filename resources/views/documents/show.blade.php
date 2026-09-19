@@ -12,7 +12,7 @@
 
     @php
         $companies = $companies ?? \App\Models\Company::with('branches')->get();
-        $divisions = $divisions ?? (auth()->user()?->isAdmin() ? \App\Models\Division::all() : \App\Models\Division::whereIn('id', auth()->user()?->allDivisionIds() ?? [])->get());
+        $unitKerjas = $unitKerjas ?? (auth()->user()?->isAdmin() ? \App\Models\UnitKerja::all() : \App\Models\UnitKerja::whereIn('id', auth()->user()?->allUnitKerjaIds() ?? [])->get());
         $approvedSignatures = $approvedSignatures ?? [];
         $version = $version ?? $document->displayVersion();
         $pendingVersion = $document->versions->firstWhere('status', 'pending');
@@ -47,7 +47,7 @@
         <x-confirm-modal
             name="confirm-approve-rollback"
             :title="__('Approve Rollback?')"
-            :message="__('Rollback request will be submitted to the division head. If approved, all versions after v:version will be permanently deleted.', ['version' => $document->pendingRollbackVersion->version_number])"
+            :message="__('Rollback request will be submitted to the unit kerja head. If approved, all versions after v:version will be permanently deleted.', ['version' => $document->pendingRollbackVersion->version_number])"
             :action="route('approvals.rollback-request.approve', $document)"
             method="POST"
             :confirmLabel="__('Approve Rollback')"
@@ -66,7 +66,7 @@
             <x-confirm-modal
                 name="confirm-rollback-{{ $version->id }}"
                 title="{{ __('Rollback to v:version?', ['version' => $version->version_number]) }}"
-                message="{{ __('Rollback request will be submitted to the division head. If approved, all versions after v:version will be permanently deleted.', ['version' => $version->version_number]) }}"
+                message="{{ __('Rollback request will be submitted to the unit kerja head. If approved, all versions after v:version will be permanently deleted.', ['version' => $version->version_number]) }}"
                 :action="route('approvals.rollback', [$document, $version])"
                 method="POST"
                 confirmLabel="{{ __('Submit Rollback') }}"
@@ -755,17 +755,10 @@
                                 {{ $document->branch?->name ?? '—' }}
                             </p>
                         </div>
-                        @if($document->unitKerja || ($document->branch && !$document->branch->is_pusat))
                         <div>
                             <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Unit Kerja') }}</span>
                             <p class="font-medium mt-0.5">{{ $document->unitKerja ? ($document->unitKerja->kode_unit_kerja . ' - ' . $document->unitKerja->nama_unit_kerja) : '—' }}</p>
                         </div>
-                        @else
-                        <div>
-                            <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Divisi') }}</span>
-                            <p class="font-medium mt-0.5">{{ $document->division?->code ?? '—' }}</p>
-                        </div>
-                        @endif
                         <div>
                             <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Pengguna') }}</span>
                             <div class="flex items-center gap-1.5 mt-0.5 min-w-0">
@@ -798,7 +791,7 @@
                                 @elseif($document->isPersonal())
                                     <span class="badge badge-info badge-sm">{{ __('Personal') }}</span>
                                 @else
-                                    <span class="badge badge-neutral badge-sm">{{ $document->division?->code ?? __('Divisi') }} {{ __('saja') }}</span>
+                                    <span class="badge badge-neutral badge-sm">{{ $document->unitKerja?->nama_unit_kerja ?? __('Unit Kerja') }} {{ __('saja') }}</span>
                                 @endif
                             </p>
                         </div>
@@ -1061,15 +1054,15 @@
 
                     {{-- Invite search --}}
                     <div class="form-control mb-2 relative">
-                        <input id="share-search-input" type="text" placeholder="{{ __('Tambahkan orang atau divisi…') }}"
+                        <input id="share-search-input" type="text" placeholder="{{ __('Tambahkan orang atau unit kerja…') }}"
                                class="input input-bordered w-full" autocomplete="off">
                         <div id="share-search-results" class="hidden absolute top-full left-0 right-0 z-10 mt-1 bg-base-100 border border-base-300 rounded-box shadow-lg max-h-64 overflow-y-auto"></div>
                     </div>
-                    <p id="share-search-hint" class="text-xs text-base-content/50 mb-4">{{ __('Ketik nama pengguna atau divisi untuk memberikan akses khusus.') }}</p>
+                    <p id="share-search-hint" class="text-xs text-base-content/50 mb-4">{{ __('Ketik nama pengguna atau unit kerja untuk memberikan akses khusus.') }}</p>
 
                     {{-- People with access --}}
                     <div class="mb-5">
-                        <h4 class="text-sm font-medium text-base-content/70 mb-2">{{ __('Orang & Divisi yang memiliki akses') }}</h4>
+                        <h4 class="text-sm font-medium text-base-content/70 mb-2">{{ __('Orang & Unit Kerja yang memiliki akses') }}</h4>
                         <div id="share-list" class="space-y-2 text-sm max-h-52 overflow-y-auto pr-1">
                             <div class="text-base-content/50 italic">Memuat&hellip;</div>
                         </div>
@@ -1084,7 +1077,7 @@
                                     <input type="radio" name="general_access" value="restricted" class="radio radio-sm" onchange="updateGeneralAccess()">
                                     <div>
                                         <span class="text-sm font-medium">{{ __('Dibatasi (Restricted)') }}</span>
-                                        <p class="text-xs text-base-content/60">{{ __('Hanya orang dan divisi dengan akses khusus yang dapat membuka dokumen ini.') }}</p>
+                                        <p class="text-xs text-base-content/60">{{ __('Hanya orang dan unit kerja dengan akses khusus yang dapat membuka dokumen ini.') }}</p>
                                     </div>
                                 </label>
                                 <label class="flex items-start gap-2.5 cursor-pointer">
@@ -1503,18 +1496,18 @@
                 </div>`);
             });
 
-            shareState.division_shares.forEach(s => {
+            (shareState.unit_kerja_shares || []).forEach(s => {
                 rows.push(`<div class="flex items-center justify-between gap-2 py-1">
                     <div class="min-w-0">
                         <p class="font-medium truncate">${escapeHtml(s.name)}</p>
-                        <p class="text-xs text-base-content/50">Divisi</p>
+                        <p class="text-xs text-base-content/50">Unit Kerja</p>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
-                        <select class="select select-bordered select-xs" onchange="updateDivisionShare(${s.id}, this.value)">
+                        <select class="select select-bordered select-xs" onchange="updateUnitKerjaShare(${s.id}, this.value)">
                             <option value="viewer" ${s.role === 'viewer' ? 'selected' : ''}>Viewer</option>
                             <option value="editor" ${s.role === 'editor' ? 'selected' : ''}>Editor</option>
                         </select>
-                        <button type="button" class="text-error hover:underline text-xs" onclick="removeDivisionShare(${s.id})">Hapus</button>
+                        <button type="button" class="text-error hover:underline text-xs" onclick="removeUnitKerjaShare(${s.id})">Hapus</button>
                     </div>
                 </div>`);
             });
@@ -1567,14 +1560,14 @@
             await loadShareData();
         }
 
-        async function updateDivisionShare(id, role) {
-            const url = @json(route('shares.division.update', [$document, '__id__'])).replace('__id__', id);
+        async function updateUnitKerjaShare(id, role) {
+            const url = @json(route('shares.unit-kerja.update', [$document, '__id__'])).replace('__id__', id);
             await postForm(url, { _method: 'PATCH', role });
             await loadShareData();
         }
 
-        async function removeDivisionShare(id) {
-            const url = @json(route('shares.division.destroy', [$document, '__id__'])).replace('__id__', id);
+        async function removeUnitKerjaShare(id) {
+            const url = @json(route('shares.unit-kerja.destroy', [$document, '__id__'])).replace('__id__', id);
             await postForm(url, { _method: 'DELETE' });
             await loadShareData();
         }
@@ -1732,11 +1725,11 @@
                     <span class="badge badge-ghost badge-sm shrink-0">Pengguna</span>
                 </button>`);
             });
-            data.divisions.forEach(d => {
+            (data.unit_kerjas || []).forEach(d => {
                 items.push(`<button type="button" class="w-full text-left px-3 py-2 hover:bg-base-200 flex items-center justify-between gap-2"
-                    onclick="inviteDivision(${d.id}, '${escapeHtml(d.name).replace(/'/g, "\\'")}')">
+                    onclick="inviteUnitKerja(${d.id}, '${escapeHtml(d.name).replace(/'/g, "\\'")}')">
                     <span class="font-medium">${escapeHtml(d.name)}</span>
-                    <span class="badge badge-ghost badge-sm shrink-0">Divisi</span>
+                    <span class="badge badge-ghost badge-sm shrink-0">Unit Kerja</span>
                 </button>`);
             });
             searchResults.innerHTML = items.join('') || '<div class="px-3 py-2 text-base-content/50">' + @json(__('Not found.')) + '</div>';
@@ -1750,8 +1743,8 @@
             await loadShareData();
         }
 
-        async function inviteDivision(id, name) {
-            await postForm(shareStoreUrl, { type: 'division', division_id: id, role: 'viewer' });
+        async function inviteUnitKerja(id, name) {
+            await postForm(shareStoreUrl, { type: 'unit_kerja', unit_kerja_id: id, role: 'viewer' });
             searchInput.value = '';
             searchResults.classList.add('hidden');
             await loadShareData();
@@ -1924,11 +1917,11 @@
                         </span>
                     </label>
                     <label class="label cursor-pointer justify-start gap-3 rounded-lg border border-base-300 p-3 hover:bg-base-200/50">
-                        <input type="radio" name="visibility" value="division" class="radio radio-sm radio-primary"
-                                x-model="visibility" {{ $document->isDivision() ? 'checked' : '' }}>
+                        <input type="radio" name="visibility" value="unit_kerja" class="radio radio-sm radio-primary"
+                                x-model="visibility" {{ $document->isUnitKerja() ? 'checked' : '' }}>
                         <span class="block min-w-0">
-                            <span class="block font-medium text-sm">Division only</span>
-                            <span class="block text-xs text-base-content/60">Hanya divisi {{ $document->division?->code ?? '' }} yang bisa melihat.</span>
+                            <span class="block font-medium text-sm">{{ __('Unit Kerja only') }}</span>
+                            <span class="block text-xs text-base-content/60">{{ __('Hanya unit kerja') }} {{ $document->unitKerja?->nama_unit_kerja ?? '' }} {{ __('yang bisa melihat.') }}</span>
                         </span>
                     </label>
                     <label class="label cursor-pointer justify-start gap-3 rounded-lg border border-base-300 p-3 hover:bg-base-200/50">
@@ -2128,7 +2121,7 @@
                         <span class="label-text font-medium">{{ __('Berkas Pengganti') }}</span>
                     </label>
                     <input type="file" name="file" id="upload-version-file" accept=".pdf,.docx" class="file-input file-input-bordered w-full" required>
-                    <p class="text-xs text-base-content/50 mt-1">{{ __('Hanya PDF atau DOCX, maksimal 10MB. Versi baru akan menunggu approval kepala divisi.') }}</p>
+                    <p class="text-xs text-base-content/50 mt-1">{{ __('Hanya PDF atau DOCX, maksimal 10MB. Versi baru akan menunggu approval kepala unit kerja.') }}</p>
                     @error('file') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                 </div>
                 <div class="flex flex-wrap justify-end gap-2">

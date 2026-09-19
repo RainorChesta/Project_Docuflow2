@@ -29,7 +29,7 @@
 
     @php
         $user = $user ?? auth()->user();
-        $user->loadMissing(['divisions', 'companies', 'branches', 'signatures.company']);
+        $user->loadMissing(['unitKerjas', 'companies', 'branches', 'signatures.company']);
     @endphp
 
     <div class="py-6" x-data="{
@@ -114,7 +114,7 @@
                             @endif
                         </div>
 
-                        {{-- Division & Company Pills --}}
+                        {{-- Work Unit & Company Pills --}}
                         <div class="flex flex-wrap items-center gap-1 pt-0.5 sm:pt-1">
                             @if($user->system_role === 'admin')
                                 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-semibold bg-accent/15 text-accent-content border border-accent/20">
@@ -124,15 +124,15 @@
                                     <span>{{ __('Semua Perusahaan & Cabang') }}</span>
                                 </span>
                             @else
-                                @if($user->divisions->isNotEmpty())
-                                    @foreach($user->divisions as $div)
+                                @if($user->unitKerjas->isNotEmpty())
+                                    @foreach($user->unitKerjas as $uk)
                                         <span class="inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-semibold bg-base-200 text-base-content border border-base-300">
-                                            📁 {{ $div->code ?: $div->name }}
+                                            📁 {{ $uk->kode_unit_kerja ?: $uk->nama_unit_kerja }}
                                         </span>
                                     @endforeach
-                                @elseif($user->division)
+                                @elseif($user->unitKerja)
                                     <span class="inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-semibold bg-base-200 text-base-content border border-base-300">
-                                        📁 {{ $user->division->code ?: $user->division->name }}
+                                        📁 {{ $user->unitKerja->kode_unit_kerja ?: $user->unitKerja->nama_unit_kerja }}
                                     </span>
                                 @endif
 

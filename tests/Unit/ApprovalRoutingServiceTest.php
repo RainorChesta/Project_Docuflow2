@@ -4,8 +4,9 @@ namespace Tests\Unit;
 
 use App\Models\Branch;
 use App\Models\Company;
-use App\Models\Division;
 use App\Models\Document;
+use App\Models\DocumentType;
+use App\Models\UnitKerja;
 use App\Models\User;
 use App\Services\ApprovalRoutingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -18,7 +19,7 @@ class ApprovalRoutingServiceTest extends TestCase
     protected ApprovalRoutingService $service;
     protected Company $company;
     protected Branch $branch;
-    protected Division $division;
+    protected UnitKerja $unitKerja;
     
     protected function setUp(): void
     {
@@ -29,7 +30,7 @@ class ApprovalRoutingServiceTest extends TestCase
         // Setup base organization
         $this->company = Company::create(['name' => 'PT Test', 'code' => 'TST']);
         $this->branch = Branch::create(['name' => 'Branch Test', 'company_id' => $this->company->id]);
-        $this->division = Division::create(['name' => 'IT Division', 'code' => 'IT']);
+        $this->unitKerja = UnitKerja::create(['nama_unit_kerja' => 'IT Unit', 'kode_unit_kerja' => '01']);
     }
 
     public function test_it_resolves_head_when_available()
@@ -39,12 +40,13 @@ class ApprovalRoutingServiceTest extends TestCase
             'email' => 'head@example.com',
             'password' => bcrypt('password'),
             'system_role' => 'head',
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'is_active' => true
         ]);
         $head->companies()->attach($this->company->id);
+        $head->branches()->attach($this->branch->id);
 
-        $documentType = \App\Models\DocumentType::create(['name' => 'SOP', 'code' => 'SOP']);
+        $documentType = DocumentType::create(['name' => 'SOP', 'code' => 'SOP', 'category' => 'akreditasi']);
 
         $document = Document::create([
             'title' => 'Test',
@@ -52,7 +54,8 @@ class ApprovalRoutingServiceTest extends TestCase
             'owner_id' => $head->id,
             'document_type_id' => $documentType->id,
             'company_id' => $this->company->id,
-            'division_id' => $this->division->id,
+            'branch_id' => $this->branch->id,
+            'unit_kerja_id' => $this->unitKerja->id,
         ]);
 
         $result = $this->service->resolveApprover($document);
@@ -73,7 +76,7 @@ class ApprovalRoutingServiceTest extends TestCase
         ]);
         $admin->companies()->attach($this->company->id);
 
-        $documentType = \App\Models\DocumentType::create(['name' => 'SOP 2', 'code' => 'SOP']);
+        $documentType = DocumentType::create(['name' => 'SOP 2', 'code' => 'SOP2', 'category' => 'akreditasi']);
 
         $document = Document::create([
             'title' => 'Test',
@@ -81,7 +84,8 @@ class ApprovalRoutingServiceTest extends TestCase
             'owner_id' => $admin->id,
             'document_type_id' => $documentType->id,
             'company_id' => $this->company->id,
-            'division_id' => $this->division->id, // no head exists for this division
+            'branch_id' => $this->branch->id,
+            'unit_kerja_id' => $this->unitKerja->id, // no head exists for this unit kerja
         ]);
 
         $result = $this->service->resolveApprover($document);
@@ -102,7 +106,7 @@ class ApprovalRoutingServiceTest extends TestCase
         ]);
         $direktur->companies()->attach($this->company->id);
 
-        $documentType = \App\Models\DocumentType::create(['name' => 'SOP 3', 'code' => 'SOP']);
+        $documentType = DocumentType::create(['name' => 'SOP 3', 'code' => 'SOP3', 'category' => 'akreditasi']);
 
         $document = Document::create([
             'title' => 'Test',
@@ -110,7 +114,8 @@ class ApprovalRoutingServiceTest extends TestCase
             'owner_id' => $direktur->id,
             'document_type_id' => $documentType->id,
             'company_id' => $this->company->id,
-            'division_id' => $this->division->id, // no head or admin exists
+            'branch_id' => $this->branch->id,
+            'unit_kerja_id' => $this->unitKerja->id, // no head or admin exists
         ]);
 
         $result = $this->service->resolveApprover($document);

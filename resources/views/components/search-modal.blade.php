@@ -273,11 +273,11 @@
                             {{ __('Umum') }}
                         </button>
                         <button type="button"
-                                @click="setVisibility('division')"
+                                @click="setVisibility('unit_kerja')"
                                 class="px-2.5 py-1 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer"
-                                :class="visibility === 'division' ? 'bg-warning text-warning-content shadow-xs' : 'bg-base-200/60 hover:bg-base-200 text-base-content/70'">
-                            <span class="w-1.5 h-1.5 rounded-full" :class="visibility === 'division' ? 'bg-white' : 'bg-warning'"></span>
-                            {{ __('Divisi') }}
+                                :class="visibility === 'unit_kerja' ? 'bg-warning text-warning-content shadow-xs' : 'bg-base-200/60 hover:bg-base-200 text-base-content/70'">
+                            <span class="w-1.5 h-1.5 rounded-full" :class="visibility === 'unit_kerja' ? 'bg-white' : 'bg-warning'"></span>
+                            {{ __('Unit Kerja') }}
                         </button>
                         <button type="button"
                                 @click="setVisibility('personal')"
@@ -349,7 +349,7 @@
                                 </svg>
                             </div>
                             <div class="text-xs font-medium text-base-content/60">{{ __('Cari dokumen di seluruh cabang dan perusahaan Anda') }}</div>
-                            <div class="text-[11px] text-base-content/40">{{ __('Ketik judul dokumen, nomor surat, nama divisi, atau kata kunci.') }}</div>
+                            <div class="text-[11px] text-base-content/40">{{ __('Ketik judul dokumen, nomor surat, nama unit kerja, atau kata kunci.') }}</div>
                         </div>
                     </template>
                 </div>
@@ -379,7 +379,7 @@
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                         </div>
                                     </template>
-                                    <template x-if="item.visibility === 'division'">
+                                    <template x-if="item.visibility === 'unit_kerja'">
                                         <div class="w-8 h-8 rounded-xl bg-warning/15 text-warning flex items-center justify-center">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
                                         </div>
@@ -420,13 +420,13 @@
                                             </span>
                                         </template>
 
-                                        {{-- Type & Division --}}
+                                        {{-- Type & Unit Kerja --}}
                                         <template x-if="item.type">
                                             <span class="badge badge-ghost badge-xs" x-text="item.type"></span>
                                         </template>
 
-                                        <template x-if="item.division">
-                                            <span class="text-[11px] text-base-content/50" x-text="item.division"></span>
+                                        <template x-if="item.unit_kerja">
+                                            <span class="text-[11px] text-base-content/50" x-text="item.unit_kerja"></span>
                                         </template>
 
                                         {{-- Branch badge if present --}}

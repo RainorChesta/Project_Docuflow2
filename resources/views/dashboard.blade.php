@@ -64,10 +64,10 @@
                                             <svg class="w-8 h-8 shrink-0 text-base-content/20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                                             <div class="min-w-0 flex-1">
                                                 <a href="{{ route('documents.show', $doc) }}" class="text-sm font-medium text-base-content hover:text-primary break-words block">{{ $doc->title }}</a>
-                                                <p class="text-xs text-base-content/60 mt-0.5 inline-flex items-center gap-1.5 flex-wrap">
+                                                 <p class="text-xs text-base-content/60 mt-0.5 inline-flex items-center gap-1.5 flex-wrap">
                                                     <span>{{ $doc->document_number }}</span>
                                                     <span>·</span>
-                                                    <span>{{ $doc->division?->code ?? '—' }}</span>
+                                                    <span>{{ $doc->unitKerja?->nama_unit_kerja ?? '—' }}</span>
                                                     <span>·</span>
                                                     <span class="inline-flex items-center gap-1 font-medium text-base-content/80">
                                                         <x-user-avatar :user="$doc->owner" size="w-3.5 h-3.5" text-size="text-[8px]" />
@@ -86,9 +86,9 @@
                                             <div class="text-xs text-base-content/40 shrink-0">
                                                 @if($doc->isGeneral()) <span class="text-success">{{ __('Umum') }}</span>
                                                 @elseif($doc->isPersonal()) <span class="text-info">{{ __('Personal') }}</span>
-                                                @else {{ $doc->division?->code }} @endif
+                                                @else {{ $doc->unitKerja?->nama_unit_kerja }} @endif
                                                 · {{ $doc->created_at->diffForHumans() }}
-                                            </div>
+                                            </div>/div>
                                         </div>
                                     </div>
                                 @empty
@@ -158,7 +158,7 @@
                                         <div class="min-w-0 flex-1">
                                             <a href="{{ route('documents.show', $doc) }}" class="text-sm font-medium text-base-content hover:text-primary break-words block">{{ $doc->title }}</a>
                                             <p class="text-xs text-base-content/40 mt-0.5">
-                                                {{ $doc->document_number }} · {{ $doc->division?->code ?? '—' }}
+                                                {{ $doc->document_number }} · {{ $doc->unitKerja?->nama_unit_kerja ?? '—' }}
                                             </p>
                                         </div>
                                     </div>

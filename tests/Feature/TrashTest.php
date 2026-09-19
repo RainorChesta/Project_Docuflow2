@@ -4,9 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\Branch;
 use App\Models\Company;
-use App\Models\Division;
 use App\Models\Document;
 use App\Models\DocumentType;
+use App\Models\UnitKerja;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -176,34 +176,34 @@ class TrashTest extends TestCase
         $response->assertDontSee('Annual Strategy HR');
     }
 
-    public function test_division_head_can_view_own_and_division_trashed_documents(): void
+    public function test_unit_kerja_head_can_view_own_and_unit_kerja_trashed_documents(): void
     {
-        $div = Division::create(['name' => 'Marketing', 'code' => 'MKT']);
+        $unitKerja = UnitKerja::create(['nama_unit_kerja' => 'Marketing', 'kode_unit_kerja' => '07']);
         $head = User::factory()->create([
             'system_role' => 'head',
-            'division_id' => $div->id,
+            'unit_kerja_id' => $unitKerja->id,
         ]);
         $staff = User::factory()->create([
             'system_role' => 'user',
-            'division_id' => $div->id,
+            'unit_kerja_id' => $unitKerja->id,
         ]);
 
-        // Division-scoped document deleted by staff
-        $divDoc = $this->createDocument([
+        // Unit-scoped document deleted by staff
+        $unitDoc = $this->createDocument([
             'title' => 'Marketing Campaign Plan',
             'document_number' => 'DOC/MKT/PLAN',
             'owner_id' => $staff->id,
-            'division_id' => $div->id,
-            'visibility' => Document::VISIBILITY_DIVISION,
+            'unit_kerja_id' => $unitKerja->id,
+            'visibility' => Document::VISIBILITY_UNIT_KERJA,
         ]);
-        $divDoc->delete();
+        $unitDoc->delete();
 
         // Personal draft document belonging to staff
         $personalDoc = $this->createDocument([
             'title' => 'Staff Secret Draft',
             'document_number' => 'DOC/STAFF/SECRET',
             'owner_id' => $staff->id,
-            'division_id' => $div->id,
+            'unit_kerja_id' => $unitKerja->id,
             'visibility' => Document::VISIBILITY_PERSONAL,
         ]);
         $personalDoc->delete();
@@ -215,10 +215,10 @@ class TrashTest extends TestCase
         // Head should NOT see personal draft of staff
         $response->assertDontSee('Staff Secret Draft');
 
-        // Head can restore division document
-        $restoreResp = $this->actingAs($head)->post(route('trash.restore', $divDoc->id));
+        // Head can restore unit document
+        $restoreResp = $this->actingAs($head)->post(route('trash.restore', $unitDoc->id));
         $restoreResp->assertRedirect(route('trash.index'));
-        $this->assertNotSoftDeleted('documents', ['id' => $divDoc->id]);
+        $this->assertNotSoftDeleted('documents', ['id' => $unitDoc->id]);
     }
 
     public function test_director_can_view_trashed_documents_in_assigned_companies_and_branches(): void

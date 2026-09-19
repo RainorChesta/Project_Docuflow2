@@ -11,8 +11,8 @@ class SearchController extends Controller
     /**
      * Global document search — scoped by visibility.
      *
-     * Reuses Document::scopeVisibleTo() to ensure division documents
-     * never leak to users outside that division.
+     * Reuses Document::scopeVisibleTo() to ensure unit kerja documents
+     * never leak to users outside that unit kerja.
      */
     public function search(Request $request): JsonResponse
     {
@@ -40,15 +40,16 @@ class SearchController extends Controller
 
         $query = Document::with([
             'owner:id,name',
-            'division:id,name,code',
+            'unitKerja:id,name,code',
             'documentType:id,name,code',
             'branch:id,name,code,company_id',
             'company:id,name,code',
             'currentVersion:id,document_id,version_number,status'
         ])->visibleTo($user);
 
-        if ($visibility && in_array($visibility, ['general', 'division', 'personal'], true)) {
-            $query->where('visibility', $visibility);
+        if ($visibility && in_array($visibility, ['general', 'unit_kerja', 'division', 'personal'], true)) {
+            $effectiveVis = $visibility === 'division' ? 'unit_kerja' : $visibility;
+            $query->where('visibility', $effectiveVis);
         }
 
         if ($formatChoice && in_array($formatChoice, ['baru', 'lama'], true)) {
@@ -68,8 +69,8 @@ class SearchController extends Controller
                 $sub->where('title', 'like', "%{$q}%")
                     ->orWhere('document_number', 'like', "%{$q}%")
                     ->orWhere('summary', 'like', "%{$q}%")
-                    ->orWhereHas('division', function ($dQuery) use ($q) {
-                        $dQuery->where('name', 'like', "%{$q}%")->orWhere('code', 'like', "%{$q}%");
+                    ->orWhereHas('unitKerja', function ($ukQuery) use ($q) {
+                        $ukQuery->where('name', 'like', "%{$q}%")->orWhere('code', 'like', "%{$q}%");
                     })
                     ->orWhereHas('branch', function ($bQuery) use ($q) {
                         $bQuery->where('name', 'like', "%{$q}%")->orWhere('code', 'like', "%{$q}%");
@@ -98,8 +99,10 @@ class SearchController extends Controller
             'format_choice'   => $doc->format_choice ?? 'baru',
             'visibility'      => $doc->visibility,
             'owner'           => $doc->owner?->name,
-            'division'        => $doc->division?->name,
-            'division_code'   => $doc->division?->code,
+            'unit_kerja'      => $doc->unitKerja?->name,
+            'unit_kerja_code' => $doc->unitKerja?->code,
+            'division'        => $doc->unitKerja?->name,
+            'division_code'   => $doc->unitKerja?->code,
             'type'            => $doc->documentType?->name,
             'type_code'       => $doc->documentType?->code,
             'branch'          => $doc->branch?->name,

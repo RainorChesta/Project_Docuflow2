@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Branch;
 use App\Models\Company;
-use App\Models\Division;
+use App\Models\UnitKerja;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\DocumentVersion;
@@ -21,8 +21,8 @@ class DocumentQrVerificationTest extends TestCase
     protected Company $company2;
     protected Branch $branch1;
     protected Branch $branch2;
-    protected Division $division1;
-    protected Division $division2;
+    protected UnitKerja $unitKerja1;
+    protected UnitKerja $unitKerja2;
     protected User $owner;
     protected User $unauthorizedUser;
     protected Document $document;
@@ -38,23 +38,23 @@ class DocumentQrVerificationTest extends TestCase
         $this->branch1 = Branch::create(['company_id' => $this->company1->id, 'name' => 'Branch One', 'code' => 'BR1']);
         $this->branch2 = Branch::create(['company_id' => $this->company2->id, 'name' => 'Branch Two', 'code' => 'BR2']);
 
-        $this->division1 = Division::create(['name' => 'Division One', 'code' => 'DIV1']);
-        $this->division2 = Division::create(['name' => 'Division Two', 'code' => 'DIV2']);
+        $this->unitKerja1 = UnitKerja::create(['nama_unit_kerja' => 'Unit Kerja One', 'kode_unit_kerja' => '01']);
+        $this->unitKerja2 = UnitKerja::create(['nama_unit_kerja' => 'Unit Kerja Two', 'kode_unit_kerja' => '02']);
 
-        $docType = DocumentType::create(['name' => 'Internal Memo', 'code' => 'MEMO']);
+        $docType = DocumentType::create(['name' => 'Internal Memo', 'code' => 'IM', 'category' => 'naskah_dinas']);
 
-        // Owner in Company 1, Branch 1, Division 1
+        // Owner in Company 1, Branch 1, Unit Kerja 1
         $this->owner = User::factory()->create([
-            'division_id' => $this->division1->id,
+            'unit_kerja_id' => $this->unitKerja1->id,
             'system_role' => 'staff',
             'is_active' => true,
         ]);
         $this->owner->branches()->attach($this->branch1->id);
         $this->owner->companies()->attach($this->company1->id);
 
-        // Unauthorized user in Company 2, Branch 2, Division 2
+        // Unauthorized user in Company 2, Branch 2, Unit Kerja 2
         $this->unauthorizedUser = User::factory()->create([
-            'division_id' => $this->division2->id,
+            'unit_kerja_id' => $this->unitKerja2->id,
             'system_role' => 'staff',
             'is_active' => true,
         ]);
@@ -64,8 +64,8 @@ class DocumentQrVerificationTest extends TestCase
         // Restricted / Personal document
         $this->document = Document::create([
             'title' => 'Confidential Financial Plan',
-            'document_number' => '001/MEMO/DIV1/BR1/2026',
-            'division_id' => $this->division1->id,
+            'document_number' => '001/IM/BR1/IX/2026',
+            'unit_kerja_id' => $this->unitKerja1->id,
             'company_id' => $this->company1->id,
             'branch_id' => $this->branch1->id,
             'owner_id' => $this->owner->id,
@@ -95,8 +95,8 @@ class DocumentQrVerificationTest extends TestCase
         $response->assertStatus(200);
         $response->assertViewIs('documents.verified');
         $response->assertSee('Confidential Financial Plan');
-        $response->assertSee('001/MEMO/DIV1/BR1/2026');
-        $response->assertSee('Division One');
+        $response->assertSee('001/IM/BR1/IX/2026');
+        $response->assertSee('Unit Kerja One');
         $response->assertSee(__('Dokumen Valid & Terverifikasi'));
         // Ensure preview button uses the token-based URL, not the numeric ID
         $response->assertSee(route('documents.hash.preview', ['token' => $this->qrToken]));
@@ -110,7 +110,7 @@ class DocumentQrVerificationTest extends TestCase
         $response->assertStatus(200);
         $response->assertViewIs('documents.verified');
         $response->assertSee('Confidential Financial Plan');
-        $response->assertSee('001/MEMO/DIV1/BR1/2026');
+        $response->assertSee('001/IM/BR1/IX/2026');
         $response->assertSee(__('Dokumen Valid & Terverifikasi'));
     }
 

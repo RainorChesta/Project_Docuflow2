@@ -54,6 +54,8 @@ class AccountVerificationController extends Controller
         if (!$user) {
             return [
                 'is_verified' => false,
+                'has_unit_kerja' => false,
+                'unit_kerja_names' => [],
                 'has_division' => false,
                 'division_names' => [],
                 'has_company' => false,
@@ -64,28 +66,28 @@ class AccountVerificationController extends Controller
             ];
         }
 
-        $user->load(['divisions', 'companies', 'branches', 'division']);
+        $user->load(['unitKerjas', 'companies', 'branches']);
 
-        $hasDivision = !empty($user->division_id) || $user->divisions->isNotEmpty();
+        $hasUnitKerja = $user->unitKerjas->isNotEmpty();
         $hasCompany = $user->companies->isNotEmpty();
         $hasBranch = $user->branches->isNotEmpty();
         $isVerified = $user->isVerified();
 
-        $divisionNames = $user->divisions->pluck('name')->all();
-        if (empty($divisionNames) && $user->division) {
-            $divisionNames = [$user->division->name];
-        }
-
+        $unitKerjaNames = $user->unitKerjas->pluck('name')->all();
         $companyNames = $user->companies->pluck('name')->all();
         $branchNames = $user->branches->pluck('name')->all();
 
         return [
             'is_verified' => $isVerified,
             'isVerified' => $isVerified,
-            'has_division' => $hasDivision,
-            'hasDivision' => $hasDivision,
-            'division_names' => $divisionNames,
-            'divisionNames' => $divisionNames,
+            'has_unit_kerja' => $hasUnitKerja,
+            'hasUnitKerja' => $hasUnitKerja,
+            'unit_kerja_names' => $unitKerjaNames,
+            'unitKerjaNames' => $unitKerjaNames,
+            'has_division' => $hasUnitKerja,
+            'hasDivision' => $hasUnitKerja,
+            'division_names' => $unitKerjaNames,
+            'divisionNames' => $unitKerjaNames,
             'has_company' => $hasCompany,
             'hasCompany' => $hasCompany,
             'company_names' => $companyNames,

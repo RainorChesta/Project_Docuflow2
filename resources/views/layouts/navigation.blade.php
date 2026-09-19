@@ -219,15 +219,15 @@
         @endif
 
         @if(!auth()->user()->isDirector())
-        <a href="{{ route('documents.index', ['type' => 'division']) }}"
+        <a href="{{ route('documents.index', ['type' => 'unit_kerja']) }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
-                  {{ request()->routeIs('documents.*') && request('type', '') === 'division' ? 'nav-item-new-active' : '' }}"
+                  {{ request()->routeIs('documents.*') && request('type', '') === 'unit_kerja' ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
-           :title="open ? '' : '{{ __('Dokumen Divisi') }}'">
+           :title="open ? '' : '{{ __('Dokumen Unit Kerja') }}'">
             <div class="icon-wrapper shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
             </div>
-            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Divisi') }}</span>
+            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Dokumen Unit Kerja') }}</span>
         </a>
         @endif
 
@@ -421,16 +421,7 @@
             </span>
         </a>
 
-        <a href="{{ route('admin.divisions.index') }}"
-           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
-                  {{ request()->routeIs('admin.divisions.*') ? 'nav-item-new-active' : '' }}"
-           :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
-           :title="open ? '' : '{{ __('Divisi') }}'">
-            <div class="icon-wrapper shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-            </div>
-            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Divisi') }}</span>
-        </a>
+
 
         <a href="{{ route('admin.documents.index') }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60

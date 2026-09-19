@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\Division;
+use App\Models\UnitKerja;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\DocumentVersion;
@@ -27,15 +27,15 @@ class DocumentExportPdfTest extends TestCase
 
         Storage::fake('local');
 
-        $division = Division::create(['code' => '01', 'name' => 'JBM']);
-        $docType = DocumentType::create(['name' => 'Surat Edaran Test Type', 'code' => 'S.ED.TEST']);
-        $this->owner = User::factory()->create(['division_id' => $division->id]);
+        $unitKerja = UnitKerja::create(['kode_unit_kerja' => '01', 'nama_unit_kerja' => 'JBM']);
+        $docType = DocumentType::create(['name' => 'Surat Edaran Test Type', 'code' => 'S.ED.TEST', 'category' => 'naskah_dinas']);
+        $this->owner = User::factory()->create(['unit_kerja_id' => $unitKerja->id]);
         $this->admin = User::factory()->create(['system_role' => 'admin', 'is_active' => true]);
         $this->document = Document::create([
             'document_number' => 'TST/002',
             'title' => 'Surat Edaran Test',
-            'visibility' => 'division',
-            'division_id' => $division->id,
+            'visibility' => 'unit_kerja',
+            'unit_kerja_id' => $unitKerja->id,
             'owner_id' => $this->owner->id,
             'document_type_id' => $docType->id,
             'paper_size' => 'A4',
@@ -216,7 +216,7 @@ class DocumentExportPdfTest extends TestCase
     {
         $this->addVersion('<p>Konten</p>');
 
-        $outsider = User::factory()->create(['division_id' => null, 'system_role' => 'staff']);
+        $outsider = User::factory()->create(['unit_kerja_id' => null, 'system_role' => 'staff']);
 
         $response = $this->actingAs($outsider)
             ->post(route('documents.export-pdf', $this->document));
@@ -260,7 +260,7 @@ class DocumentExportPdfTest extends TestCase
         $this->addVersion('<p>Rahasia</p>');
         $this->document->update(['visibility' => 'personal']);
 
-        $other = User::factory()->create(['division_id' => 1]);
+        $other = User::factory()->create(['unit_kerja_id' => 1]);
 
         $response = $this->actingAs($other)
             ->post(route('documents.export-pdf', $this->document));

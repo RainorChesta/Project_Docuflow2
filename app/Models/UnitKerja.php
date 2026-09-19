@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class UnitKerja extends Model
@@ -14,11 +15,20 @@ class UnitKerja extends Model
     protected $table = 'unit_kerjas';
 
     protected $fillable = [
-        'cabang_id',
         'kode_unit_kerja',
         'nama_unit_kerja',
         'pic_user_id',
     ];
+
+    public function getNameAttribute(): string
+    {
+        return $this->nama_unit_kerja ?? '';
+    }
+
+    public function getCodeAttribute(): string
+    {
+        return $this->kode_unit_kerja ?? '';
+    }
 
     public function picUser(): BelongsTo
     {
@@ -30,27 +40,19 @@ class UnitKerja extends Model
         $this->attributes['kode_unit_kerja'] = strtoupper(trim((string) $value));
     }
 
-    public function cabang(): BelongsTo
-    {
-        return $this->belongsTo(Branch::class, 'cabang_id')->withDefault();
-    }
-
-    /**
-     * Alias for cabang() to support English convention
-     */
-    public function branch(): BelongsTo
-    {
-        return $this->belongsTo(Branch::class, 'cabang_id')->withDefault();
-    }
-
     public function documents(): HasMany
     {
         return $this->hasMany(Document::class, 'unit_kerja_id');
     }
 
-    public function users(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function documentShares(): HasMany
     {
-        return $this->belongsToMany(User::class)->withTimestamps();
+        return $this->hasMany(DocumentUnitKerjaShare::class, 'unit_kerja_id');
+    }
+
+    public function users(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'unit_kerja_user')->withPivot('branch_id')->withTimestamps();
     }
 
     public function primaryUsers(): HasMany

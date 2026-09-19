@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Branch;
 use App\Models\Company;
-use App\Models\Division;
+use App\Models\UnitKerja;
 use App\Models\Document;
 use App\Models\DocumentShare;
 use App\Models\DocumentType;
@@ -20,12 +20,12 @@ class ShareLinkCrossBranchTest extends TestCase
 
     private Company $companyA;
     private Branch $branchA;
-    private Division $divisionA;
+    private UnitKerja $unitKerjaA;
     private User $userA;
 
     private Company $companyB;
     private Branch $branchB;
-    private Division $divisionB;
+    private UnitKerja $unitKerjaB;
     private User $userB;
 
     private DocumentType $docType;
@@ -41,27 +41,27 @@ class ShareLinkCrossBranchTest extends TestCase
 
         $this->companyA = Company::create(['name' => 'PT Alfa', 'code' => 'ALF']);
         $this->branchA = Branch::create(['company_id' => $this->companyA->id, 'name' => 'Pusat Alfa', 'is_pusat' => true]);
-        $this->divisionA = Division::create(['code' => 'IT', 'name' => 'IT Department']);
-        $this->userA = User::factory()->create(['division_id' => $this->divisionA->id]);
+        $this->unitKerjaA = UnitKerja::create(['kode_unit_kerja' => '01', 'nama_unit_kerja' => 'IT Department']);
+        $this->userA = User::factory()->create(['unit_kerja_id' => $this->unitKerjaA->id]);
         $this->userA->companies()->sync([$this->companyA->id]);
         $this->userA->branches()->sync([$this->branchA->id]);
 
         $this->companyB = Company::create(['name' => 'PT Beta', 'code' => 'BET']);
         $this->branchB = Branch::create(['company_id' => $this->companyB->id, 'name' => 'Pusat Beta', 'is_pusat' => true]);
-        $this->divisionB = Division::create(['code' => 'HR', 'name' => 'HR Department']);
-        $this->userB = User::factory()->create(['division_id' => $this->divisionB->id]);
+        $this->unitKerjaB = UnitKerja::create(['kode_unit_kerja' => '02', 'nama_unit_kerja' => 'HR Department']);
+        $this->userB = User::factory()->create(['unit_kerja_id' => $this->unitKerjaB->id]);
         $this->userB->companies()->sync([$this->companyB->id]);
         $this->userB->branches()->sync([$this->branchB->id]);
 
-        $this->docType = DocumentType::create(['code' => 'S.KEL', 'name' => 'Surat Keluar']);
+        $this->docType = DocumentType::create(['code' => 'S.KEL', 'name' => 'Surat Keluar', 'category' => 'naskah_dinas']);
     }
 
-    private function createDocInCompanyA(string $title, string $visibility = Document::VISIBILITY_DIVISION): Document
+    private function createDocInCompanyA(string $title, string $visibility = Document::VISIBILITY_UNIT_KERJA): Document
     {
         $doc = $this->documentService->create([
             'title' => $title,
             'document_type_id' => $this->docType->id,
-            'division_id' => $this->divisionA->id,
+            'unit_kerja_id' => $this->unitKerjaA->id,
             'branch_id' => $this->branchA->id,
             'company_id' => $this->companyA->id,
             'visibility' => $visibility,
@@ -150,16 +150,16 @@ class ShareLinkCrossBranchTest extends TestCase
         $sharedTabResp->assertSee('Dokumen Direct Share Alfa');
     }
 
-    public function test_user_from_different_company_can_view_document_via_share_link_when_division_shared(): void
+    public function test_user_from_different_company_can_view_document_via_share_link_when_unit_kerja_shared(): void
     {
-        $doc = $this->createDocInCompanyA('Dokumen Division Share Alfa');
-        $this->shareService->addDivisionShare($doc, $this->divisionB, 'viewer', $this->userA);
+        $doc = $this->createDocInCompanyA('Dokumen Unit Kerja Share Alfa');
+        $this->shareService->addUnitKerjaShare($doc, $this->unitKerjaB, 'viewer', $this->userA);
 
-        // User B (in division B) can view via share link route while general_access is restricted
+        // User B (in unit kerja B) can view via share link route while general_access is restricted
         $token = $doc->share_token ?? $this->shareService->regenerateShareToken($doc);
         $linkResponse = $this->actingAs($this->userB)->get(route('documents.shared', $token));
         $linkResponse->assertOk();
-        $linkResponse->assertSee('Dokumen Division Share Alfa');
+        $linkResponse->assertSee('Dokumen Unit Kerja Share Alfa');
     }
 
     public function test_user_from_different_company_cannot_access_unshared_restricted_document(): void

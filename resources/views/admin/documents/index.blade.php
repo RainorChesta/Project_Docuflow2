@@ -36,7 +36,7 @@
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
                                     @elseif(($crumb['icon'] ?? '') === 'branch')
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" /></svg>
-                                    @elseif(($crumb['icon'] ?? '') === 'division')
+                                    @elseif(($crumb['icon'] ?? '') === 'unit_kerja')
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
                                     @endif
                                     {{ $crumb['name'] }}
@@ -114,15 +114,15 @@
                     <form method="GET" action="{{ route('admin.documents.index') }}" class="space-y-3">
                         <input type="hidden" name="company_id" value="{{ $selectedCompanyId }}">
                         <input type="hidden" name="branch_id" value="{{ $selectedBranchId }}">
-                        @if($selectedDivisionId)<input type="hidden" name="division_id" value="{{ $selectedDivisionId }}">@endif
+                        @if($selectedUnitKerjaId)<input type="hidden" name="unit_kerja_id" value="{{ $selectedUnitKerjaId }}">@endif
                         <input type="hidden" name="view_mode" value="{{ $viewMode }}">
 
                         <div class="flex flex-col lg:flex-row gap-3 w-full">
-                            @if(!$selectedDivisionId)
-                                {{-- Division Search (When in Branch) --}}
+                            @if(!$selectedUnitKerjaId)
+                                {{-- Unit Kerja Search (When in Branch) --}}
                                 <div class="flex-grow relative">
                                     <input type="text" name="search" value="{{ $search }}" 
-                                           placeholder="{{ __('Search division...') }}" 
+                                           placeholder="{{ __('Search unit kerja...') }}" 
                                            class="input input-bordered input-sm w-full pl-9 pr-8 bg-base-100 shadow-sm focus:shadow-md focus:border-primary transition-all">
                                     <svg class="w-4 h-4 absolute left-3 top-2.5 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -141,7 +141,7 @@
                                     </button>
                                 </div>
                             @else
-                                {{-- Document Search & Filters (When inside a Division) --}}
+                                {{-- Document Search & Filters (When inside a Unit Kerja) --}}
                                 <div class="flex-grow relative">
                                     <input type="text" name="search" value="{{ $search }}" 
                                            placeholder="{{ __('Search documents...') }}" 
@@ -210,7 +210,7 @@
                     @php
                         $hasActiveFilters = $search || $selectedDocTypeId || $selectedOwnerId || $selectedFormatChoice;
                     @endphp
-                    @if($hasActiveFilters || $selectedDivisionId)
+                    @if($hasActiveFilters || $selectedUnitKerjaId)
                         <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-base-200 text-xs">
                             <span class="text-base-content/50 font-medium">{{ __('Filter Aktif:') }}</span>
                             
@@ -261,7 +261,7 @@
             @endif
             </div>
 
-            {{-- 3. FOLDERS SECTION (Company / Branch / Division Folders) --}}
+            {{-- 3. FOLDERS SECTION (Company / Branch / Unit Kerja Folders) --}}
             @if($folders->isNotEmpty())
                 <div class="space-y-3">
                     <div class="flex items-center justify-between">
@@ -274,11 +274,11 @@
                             @elseif($selectedCompanyId && !$selectedBranchId)
                                 {{ __('Folder Cabang') }} ({{ $folders->count() }})
                             @else
-                                {{ __('Folder Divisi') }} ({{ $folders->count() }})
+                                {{ __('Folder Unit Kerja') }} ({{ $folders->count() }})
                             @endif
                         </h3>
 
-                        {{-- View Mode Toggle for Folders / Divisions --}}
+                        {{-- View Mode Toggle for Folders / Unit Kerja --}}
                         <div class="join border border-base-300 bg-base-200/50 p-0.5 rounded-lg">
                             <a href="{{ request()->fullUrlWithQuery(['view_mode' => 'grid']) }}" 
                                class="join-item btn btn-xs {{ $viewMode === 'grid' ? 'btn-primary shadow-xs' : 'btn-ghost' }}"
@@ -379,7 +379,7 @@
                                                 @elseif($selectedCompanyId && !$selectedBranchId)
                                                     {{ __('Nama Cabang') }}
                                                 @else
-                                                    {{ __('Nama Divisi') }}
+                                                    {{ __('Nama Unit Kerja') }}
                                                 @endif
                                             </th>
                                             <th>{{ __('Kode') }}</th>
@@ -435,7 +435,7 @@
                                                     @elseif($folder['type'] === 'branch')
                                                         <span class="badge badge-outline badge-sm text-amber-600 dark:text-amber-400">{{ __('Cabang') }}</span>
                                                     @else
-                                                        <span class="badge badge-outline badge-sm text-primary">{{ __('Divisi') }}</span>
+                                                        <span class="badge badge-outline badge-sm text-primary">{{ __('Unit Kerja') }}</span>
                                                     @endif
                                                 </td>
                                                 <td>
@@ -458,7 +458,7 @@
                         </div>
                     @endif
                 </div>
-            @elseif($search && !$selectedDivisionId)
+            @elseif($search && !$selectedUnitKerjaId)
                 <div class="bg-base-100 border border-base-300 rounded-2xl p-10 text-center shadow-xs">
                     <div class="w-14 h-14 rounded-2xl bg-base-200/80 text-base-content/30 flex items-center justify-center mx-auto mb-3">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -470,7 +470,7 @@
                     @elseif($selectedCompanyId && !$selectedBranchId)
                         <h4 class="font-bold text-base text-base-content">{{ __('No branch folders found.') }}</h4>
                     @else
-                        <h4 class="font-bold text-base text-base-content">{{ __('No division folders found.') }}</h4>
+                        <h4 class="font-bold text-base text-base-content">{{ __('No unit kerja folders found.') }}</h4>
                     @endif
                     <p class="text-xs text-base-content/60 mt-1 max-w-md mx-auto">
                         {{ __('Tidak ada folder yang sesuai dengan kata kunci pencarian yang dimasukkan.') }}
@@ -481,8 +481,8 @@
                 </div>
             @endif
 
-            {{-- 4. DOCUMENT RESULTS SECTION (Only rendered when in a division) --}}
-            @if($selectedDivisionId)
+            {{-- 4. DOCUMENT RESULTS SECTION (Only rendered when in a unit kerja) --}}
+            @if($selectedUnitKerjaId)
                 <div class="space-y-4 pt-2">
                     
                     {{-- Results Header with View Mode Toggle --}}
@@ -534,7 +534,7 @@
                                                 <th>{{ __('Judul Dokumen') }}</th>
                                                 <th>{{ __('No. Dokumen') }}</th>
                                                 <th>{{ __('Cabang & Perusahaan') }}</th>
-                                                <th>{{ __('Divisi') }}</th>
+                                                <th>{{ __('Unit Kerja') }}</th>
                                                 <th>{{ __('Tipe') }}</th>
                                                 <th>{{ __('Pembuat') }}</th>
                                                 <th>{{ __('Status') }}</th>
@@ -577,9 +577,9 @@
                                                         @endif
                                                     </td>
                                                     <td>
-                                                        @if($doc->division)
-                                                            <span class="badge badge-ghost badge-sm max-w-[140px] inline-flex items-center" title="{{ $doc->division->name }}">
-                                                                <span class="truncate">{{ $doc->division->name }}</span>
+                                                        @if($doc->unitKerja)
+                                                            <span class="badge badge-ghost badge-sm max-w-[140px] inline-flex items-center" title="{{ $doc->unitKerja->nama_unit_kerja }}">
+                                                                <span class="truncate">{{ $doc->unitKerja->nama_unit_kerja }}</span>
                                                             </span>
                                                         @else
                                                             <span class="text-base-content/40">—</span>

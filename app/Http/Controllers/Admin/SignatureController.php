@@ -22,7 +22,7 @@ class SignatureController extends Controller
     {
         $this->authorize('admin');
 
-        $query = User::with(['signatures.company', 'companies', 'branches', 'divisions']);
+        $query = User::with(['signatures.company', 'companies', 'branches', 'unitKerjas']);
 
         // Filter pencarian: nama, email, nip
         if ($request->filled('search')) {

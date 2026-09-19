@@ -182,15 +182,15 @@
                 </div>
 
                 <div class="bg-base-100 p-3.5 rounded-xl border border-base-200">
-                    <span class="text-base-content/50 block mb-1">{{ __('Divisi') }}</span>
-                    @if($user->divisions->isNotEmpty())
+                    <span class="text-base-content/50 block mb-1">{{ __('Unit Kerja') }}</span>
+                    @if($user->unitKerjas->isNotEmpty())
                         <div class="flex flex-wrap gap-1">
-                            @foreach($user->divisions as $div)
-                                <span class="font-semibold text-base-content bg-base-200 px-1.5 py-0.5 rounded">{{ $div->code ?: $div->name }}</span>
+                            @foreach($user->unitKerjas as $uk)
+                                <span class="font-semibold text-base-content bg-base-200 px-1.5 py-0.5 rounded">{{ $uk->kode_unit_kerja ?: $uk->nama_unit_kerja }}</span>
                             @endforeach
                         </div>
-                    @elseif($user->division)
-                        <span class="font-semibold text-base-content">{{ $user->division->name }}</span>
+                    @elseif($user->unitKerja)
+                        <span class="font-semibold text-base-content">{{ $user->unitKerja->nama_unit_kerja }}</span>
                     @else
                         <span class="text-base-content/40 italic">-</span>
                     @endif

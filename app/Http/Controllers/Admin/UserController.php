@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\Company;
-use App\Models\Division;
+use App\Models\UnitKerja;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,7 +17,7 @@ class UserController extends Controller
     public function index(Request $request): View
     {
         $this->authorize('admin');
-        $query = User::with(['divisions', 'companies', 'branches.company', 'unitKerjas', 'unitKerja']);
+        $query = User::with(['companies', 'branches.company', 'unitKerjas', 'unitKerja']);
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -25,15 +25,6 @@ class UserController extends Controller
                 $q->where('name', 'like', "%{$search}%")
                   ->orWhere('email', 'like', "%{$search}%")
                   ->orWhere('nip', 'like', "%{$search}%");
-            });
-        }
-
-        if ($request->filled('division')) {
-            $query->where(function($q) use ($request) {
-                $q->where('division_id', $request->division)
-                  ->orWhereHas('divisions', function($sub) use ($request) {
-                      $sub->where('divisions.id', $request->division);
-                  });
             });
         }
 
@@ -57,10 +48,8 @@ class UserController extends Controller
                           $q->where(function ($sub) {
                               $sub->where('system_role', '!=', 'direktur')
                                   ->where(function ($missing) {
-                                      $missing->where(function ($noDept) {
-                                          $noDept->whereNull('division_id')
-                                                 ->whereDoesntHave('divisions')
-                                                 ->whereNull('unit_kerja_id')
+                                      $missing->where(function ($noUnit) {
+                                          $noUnit->whereNull('unit_kerja_id')
                                                  ->whereDoesntHave('unitKerjas');
                                       })
                                       ->orWhereDoesntHave('companies')
@@ -85,11 +74,9 @@ class UserController extends Controller
                             })
                             ->orWhere(function ($sub) {
                                 $sub->whereNotIn('system_role', ['admin', 'direktur'])
-                                    ->where(function ($divQ) {
-                                        $divQ->whereNotNull('division_id')
-                                             ->orWhereHas('divisions')
-                                             ->orWhereNotNull('unit_kerja_id')
-                                             ->orWhereHas('unitKerjas');
+                                    ->where(function ($unitQ) {
+                                        $unitQ->whereNotNull('unit_kerja_id')
+                                              ->orWhereHas('unitKerjas');
                                     })
                                     ->whereHas('companies')
                                     ->whereHas('branches');
@@ -101,19 +88,17 @@ class UserController extends Controller
         }
 
         $users = $query->latest('id')->paginate(20)->appends($request->query());
-        $divisions = Division::all();
-        $unitKerjas = \App\Models\UnitKerja::orderBy('kode_unit_kerja')->get();
+        $unitKerjas = UnitKerja::orderBy('kode_unit_kerja')->get();
 
-        return view('admin.users.index', compact('users', 'divisions', 'unitKerjas'));
+        return view('admin.users.index', compact('users', 'unitKerjas'));
     }
 
     public function create(): View
     {
         $this->authorize('admin');
-        $divisions = Division::all();
         $companies = Company::with(['branches'])->orderBy('name')->get();
-        $unitKerjas = \App\Models\UnitKerja::orderBy('kode_unit_kerja')->get();
-        return view('admin.users.create', compact('divisions', 'companies', 'unitKerjas'));
+        $unitKerjas = UnitKerja::orderBy('kode_unit_kerja')->get();
+        return view('admin.users.create', compact('companies', 'unitKerjas'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -125,13 +110,9 @@ class UserController extends Controller
             'nip' => 'nullable|string|max:50|unique:users,nip',
             'phone_number' => 'nullable|string|max:50',
             'password' => 'required|string|min:8|confirmed',
-            'division_id' => 'nullable|exists:divisions,id',
-            'division_ids' => 'nullable|array',
-            'division_ids.*' => 'exists:divisions,id',
             'unit_kerja_id' => 'nullable|exists:unit_kerjas,id',
             'unit_kerja_ids' => 'nullable|array',
             'unit_kerja_ids.*' => 'exists:unit_kerjas,id',
-            'branch_divisions' => 'nullable|array',
             'branch_unit_kerjas' => 'nullable|array',
             'system_role' => 'required|in:admin,direktur,head,user',
             'is_active' => 'boolean',
@@ -144,23 +125,17 @@ class UserController extends Controller
         unset($validated['password_confirmation']);
         $companyIds = $validated['company_ids'] ?? [];
         $branchIds = $validated['branch_ids'] ?? [];
-        $divisionIds = $validated['division_ids'] ?? [];
         $unitKerjaIds = $validated['unit_kerja_ids'] ?? [];
-        $branchDivisions = $request->input('branch_divisions', []);
         $branchUnitKerjas = $request->input('branch_unit_kerjas', []);
-        unset($validated['company_ids'], $validated['branch_ids'], $validated['division_ids'], $validated['unit_kerja_ids'], $validated['branch_divisions'], $validated['branch_unit_kerjas']);
+        unset($validated['company_ids'], $validated['branch_ids'], $validated['unit_kerja_ids'], $validated['branch_unit_kerjas']);
 
         if ($validated['system_role'] === 'admin') {
             $companyIds = Company::pluck('id')->all();
             $branchIds = Branch::pluck('id')->all();
-            $validated['division_id'] = null;
-            $divisionIds = [];
             $validated['unit_kerja_id'] = null;
             $unitKerjaIds = [];
         } elseif ($validated['system_role'] === 'direktur') {
             $validated['nip'] = null;
-            $validated['division_id'] = null;
-            $divisionIds = [];
             $validated['unit_kerja_id'] = null;
             $unitKerjaIds = [];
         } else {
@@ -171,46 +146,24 @@ class UserController extends Controller
 
                 $assignedBranches = Branch::whereIn('id', $branchIds)->get();
 
-                // Validasi divisi per Kantor Pusat
-                $pusatBranches = $assignedBranches->where('is_pusat', true);
-                if ($pusatBranches->isNotEmpty()) {
-                    foreach ($pusatBranches as $pusat) {
-                        $divs = $branchDivisions[$pusat->id] ?? [];
-                        if (empty($divs) && !empty($divisionIds)) {
-                            $divs = $divisionIds;
-                        }
-                        if (empty($divs) && Division::exists()) {
-                            return back()->withInput()->withErrors([
-                                'branch_divisions' => __('Pilih minimal satu divisi untuk penugasan di :branch.', ['branch' => $pusat->name]),
-                                'division_ids' => __('Pilih minimal satu divisi untuk penugasan di :branch.', ['branch' => $pusat->name]),
-                            ]);
-                        }
-                    }
-                }
-
-                // Validasi unit kerja per Cabang
-                $cabangBranches = $assignedBranches->where('is_pusat', false);
-                if ($cabangBranches->isNotEmpty()) {
-                    foreach ($cabangBranches as $cabang) {
-                        $uks = $branchUnitKerjas[$cabang->id] ?? [];
+                // Validasi unit kerja per Cabang/Pusat
+                if ($assignedBranches->isNotEmpty()) {
+                    foreach ($assignedBranches as $branch) {
+                        $uks = $branchUnitKerjas[$branch->id] ?? [];
                         if (empty($uks) && !empty($unitKerjaIds)) {
                             $uks = $unitKerjaIds;
                         }
-                        if (empty($uks) && \App\Models\UnitKerja::exists()) {
+                        if (empty($uks) && UnitKerja::exists()) {
                             return back()->withInput()->withErrors([
-                                'branch_unit_kerjas' => __('Pilih minimal satu unit kerja untuk penugasan di :branch.', ['branch' => $cabang->name]),
-                                'unit_kerja_ids' => __('Pilih minimal satu unit kerja untuk penugasan di :branch.', ['branch' => $cabang->name]),
+                                'branch_unit_kerjas' => __('Pilih minimal satu unit kerja untuk penugasan di :branch.', ['branch' => $branch->name]),
+                                'unit_kerja_ids' => __('Pilih minimal satu unit kerja untuk penugasan di :branch.', ['branch' => $branch->name]),
                             ]);
                         }
                     }
                 }
             }
 
-            // Tentukan primary division_id dan unit_kerja_id
-            $resolvedDivisions = $this->collectAllDivisionIds($branchIds, $branchDivisions, $divisionIds);
             $resolvedUnitKerjas = $this->collectAllUnitKerjaIds($branchIds, $branchUnitKerjas, $unitKerjaIds);
-
-            $validated['division_id'] = !empty($resolvedDivisions) ? $resolvedDivisions[0] : null;
             $validated['unit_kerja_id'] = !empty($resolvedUnitKerjas) ? $resolvedUnitKerjas[0] : null;
         }
 
@@ -223,9 +176,7 @@ class UserController extends Controller
             $validated['system_role'],
             $companyIds,
             $branchIds,
-            $branchDivisions,
             $branchUnitKerjas,
-            $divisionIds,
             $unitKerjaIds
         );
 
@@ -235,20 +186,17 @@ class UserController extends Controller
     public function edit(User $user): View
     {
         $this->authorize('admin');
-        $divisions = Division::all();
         $companies = Company::with(['branches'])->orderBy('name')->get();
-        $unitKerjas = \App\Models\UnitKerja::orderBy('kode_unit_kerja')->get();
-        $user->load(['companies', 'branches', 'divisions', 'unitKerjas', 'unitKerja']);
-        $branchDivisionsMap = $user->getBranchDivisionsMap();
+        $unitKerjas = UnitKerja::orderBy('kode_unit_kerja')->get();
+        $user->load(['companies', 'branches', 'unitKerjas', 'unitKerja']);
         $branchUnitKerjasMap = $user->getBranchUnitKerjasMap();
-        return view('admin.users.edit', compact('user', 'divisions', 'companies', 'unitKerjas', 'branchDivisionsMap', 'branchUnitKerjasMap'));
+        return view('admin.users.edit', compact('user', 'companies', 'unitKerjas', 'branchUnitKerjasMap'));
     }
 
     public function update(Request $request, User $user): RedirectResponse
     {
         $this->authorize('admin');
 
-        // Role direktur tidak dapat ditambahkan saat edit user non-direktur
         $allowedRoles = $user->isDirector() ? 'admin,direktur,head,user' : 'admin,head,user';
 
         $validated = $request->validate([
@@ -257,13 +205,9 @@ class UserController extends Controller
             'nip' => 'nullable|string|max:50|unique:users,nip,' . $user->id,
             'phone_number' => 'nullable|string|max:50',
             'password' => 'nullable|string|min:8|confirmed',
-            'division_id' => 'nullable|exists:divisions,id',
-            'division_ids' => 'nullable|array',
-            'division_ids.*' => 'exists:divisions,id',
             'unit_kerja_id' => 'nullable|exists:unit_kerjas,id',
             'unit_kerja_ids' => 'nullable|array',
             'unit_kerja_ids.*' => 'exists:unit_kerjas,id',
-            'branch_divisions' => 'nullable|array',
             'branch_unit_kerjas' => 'nullable|array',
             'system_role' => 'required|in:' . $allowedRoles,
             'is_active' => 'boolean',
@@ -281,23 +225,17 @@ class UserController extends Controller
 
         $companyIds = $validated['company_ids'] ?? [];
         $branchIds = $validated['branch_ids'] ?? [];
-        $divisionIds = $validated['division_ids'] ?? [];
         $unitKerjaIds = $validated['unit_kerja_ids'] ?? [];
-        $branchDivisions = $request->input('branch_divisions', []);
         $branchUnitKerjas = $request->input('branch_unit_kerjas', []);
-        unset($validated['company_ids'], $validated['branch_ids'], $validated['division_ids'], $validated['unit_kerja_ids'], $validated['branch_divisions'], $validated['branch_unit_kerjas']);
+        unset($validated['company_ids'], $validated['branch_ids'], $validated['unit_kerja_ids'], $validated['branch_unit_kerjas']);
 
         if ($validated['system_role'] === 'admin') {
             $companyIds = Company::pluck('id')->all();
             $branchIds = Branch::pluck('id')->all();
-            $validated['division_id'] = null;
-            $divisionIds = [];
             $validated['unit_kerja_id'] = null;
             $unitKerjaIds = [];
         } elseif ($validated['system_role'] === 'direktur') {
             $validated['nip'] = null;
-            $validated['division_id'] = null;
-            $divisionIds = [];
             $validated['unit_kerja_id'] = null;
             $unitKerjaIds = [];
         } else {
@@ -305,35 +243,16 @@ class UserController extends Controller
                 if (!empty($branchIds)) {
                     $assignedBranches = Branch::whereIn('id', $branchIds)->get();
 
-                    // Validasi divisi per Kantor Pusat
-                    $pusatBranches = $assignedBranches->where('is_pusat', true);
-                    if ($pusatBranches->isNotEmpty()) {
-                        foreach ($pusatBranches as $pusat) {
-                            $divs = $branchDivisions[$pusat->id] ?? [];
-                            if (empty($divs) && !empty($divisionIds)) {
-                                $divs = $divisionIds;
-                            }
-                            if (empty($divs) && Division::exists()) {
-                                return back()->withInput()->withErrors([
-                                    'branch_divisions' => __('Pilih minimal satu divisi untuk penugasan di :branch.', ['branch' => $pusat->name]),
-                                    'division_ids' => __('Pilih minimal satu divisi untuk penugasan di :branch.', ['branch' => $pusat->name]),
-                                ]);
-                            }
-                        }
-                    }
-
-                    // Validasi unit kerja per Cabang
-                    $cabangBranches = $assignedBranches->where('is_pusat', false);
-                    if ($cabangBranches->isNotEmpty()) {
-                        foreach ($cabangBranches as $cabang) {
-                            $uks = $branchUnitKerjas[$cabang->id] ?? [];
+                    if ($assignedBranches->isNotEmpty()) {
+                        foreach ($assignedBranches as $branch) {
+                            $uks = $branchUnitKerjas[$branch->id] ?? [];
                             if (empty($uks) && !empty($unitKerjaIds)) {
                                 $uks = $unitKerjaIds;
                             }
-                            if (empty($uks) && \App\Models\UnitKerja::exists()) {
+                            if (empty($uks) && UnitKerja::exists()) {
                                 return back()->withInput()->withErrors([
-                                    'branch_unit_kerjas' => __('Pilih minimal satu unit kerja untuk penugasan di :branch.', ['branch' => $cabang->name]),
-                                    'unit_kerja_ids' => __('Pilih minimal satu unit kerja untuk penugasan di :branch.', ['branch' => $cabang->name]),
+                                    'branch_unit_kerjas' => __('Pilih minimal satu unit kerja untuk penugasan di :branch.', ['branch' => $branch->name]),
+                                    'unit_kerja_ids' => __('Pilih minimal satu unit kerja untuk penugasan di :branch.', ['branch' => $branch->name]),
                                 ]);
                             }
                         }
@@ -341,11 +260,7 @@ class UserController extends Controller
                 }
             }
 
-            // Tentukan primary division_id dan unit_kerja_id
-            $resolvedDivisions = $this->collectAllDivisionIds($branchIds, $branchDivisions, $divisionIds);
             $resolvedUnitKerjas = $this->collectAllUnitKerjaIds($branchIds, $branchUnitKerjas, $unitKerjaIds);
-
-            $validated['division_id'] = !empty($resolvedDivisions) ? $resolvedDivisions[0] : null;
             $validated['unit_kerja_id'] = !empty($resolvedUnitKerjas) ? $resolvedUnitKerjas[0] : null;
         }
 
@@ -358,9 +273,7 @@ class UserController extends Controller
             $validated['system_role'],
             $companyIds,
             $branchIds,
-            $branchDivisions,
             $branchUnitKerjas,
-            $divisionIds,
             $unitKerjaIds
         );
 
@@ -369,27 +282,11 @@ class UserController extends Controller
         return redirect()->route('admin.users.index')->with('success', __('Pengguna berhasil diperbarui.'));
     }
 
-    private function collectAllDivisionIds(array $branchIds, array $branchDivisions, array $flatDivisionIds): array
-    {
-        $collected = [];
-        $pusatBranches = Branch::whereIn('id', $branchIds)->where('is_pusat', true)->get();
-        foreach ($pusatBranches as $p) {
-            $divs = $branchDivisions[$p->id] ?? [];
-            foreach ($divs as $dId) {
-                $collected[] = (int) $dId;
-            }
-        }
-        if (empty($collected) && !empty($flatDivisionIds)) {
-            $collected = array_map('intval', $flatDivisionIds);
-        }
-        return array_values(array_unique($collected));
-    }
-
     private function collectAllUnitKerjaIds(array $branchIds, array $branchUnitKerjas, array $flatUnitKerjaIds): array
     {
         $collected = [];
-        $cabangBranches = Branch::whereIn('id', $branchIds)->where('is_pusat', false)->get();
-        foreach ($cabangBranches as $c) {
+        $branches = Branch::whereIn('id', $branchIds)->get();
+        foreach ($branches as $c) {
             $uks = $branchUnitKerjas[$c->id] ?? [];
             foreach ($uks as $uId) {
                 $collected[] = (int) $uId;
@@ -406,15 +303,12 @@ class UserController extends Controller
         string $systemRole,
         array $companyIds,
         array $branchIds,
-        array $branchDivisions,
         array $branchUnitKerjas,
-        array $flatDivisionIds,
         array $flatUnitKerjaIds
     ): void {
         if ($systemRole === 'admin') {
             $user->companies()->sync(Company::pluck('id')->all());
             $user->branches()->sync(Branch::pluck('id')->all());
-            DB::table('division_user')->where('user_id', $user->id)->delete();
             DB::table('unit_kerja_user')->where('user_id', $user->id)->delete();
             return;
         }
@@ -422,7 +316,6 @@ class UserController extends Controller
         if ($systemRole === 'direktur') {
             $user->companies()->sync($companyIds);
             $user->branches()->sync($branchIds);
-            DB::table('division_user')->where('user_id', $user->id)->delete();
             DB::table('unit_kerja_user')->where('user_id', $user->id)->delete();
             return;
         }
@@ -432,51 +325,13 @@ class UserController extends Controller
 
         $assignedBranches = Branch::whereIn('id', $branchIds)->get();
 
-        // 1. Division sync with branch_id
-        DB::table('division_user')->where('user_id', $user->id)->delete();
-        $divisionRows = [];
-        $pusatBranches = $assignedBranches->where('is_pusat', true);
-
-        if ($pusatBranches->isNotEmpty()) {
-            foreach ($pusatBranches as $pusat) {
-                $divs = $branchDivisions[$pusat->id] ?? [];
-                if (empty($divs) && !empty($flatDivisionIds)) {
-                    $divs = $flatDivisionIds;
-                }
-                foreach ($divs as $dId) {
-                    $divisionRows[] = [
-                        'user_id' => $user->id,
-                        'division_id' => (int) $dId,
-                        'branch_id' => $pusat->id,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ];
-                }
-            }
-        } elseif (!empty($flatDivisionIds)) {
-            foreach ($flatDivisionIds as $dId) {
-                $divisionRows[] = [
-                    'user_id' => $user->id,
-                    'division_id' => (int) $dId,
-                    'branch_id' => null,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
-            }
-        }
-
-        if (!empty($divisionRows)) {
-            DB::table('division_user')->insert($divisionRows);
-        }
-
-        // 2. Unit Kerja sync with branch_id
+        // Unit Kerja sync with branch_id
         DB::table('unit_kerja_user')->where('user_id', $user->id)->delete();
         $unitKerjaRows = [];
-        $cabangBranches = $assignedBranches->where('is_pusat', false);
 
-        if ($cabangBranches->isNotEmpty()) {
-            foreach ($cabangBranches as $cabang) {
-                $uks = $branchUnitKerjas[$cabang->id] ?? [];
+        if ($assignedBranches->isNotEmpty()) {
+            foreach ($assignedBranches as $branch) {
+                $uks = $branchUnitKerjas[$branch->id] ?? [];
                 if (empty($uks) && !empty($flatUnitKerjaIds)) {
                     $uks = $flatUnitKerjaIds;
                 }
@@ -484,7 +339,7 @@ class UserController extends Controller
                     $unitKerjaRows[] = [
                         'user_id' => $user->id,
                         'unit_kerja_id' => (int) $ukId,
-                        'branch_id' => $cabang->id,
+                        'branch_id' => $branch->id,
                         'created_at' => now(),
                         'updated_at' => now(),
                     ];
@@ -512,12 +367,11 @@ class UserController extends Controller
         $this->authorize('admin');
 
         if ($user->id === auth()->id()) {
-            return back()->withErrors(['error' => 'Tidak dapat menghapus akun Anda sendiri.']);
+            return back()->withErrors(['error' => __('Tidak dapat menghapus akun Anda sendiri.')]);
         }
 
         try {
-            \Illuminate\Support\Facades\DB::transaction(function () use ($user) {
-                // Hapus file tanda tangan jika ada
+            DB::transaction(function () use ($user) {
                 if ($user->signature) {
                     if ($user->signature->file_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($user->signature->file_path)) {
                         \Illuminate\Support\Facades\Storage::disk('public')->delete($user->signature->file_path);
@@ -525,41 +379,29 @@ class UserController extends Controller
                     $user->signature()->delete();
                 }
 
-                // Hapus foto profil jika ada
                 if ($user->profile_picture && \Illuminate\Support\Facades\Storage::disk('public')->exists($user->profile_picture)) {
                     \Illuminate\Support\Facades\Storage::disk('public')->delete($user->profile_picture);
                 }
 
-                // Detach pivot tables
                 $user->companies()->detach();
                 $user->branches()->detach();
-                $user->divisions()->detach();
+                $user->unitKerjas()->detach();
 
-                // Bersihkan relasi foreign key yang belum cascade
-                // 1. Dokumen yang dimiliki user: hapus atau nullkan owner
-                // Jika user memiliki dokumen, kita bisa nullkan atau hapus dokumen sesuai kebutuhan sistem
-                // Mengingat owner_id di dokumen:
                 \App\Models\DocumentAccessLink::where('created_by', $user->id)->delete();
                 \App\Models\DocumentDistribution::where('created_by', $user->id)->orWhere('target_user_id', $user->id)->delete();
                 
-                // Rollback request references
                 \App\Models\Document::where('rollback_requested_by_id', $user->id)->update([
                     'rollback_requested_by_id' => null
                 ]);
 
-                // Version author / reviewer nullOnDelete
                 \App\Models\DocumentVersion::where('author_id', $user->id)->update(['author_id' => null]);
                 \App\Models\DocumentVersion::where('reviewer_id', $user->id)->update(['reviewer_id' => null]);
 
-                // Signature requests
                 \App\Models\SignatureRequest::where('requester_id', $user->id)->orWhere('target_user_id', $user->id)->delete();
-
-                // Document shares
                 \App\Models\DocumentShare::where('user_id', $user->id)->orWhere('invited_by', $user->id)->delete();
-                \App\Models\DocumentDivisionShare::where('invited_by', $user->id)->delete();
+                \App\Models\DocumentUnitKerjaShare::where('invited_by', $user->id)->delete();
 
-                // Dokumen milik user: jika ada, kita hapus dokumen beserta versinya
-                $ownedDocuments = \App\Models\Document::where('owner_id', $user->id)->get();
+                $ownedDocuments = Document::where('owner_id', $user->id)->get();
                 foreach ($ownedDocuments as $doc) {
                     foreach ($doc->versions as $version) {
                         if ($version->file_path && \Illuminate\Support\Facades\Storage::disk('local')->exists($version->file_path)) {
@@ -570,7 +412,6 @@ class UserController extends Controller
                     $doc->forceDelete();
                 }
 
-                // Document templates created by user
                 $ownedTemplates = \App\Models\DocumentTemplate::where('created_by', $user->id)->get();
                 foreach ($ownedTemplates as $tmpl) {
                     if ($tmpl->file_path && \Illuminate\Support\Facades\Storage::disk(config('onlyoffice.storage_disk', 'local'))->exists($tmpl->file_path)) {
@@ -579,16 +420,14 @@ class UserController extends Controller
                     $tmpl->delete();
                 }
 
-                // Audit logs
                 \App\Models\AuditLog::where('user_id', $user->id)->update(['user_id' => null]);
 
-                // Hard delete user
                 $user->delete();
             });
 
-            return redirect()->route('admin.users.index')->with('success', 'User berhasil dihapus secara permanen.');
+            return redirect()->route('admin.users.index')->with('success', __('User berhasil dihapus secara permanen.'));
         } catch (\Throwable $e) {
-            return back()->withErrors(['error' => 'Gagal menghapus user: ' . $e->getMessage()]);
+            return back()->withErrors(['error' => __('Gagal menghapus user: :message', ['message' => $e->getMessage()])]);
         }
     }
 }

@@ -7,7 +7,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
 
 /**
- * Sent to a user (or division members) when their access to a document is revoked.
+ * Sent to a user (or unit kerja members) when their access to a document is revoked.
  */
 class DocumentAccessRevoked extends Notification
 {
@@ -16,7 +16,7 @@ class DocumentAccessRevoked extends Notification
     public function __construct(
         public Document $document,
         public string $revokedByName,
-        public ?string $divisionName = null,
+        public ?string $unitKerjaName = null,
     ) {}
 
     public function via(object $notifiable): array
@@ -26,11 +26,11 @@ class DocumentAccessRevoked extends Notification
 
     public function toArray(object $notifiable): array
     {
-        $message = $this->divisionName
-            ? __(':user mencabut akses divisi :division ke dokumen ":doc".', [
-                'user'     => $this->revokedByName,
-                'division' => $this->divisionName,
-                'doc'      => $this->document->title,
+        $message = $this->unitKerjaName
+            ? __(':user mencabut akses unit kerja :unit ke dokumen ":doc".', [
+                'user' => $this->revokedByName,
+                'unit' => $this->unitKerjaName,
+                'doc'  => $this->document->title,
             ])
             : __(':user mencabut akses Anda ke dokumen ":doc".', [
                 'user' => $this->revokedByName,

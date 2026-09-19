@@ -6,7 +6,6 @@
             @php
                 $userCompanyIds = old('company_ids', $user->companies->pluck('id')->toArray()) ?: [];
                 $userBranchIds = old('branch_ids', $user->branches->pluck('id')->toArray()) ?: [];
-                $userDivisionIds = old('division_ids', $user->allDivisionIds()) ?: [];
                 $userUnitKerjaIds = old('unit_kerja_ids', $user->allUnitKerjaIds()) ?: [];
             @endphp
             <div class="card bg-base-100 border border-base-300 shadow-sm p-4 sm:p-6"
@@ -35,7 +34,7 @@
                             <div>
                                 <div class="font-bold text-sm text-base-content">{{ __('Akun Ini Menunggu Verifikasi') }}</div>
                                 <div class="text-xs text-base-content/80 mt-0.5 leading-relaxed">
-                                    {{ __('Akun ini belum memiliki penugasan lengkap. Untuk memverifikasi dan membuka akses akun pengguna ini, silakan tentukan Divisi serta lakukan penugasan Perusahaan & Cabang di bawah, lalu klik Perbarui Pengguna.') }}
+                                    {{ __('Akun ini belum memiliki penugasan lengkap. Untuk memverifikasi dan membuka akses akun pengguna ini, silakan tentukan Unit Kerja serta lakukan penugasan Perusahaan & Cabang di bawah, lalu klik Perbarui Pengguna.') }}
                                 </div>
                             </div>
                         </div>
@@ -88,7 +87,7 @@
                             <label for="system_role" class="label"><span class="label-text font-medium">{{ __('Peran Sistem (Role)') }} <span class="text-error">*</span></span></label>
                             <select name="system_role" id="system_role" x-model="role" class="select select-bordered w-full" required>
                                 <option value="user" {{ old('system_role', $user->system_role) === 'user' ? 'selected' : '' }}>User (Staff)</option>
-                                <option value="head" {{ old('system_role', $user->system_role) === 'head' ? 'selected' : '' }}>Division / Unit Head (Kepala)</option>
+                                <option value="head" {{ old('system_role', $user->system_role) === 'head' ? 'selected' : '' }}>Head / Kepala Unit Kerja</option>
                                 @if($user->system_role === 'direktur')
                                     <option value="direktur" {{ old('system_role', $user->system_role) === 'direktur' ? 'selected' : '' }}>Direktur</option>
                                 @endif
@@ -222,9 +221,7 @@
                                             @foreach($company->branches as $branch)
                                                 @php
                                                     $isPusat = (bool) $branch->is_pusat;
-                                                    $defaultSelected = $isPusat 
-                                                        ? old('branch_divisions.' . $branch->id, $branchDivisionsMap[$branch->id] ?? ($branch->is_pusat ? $userDivisionIds : []))
-                                                        : old('branch_unit_kerjas.' . $branch->id, $branchUnitKerjasMap[$branch->id] ?? (in_array((string)$branch->id, array_map('strval', $userBranchIds)) ? $userUnitKerjaIds : []));
+                                                    $defaultSelected = old('branch_unit_kerjas.' . $branch->id, $branchUnitKerjasMap[$branch->id] ?? (in_array((string)$branch->id, array_map('strval', $userBranchIds)) ? $userUnitKerjaIds : []));
                                                     $defaultSelectedJson = json_encode(array_values(array_map('strval', $defaultSelected ?: [])));
                                                 @endphp
                                                 <div class="border border-base-200 rounded-xl p-3 bg-base-100 shadow-xs transition-all duration-200 hover:border-base-300"
@@ -235,15 +232,9 @@
                                                         subSearch: '',
                                                         selectedItems: {{ $defaultSelectedJson }},
                                                         itemsList: [
-                                                            @if($isPusat)
-                                                                @foreach($divisions as $div)
-                                                                    { id: '{{ $div->id }}', name: '{{ addslashes($div->code) }} - {{ addslashes($div->name) }}' },
-                                                                @endforeach
-                                                            @else
-                                                                @foreach($unitKerjas as $uk)
-                                                                    { id: '{{ $uk->id }}', name: '{{ addslashes($uk->kode_unit_kerja) }} - {{ addslashes($uk->nama_unit_kerja) }}' },
-                                                                @endforeach
-                                                            @endif
+                                                            @foreach($unitKerjas as $uk)
+                                                                { id: '{{ $uk->id }}', name: '{{ addslashes($uk->kode_unit_kerja) }} - {{ addslashes($uk->nama_unit_kerja) }}' },
+                                                            @endforeach
                                                         ],
                                                         get filteredItems() {
                                                             if (!this.subSearch) return this.itemsList;
@@ -291,32 +282,23 @@
                                                          class="mt-3 pt-3 border-t border-base-200">
 
                                                         <div class="flex items-center justify-between mb-1.5">
-                                                            <label class="text-xs font-semibold {{ $isPusat ? 'text-primary' : 'text-secondary' }} flex items-center gap-1.5">
-                                                                @if($isPusat)
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                                                                    <span>{{ __('Divisi di') }} {{ $branch->name }} <span class="text-error">*</span></span>
-                                                                @else
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                                                                    <span>{{ __('Unit Kerja di') }} {{ $branch->name }} <span class="text-error">*</span></span>
-                                                                @endif
+                                                            <label class="text-xs font-semibold text-primary flex items-center gap-1.5">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                                                                <span>{{ __('Unit Kerja di') }} {{ $branch->name }} <span class="text-error">*</span></span>
                                                             </label>
                                                             <span class="text-[11px] text-base-content/50" x-text="selectedItems.length + ' {{ __('terpilih') }}'"></span>
                                                         </div>
 
                                                         {{-- Hidden Inputs for form submission --}}
                                                         <template x-for="id in selectedItems" :key="id">
-                                                            @if($isPusat)
-                                                                <input type="hidden" name="branch_divisions[{{ $branch->id }}][]" :value="id">
-                                                            @else
-                                                                <input type="hidden" name="branch_unit_kerjas[{{ $branch->id }}][]" :value="id">
-                                                            @endif
+                                                            <input type="hidden" name="branch_unit_kerjas[{{ $branch->id }}][]" :value="id">
                                                         </template>
 
                                                         {{-- Dropdown trigger --}}
                                                         <div class="relative" @click.away="subOpen = false">
                                                             <div class="input input-sm input-bordered w-full flex items-center justify-between cursor-pointer bg-base-100"
                                                                  @click="subOpen = !subOpen">
-                                                                <span class="text-xs truncate" x-text="selectedItems.length > 0 ? selectedItems.length + ' {{ $isPusat ? __('Divisi Terpilih') : __('Unit Kerja Terpilih') }}' : '{{ $isPusat ? __('-- Pilih Divisi (Pusat) --') : __('-- Pilih Unit Kerja (Cabang) --') }}'"></span>
+                                                                <span class="text-xs truncate" x-text="selectedItems.length > 0 ? selectedItems.length + ' {{ __('Unit Kerja Terpilih') }}' : '{{ __('-- Pilih Unit Kerja --') }}'"></span>
                                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 opacity-50 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                                                             </div>
 
@@ -325,7 +307,7 @@
                                                                  x-transition
                                                                  class="absolute z-30 mt-1 w-full bg-base-100 border border-base-300 rounded-lg shadow-xl flex flex-col">
                                                                 <div class="p-2 border-b border-base-200">
-                                                                    <input type="text" x-model="subSearch" class="input input-xs input-bordered w-full" placeholder="{{ $isPusat ? __('Cari divisi...') : __('Cari unit kerja...') }}">
+                                                                    <input type="text" x-model="subSearch" class="input input-xs input-bordered w-full" placeholder="{{ __('Cari unit kerja...') }}">
                                                                 </div>
                                                                 <div class="max-h-48 overflow-y-auto p-1">
                                                                     <template x-if="filteredItems.length === 0">

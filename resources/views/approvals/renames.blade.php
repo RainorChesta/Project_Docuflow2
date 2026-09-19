@@ -149,8 +149,8 @@
                                             @if($doc->branch)
                                                 <span class="text-[11px] text-base-content/60 bg-base-200/80 px-1.5 py-0.5 rounded">{{ $doc->branch->name }}</span>
                                             @endif
-                                            @if($doc->division)
-                                                <span class="text-[11px] text-base-content/60 bg-base-200/80 px-1.5 py-0.5 rounded">{{ $doc->division->name }}</span>
+                                            @if($doc->unitKerja)
+                                                <span class="text-[11px] text-base-content/60 bg-base-200/80 px-1.5 py-0.5 rounded">{{ $doc->unitKerja->nama_unit_kerja }}</span>
                                             @endif
                                         </div>
                                     </td>

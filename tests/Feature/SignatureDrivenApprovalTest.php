@@ -4,11 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\Branch;
 use App\Models\Company;
-use App\Models\Division;
 use App\Models\Document;
 use App\Models\DocumentApprovalStep;
 use App\Models\DocumentType;
 use App\Models\SignatureRequest;
+use App\Models\UnitKerja;
 use App\Models\User;
 use App\Notifications\DirectorDocumentTembusanNotification;
 use App\Services\ApprovalRoutingService;
@@ -22,7 +22,7 @@ class SignatureDrivenApprovalTest extends TestCase
 
     protected Company $company;
     protected Branch $pusatBranch;
-    protected Division $hrDivision;
+    protected UnitKerja $hrUnitKerja;
     protected DocumentType $sopType;
     protected User $staffUser;
     protected User $kadivUser;
@@ -43,11 +43,12 @@ class SignatureDrivenApprovalTest extends TestCase
             'is_pusat' => true,
         ]);
 
-        $this->hrDivision = Division::create(['name' => 'Human Resources', 'code' => 'HR']);
+        $this->hrUnitKerja = UnitKerja::create(['nama_unit_kerja' => 'Human Resources', 'kode_unit_kerja' => '03']);
 
         $this->sopType = DocumentType::create([
             'code' => 'SOP',
             'name' => 'Standar Operasional Prosedur',
+            'category' => 'akreditasi',
         ]);
 
         $this->directorUser = User::factory()->create([
@@ -63,7 +64,7 @@ class SignatureDrivenApprovalTest extends TestCase
             'name' => 'Siti Kadiv HR',
             'email' => 'kadiv.hr@cmh.co.id',
             'system_role' => 'head',
-            'division_id' => $this->hrDivision->id,
+            'unit_kerja_id' => $this->hrUnitKerja->id,
             'is_active' => true,
         ]);
         $this->kadivUser->companies()->sync([$this->company->id]);
@@ -73,7 +74,7 @@ class SignatureDrivenApprovalTest extends TestCase
             'name' => 'Agus Staff HR',
             'email' => 'staff.hr@cmh.co.id',
             'system_role' => 'user',
-            'division_id' => $this->hrDivision->id,
+            'unit_kerja_id' => $this->hrUnitKerja->id,
             'is_active' => true,
         ]);
         $this->staffUser->companies()->sync([$this->company->id]);
@@ -90,10 +91,10 @@ class SignatureDrivenApprovalTest extends TestCase
             'title' => 'SOP Rekrutmen Pegawai',
             'company_id' => $this->company->id,
             'branch_id' => $this->pusatBranch->id,
-            'division_id' => $this->hrDivision->id,
+            'unit_kerja_id' => $this->hrUnitKerja->id,
             'document_type_id' => $this->sopType->id,
             'owner_id' => $this->staffUser->id,
-            'visibility' => 'division',
+            'visibility' => 'unit_kerja',
         ]);
 
         $version = $document->versions()->create([
@@ -160,10 +161,10 @@ class SignatureDrivenApprovalTest extends TestCase
             'title' => 'SK Direksi Pengangkatan Pegawai',
             'company_id' => $this->company->id,
             'branch_id' => $this->pusatBranch->id,
-            'division_id' => $this->hrDivision->id,
+            'unit_kerja_id' => $this->hrUnitKerja->id,
             'document_type_id' => $this->sopType->id,
             'owner_id' => $this->staffUser->id,
-            'visibility' => 'division',
+            'visibility' => 'unit_kerja',
         ]);
 
         $version = $document->versions()->create([
@@ -236,10 +237,10 @@ class SignatureDrivenApprovalTest extends TestCase
             'title' => 'SOP Tanpa Kotak TTD',
             'company_id' => $this->company->id,
             'branch_id' => $this->pusatBranch->id,
-            'division_id' => $this->hrDivision->id,
+            'unit_kerja_id' => $this->hrUnitKerja->id,
             'document_type_id' => $this->sopType->id,
             'owner_id' => $this->staffUser->id,
-            'visibility' => 'division',
+            'visibility' => 'unit_kerja',
         ]);
 
         $version = $document->versions()->create([
@@ -253,10 +254,10 @@ class SignatureDrivenApprovalTest extends TestCase
         // No SignatureRequests added
         $this->routingService->compileWorkflowFromSignatures($document, $version, $this->staffUser);
 
-        // 1 step created (Kadiv)
+        // 1 step created (PIC Unit / Head)
         $steps = DocumentApprovalStep::where('version_id', $version->id)->get();
         $this->assertCount(1, $steps);
-        $this->assertEquals('kadiv_approval', $steps[0]->step_type);
+        $this->assertEquals('pic_unit_acknowledge', $steps[0]->step_type);
         $this->assertEquals('pending', $steps[0]->status);
         $this->assertEquals($this->kadivUser->id, $steps[0]->assigned_user_id);
 
@@ -279,10 +280,10 @@ class SignatureDrivenApprovalTest extends TestCase
             'title' => 'SOP Tembusan Direktur',
             'company_id' => $this->company->id,
             'branch_id' => $this->pusatBranch->id,
-            'division_id' => $this->hrDivision->id,
+            'unit_kerja_id' => $this->hrUnitKerja->id,
             'document_type_id' => $this->sopType->id,
             'owner_id' => $this->staffUser->id,
-            'visibility' => 'division',
+            'visibility' => 'unit_kerja',
             'director_notified_at' => now(),
         ]);
 
@@ -305,10 +306,10 @@ class SignatureDrivenApprovalTest extends TestCase
             'title' => 'SOP Ditolak Kadiv',
             'company_id' => $this->company->id,
             'branch_id' => $this->pusatBranch->id,
-            'division_id' => $this->hrDivision->id,
+            'unit_kerja_id' => $this->hrUnitKerja->id,
             'document_type_id' => $this->sopType->id,
             'owner_id' => $this->staffUser->id,
-            'visibility' => 'division',
+            'visibility' => 'unit_kerja',
         ]);
 
         $version = $document->versions()->create([

@@ -3,11 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\Company;
-use App\Models\Division;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\Signature;
 use App\Models\SignatureRequest;
+use App\Models\UnitKerja;
 use App\Models\User;
 use App\Services\SignatureResolverService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -423,9 +423,9 @@ class DigitalSignatureTest extends TestCase
     {
         \Illuminate\Support\Facades\Notification::fake();
 
-        $division = Division::create(['name' => 'IT Dept', 'code' => 'IT']);
-        $requester = User::factory()->create(['division_id' => $division->id, 'name' => 'Requester User']);
-        $targetUser = User::factory()->create(['division_id' => $division->id, 'name' => 'Signer User']);
+        $unitKerja = UnitKerja::create(['nama_unit_kerja' => 'IT Dept', 'kode_unit_kerja' => '01']);
+        $requester = User::factory()->create(['unit_kerja_id' => $unitKerja->id, 'name' => 'Requester User']);
+        $targetUser = User::factory()->create(['unit_kerja_id' => $unitKerja->id, 'name' => 'Signer User']);
 
         $docType = DocumentType::create(['name' => 'Surat Keputusan', 'code' => 'SK']);
         $document = Document::create([

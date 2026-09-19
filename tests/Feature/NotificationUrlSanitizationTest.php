@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Branch;
 use App\Models\Company;
-use App\Models\Division;
+use App\Models\UnitKerja;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\DocumentVersion;
@@ -29,11 +29,11 @@ class NotificationUrlSanitizationTest extends TestCase
 
         $company = Company::create(['name' => 'CMH Group', 'code' => 'CMH']);
         $branch = Branch::create(['company_id' => $company->id, 'name' => 'HQ', 'code' => 'HQ']);
-        $division = Division::create(['name' => 'Finance', 'code' => 'FIN']);
-        $docType = DocumentType::create(['name' => 'Standard SOP', 'code' => 'SOP']);
+        $unitKerja = UnitKerja::create(['nama_unit_kerja' => 'Finance', 'kode_unit_kerja' => '05']);
+        $docType = DocumentType::create(['name' => 'Standard SOP', 'code' => 'SOP', 'category' => 'akreditasi']);
 
         $this->user = User::factory()->create([
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'system_role' => 'staff',
             'is_active' => true,
         ]);
@@ -42,8 +42,8 @@ class NotificationUrlSanitizationTest extends TestCase
 
         $this->document = Document::create([
             'title' => 'ssnsn',
-            'document_number' => '060/SOP/FIN/HQ/IX/2026',
-            'division_id' => $division->id,
+            'document_number' => '060/SOP-05/HQ/IX/2026',
+            'unit_kerja_id' => $unitKerja->id,
             'company_id' => $company->id,
             'branch_id' => $branch->id,
             'owner_id' => $this->user->id,

@@ -5,9 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class DocumentDivisionShare extends Model
+class DocumentUnitKerjaShare extends Model
 {
-    protected $fillable = ['document_id', 'division_id', 'role', 'invited_by'];
+    protected $table = 'document_unit_kerja_shares';
+
+    protected $fillable = ['document_id', 'unit_kerja_id', 'role', 'invited_by'];
 
     protected function casts(): array
     {
@@ -21,9 +23,9 @@ class DocumentDivisionShare extends Model
         return $this->belongsTo(Document::class);
     }
 
-    public function division(): BelongsTo
+    public function unitKerja(): BelongsTo
     {
-        return $this->belongsTo(Division::class);
+        return $this->belongsTo(UnitKerja::class, 'unit_kerja_id');
     }
 
     public function invitedBy(): BelongsTo

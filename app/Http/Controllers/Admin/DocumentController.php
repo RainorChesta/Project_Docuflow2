@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\Company;
-use App\Models\Division;
 use App\Models\Document;
 use App\Models\DocumentType;
+use App\Models\UnitKerja;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,7 +17,7 @@ use Illuminate\View\View;
 class DocumentController extends Controller
 {
     /**
-     * Semua dokumen dari semua divisi/user, termasuk yang masih pending
+     * Semua dokumen dari semua unit kerja/user, termasuk yang masih pending
      * atau draft (belum di-approve). Admin bisa melihat & menghapusnya.
      */
     public function index(Request $request): View
@@ -28,7 +28,7 @@ class DocumentController extends Controller
         $search = $request->get('search');
         $selectedCompanyId = $request->get('company_id');
         $selectedBranchId = $request->get('branch_id');
-        $selectedDivisionId = $request->get('division_id');
+        $selectedUnitKerjaId = $request->get('unit_kerja_id') ?? $request->get('division_id');
         $selectedDocTypeId = $request->get('document_type_id');
         $selectedOwnerId = $request->get('owner_id');
         $selectedFormatChoice = $request->get('format_choice');
@@ -45,7 +45,7 @@ class DocumentController extends Controller
             if (!$currentCompany) {
                 $selectedCompanyId = null;
                 $selectedBranchId = null;
-                $selectedDivisionId = null;
+                $selectedUnitKerjaId = null;
             }
         }
 
@@ -59,14 +59,14 @@ class DocumentController extends Controller
             $currentBranch = $branchQuery->first();
             if (!$currentBranch) {
                 $selectedBranchId = null;
-                $selectedDivisionId = null;
+                $selectedUnitKerjaId = null;
             }
         }
 
-        // Verify division if specified
-        $currentDivision = null;
-        if ($selectedDivisionId) {
-            $currentDivision = Division::find($selectedDivisionId);
+        // Verify unit kerja if specified
+        $currentUnitKerja = null;
+        if ($selectedUnitKerjaId) {
+            $currentUnitKerja = UnitKerja::find($selectedUnitKerjaId);
         }
 
         // Build Breadcrumbs trail
@@ -100,27 +100,27 @@ class DocumentController extends Controller
                     'view_mode' => $viewMode,
                 ])),
                 'icon' => 'branch',
-                'active' => $selectedBranchId && !$selectedDivisionId,
+                'active' => $selectedBranchId && !$selectedUnitKerjaId,
             ];
         }
 
-        if ($currentDivision) {
+        if ($currentUnitKerja) {
             $breadcrumbs[] = [
-                'name' => $currentDivision->name,
+                'name' => $currentUnitKerja->name,
                 'url' => route('admin.documents.index', array_filter([
                     'company_id' => $currentCompany?->id,
                     'branch_id' => $currentBranch?->id,
-                    'division_id' => $currentDivision->id,
+                    'unit_kerja_id' => $currentUnitKerja->id,
                     'view_mode' => $viewMode,
                 ])),
-                'icon' => 'division',
+                'icon' => 'unit_kerja',
                 'active' => true,
             ];
         }
 
         // Parent URL for "Up one level"
         $parentUrl = null;
-        if ($selectedDivisionId) {
+        if ($selectedUnitKerjaId) {
             $parentUrl = route('admin.documents.index', array_filter([
                 'company_id' => $selectedCompanyId,
                 'branch_id' => $selectedBranchId,
@@ -197,36 +197,36 @@ class DocumentController extends Controller
                 ];
             });
         }
-        // Level 2: Inside Branch -> Show Division folders
-        elseif ($selectedBranchId && !$selectedDivisionId) {
-            $branchDocDivisions = Document::where('branch_id', $selectedBranchId)
-                ->whereNotNull('division_id')
-                ->select('division_id')
+        // Level 2: Inside Branch -> Show Unit Kerja folders
+        elseif ($selectedBranchId && !$selectedUnitKerjaId) {
+            $branchDocUnits = Document::where('branch_id', $selectedBranchId)
+                ->whereNotNull('unit_kerja_id')
+                ->select('unit_kerja_id')
                 ->selectRaw('count(*) as count')
-                ->groupBy('division_id')
-                ->pluck('count', 'division_id');
+                ->groupBy('unit_kerja_id')
+                ->pluck('count', 'unit_kerja_id');
 
-            $allDivisions = Division::orderBy('name');
+            $allUnitKerjas = UnitKerja::orderBy('code');
             if (!empty($search)) {
-                $allDivisions->where(function ($q) use ($search) {
+                $allUnitKerjas->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
                       ->orWhere('code', 'like', "%{$search}%");
                 });
             }
-            $allDivisions = $allDivisions->get();
+            $allUnitKerjas = $allUnitKerjas->get();
             
-            $folders = $allDivisions->map(function ($div) use ($branchDocDivisions, $selectedCompanyId, $selectedBranchId, $viewMode) {
-                $count = $branchDocDivisions[$div->id] ?? 0;
+            $folders = $allUnitKerjas->map(function ($uk) use ($branchDocUnits, $selectedCompanyId, $selectedBranchId, $viewMode) {
+                $count = $branchDocUnits[$uk->id] ?? 0;
                 return [
-                    'id' => $div->id,
-                    'type' => 'division',
-                    'name' => $div->name,
-                    'code' => strtoupper($div->code),
+                    'id' => $uk->id,
+                    'type' => 'unit_kerja',
+                    'name' => $uk->name,
+                    'code' => strtoupper($uk->code),
                     'doc_count' => $count,
                     'url' => route('admin.documents.index', array_filter([
                         'company_id' => $selectedCompanyId,
                         'branch_id' => $selectedBranchId,
-                        'division_id' => $div->id,
+                        'unit_kerja_id' => $uk->id,
                         'view_mode' => $viewMode,
                     ])),
                 ];
@@ -235,29 +235,29 @@ class DocumentController extends Controller
 
         // Fetch Documents for current branch & filters
         $documents = collect();
-        $availableDivisions = collect();
+        $availableUnitKerjas = collect();
         $availableDocumentTypes = collect();
         $availableCreators = collect();
 
-        $hasSearchOrFilter = $selectedDivisionId 
+        $hasSearchOrFilter = $selectedUnitKerjaId 
             || ($search !== null && trim($search) !== '') 
             || $selectedDocTypeId 
             || $selectedOwnerId
             || $selectedFormatChoice;
 
-        // Documents are only queried inside a selected division
-        if ($selectedDivisionId) {
-            // Populate filter options dynamically from documents in this selected division and branch
-            $branchDocTypes = DocumentType::whereHas('documents', fn($q) => $q->where('division_id', $selectedDivisionId)->where('branch_id', $selectedBranchId))->orderBy('name')->get();
+        // Documents are only queried inside a selected unit kerja
+        if ($selectedUnitKerjaId) {
+            // Populate filter options dynamically from documents in this selected unit kerja and branch
+            $branchDocTypes = DocumentType::whereHas('documents', fn($q) => $q->where('unit_kerja_id', $selectedUnitKerjaId)->where('branch_id', $selectedBranchId))->orderBy('name')->get();
             $availableDocumentTypes = $branchDocTypes->isNotEmpty() ? $branchDocTypes : DocumentType::orderBy('name')->get();
 
-            $availableCreators = User::whereHas('documents', fn($q) => $q->where('division_id', $selectedDivisionId)->where('branch_id', $selectedBranchId))->orderBy('name')->get(['id', 'name']);
+            $availableCreators = User::whereHas('documents', fn($q) => $q->where('unit_kerja_id', $selectedUnitKerjaId)->where('branch_id', $selectedBranchId))->orderBy('name')->get(['id', 'name']);
 
-            $docQuery = Document::where('division_id', $selectedDivisionId)
+            $docQuery = Document::where('unit_kerja_id', $selectedUnitKerjaId)
                 ->where('branch_id', $selectedBranchId)
-                ->with(['owner', 'division', 'documentType', 'currentVersion', 'versions', 'branch.company']);
+                ->with(['owner', 'unitKerja', 'documentType', 'currentVersion', 'versions', 'branch.company']);
 
-            // Apply search filter for documents inside division
+            // Apply search filter for documents inside unit kerja
             if (!empty($search)) {
                 $docQuery->where(function ($q) use ($search) {
                     $q->where('title', 'like', "%{$search}%")
@@ -291,19 +291,20 @@ class DocumentController extends Controller
             'hasSearchOrFilter',
             'currentCompany',
             'currentBranch',
-            'currentDivision',
+            'currentUnitKerja',
             'selectedCompanyId',
             'selectedBranchId',
-            'selectedDivisionId',
+            'selectedUnitKerjaId',
             'selectedDocTypeId',
             'selectedOwnerId',
             'selectedFormatChoice',
             'search',
             'viewMode',
-            'availableDivisions',
+            'availableUnitKerjas',
             'availableDocumentTypes',
             'availableCreators'
         ));
+    }
     }
 
     public function destroy(Document $document): RedirectResponse

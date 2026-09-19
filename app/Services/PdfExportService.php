@@ -328,10 +328,10 @@ class PdfExportService
     private function filename(Document $document): string
     {
         $title = preg_replace('/[^A-Za-z0-9_\-]+/', '_', $document->title) ?: 'document';
-        $division = preg_replace('/[^A-Za-z0-9_\-]+/', '_', $document->division?->code ?? 'no_division') ?: 'no_division';
+        $unitKerja = preg_replace('/[^A-Za-z0-9_\-]+/', '_', $document->unitKerja?->kode_unit_kerja ?? 'no_unit') ?: 'no_unit';
         $date = now()->format('Y-m-d');
 
-        return "{$title}_{$division}_{$date}.pdf";
+        return "{$title}_{$unitKerja}_{$date}.pdf";
     }
 
     private function pxToIn(float $px): float

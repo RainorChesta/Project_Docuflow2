@@ -11,9 +11,9 @@ use App\Models\SignatureRequest;
 use App\Models\UnitKerja;
 use App\Models\User;
 use App\Notifications\ApprovalRouteResolved;
+use App\Notifications\DirectorDocumentTembusanNotification;
 use App\Notifications\DocumentApprovalRequested;
 use App\Notifications\DocumentApprovalResult;
-use App\Notifications\DirectorDocumentTembusanNotification;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -23,12 +23,12 @@ use Illuminate\Support\Facades\Log;
  *
  * Principles:
  * 1. Driven by signature boxes ([ttd:user]) in document content or active SignatureRequest records.
- * 2. Ordered by hierarchy: Staff (10) -> Unit PIC (20) -> Kadiv / PIC Klinik (30) -> Director (40) -> Admin (50).
+ * 2. Ordered by hierarchy: Staff (10) -> Unit PIC (20) -> Head / PIC Klinik (30) -> Director (40) -> Admin (50).
  * 3. Smart Bypass: If document author is an assigned signer, their step is automatically bypassed.
- * 4. Fallback: If no signature boxes exist, systemic approval applies (Kadiv for Pusat, PIC Unit -> PIC Klinik for Cabang).
+ * 4. Fallback: If no signature boxes exist, systemic approval applies (PIC Unit -> PIC Klinik / Head).
  * 5. Director Rule:
  *    - With Director signature box: Blocking final approval step.
- *    - Without Director signature box: Finalized at Kadiv / PIC Klinik, Director receives a copy (Tembusan / Only To Know).
+ *    - Without Director signature box: Finalized at Head / PIC Klinik, Director receives a copy (Tembusan / Only To Know).
  */
 class ApprovalRoutingService
 {
@@ -74,16 +74,16 @@ class ApprovalRoutingService
                         $stepType = 'director_approval';
                         $stepName = __('Pengesahan Direktur PT (:name)', ['name' => $targetUser->name]);
                     } elseif ($targetUser->isHead()) {
-                        if (!$isPusat && $document->branch && $document->branch->pic_klinik_id === $targetUser->id) {
+                        if ($document->branch && $document->branch->pic_klinik_id === $targetUser->id) {
                             $stepType = 'pic_klinik_approval';
                             $stepName = __('Pengesahan Kepala Cabang :branch (:name)', [
                                 'branch' => $document->branch->name,
                                 'name' => $targetUser->name,
                             ]);
                         } else {
-                            $stepType = 'kadiv_approval';
-                            $stepName = __('Persetujuan Kepala Divisi :div (:name)', [
-                                'div' => $document->division?->name ?? 'Terkait',
+                            $stepType = 'head_approval';
+                            $stepName = __('Persetujuan Kepala Unit :unit (:name)', [
+                                'unit' => $document->unitKerja?->nama_unit_kerja ?? 'Unit Kerja',
                                 'name' => $targetUser->name,
                             ]);
                         }
@@ -114,67 +114,45 @@ class ApprovalRoutingService
                 }
             } else {
                 // ── Fallback when NO signature boxes are in the document ──
-                if ($isPusat) {
-                    // Pusat: Kadiv approval
-                    $kadiv = $this->findKadivForDocument($document, $creator);
-                    $isCreatorKadiv = $creator->isHead() && (
-                        $creator->division_id === $document->division_id ||
-                        in_array($document->division_id, $creator->allDivisionIds(), true)
-                    );
+                $picUnit = null;
+                if ($document->unitKerja?->pic_user_id) {
+                    $picUnit = $document->unitKerja->picUser;
+                } else {
+                    $picUnit = $this->findActiveUsers($document, 'head')->first();
+                }
+
+                if ($picUnit) {
+                    $isCreatorPicUnit = ($creator->id === $picUnit->id);
+                    $unitName = $document->unitKerja?->nama_unit_kerja ?? 'Unit Kerja';
 
                     $stepsToCreate[] = [
                         'step_order' => $order++,
                         'signature_request_id' => null,
-                        'step_type' => 'kadiv_approval',
-                        'step_name' => __('Persetujuan Kepala Divisi :div', ['div' => $document->division?->name ?? 'Terkait']),
-                        'assigned_user_id' => $kadiv?->id,
+                        'step_type' => 'pic_unit_acknowledge',
+                        'step_name' => __('Verifikasi PIC :unit', ['unit' => $unitName]),
+                        'assigned_user_id' => $picUnit->id,
                         'assigned_role' => 'head',
-                        'status' => $isCreatorKadiv ? 'bypassed' : 'waiting',
-                        'action_by_id' => $isCreatorKadiv ? $creator->id : null,
-                        'action_at' => $isCreatorKadiv ? now() : null,
-                        'notes' => $isCreatorKadiv ? __('Dilewati otomatis (Pembuat adalah Kepala Divisi)') : null,
+                        'status' => $isCreatorPicUnit ? 'bypassed' : 'waiting',
+                        'action_by_id' => $isCreatorPicUnit ? $creator->id : null,
+                        'action_at' => $isCreatorPicUnit ? now() : null,
+                        'notes' => $isCreatorPicUnit ? __('Dilewati otomatis (Pembuat adalah PIC Unit Kerja)') : null,
                     ];
-                } else {
-                    // Cabang: PIC Unit -> PIC Klinik
-                    $picUnit = null;
-                    if ($document->unitKerja?->pic_user_id) {
-                        $picUnit = $document->unitKerja->picUser;
-                    } else {
-                        $picUnit = $document->branch?->availablePics()->first()
-                            ?? $this->findActiveUsers($document, 'head')->first();
-                    }
+                }
 
-                    if ($picUnit) {
-                        $isCreatorPicUnit = ($creator->id === $picUnit->id);
-                        $unitName = $document->unitKerja?->nama_unit_kerja ?? 'Unit Kerja';
+                $picKlinik = $document->branch?->picKlinik
+                    ?? ($isPusat ? null : $this->findActiveUsers($document, 'head')->first())
+                    ?? $this->findActiveUsers($document, 'admin')->first();
 
-                        $stepsToCreate[] = [
-                            'step_order' => $order++,
-                            'signature_request_id' => null,
-                            'step_type' => 'pic_unit_acknowledge',
-                            'step_name' => __('Verifikasi PIC :unit', ['unit' => $unitName]),
-                            'assigned_user_id' => $picUnit->id,
-                            'assigned_role' => 'head',
-                            'status' => $isCreatorPicUnit ? 'bypassed' : 'waiting',
-                            'action_by_id' => $isCreatorPicUnit ? $creator->id : null,
-                            'action_at' => $isCreatorPicUnit ? now() : null,
-                            'notes' => $isCreatorPicUnit ? __('Dilewati otomatis (Pembuat adalah PIC Unit Kerja)') : null,
-                        ];
-                    }
-
-                    $picKlinik = $document->branch?->picKlinik
-                        ?? $this->findActiveUsers($document, 'head')->first()
-                        ?? $this->findActiveUsers($document, 'admin')->first();
-
-                    $isCreatorPicKlinik = ($picKlinik && $creator->id === $picKlinik->id);
+                if ($picKlinik && (!$picUnit || $picKlinik->id !== $picUnit->id)) {
+                    $isCreatorPicKlinik = ($creator->id === $picKlinik->id);
                     $branchName = $document->branch?->name ?? 'Cabang';
 
                     $stepsToCreate[] = [
                         'step_order' => $order++,
                         'signature_request_id' => null,
                         'step_type' => 'pic_klinik_approval',
-                        'step_name' => __('Pengesahan Kepala Cabang :branch', ['branch' => $branchName]),
-                        'assigned_user_id' => $picKlinik?->id,
+                        'step_name' => __('Pengesahan Kepala :branch', ['branch' => $branchName]),
+                        'assigned_user_id' => $picKlinik->id,
                         'assigned_role' => 'head',
                         'status' => $isCreatorPicKlinik ? 'bypassed' : 'waiting',
                         'action_by_id' => $isCreatorPicKlinik ? $creator->id : null,
@@ -242,7 +220,7 @@ class ApprovalRoutingService
     }
 
     /**
-     * Alias for compileWorkflowFromSignatures to maintain backward compatibility.
+     * Alias for compileWorkflowFromSignatures.
      */
     public function initializeWorkflow(Document $document, DocumentVersion $version, User $creator, ?int $selectedPicId = null): array
     {
@@ -403,7 +381,7 @@ class ApprovalRoutingService
     // Helper Finders & Query Builders
     // ───────────────────────────────────────────────────
 
-    public function findKadivForDocument(Document $document, ?User $excludeUser = null): ?User
+    public function findHeadForDocument(Document $document, ?User $excludeUser = null): ?User
     {
         $heads = $this->findActiveUsers($document, 'head', $excludeUser);
         return $heads->first() ?? $this->findActiveUsers($document, 'admin', $excludeUser)->first();
@@ -416,7 +394,7 @@ class ApprovalRoutingService
     }
 
     /**
-     * Find active users with the given role in the same PT context as the document.
+     * Find active users with the given role in the same branch/PT context as the document.
      */
     public function findActiveUsers(Document $document, string $role, ?User $excludeUser = null): Collection
     {
@@ -428,13 +406,11 @@ class ApprovalRoutingService
         }
 
         if ($role === 'head') {
-            if ($document->division_id) {
+            if ($document->unit_kerja_id) {
                 $query->where(function ($q) use ($document) {
-                    $q->where('division_id', $document->division_id)
-                      ->orWhereHas('divisions', fn($dq) => $dq->where('divisions.id', $document->division_id));
+                    $q->where('unit_kerja_id', $document->unit_kerja_id)
+                      ->orWhereHas('unitKerjas', fn($uq) => $uq->where('unit_kerjas.id', $document->unit_kerja_id));
                 });
-            } else {
-                return collect();
             }
 
             if ($document->branch_id) {
@@ -463,7 +439,7 @@ class ApprovalRoutingService
     }
 
     /**
-     * Resolve approver(s) for the given document (legacy wrapper).
+     * Resolve approver(s) for the given document.
      */
     public function resolveApprover(Document $document, ?User $excludeUser = null): array
     {

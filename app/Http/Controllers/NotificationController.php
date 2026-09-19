@@ -72,6 +72,7 @@ class NotificationController extends Controller
             if (!isset($docIds[$n->id])) {
                 if (in_array($type, [
                     'approval_request', 
+                    'document_added_unit_kerja', 
                     'document_added_division', 
                     'rollback_request',
                     'rename_request',

@@ -46,6 +46,11 @@ class DocumentVersion extends Model
         return $this->review_notes;
     }
 
+    public function getRejectionNotesAttribute(): ?string
+    {
+        return $this->review_notes;
+    }
+
     public function isFileUpload(): bool
     {
         return !is_null($this->file_path);

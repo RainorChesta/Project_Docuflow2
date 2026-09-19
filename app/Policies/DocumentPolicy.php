@@ -25,7 +25,7 @@ class DocumentPolicy
             return true;
         }
 
-        // Explicit share access (user share, division share, or anyone with link)
+        // Explicit share access (user share, unit kerja share, or anyone with link)
         // allows access across different companies/branches
         if (app(DocumentShareService::class)->resolveEffectiveRole($document, $user) !== null) {
             return true;
@@ -88,9 +88,9 @@ class DocumentPolicy
             return true;
         }
 
-        if ($document->isDivision()
-            && $document->division_id
-            && in_array($document->division_id, $user->allDivisionIds(), true)) {
+        if ($document->isUnitKerja()
+            && $document->unit_kerja_id
+            && in_array($document->unit_kerja_id, $user->allUnitKerjaIds(), true)) {
             return true;
         }
 
@@ -100,7 +100,7 @@ class DocumentPolicy
     public function create(User $user): bool
     {
         // Any active user (including Director) may create documents; personal/general docs
-        // do not require a division.
+        // do not require a unit kerja.
         return (bool) ($user->is_active ?? true);
     }
 
@@ -146,7 +146,7 @@ class DocumentPolicy
             return true;
         }
 
-        if ($user->isHead() && ($user->division_id === $document->division_id || in_array($document->division_id, $user->allDivisionIds(), true))) {
+        if ($user->isHead() && ($user->unit_kerja_id === $document->unit_kerja_id || in_array($document->unit_kerja_id, $user->allUnitKerjaIds(), true))) {
             $contextService = app(\App\Services\CompanyContextService::class);
             $activeCompanyId = $contextService->getActiveCompanyId($user);
             $activeBranchId = $contextService->getActiveBranchId($user);
@@ -176,7 +176,7 @@ class DocumentPolicy
     {
         if (!$this->view($user, $document)) return false;
         if ($user->id === $document->owner_id || $user->isAdmin() || $user->isDirector()) return true;
-        if ($user->isHead() && ($user->division_id === $document->division_id || in_array($document->division_id, $user->allDivisionIds(), true))) {
+        if ($user->isHead() && ($user->unit_kerja_id === $document->unit_kerja_id || in_array($document->unit_kerja_id, $user->allUnitKerjaIds(), true))) {
             return true;
         }
         return $this->update($user, $document);
@@ -186,7 +186,7 @@ class DocumentPolicy
     {
         if (!$this->view($user, $document)) return false;
         if ($user->id === $document->owner_id || $user->isAdmin() || $user->isDirector()) return true;
-        if ($user->isHead() && ($user->division_id === $document->division_id || in_array($document->division_id, $user->allDivisionIds(), true))) {
+        if ($user->isHead() && ($user->unit_kerja_id === $document->unit_kerja_id || in_array($document->unit_kerja_id, $user->allUnitKerjaIds(), true))) {
             return true;
         }
         return $this->update($user, $document);
@@ -201,8 +201,8 @@ class DocumentPolicy
             return true;
         }
 
-        // Division Head can approve requests in their division within active context
-        if ($user->isHead() && ($user->division_id === $document->division_id || in_array($document->division_id, $user->allDivisionIds(), true))) {
+        // Head of Unit Kerja can approve requests in their unit kerja within active context
+        if ($user->isHead() && ($user->unit_kerja_id === $document->unit_kerja_id || in_array($document->unit_kerja_id, $user->allUnitKerjaIds(), true))) {
             $contextService = app(\App\Services\CompanyContextService::class);
             $activeCompanyId = $contextService->getActiveCompanyId($user);
             $activeBranchId = $contextService->getActiveBranchId($user);
@@ -250,7 +250,7 @@ class DocumentPolicy
 
         if ($user->isHead()) {
             if ($document->owner_id === $user->id) return true;
-            return $document->isDivision() && in_array($document->division_id, $user->allDivisionIds(), true);
+            return $document->isUnitKerja() && in_array($document->unit_kerja_id, $user->allUnitKerjaIds(), true);
         }
 
         return $user->id === $document->owner_id;

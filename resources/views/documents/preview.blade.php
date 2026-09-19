@@ -30,7 +30,7 @@
                 <div class="card-body">
                     <div class="flex flex-wrap justify-between items-center gap-3 mb-4 pb-4 border-b border-base-300">
                         <div class="text-sm">
-                            <div><span class="text-base-content/60">{{ __('Divisi') }}:</span> {{ $document->division?->code ?? '—' }}</div>
+                            <div><span class="text-base-content/60">{{ __('Unit Kerja') }}:</span> {{ $document->unitKerja?->nama_unit_kerja ?? $document->unitKerja?->kode_unit_kerja ?? '—' }}</div>
                             <div class="flex items-center gap-1.5 mt-0.5"><span class="text-base-content/60">{{ __('Pemilik') }}:</span> <x-user-avatar :user="$document->owner" size="w-4 h-4" text-size="text-[9px]" /> <span class="font-medium text-base-content">{{ $document->owner->name }}</span></div>
                         </div>
                         @php

@@ -2,15 +2,15 @@
 
 namespace Tests\Feature;
 
-use App\Models\Division;
+use App\Models\UnitKerja;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\User;
-use App\Models\DocumentDivisionShare;
+use App\Models\DocumentUnitKerjaShare;
 use App\Models\DocumentShare;
 use App\Notifications\DocumentAccessRevoked;
 use App\Notifications\DocumentOpenedByGrantedUser;
-use App\Notifications\DocumentSharedWithDivision;
+use App\Notifications\DocumentSharedWithUnitKerja;
 use App\Notifications\DocumentSharedWithUser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -23,7 +23,7 @@ class DocumentAccessNotificationTest extends TestCase
 
     protected User $owner;
     protected User $recipient;
-    protected Division $division;
+    protected UnitKerja $unitKerja;
     protected DocumentType $docType;
     protected Document $document;
 
@@ -34,11 +34,11 @@ class DocumentAccessNotificationTest extends TestCase
 
         $company = \App\Models\Company::create(['name' => 'PT Jaya', 'code' => 'JBM']);
         $branch = \App\Models\Branch::create(['company_id' => $company->id, 'name' => 'Pusat', 'is_pusat' => true]);
-        $this->division = Division::create(['name' => 'IT Division', 'code' => 'IT']);
-        $this->docType = DocumentType::create(['name' => 'Surat Edaran', 'code' => 'S.ED']);
+        $this->unitKerja = UnitKerja::create(['nama_unit_kerja' => 'IT Unit', 'kode_unit_kerja' => '01']);
+        $this->docType = DocumentType::create(['name' => 'Surat Edaran', 'code' => 'S.ED', 'category' => 'naskah_dinas']);
 
         $this->owner = User::factory()->create([
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'name' => 'Owner User',
             'is_active' => true,
         ]);
@@ -46,7 +46,7 @@ class DocumentAccessNotificationTest extends TestCase
         $this->owner->branches()->sync([$branch->id]);
 
         $this->recipient = User::factory()->create([
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'name' => 'Recipient User',
             'is_active' => true,
         ]);
@@ -55,13 +55,13 @@ class DocumentAccessNotificationTest extends TestCase
 
         $this->document = Document::create([
             'title' => 'Important Policy Document',
-            'document_number' => '001/S.ED/IT/JBM/VIII/2026',
+            'document_number' => '001/S.ED/JBM/VIII/2026',
             'company_id' => $company->id,
             'branch_id' => $branch->id,
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'owner_id' => $this->owner->id,
             'document_type_id' => $this->docType->id,
-            'visibility' => Document::VISIBILITY_DIVISION,
+            'visibility' => Document::VISIBILITY_UNIT_KERJA,
         ]);
     }
 
@@ -88,20 +88,20 @@ class DocumentAccessNotificationTest extends TestCase
         );
     }
 
-    public function test_division_members_receive_notification_when_division_granted_access(): void
+    public function test_unit_kerja_members_receive_notification_when_unit_kerja_granted_access(): void
     {
         Notification::fake();
 
-        $financeDiv = Division::create(['name' => 'Finance Division', 'code' => 'FIN']);
+        $financeUnit = UnitKerja::create(['nama_unit_kerja' => 'Finance Unit', 'kode_unit_kerja' => '05']);
         $financeUser = User::factory()->create([
-            'division_id' => $financeDiv->id,
+            'unit_kerja_id' => $financeUnit->id,
             'name' => 'Finance Staff',
             'is_active' => true,
         ]);
 
         $response = $this->actingAs($this->owner)->post(route('shares.store', $this->document), [
-            'type' => 'division',
-            'division_id' => $financeDiv->id,
+            'type' => 'unit_kerja',
+            'unit_kerja_id' => $financeUnit->id,
             'role' => 'viewer',
         ]);
 
@@ -109,10 +109,10 @@ class DocumentAccessNotificationTest extends TestCase
 
         Notification::assertSentTo(
             $financeUser,
-            DocumentSharedWithDivision::class,
-            function (DocumentSharedWithDivision $notification) use ($financeDiv) {
+            DocumentSharedWithUnitKerja::class,
+            function (DocumentSharedWithUnitKerja $notification) use ($financeUnit) {
                 return $notification->document->id === $this->document->id
-                    && $notification->divisionName === $financeDiv->name
+                    && $notification->unitKerjaName === $financeUnit->nama_unit_kerja
                     && $notification->role === 'viewer';
             }
         );
@@ -138,39 +138,39 @@ class DocumentAccessNotificationTest extends TestCase
             function (DocumentAccessRevoked $notification) {
                 return $notification->document->id === $this->document->id
                     && $notification->revokedByName === $this->owner->name
-                    && $notification->divisionName === null;
+                    && $notification->unitKerjaName === null;
             }
         );
     }
 
-    public function test_division_members_receive_notification_when_division_access_is_revoked(): void
+    public function test_unit_kerja_members_receive_notification_when_unit_kerja_access_is_revoked(): void
     {
         Notification::fake();
 
-        $financeDiv = Division::create(['name' => 'Finance Division', 'code' => 'FIN']);
+        $financeUnit = UnitKerja::create(['nama_unit_kerja' => 'Finance Unit', 'kode_unit_kerja' => '05']);
         $financeUser = User::factory()->create([
-            'division_id' => $financeDiv->id,
+            'unit_kerja_id' => $financeUnit->id,
             'name' => 'Finance Staff',
             'is_active' => true,
         ]);
 
-        $divisionShare = DocumentDivisionShare::create([
+        $unitKerjaShare = DocumentUnitKerjaShare::create([
             'document_id' => $this->document->id,
-            'division_id' => $financeDiv->id,
+            'unit_kerja_id' => $financeUnit->id,
             'role' => 'viewer',
             'invited_by' => $this->owner->id,
         ]);
 
-        $response = $this->actingAs($this->owner)->delete(route('shares.division.destroy', [$this->document, $divisionShare]));
+        $response = $this->actingAs($this->owner)->delete(route('shares.unit-kerja.destroy', [$this->document, $unitKerjaShare]));
         $response->assertRedirect();
 
         Notification::assertSentTo(
             $financeUser,
             DocumentAccessRevoked::class,
-            function (DocumentAccessRevoked $notification) use ($financeDiv) {
+            function (DocumentAccessRevoked $notification) use ($financeUnit) {
                 return $notification->document->id === $this->document->id
                     && $notification->revokedByName === $this->owner->name
-                    && $notification->divisionName === $financeDiv->name;
+                    && $notification->unitKerjaName === $financeUnit->nama_unit_kerja;
             }
         );
     }
@@ -244,11 +244,11 @@ class DocumentAccessNotificationTest extends TestCase
         // Now share a second distinct document
         $doc2 = Document::create([
             'title' => 'Second Policy Document',
-            'document_number' => '002/S.ED/IT/JBM/VIII/2026',
-            'division_id' => $this->division->id,
+            'document_number' => '002/S.ED/JBM/VIII/2026',
+            'unit_kerja_id' => $this->unitKerja->id,
             'owner_id' => $this->owner->id,
             'document_type_id' => $this->docType->id,
-            'visibility' => Document::VISIBILITY_DIVISION,
+            'visibility' => Document::VISIBILITY_UNIT_KERJA,
         ]);
         $this->recipient->notify(new DocumentSharedWithUser($doc2, 'viewer', $this->owner->name));
 
@@ -262,7 +262,7 @@ class DocumentAccessNotificationTest extends TestCase
         $company2 = \App\Models\Company::create(['name' => 'PT Berbeda', 'code' => 'PBD']);
         $branch2 = \App\Models\Branch::create(['company_id' => $company2->id, 'name' => 'Cabang 2', 'is_pusat' => false]);
         $recipient2 = User::factory()->create([
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'name' => 'Cross Branch Recipient',
             'is_active' => true,
         ]);
@@ -304,4 +304,3 @@ class DocumentAccessNotificationTest extends TestCase
         $countResp2->assertJsonPath('unread_count', 1);
     }
 }
-

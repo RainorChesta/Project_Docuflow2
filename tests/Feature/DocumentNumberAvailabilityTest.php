@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Company;
 use App\Models\Branch;
-use App\Models\Division;
+use App\Models\UnitKerja;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\User;
@@ -18,7 +18,7 @@ class DocumentNumberAvailabilityTest extends TestCase
     private User $user;
     private DocumentType $docType;
     private Branch $branch;
-    private Division $division;
+    private UnitKerja $unitKerja;
 
     protected function setUp(): void
     {
@@ -26,12 +26,12 @@ class DocumentNumberAvailabilityTest extends TestCase
 
         $company = Company::create(['name' => 'PT Test', 'code' => 'TEST']);
         $this->branch = Branch::create(['name' => 'Branch 1', 'code' => 'B1', 'company_id' => $company->id, 'is_pusat' => true]);
-        $this->division = Division::create(['name' => 'IT Dept', 'code' => 'IT']);
-        $this->docType = DocumentType::create(['name' => 'Surat Keputusan', 'code' => 'SK']);
+        $this->unitKerja = UnitKerja::create(['nama_unit_kerja' => 'IT Dept', 'kode_unit_kerja' => '01']);
+        $this->docType = DocumentType::create(['name' => 'Surat Keputusan', 'code' => 'SK', 'category' => 'akreditasi']);
 
         $this->user = User::factory()->create([
             'system_role' => 'staff',
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'is_active' => true,
         ]);
         $this->user->branches()->attach($this->branch->id);
@@ -41,7 +41,7 @@ class DocumentNumberAvailabilityTest extends TestCase
     public function test_check_number_returns_not_exists_for_available_number(): void
     {
         $response = $this->actingAs($this->user)->getJson(route('documents.check-number', [
-            'document_number' => '001/SK/IT/B1/IX/2026',
+            'document_number' => '001/SK-01/B1/IX/2026',
         ]));
 
         $response->assertStatus(200)
@@ -68,17 +68,17 @@ class DocumentNumberAvailabilityTest extends TestCase
     {
         $existingDoc = Document::create([
             'title' => 'Existing Policy Doc',
-            'document_number' => '001/SK/IT/B1/IX/2026',
+            'document_number' => '001/SK-01/B1/IX/2026',
             'document_type_id' => $this->docType->id,
             'owner_id' => $this->user->id,
             'branch_id' => $this->branch->id,
-            'division_id' => $this->division->id,
-            'visibility' => Document::VISIBILITY_DIVISION,
+            'unit_kerja_id' => $this->unitKerja->id,
+            'visibility' => Document::VISIBILITY_UNIT_KERJA,
         ]);
 
         // When checking 001, it exists
         $response1 = $this->actingAs($this->user)->getJson(route('documents.check-number', [
-            'document_number' => '001/SK/IT/B1/IX/2026',
+            'document_number' => '001/SK-01/B1/IX/2026',
         ]));
 
         $response1->assertStatus(200)
@@ -94,7 +94,7 @@ class DocumentNumberAvailabilityTest extends TestCase
 
         // When user changes to 002, it does NOT exist (available)
         $response2 = $this->actingAs($this->user)->getJson(route('documents.check-number', [
-            'document_number' => '002/SK/IT/B1/IX/2026',
+            'document_number' => '002/SK-01/B1/IX/2026',
         ]));
 
         $response2->assertStatus(200)
@@ -118,7 +118,7 @@ class DocumentNumberAvailabilityTest extends TestCase
             'document_number' => 'CUSTOM-999/SK/2026',
             'branch_id' => $this->branch->id,
             'branch_ids' => [$this->branch->id],
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
         ]);
 
         $this->assertDatabaseHas('documents', [
@@ -135,8 +135,8 @@ class DocumentNumberAvailabilityTest extends TestCase
             'document_type_id' => $this->docType->id,
             'owner_id' => $this->user->id,
             'branch_id' => $this->branch->id,
-            'division_id' => $this->division->id,
-            'visibility' => Document::VISIBILITY_DIVISION,
+            'unit_kerja_id' => $this->unitKerja->id,
+            'visibility' => Document::VISIBILITY_UNIT_KERJA,
         ]);
 
         $file = \Illuminate\Http\UploadedFile::fake()->create('test.docx', 100, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
@@ -150,7 +150,7 @@ class DocumentNumberAvailabilityTest extends TestCase
             'document_number' => 'DUPLICATE-001',
             'branch_id' => $this->branch->id,
             'branch_ids' => [$this->branch->id],
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
         ]);
 
         $response->assertSessionHasErrors('document_number');

@@ -57,16 +57,6 @@ class Branch extends Model
         return $this->hasMany(Document::class);
     }
 
-    public function divisions(): HasMany
-    {
-        return $this->hasMany(Division::class);
-    }
-
-    public function unitKerjas(): HasMany
-    {
-        return $this->hasMany(UnitKerja::class, 'cabang_id');
-    }
-
     /**
      * Get all active PIC users belonging to unit kerjas in this branch.
      */
@@ -75,11 +65,9 @@ class Branch extends Model
         return User::whereIn('id', function ($query) {
             $query->select('pic_user_id')
                 ->from('unit_kerjas')
-                ->where('cabang_id', $this->id)
                 ->whereNotNull('pic_user_id');
-        })->get();
+        })->where('is_active', true)->get();
     }
-
 
     /**
      * Effective branch code for document numbering.

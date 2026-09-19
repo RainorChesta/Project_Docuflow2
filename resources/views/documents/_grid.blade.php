@@ -103,7 +103,7 @@
             @endif
             @if($doc->isGeneral()) <span class="text-success">· {{ __('Umum') }}</span>
             @elseif($doc->isPersonal()) <span class="text-info">· {{ __('Personal') }}</span>
-            @else <span>· {{ $doc->division?->code ?? '—' }}</span>
+            @else <span>· {{ $doc->unitKerja?->kode_unit_kerja ?? '—' }}</span>
             @endif
         </div>
         <div class="inline-flex items-center justify-center gap-1 mt-1 text-[10px] text-base-content/70 font-medium max-w-full">

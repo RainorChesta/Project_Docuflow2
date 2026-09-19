@@ -4,9 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\Branch;
 use App\Models\Company;
-use App\Models\Division;
 use App\Models\Document;
 use App\Models\DocumentType;
+use App\Models\UnitKerja;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -19,30 +19,30 @@ class GlobalSearchTest extends TestCase
     {
         $company = Company::create(['name' => 'PT Makmur', 'code' => 'MKM']);
         $branch = Branch::create(['company_id' => $company->id, 'name' => 'Pusat', 'is_pusat' => true]);
-        $division = Division::create(['name' => 'IT Dept', 'code' => 'IT']);
-        $docType = DocumentType::create(['name' => 'Surat Keputusan', 'code' => 'SK']);
+        $unitKerja = UnitKerja::create(['nama_unit_kerja' => 'IT Dept', 'kode_unit_kerja' => '01']);
+        $docType = DocumentType::create(['name' => 'Surat Keputusan', 'code' => 'SK', 'category' => 'akreditasi']);
 
-        $user = User::factory()->create(['division_id' => $division->id]);
+        $user = User::factory()->create(['unit_kerja_id' => $unitKerja->id]);
         $user->companies()->sync([$company->id]);
         $user->branches()->sync([$branch->id]);
 
         $doc1 = Document::create([
             'title' => 'Panduan Keamanan Sistem',
-            'document_number' => '001/SK/IT/2026',
+            'document_number' => '001/SK-01/MKM/IX/2026',
             'company_id' => $company->id,
             'branch_id' => $branch->id,
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'document_type_id' => $docType->id,
             'owner_id' => $user->id,
-            'visibility' => 'division',
+            'visibility' => 'unit_kerja',
         ]);
 
         $doc2 = Document::create([
             'title' => 'Laporan Keuangan Tahunan',
-            'document_number' => '002/SK/FIN/2026',
+            'document_number' => '002/SK-01/MKM/IX/2026',
             'company_id' => $company->id,
             'branch_id' => $branch->id,
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'document_type_id' => $docType->id,
             'owner_id' => $user->id,
             'visibility' => 'general',
@@ -65,31 +65,31 @@ class GlobalSearchTest extends TestCase
     {
         $company = Company::create(['name' => 'PT Makmur', 'code' => 'MKM']);
         $branch = Branch::create(['company_id' => $company->id, 'name' => 'Pusat', 'is_pusat' => true]);
-        $division = Division::create(['name' => 'IT Dept', 'code' => 'IT']);
-        $docTypeSK = DocumentType::create(['name' => 'Surat Keputusan', 'code' => 'SK']);
-        $docTypeSOP = DocumentType::create(['name' => 'Standard Operating Procedure', 'code' => 'SOP']);
+        $unitKerja = UnitKerja::create(['nama_unit_kerja' => 'IT Dept', 'kode_unit_kerja' => '01']);
+        $docTypeSK = DocumentType::create(['name' => 'Surat Keputusan', 'code' => 'SK', 'category' => 'akreditasi']);
+        $docTypeSOP = DocumentType::create(['name' => 'Standard Operating Procedure', 'code' => 'SOP', 'category' => 'akreditasi']);
 
-        $user = User::factory()->create(['division_id' => $division->id]);
+        $user = User::factory()->create(['unit_kerja_id' => $unitKerja->id]);
         $user->companies()->sync([$company->id]);
         $user->branches()->sync([$branch->id]);
 
         Document::create([
             'title' => 'SOP Backup Database',
-            'document_number' => '001/SOP/IT/2026',
+            'document_number' => '001/SOP-01/MKM/IX/2026',
             'company_id' => $company->id,
             'branch_id' => $branch->id,
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'document_type_id' => $docTypeSOP->id,
             'owner_id' => $user->id,
-            'visibility' => 'division',
+            'visibility' => 'unit_kerja',
         ]);
 
         Document::create([
             'title' => 'SK Kebijakan Umum',
-            'document_number' => '002/SK/IT/2026',
+            'document_number' => '002/SK-01/MKM/IX/2026',
             'company_id' => $company->id,
             'branch_id' => $branch->id,
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'document_type_id' => $docTypeSK->id,
             'owner_id' => $user->id,
             'visibility' => 'general',
@@ -117,10 +117,10 @@ class GlobalSearchTest extends TestCase
         $companyB = Company::create(['name' => 'PT Beta', 'code' => 'BET']);
         $branchB1 = Branch::create(['company_id' => $companyB->id, 'name' => 'Beta Surabaya', 'is_pusat' => true]);
 
-        $division = Division::create(['name' => 'Finance', 'code' => 'FIN']);
-        $docType = DocumentType::create(['name' => 'Regulasi Internal', 'code' => 'REG']);
+        $unitKerja = UnitKerja::create(['nama_unit_kerja' => 'Finance', 'kode_unit_kerja' => '05']);
+        $docType = DocumentType::create(['name' => 'Regulasi Internal', 'code' => 'REG', 'category' => 'akreditasi']);
 
-        $user = User::factory()->create(['division_id' => $division->id]);
+        $user = User::factory()->create(['unit_kerja_id' => $unitKerja->id]);
         // User assigned to Company A (and Branch A1)
         $user->companies()->sync([$companyA->id]);
         $user->branches()->sync([$branchA1->id]);
@@ -131,7 +131,7 @@ class GlobalSearchTest extends TestCase
             'document_number' => '001/ALF/JKT',
             'company_id' => $companyA->id,
             'branch_id' => $branchA1->id,
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'document_type_id' => $docType->id,
             'owner_id' => $user->id,
             'visibility' => 'general',
@@ -143,20 +143,20 @@ class GlobalSearchTest extends TestCase
             'document_number' => '002/ALF/BDG',
             'company_id' => $companyA->id,
             'branch_id' => $branchA2->id,
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'document_type_id' => $docType->id,
             'owner_id' => $user->id,
             'visibility' => 'general',
         ]);
 
         // Doc in Company B (unassigned)
-        $otherUser = User::factory()->create(['division_id' => $division->id]);
+        $otherUser = User::factory()->create(['unit_kerja_id' => $unitKerja->id]);
         Document::create([
             'title' => 'Dokumen Beta Surabaya',
             'document_number' => '003/BET/SBY',
             'company_id' => $companyB->id,
             'branch_id' => $branchB1->id,
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'document_type_id' => $docType->id,
             'owner_id' => $otherUser->id,
             'visibility' => 'general',
@@ -179,19 +179,19 @@ class GlobalSearchTest extends TestCase
     {
         $company = Company::create(['name' => 'PT Nusantara Sentosa', 'code' => 'NTS']);
         $branch = Branch::create(['company_id' => $company->id, 'name' => 'Cabang Yogyakarta', 'is_pusat' => true]);
-        $division = Division::create(['name' => 'Legal', 'code' => 'LEG']);
-        $docType = DocumentType::create(['name' => 'Nota Dinas', 'code' => 'ND']);
+        $unitKerja = UnitKerja::create(['nama_unit_kerja' => 'Legal', 'kode_unit_kerja' => '06']);
+        $docType = DocumentType::create(['name' => 'Nota Dinas', 'code' => 'ND', 'category' => 'naskah_dinas']);
 
-        $user = User::factory()->create(['division_id' => $division->id]);
+        $user = User::factory()->create(['unit_kerja_id' => $unitKerja->id]);
         $user->companies()->sync([$company->id]);
         $user->branches()->sync([$branch->id]);
 
         Document::create([
             'title' => 'Pengumuman Libur Nasional',
-            'document_number' => '010/ND/LEG/2026',
+            'document_number' => '010/ND/NTS/IX/2026',
             'company_id' => $company->id,
             'branch_id' => $branch->id,
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'document_type_id' => $docType->id,
             'owner_id' => $user->id,
             'visibility' => 'general',

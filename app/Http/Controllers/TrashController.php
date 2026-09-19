@@ -18,7 +18,7 @@ class TrashController extends Controller
     protected function getScopedTrashQuery(User $user): Builder
     {
         $query = Document::onlyTrashed()
-            ->with(['owner', 'division', 'documentType', 'branch.company', 'versions']);
+            ->with(['owner', 'unitKerja', 'documentType', 'branch.company', 'versions']);
 
         if ($user->isAdmin()) {
             return $query;
@@ -43,13 +43,13 @@ class TrashController extends Controller
         }
 
         if ($user->isHead()) {
-            $divisionIds = $user->allDivisionIds();
+            $unitKerjaIds = $user->allUnitKerjaIds();
 
-            return $query->where(function ($q) use ($user, $divisionIds) {
+            return $query->where(function ($q) use ($user, $unitKerjaIds) {
                 $q->where('owner_id', $user->id)
-                  ->orWhere(function ($sub) use ($divisionIds) {
-                      $sub->whereIn('division_id', $divisionIds)
-                          ->where('visibility', Document::VISIBILITY_DIVISION);
+                  ->orWhere(function ($sub) use ($unitKerjaIds) {
+                      $sub->whereIn('unit_kerja_id', $unitKerjaIds)
+                          ->where('visibility', Document::VISIBILITY_UNIT_KERJA);
                   });
             });
         }

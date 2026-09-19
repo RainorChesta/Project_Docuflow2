@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Division;
 use App\Models\Document;
-use App\Models\DocumentDivisionShare;
 use App\Models\DocumentShare;
+use App\Models\DocumentUnitKerjaShare;
+use App\Models\UnitKerja;
 use App\Models\User;
 use App\Services\AuditService;
 use App\Services\DocumentShareService;
@@ -25,9 +25,10 @@ class DocumentShareController extends Controller
         $this->authorize('manageAccess', $document);
 
         $validated = $request->validate([
-            'type' => 'required|in:user,division',
-            'user_id' => 'required_without:division_id|exists:users,id',
-            'division_id' => 'required_without:user_id|exists:divisions,id',
+            'type' => 'required|in:user,unit_kerja,division',
+            'user_id' => 'required_without_all:unit_kerja_id,division_id|exists:users,id',
+            'unit_kerja_id' => 'nullable|exists:unit_kerjas,id',
+            'division_id' => 'nullable|exists:unit_kerjas,id', // backward compatibility fallback
             'role' => 'required|in:editor,viewer',
         ]);
 
@@ -47,21 +48,22 @@ class DocumentShareController extends Controller
                 'role' => $validated['role'],
             ]);
         } else {
-            $division = Division::findOrFail($validated['division_id']);
-            $share = $this->shareService->addDivisionShare(
+            $ukId = $validated['unit_kerja_id'] ?? $validated['division_id'];
+            $unitKerja = UnitKerja::findOrFail($ukId);
+            $share = $this->shareService->addUnitKerjaShare(
                 $document,
-                $division,
+                $unitKerja,
                 $validated['role'],
                 $invitedBy,
             );
-            $this->auditService->log($invitedBy, 'share.division.added', 'document_division_share', $share->id, [
+            $this->auditService->log($invitedBy, 'share.unit_kerja.added', 'document_unit_kerja_share', $share->id, [
                 'document_id' => $document->id,
-                'division_id' => $validated['division_id'],
+                'unit_kerja_id' => $ukId,
                 'role' => $validated['role'],
             ]);
         }
 
-        return back()->with('notice', 'Akses berhasil ditambahkan.');
+        return back()->with('notice', __('Akses berhasil ditambahkan.'));
     }
 
     public function updateUserShare(Request $request, Document $document, DocumentShare $share): RedirectResponse
@@ -80,7 +82,7 @@ class DocumentShareController extends Controller
             $share->user?->notify(new \App\Notifications\DocumentSharedWithUser($document, $validated['role'], auth()->user()->name));
         }
 
-        return back()->with('notice', 'Peran pengguna diperbarui.');
+        return back()->with('notice', __('Peran pengguna diperbarui.'));
     }
 
     public function destroyUserShare(Document $document, DocumentShare $share): RedirectResponse
@@ -92,51 +94,54 @@ class DocumentShareController extends Controller
             'document_id' => $document->id,
         ]);
 
-        return back()->with('notice', 'Akses pengguna dihapus.');
+        return back()->with('notice', __('Akses pengguna dihapus.'));
     }
 
-    public function updateDivisionShare(Request $request, Document $document, DocumentDivisionShare $divisionShare): RedirectResponse
+    public function updateUnitKerjaShare(Request $request, Document $document, DocumentUnitKerjaShare $unitKerjaShare): RedirectResponse
     {
         $this->authorize('manageAccess', $document);
 
         $validated = $request->validate(['role' => 'required|in:editor,viewer']);
 
-        $this->shareService->updateDivisionShareRole($divisionShare, $validated['role']);
-        $this->auditService->log(auth()->user(), 'share.division.updated', 'document_division_share', $divisionShare->id, [
+        $this->shareService->updateUnitKerjaShareRole($unitKerjaShare, $validated['role']);
+        $this->auditService->log(auth()->user(), 'share.unit_kerja.updated', 'document_unit_kerja_share', $unitKerjaShare->id, [
             'document_id' => $document->id,
             'role' => $validated['role'],
         ]);
 
-        $division = $divisionShare->division;
-        if ($division) {
-            $divisionUsers = User::where('division_id', $division->id)
+        $unitKerja = $unitKerjaShare->unitKerja;
+        if ($unitKerja) {
+            $unitUsers = User::where(function ($q) use ($unitKerja) {
+                    $q->where('unit_kerja_id', $unitKerja->id)
+                      ->orWhereHas('unitKerjas', fn($uq) => $uq->where('unit_kerjas.id', $unitKerja->id));
+                })
                 ->where('is_active', true)
                 ->where('id', '!=', auth()->id())
                 ->get();
 
-            foreach ($divisionUsers as $member) {
-                $member->notify(new \App\Notifications\DocumentSharedWithDivision(
+            foreach ($unitUsers as $member) {
+                $member->notify(new \App\Notifications\DocumentSharedWithUnitKerja(
                     $document,
-                    $division->name,
+                    $unitKerja->nama_unit_kerja,
                     $validated['role'],
                     auth()->user()->name
                 ));
             }
         }
 
-        return back()->with('notice', 'Peran divisi diperbarui.');
+        return back()->with('notice', __('Peran unit kerja diperbarui.'));
     }
 
-    public function destroyDivisionShare(Document $document, DocumentDivisionShare $divisionShare): RedirectResponse
+    public function destroyUnitKerjaShare(Document $document, DocumentUnitKerjaShare $unitKerjaShare): RedirectResponse
     {
         $this->authorize('manageAccess', $document);
 
-        $this->shareService->removeDivisionShare($divisionShare, auth()->user());
-        $this->auditService->log(auth()->user(), 'share.division.removed', 'document_division_share', $divisionShare->id, [
+        $this->shareService->removeUnitKerjaShare($unitKerjaShare, auth()->user());
+        $this->auditService->log(auth()->user(), 'share.unit_kerja.removed', 'document_unit_kerja_share', $unitKerjaShare->id, [
             'document_id' => $document->id,
         ]);
 
-        return back()->with('notice', 'Akses divisi dihapus.');
+        return back()->with('notice', __('Akses unit kerja dihapus.'));
     }
 
     public function updateGeneralAccess(Request $request, Document $document): RedirectResponse
@@ -154,7 +159,7 @@ class DocumentShareController extends Controller
             'link_role' => $document->fresh()->link_role,
         ]);
 
-        return back()->with('notice', 'Pengaturan akses umum diperbarui.');
+        return back()->with('notice', __('Pengaturan akses umum diperbarui.'));
     }
 
     public function regenerateToken(Document $document): JsonResponse
@@ -180,7 +185,7 @@ class DocumentShareController extends Controller
             $document->refresh();
         }
 
-        $document->load(['shares.user', 'divisionShares.division']);
+        $document->load(['shares.user', 'unitKerjaShares.unitKerja']);
 
         return response()->json([
             'owner' => [
@@ -200,10 +205,17 @@ class DocumentShareController extends Controller
                 'avatar_url' => $s->user?->avatar_url,
                 'role' => $s->role,
             ]),
-            'division_shares' => $document->divisionShares->map(fn(DocumentDivisionShare $s) => [
+            'unit_kerja_shares' => $document->unitKerjaShares->map(fn(DocumentUnitKerjaShare $s) => [
                 'id' => $s->id,
-                'division_id' => $s->division_id,
-                'name' => $s->division?->name,
+                'unit_kerja_id' => $s->unit_kerja_id,
+                'name' => $s->unitKerja?->nama_unit_kerja,
+                'code' => $s->unitKerja?->kode_unit_kerja,
+                'role' => $s->role,
+            ]),
+            'division_shares' => $document->unitKerjaShares->map(fn(DocumentUnitKerjaShare $s) => [
+                'id' => $s->id,
+                'division_id' => $s->unit_kerja_id,
+                'name' => $s->unitKerja?->nama_unit_kerja,
                 'role' => $s->role,
             ]),
         ]);
@@ -227,14 +239,21 @@ class DocumentShareController extends Controller
                 'avatar_url' => $u->avatar_url,
             ]);
 
-        $divisions = Division::query()
-            ->when($term !== '', fn($q) => $q->where('name', 'like', "%{$term}%"))
+        $unitKerjas = UnitKerja::query()
+            ->when($term !== '', fn($q) => $q->where('nama_unit_kerja', 'like', "%{$term}%")->orWhere('kode_unit_kerja', 'like', "%{$term}%"))
+            ->orderBy('kode_unit_kerja')
             ->limit(10)
-            ->get(['id', 'name']);
+            ->get(['id', 'kode_unit_kerja', 'nama_unit_kerja'])
+            ->map(fn($u) => [
+                'id' => $u->id,
+                'name' => $u->nama_unit_kerja,
+                'code' => $u->kode_unit_kerja,
+            ]);
 
         return response()->json([
             'users' => $users,
-            'divisions' => $divisions,
+            'unit_kerjas' => $unitKerjas,
+            'divisions' => $unitKerjas, // backward compatibility for frontend
         ]);
     }
 
@@ -250,14 +269,12 @@ class DocumentShareController extends Controller
         $currentUser = auth()->user();
 
         if ($currentUser) {
-            // Mark unread share notifications for this document as read
             $currentUser->unreadNotifications()
                 ->where('data->type', 'document_shared')
                 ->where('data->document_id', $document->id)
                 ->update(['read_at' => now()]);
         }
 
-        // Notify document owner when another user opens the document via the share link (throttled)
         if ($document->owner_id && $currentUser && $currentUser->id !== $document->owner_id) {
             $throttleKey = 'notif_doc_opened_link_' . $document->id . '_' . $currentUser->id;
             if (\Illuminate\Support\Facades\Cache::add($throttleKey, true, now()->addMinutes(15))) {
@@ -265,11 +282,11 @@ class DocumentShareController extends Controller
             }
         }
 
-        $document->load('owner', 'division', 'documentType', 'currentVersion', 'versions.author', 'shares.user', 'divisionShares.division');
+        $document->load('owner', 'unitKerja', 'documentType', 'currentVersion', 'versions.author', 'shares.user', 'unitKerjaShares.unitKerja');
 
-        $divisions = auth()->user()->isAdmin()
-            ? Division::all()
-            : Division::whereIn('id', auth()->user()->allDivisionIds())->get();
+        $unitKerjas = auth()->user()->isAdmin()
+            ? UnitKerja::orderBy('kode_unit_kerja')->get()
+            : UnitKerja::whereIn('id', auth()->user()->allUnitKerjaIds())->get();
 
         $version = $document->displayVersion();
         $onlyOfficeConfig = null;
@@ -311,6 +328,6 @@ class DocumentShareController extends Controller
             ->values()
             ->toArray();
 
-        return view('documents.show', compact('document', 'divisions', 'onlyOfficeConfig', 'version', 'approvedSignatures', 'companies'));
+        return view('documents.show', compact('document', 'unitKerjas', 'onlyOfficeConfig', 'version', 'approvedSignatures', 'companies'));
     }
 }

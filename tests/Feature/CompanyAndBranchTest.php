@@ -4,9 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\Branch;
 use App\Models\Company;
-use App\Models\Division;
 use App\Models\Document;
 use App\Models\DocumentType;
+use App\Models\UnitKerja;
 use App\Models\User;
 use App\Services\DocumentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -56,23 +56,23 @@ class CompanyAndBranchTest extends TestCase
         $company = Company::create(['name' => 'PT Jaya', 'code' => 'JBM']);
         $branch = Branch::create(['company_id' => $company->id, 'name' => 'Cabang Surabaya', 'is_pusat' => false, 'code' => 'SBY']);
         $pusat = Branch::create(['company_id' => $company->id, 'name' => 'Pusat', 'is_pusat' => true]);
-        $division = Division::create(['code' => 'IT', 'name' => 'Information Tech']);
-        $docType = DocumentType::create(['code' => 'S.KEL', 'name' => 'Surat Keluar']);
+        $unitKerja = UnitKerja::create(['kode_unit_kerja' => '01', 'nama_unit_kerja' => 'Tim Mutu']);
+        $docType = DocumentType::create(['code' => 'S.KEL', 'name' => 'Surat Keluar', 'category' => 'naskah_dinas']);
 
         $service = app(DocumentService::class);
-        $numberCabang = $service->generateId($division, $docType, $branch);
-        $numberPusat = $service->generateId($division, $docType, $pusat);
+        $numberCabang = $service->generateId(null, $docType, $branch, $unitKerja);
+        $numberPusat = $service->generateId(null, $docType, $pusat, $unitKerja);
 
         $this->assertStringContainsString('/SBY/', $numberCabang);
-        $this->assertStringContainsString('/IT/JBM/', $numberPusat);
+        $this->assertStringContainsString('/JBM/', $numberPusat);
     }
 
     public function test_sop_document_numbering_includes_unit_kerja_and_branch_code(): void
     {
         $company = Company::create(['name' => 'PT Jaya', 'code' => 'JBM']);
         $branch = Branch::create(['company_id' => $company->id, 'name' => 'CDC Diponegoro', 'is_pusat' => false, 'code' => 'CDC-DIP']);
-        $unitKerja = \App\Models\UnitKerja::create(['kode_unit_kerja' => '11', 'nama_unit_kerja' => 'Unit Operasional']);
-        $sopType = DocumentType::create(['code' => 'SOP', 'name' => 'Standard Operating Procedure']);
+        $unitKerja = UnitKerja::create(['kode_unit_kerja' => '11', 'nama_unit_kerja' => 'Unit Operasional']);
+        $sopType = DocumentType::create(['code' => 'SOP', 'name' => 'Standard Operating Procedure', 'category' => 'akreditasi']);
 
         $service = app(DocumentService::class);
         
@@ -90,8 +90,8 @@ class CompanyAndBranchTest extends TestCase
     {
         $company = Company::create(['name' => 'PT Jaya', 'code' => 'JBM']);
         $branch = Branch::create(['company_id' => $company->id, 'name' => 'CDC Diponegoro', 'is_pusat' => false, 'code' => 'CDC-DIP']);
-        $unitKerja11 = \App\Models\UnitKerja::create(['kode_unit_kerja' => '11', 'nama_unit_kerja' => 'Unit Operasional']);
-        $sopType = DocumentType::create(['code' => 'SOP', 'name' => 'Standard Operating Procedure']);
+        $unitKerja11 = UnitKerja::create(['kode_unit_kerja' => '11', 'nama_unit_kerja' => 'Unit Operasional']);
+        $sopType = DocumentType::create(['code' => 'SOP', 'name' => 'Standard Operating Procedure', 'category' => 'akreditasi']);
 
         $service = app(DocumentService::class);
         $user = User::factory()->create();
@@ -137,13 +137,13 @@ class CompanyAndBranchTest extends TestCase
     {
         $company = Company::create(['name' => 'PT Jaya', 'code' => 'JBM']);
         $branch = Branch::create(['company_id' => $company->id, 'name' => 'Pusat', 'is_pusat' => true]);
-        $division = Division::create(['code' => 'IT', 'name' => 'Information Technology']);
-        $docType = DocumentType::create(['code' => 'S.KEL', 'name' => 'Surat Keluar']);
+        $unitKerja = UnitKerja::create(['kode_unit_kerja' => '01', 'nama_unit_kerja' => 'Tim Mutu']);
+        $docType = DocumentType::create(['code' => 'S.KEL', 'name' => 'Surat Keluar', 'category' => 'naskah_dinas']);
 
         $director = User::factory()->create([
             'system_role' => 'direktur',
             'nip' => null,
-            'division_id' => null,
+            'unit_kerja_id' => null,
         ]);
         $director->companies()->sync([$company->id]);
         $director->branches()->sync([$branch->id]);
@@ -152,13 +152,12 @@ class CompanyAndBranchTest extends TestCase
         $response = $this->actingAs($director)->post('/documents', [
             'title' => 'Director Document',
             'document_type_id' => $docType->id,
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'branch_id' => $branch->id,
         ]);
 
         $document = Document::where('title', 'Director Document')->first();
         $this->assertNotNull($document);
-        $response->assertRedirect(route('documents.edit', $document));
         $response->assertRedirect(route('documents.edit', $document));
 
         // 2. Director can edit document
@@ -180,13 +179,13 @@ class CompanyAndBranchTest extends TestCase
         $this->assertSame('active', $pendingVersion->status);
     }
 
-    public function test_admin_can_create_director_with_company_assignments_and_null_nip_division(): void
+    public function test_admin_can_create_director_with_company_assignments_and_null_nip_unit_kerja(): void
     {
         $admin = User::factory()->create(['system_role' => 'admin']);
         $companyA = Company::create(['name' => 'PT Alfa', 'code' => 'ALF']);
         $branchA1 = Branch::create(['company_id' => $companyA->id, 'name' => 'Pusat', 'is_pusat' => true]);
         $companyB = Company::create(['name' => 'PT Beta', 'code' => 'BET']);
-        $division = Division::create(['code' => 'HR', 'name' => 'Human Resources']);
+        $unitKerja = UnitKerja::create(['kode_unit_kerja' => '01', 'nama_unit_kerja' => 'Tim Mutu']);
 
         $response = $this->actingAs($admin)->post('/admin/users', [
             'name' => 'Pak Direktur',
@@ -194,7 +193,7 @@ class CompanyAndBranchTest extends TestCase
             'password' => 'password123',
             'password_confirmation' => 'password123',
             'nip' => '123456789', // Should be cleared to null
-            'division_id' => $division->id, // Should be cleared to null
+            'unit_kerja_id' => $unitKerja->id, // Should be cleared to null
             'system_role' => 'direktur',
             'is_active' => '1',
             'company_ids' => [$companyA->id],
@@ -207,7 +206,7 @@ class CompanyAndBranchTest extends TestCase
         $this->assertNotNull($director);
         $this->assertSame('direktur', $director->system_role);
         $this->assertNull($director->nip);
-        $this->assertNull($director->division_id);
+        $this->assertNull($director->unit_kerja_id);
         $this->assertTrue($director->companies->contains($companyA->id));
         $this->assertFalse($director->companies->contains($companyB->id));
         $this->assertTrue($director->branches->contains($branchA1->id));
@@ -216,11 +215,11 @@ class CompanyAndBranchTest extends TestCase
     public function test_admin_can_update_director_company_assignments(): void
     {
         $admin = User::factory()->create(['system_role' => 'admin']);
-        $division = Division::create(['code' => 'ACC', 'name' => 'Accounting']);
+        $unitKerja = UnitKerja::create(['kode_unit_kerja' => '02', 'nama_unit_kerja' => 'Tim Audit']);
         $director = User::factory()->create([
             'system_role' => 'direktur',
             'nip' => null,
-            'division_id' => null,
+            'unit_kerja_id' => null,
         ]);
 
         $companyA = Company::create(['name' => 'PT Alfa', 'code' => 'ALF']);
@@ -231,7 +230,7 @@ class CompanyAndBranchTest extends TestCase
             'name' => 'Pak Direktur Updated',
             'email' => $director->email,
             'nip' => '999999', // Should be ignored/null
-            'division_id' => $division->id, // Should be ignored/null for direktur
+            'unit_kerja_id' => $unitKerja->id, // Should be ignored/null for direktur
             'system_role' => 'direktur',
             'is_active' => '1',
             'company_ids' => [$companyB->id],
@@ -243,7 +242,7 @@ class CompanyAndBranchTest extends TestCase
         $director->refresh();
         $this->assertSame('Pak Direktur Updated', $director->name);
         $this->assertNull($director->nip);
-        $this->assertNull($director->division_id);
+        $this->assertNull($director->unit_kerja_id);
         $this->assertFalse($director->companies->contains($companyA->id));
         $this->assertTrue($director->companies->contains($companyB->id));
         $this->assertTrue($director->branches->contains($branchB1->id));
@@ -283,10 +282,10 @@ class CompanyAndBranchTest extends TestCase
         $admin = User::factory()->create(['system_role' => 'admin']);
         $companyA = Company::create(['name' => 'PT Alfa', 'code' => 'ALF']);
         $branchA = Branch::create(['company_id' => $companyA->id, 'name' => 'Pusat', 'is_pusat' => true]);
-        $divisionA = Division::create(['code' => 'HR', 'name' => 'HR']);
-        $docType = DocumentType::create(['code' => 'S.KEL', 'name' => 'Surat Keluar']);
+        $unitKerjaA = UnitKerja::create(['kode_unit_kerja' => '01', 'nama_unit_kerja' => 'Tim Mutu']);
+        $docType = DocumentType::create(['code' => 'S.KEL', 'name' => 'Surat Keluar', 'category' => 'naskah_dinas']);
 
-        $userA = User::factory()->create(['division_id' => $divisionA->id]);
+        $userA = User::factory()->create(['unit_kerja_id' => $unitKerjaA->id]);
         $userA->companies()->sync([$companyA->id]);
         $userA->branches()->sync([$branchA->id]);
 
@@ -294,10 +293,10 @@ class CompanyAndBranchTest extends TestCase
         $doc = $documentService->create([
             'title' => 'PT Alfa Internal Doc',
             'document_type_id' => $docType->id,
-            'division_id' => $divisionA->id,
+            'unit_kerja_id' => $unitKerjaA->id,
             'branch_id' => $branchA->id,
             'company_id' => $companyA->id,
-            'visibility' => Document::VISIBILITY_DIVISION,
+            'visibility' => Document::VISIBILITY_UNIT_KERJA,
         ], $userA->id);
 
         $doc->versions()->first()->update(['status' => 'active']);
@@ -305,8 +304,8 @@ class CompanyAndBranchTest extends TestCase
         // Admin can view document show page
         $this->actingAs($admin)->get(route('documents.show', $doc))->assertOk();
 
-        // Admin can view Dokumen Divisi tab and see docs from all divisions
-        $response = $this->actingAs($admin)->get(route('documents.index', ['type' => 'division']))->assertOk();
+        // Admin can view Dokumen Unit Kerja tab and see docs
+        $response = $this->actingAs($admin)->get(route('documents.index', ['type' => 'unit_kerja']))->assertOk();
         $response->assertSee('PT Alfa Internal Doc');
 
         // Admin can view director accordion with all companies
@@ -321,14 +320,14 @@ class CompanyAndBranchTest extends TestCase
         $companyB = Company::create(['name' => 'PT Beta', 'code' => 'BET']);
         $branchB = Branch::create(['company_id' => $companyB->id, 'name' => 'Branch Beta', 'is_pusat' => true]);
 
-        $division = Division::create(['code' => 'HR', 'name' => 'Human Resources']);
-        $docType = DocumentType::create(['code' => 'S.KEL', 'name' => 'Surat Keluar']);
+        $unitKerja = UnitKerja::create(['kode_unit_kerja' => '01', 'nama_unit_kerja' => 'Tim Mutu']);
+        $docType = DocumentType::create(['code' => 'S.KEL', 'name' => 'Surat Keluar', 'category' => 'naskah_dinas']);
 
-        $userAlfa = User::factory()->create(['division_id' => $division->id]);
+        $userAlfa = User::factory()->create(['unit_kerja_id' => $unitKerja->id]);
         $userAlfa->companies()->sync([$companyA->id]);
         $userAlfa->branches()->sync([$branchA->id]);
 
-        $userBeta = User::factory()->create(['division_id' => $division->id]);
+        $userBeta = User::factory()->create(['unit_kerja_id' => $unitKerja->id]);
         $userBeta->companies()->sync([$companyB->id]);
         $userBeta->branches()->sync([$branchB->id]);
 
@@ -338,10 +337,10 @@ class CompanyAndBranchTest extends TestCase
         $docAlfa = $documentService->create([
             'title' => 'Dokumen Khusus Alfa',
             'document_type_id' => $docType->id,
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'branch_id' => $branchA->id,
             'company_id' => $companyA->id,
-            'visibility' => Document::VISIBILITY_DIVISION,
+            'visibility' => Document::VISIBILITY_UNIT_KERJA,
         ], $userAlfa->id);
         $docAlfa->versions()->first()->update(['status' => 'active']);
 
@@ -349,10 +348,10 @@ class CompanyAndBranchTest extends TestCase
         $docBeta = $documentService->create([
             'title' => 'Dokumen Rahasia Beta',
             'document_type_id' => $docType->id,
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'branch_id' => $branchB->id,
             'company_id' => $companyB->id,
-            'visibility' => Document::VISIBILITY_DIVISION,
+            'visibility' => Document::VISIBILITY_UNIT_KERJA,
         ], $userBeta->id);
         $docBeta->versions()->first()->update(['status' => 'active']);
 
@@ -363,14 +362,14 @@ class CompanyAndBranchTest extends TestCase
         // 2. User Alfa can view own doc in Alfa
         $this->actingAs($userAlfa)->get(route('documents.show', $docAlfa))->assertOk();
 
-        // 3. User Alfa dashboard recent & division list does NOT include Beta doc
+        // 3. User Alfa dashboard recent & unit_kerja list does NOT include Beta doc
         $dashResponse = $this->actingAs($userAlfa)->get(route('dashboard'));
         $dashResponse->assertOk();
         $dashResponse->assertSee('Dokumen Khusus Alfa');
         $dashResponse->assertDontSee('Dokumen Rahasia Beta');
 
         // 4. User Alfa document list does not contain Beta doc
-        $docListResponse = $this->actingAs($userAlfa)->get(route('documents.index', ['type' => 'division']));
+        $docListResponse = $this->actingAs($userAlfa)->get(route('documents.index', ['type' => 'unit_kerja']));
         $docListResponse->assertOk();
         $docListResponse->assertSee('Dokumen Khusus Alfa');
         $docListResponse->assertDontSee('Dokumen Rahasia Beta');
@@ -384,7 +383,7 @@ class CompanyAndBranchTest extends TestCase
         $director = User::factory()->create([
             'system_role' => 'direktur',
             'nip' => null,
-            'division_id' => null,
+            'unit_kerja_id' => null,
         ]);
         $director->companies()->sync([$company->id]);
         $director->branches()->sync([$branch->id]);
@@ -410,10 +409,10 @@ class CompanyAndBranchTest extends TestCase
     {
         $companyA = Company::create(['name' => 'PT Alfa', 'code' => 'ALF']);
         $branchPusatA = Branch::create(['company_id' => $companyA->id, 'name' => 'Pusat Alfa', 'is_pusat' => true]);
-        $division = Division::create(['code' => 'HR', 'name' => 'Human Resources']);
-        $docType = DocumentType::create(['code' => 'S.KEL', 'name' => 'Surat Keluar']);
+        $unitKerja = UnitKerja::create(['kode_unit_kerja' => '01', 'nama_unit_kerja' => 'Tim Mutu']);
+        $docType = DocumentType::create(['code' => 'S.KEL', 'name' => 'Surat Keluar', 'category' => 'naskah_dinas']);
 
-        $user = User::factory()->create(['division_id' => $division->id]);
+        $user = User::factory()->create(['unit_kerja_id' => $unitKerja->id]);
         $user->companies()->sync([$companyA->id]);
         $user->branches()->sync([$branchPusatA->id]);
 
@@ -421,10 +420,10 @@ class CompanyAndBranchTest extends TestCase
         $doc = $documentService->create([
             'title' => 'Dokumen Scope Test',
             'document_type_id' => $docType->id,
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'branch_id' => $branchPusatA->id,
             'company_id' => $companyA->id,
-            'visibility' => Document::VISIBILITY_DIVISION,
+            'visibility' => Document::VISIBILITY_UNIT_KERJA,
         ], $user->id);
         $doc->versions()->first()->update(['status' => 'active']);
 
@@ -492,7 +491,7 @@ class CompanyAndBranchTest extends TestCase
         $company2 = Company::create(['name' => 'PT Dua', 'code' => 'DUA']);
         $branch2 = Branch::create(['company_id' => $company2->id, 'name' => 'Pusat Dua', 'is_pusat' => true]);
 
-        $docType = DocumentType::create(['code' => 'SK', 'name' => 'Surat Keputusan']);
+        $docType = DocumentType::create(['code' => 'SK', 'name' => 'Surat Keputusan', 'category' => 'akreditasi']);
 
         $user = User::factory()->create();
         $user->companies()->sync([$company1->id, $company2->id]);
@@ -527,8 +526,8 @@ class CompanyAndBranchTest extends TestCase
         $company = Company::create(['name' => 'Jaya Bhakti Mandiri', 'code' => 'JBM']);
         $branch1 = Branch::create(['company_id' => $company->id, 'name' => 'Pusat', 'is_pusat' => true]);
         $branch2 = Branch::create(['company_id' => $company->id, 'name' => 'Mitra Medicare Clinic Dharmahusada', 'is_pusat' => false, 'code' => 'MMCD']);
-        $division = Division::create(['code' => 'HR', 'name' => 'Human Resources']);
-        $docType = DocumentType::create(['code' => 'S.ED', 'name' => 'Surat Edaran']);
+        $unitKerja = UnitKerja::create(['kode_unit_kerja' => '01', 'nama_unit_kerja' => 'Tim Mutu']);
+        $docType = DocumentType::create(['code' => 'S.ED', 'name' => 'Surat Edaran', 'category' => 'naskah_dinas']);
 
         $admin = User::factory()->create(['system_role' => 'admin']);
 
@@ -543,7 +542,7 @@ class CompanyAndBranchTest extends TestCase
         $postResp = $this->actingAs($admin)->post('/documents', [
             'title' => 'Dokumen Multi Cabang Test',
             'document_type_id' => $docType->id,
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'branch_ids' => [$branch1->id, $branch2->id],
         ]);
 
@@ -581,4 +580,3 @@ class CompanyAndBranchTest extends TestCase
         $this->assertSame('Brand New User', $paginatedUsers->first()->name);
     }
 }
-

@@ -37,8 +37,8 @@
                     <dd class="font-medium">{{ $document->title }}</dd>
                 </div>
                 <div>
-                    <dt class="text-[10px] font-semibold text-base-content/50 uppercase">{{ __('Divisi') }}</dt>
-                    <dd class="font-medium">{{ $document->division?->name ?? $document->division?->code ?? '-' }}</dd>
+                    <dt class="text-[10px] font-semibold text-base-content/50 uppercase">{{ __('Unit Kerja') }}</dt>
+                    <dd class="font-medium">{{ $document->unitKerja?->nama_unit_kerja ?? $document->unitKerja?->kode_unit_kerja ?? '-' }}</dd>
                 </div>
                 <div>
                     <dt class="text-[10px] font-semibold text-base-content/50 uppercase">{{ __('Pemilik') }}</dt>

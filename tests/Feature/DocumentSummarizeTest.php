@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\AI\GroqClient;
 
 use App\Jobs\SummarizeDocumentJob;
-use App\Models\Division;
+use App\Models\UnitKerja;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\DocumentVersion;
@@ -30,19 +30,19 @@ class DocumentSummarizeTest extends TestCase
 
         $company = \App\Models\Company::create(['name' => 'PT Jaya', 'code' => 'JBM']);
         $branch = \App\Models\Branch::create(['company_id' => $company->id, 'name' => 'Pusat', 'is_pusat' => true]);
-        $division = Division::create(['code' => 'HRD', 'name' => 'Human Resources']);
-        $docType = DocumentType::create(['name' => 'Surat Edaran', 'code' => 'S.ED']);
-        $this->user = User::factory()->create(['division_id' => $division->id]);
+        $unitKerja = UnitKerja::create(['kode_unit_kerja' => '02', 'nama_unit_kerja' => 'Human Resources']);
+        $docType = DocumentType::create(['name' => 'Surat Edaran', 'code' => 'S.ED', 'category' => 'naskah_dinas']);
+        $this->user = User::factory()->create(['unit_kerja_id' => $unitKerja->id]);
         $this->user->companies()->sync([$company->id]);
         $this->user->branches()->sync([$branch->id]);
 
         $this->document = Document::create([
-            'document_number' => '001/S.ED/HRD/JBM/VIII/2026',
+            'document_number' => '001/S.ED/JBM/VIII/2026',
             'title' => 'Dokumen Uji Ringkasan AI',
-            'visibility' => Document::VISIBILITY_DIVISION,
+            'visibility' => Document::VISIBILITY_UNIT_KERJA,
             'company_id' => $company->id,
             'branch_id' => $branch->id,
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'owner_id' => $this->user->id,
             'document_type_id' => $docType->id,
         ]);

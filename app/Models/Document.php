@@ -11,9 +11,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Document extends Model
 {
     use SoftDeletes;
+
     protected $fillable = [
         'document_number', 'format_choice', 'numbering_scheme', 'title', 'summary', 'summary_status', 'summary_error',
-        'summary_started_at', 'summary_completed_at', 'visibility', 'division_id', 'unit_kerja_id', 'company_id', 'branch_id', 'owner_id',
+        'summary_started_at', 'summary_completed_at', 'visibility', 'unit_kerja_id', 'company_id', 'branch_id', 'owner_id',
         'document_type_id', 'template_id', 'is_public', 'current_version_id',
         'pending_rollback_version_id', 'rollback_requested_by_id', 'rollback_requested_at',
         'pending_title', 'rename_requested_by_id', 'rename_requested_at', 'rename_request_notes',
@@ -81,7 +82,8 @@ class Document extends Model
     }
 
     public const VISIBILITY_GENERAL = 'general';
-    public const VISIBILITY_DIVISION = 'division';
+    public const VISIBILITY_UNIT_KERJA = 'unit_kerja';
+    public const VISIBILITY_DIVISION = 'unit_kerja'; // Backward-compatible alias
     public const VISIBILITY_PERSONAL = 'personal';
 
     public function isGeneral(): bool
@@ -89,19 +91,19 @@ class Document extends Model
         return $this->visibility === self::VISIBILITY_GENERAL;
     }
 
+    public function isUnitKerja(): bool
+    {
+        return $this->visibility === self::VISIBILITY_UNIT_KERJA || $this->visibility === 'division';
+    }
+
     public function isDivision(): bool
     {
-        return $this->visibility === self::VISIBILITY_DIVISION;
+        return $this->isUnitKerja();
     }
 
     public function isPersonal(): bool
     {
         return $this->visibility === self::VISIBILITY_PERSONAL;
-    }
-
-    public function division(): BelongsTo
-    {
-        return $this->belongsTo(Division::class);
     }
 
     public function company(): BelongsTo
@@ -211,6 +213,11 @@ class Document extends Model
         return $this->hasMany(DocumentShare::class);
     }
 
+    public function unitKerjaShares(): HasMany
+    {
+        return $this->hasMany(DocumentUnitKerjaShare::class);
+    }
+
     public function signatureRequests(): HasMany
     {
         return $this->hasMany(SignatureRequest::class);
@@ -267,11 +274,6 @@ class Document extends Model
         return !is_null($this->director_notified_at);
     }
 
-    public function divisionShares(): HasMany
-    {
-        return $this->hasMany(DocumentDivisionShare::class);
-    }
-
     public function scopeActive($query)
     {
         return $query->whereHas('versions', fn($q) => $q->where('status', 'active'));
@@ -283,9 +285,7 @@ class Document extends Model
     }
 
     /**
-     * General (public) documents — visible to every authenticated user.
-     * Hanya dokumen berstatus aktif (punya versi approved) yang muncul,
-     * konsisten dengan scopeDivision. Dokumen pending/draft tidak tampil.
+     * General (public) documents — visible to every authenticated user within context scope.
      */
     public function scopeGeneral(Builder $query): Builder
     {
@@ -294,41 +294,36 @@ class Document extends Model
     }
 
     /**
-     * Division-scoped documents the given user may see (Dokumen Divisi / Unit Kerja tab).
+     * Work Unit-scoped documents the given user may see (Dokumen Unit Kerja tab).
      */
-    public function scopeDivision(Builder $query, User $user): Builder
+    public function scopeUnitKerja(Builder $query, User $user): Builder
     {
         if ($user->isAdmin()) {
-            return $query->where('visibility', self::VISIBILITY_DIVISION)
+            return $query->whereIn('visibility', [self::VISIBILITY_UNIT_KERJA, 'division'])
                 ->whereHas('versions', fn($q) => $q->where('status', 'active'));
         }
 
-        $divisionIds = $user->allDivisionIds();
         $unitKerjaIds = $user->allUnitKerjaIds();
 
-        if (empty($divisionIds) && empty($unitKerjaIds)) {
+        if (empty($unitKerjaIds)) {
             return $query->whereRaw('1 = 0');
         }
 
-        return $query->where('visibility', self::VISIBILITY_DIVISION)
-            ->where(function (Builder $q) use ($divisionIds, $unitKerjaIds) {
-                if (!empty($divisionIds)) {
-                    $q->whereIn('division_id', $divisionIds);
-                }
-                if (!empty($unitKerjaIds)) {
-                    $q->orWhereIn('unit_kerja_id', $unitKerjaIds);
-                }
-            })
-            // Only approved/published documents appear in Dokumen Divisi / Unit Kerja.
-            // Pending (not yet approved) documents stay hidden until approved.
+        return $query->whereIn('visibility', [self::VISIBILITY_UNIT_KERJA, 'division'])
+            ->whereIn('unit_kerja_id', $unitKerjaIds)
             ->whereHas('versions', fn($q) => $q->where('status', 'active'));
     }
 
     /**
+     * Backward compatibility alias for scopeUnitKerja.
+     */
+    public function scopeDivision(Builder $query, User $user): Builder
+    {
+        return $this->scopeUnitKerja($query, $user);
+    }
+
+    /**
      * Documents the given user is allowed to see (row-level visibility).
-     * Admin sees everything. Regular users see: general docs within their accessible
-     * company/branch scope, own docs, division/unit kerja docs of any division/unit kerja they belong to,
-     * and docs where they have a personal share, division share, or branch distribution.
      */
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
@@ -338,7 +333,6 @@ class Document extends Model
 
         $directCompanyIds = $user->allCompanyIds();
         $directBranchIds = $user->allBranchIds();
-        $divisionIds = $user->allDivisionIds();
         $unitKerjaIds = $user->allUnitKerjaIds();
 
         // Include company IDs inferred from assigned branches
@@ -376,12 +370,12 @@ class Document extends Model
             return $query;
         }
 
-        return $query->where(function (Builder $q) use ($user, $divisionIds, $unitKerjaIds, $branchIds, $companyIds) {
-            // Explicitly shared with user or division (accessible across branches/companies)
+        return $query->where(function (Builder $q) use ($user, $unitKerjaIds, $branchIds, $companyIds) {
+            // Explicitly shared with user or unit kerja
             $q->whereHas('shares', fn(Builder $s) => $s->where('user_id', $user->id));
 
-            if (!empty($divisionIds)) {
-                $q->orWhereHas('divisionShares', fn(Builder $ds) => $ds->whereIn('division_id', $divisionIds));
+            if (!empty($unitKerjaIds)) {
+                $q->orWhereHas('unitKerjaShares', fn(Builder $us) => $us->whereIn('unit_kerja_id', $unitKerjaIds));
             }
 
             // Cross-branch distributed documents to user's branches or companies
@@ -395,7 +389,7 @@ class Document extends Model
             }));
 
             // Documents within the user's accessible branch/company scope
-            $q->orWhere(function (Builder $inScope) use ($user, $divisionIds, $unitKerjaIds, $branchIds, $companyIds) {
+            $q->orWhere(function (Builder $inScope) use ($user, $unitKerjaIds, $branchIds, $companyIds) {
                 if (!empty($branchIds) || !empty($companyIds)) {
                     $inScope->where(function (Builder $b) use ($branchIds, $companyIds) {
                         if (!empty($branchIds)) {
@@ -408,19 +402,12 @@ class Document extends Model
                     });
                 }
 
-                $inScope->where(function (Builder $sub) use ($user, $divisionIds, $unitKerjaIds) {
+                $inScope->where(function (Builder $sub) use ($user, $unitKerjaIds) {
                     $sub->where('visibility', self::VISIBILITY_GENERAL)
                         ->orWhere('owner_id', $user->id)
-                        ->orWhere(function (Builder $d) use ($divisionIds, $unitKerjaIds) {
-                            $d->where('visibility', self::VISIBILITY_DIVISION)
-                              ->where(function (Builder $w) use ($divisionIds, $unitKerjaIds) {
-                                  if (!empty($divisionIds)) {
-                                      $w->whereIn('division_id', $divisionIds);
-                                  }
-                                  if (!empty($unitKerjaIds)) {
-                                      $w->orWhereIn('unit_kerja_id', $unitKerjaIds);
-                                  }
-                              });
+                        ->orWhere(function (Builder $d) use ($unitKerjaIds) {
+                            $d->whereIn('visibility', [self::VISIBILITY_UNIT_KERJA, 'division'])
+                              ->whereIn('unit_kerja_id', $unitKerjaIds);
                         });
                 });
             });

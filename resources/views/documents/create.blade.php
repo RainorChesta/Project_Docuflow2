@@ -45,20 +45,20 @@
                                     selectedId: '{{ old('document_type_id') }}',
                                     options: [
                                         @foreach($documentTypes as $type)
-                                            { id: '{{ $type->id }}', code: '{{ strtoupper($type->code) }}', label: '{{ $type->code }} - {{ $type->name }}' },
+                                            { id: '{{ $type->id }}', code: '{{ strtoupper($type->code) }}', label: '{{ $type->code }} - {{ $type->name }}', category: '{{ $type->category }}', category_label: '{{ $type->category === 'naskah_dinas' ? __('Naskah Dinas') : __('Dokumen Akreditasi') }}' },
                                         @endforeach
                                     ],
                                     init() {
                                         window.docTypeMap = {
                                             @foreach($documentTypes as $type)
-                                                '{{ $type->id }}': { code: '{{ strtoupper($type->code) }}' },
+                                                '{{ $type->id }}': { code: '{{ strtoupper($type->code) }}', category: '{{ $type->category }}' },
                                             @endforeach
                                         };
                                     },
                                     get filteredOptions() {
                                         if (this.search === '') return this.options;
                                         const searchLower = this.search.toLowerCase();
-                                        return this.options.filter(opt => opt.label.toLowerCase().includes(searchLower));
+                                        return this.options.filter(opt => opt.label.toLowerCase().includes(searchLower) || opt.category_label.toLowerCase().includes(searchLower));
                                     },
                                     get selectedLabel() {
                                         let selected = this.options.find(opt => opt.id == this.selectedId);
@@ -95,8 +95,9 @@
                                     <ul class="max-h-60 overflow-y-auto p-1">
                                         <template x-for="option in filteredOptions" :key="option.id">
                                             <li>
-                                                <button type="button" @click="selectOption(option.id)" class="w-full text-left px-3 py-2 rounded-lg hover:bg-base-200 transition-colors" :class="{'bg-base-200 font-medium': selectedId == option.id}">
+                                                <button type="button" @click="selectOption(option.id)" class="w-full text-left px-3 py-2 rounded-lg hover:bg-base-200 transition-colors flex items-center justify-between gap-2" :class="{'bg-base-200 font-medium': selectedId == option.id}">
                                                     <span x-text="option.label"></span>
+                                                    <span class="badge badge-xs" :class="option.category === 'naskah_dinas' ? 'badge-primary' : 'badge-secondary'" x-text="option.category_label"></span>
                                                 </button>
                                             </li>
                                         </template>
@@ -110,24 +111,18 @@
                             @error('document_type_id') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                         </div>
 
-                        {{-- Format Penomoran Dokumen (Otomatis berdasarkan Cabang Pusat / Cabang PT) --}}
-                        @php
-                            $isPusatBranch = $activeBranch ? (bool) $activeBranch->is_pusat : true;
-                        @endphp
-                        <input type="hidden" name="format_choice" id="format_choice" value="{{ $isPusatBranch ? 'baru' : 'lama' }}">
+                        {{-- Format Penomoran Dokumen --}}
                         <div class="mb-4 p-3.5 rounded-xl border border-base-300 bg-base-200/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                             <div class="flex items-center gap-2.5">
-                                <span class="badge {{ $isPusatBranch ? 'badge-primary' : 'badge-secondary' }} badge-sm font-semibold" id="badge-branch-type">
-                                    {{ $isPusatBranch ? __('Cabang Pusat') : __('Cabang PT') }}
+                                <span class="badge badge-primary badge-sm font-semibold" id="badge-doc-category">
+                                    {{ __('Format Penomoran') }}
                                 </span>
-                                <span class="text-xs text-base-content/80" id="desc-branch-type">
-                                    {{ $isPusatBranch 
-                                        ? __('Penomoran Divisi: [No]/[Tipe]/[Divisi]/[Pusat]/[Bulan]/[Tahun]') 
-                                        : __('Penomoran Unit Kerja: [No]/[Tipe]-[UnitKerja]/[Cabang]/[Bulan]/[Tahun]') }}
+                                <span class="text-xs text-base-content/80" id="desc-doc-category">
+                                    {{ __('Naskah Dinas: [No]/[Tipe]/[Cabang]/[Bulan]/[Tahun] | Akreditasi: [No]/[Tipe]-[UnitKerja]/[Cabang]/[Bulan]/[Tahun]') }}
                                 </span>
                             </div>
-                            <span class="text-xs font-mono text-base-content/60" id="example-branch-type">
-                                {{ $isPusatBranch ? 'Ex: 001/SK/SKRT/JBM/IX/2026' : 'Ex: 001/SK-01/MMC/IX/2026' }}
+                            <span class="text-xs font-mono text-base-content/60" id="example-doc-format">
+                                Ex: 001/ST/KPS/IX/2026 atau 001/SOP-01/KPS/IX/2026
                             </span>
                         </div>
 
@@ -325,63 +320,40 @@
                             @error('title') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                         </div>
 
-                        {{-- Division --}}
-                        <div id="container-division" class="form-control w-full mb-4">
-                            <label for="division_id" class="label">
-                                <span class="label-text font-medium">{{ __('Divisi') }} <span class="text-error">*</span></span>
+                        {{-- Unit Kerja --}}
+                        <div id="container-unit-kerja" class="form-control w-full mb-4">
+                            <label for="unit_kerja_id" class="label">
+                                <span class="label-text font-medium">{{ __('Unit Kerja') }} <span id="uk-required-asterisk" class="text-error" style="display: none;">*</span></span>
                             </label>
                             @php
-                                $activeDivision = $activeDivision ?? app(\App\Services\CompanyContextService::class)->getActiveDivision();
-                                $activeDivisionId = $activeDivisionId ?? ($activeDivision?->id ?? app(\App\Services\CompanyContextService::class)->getActiveDivisionId());
+                                $activeUk = $activeUnitKerja ?? app(\App\Services\CompanyContextService::class)->getActiveUnitKerja();
+                                $activeUkId = $activeUk?->id ?? app(\App\Services\CompanyContextService::class)->getActiveUnitKerjaId();
                             @endphp
                             @if(auth()->user()->isAdmin() || auth()->user()->isDirector())
-                                <select name="division_id" id="division_id" class="select select-bordered w-full" required>
-                                    <option value="">{{ __('Pilih divisi...') }}</option>
-                                    @foreach($divisions as $div)
-                                        <option value="{{ $div->id }}" {{ old('division_id', $activeDivisionId ?? '') == $div->id ? 'selected' : '' }}>
-                                            {{ $div->code }} - {{ $div->name }}
+                                <select name="unit_kerja_id" id="unit_kerja_id" class="select select-bordered w-full">
+                                    <option value="">{{ __('Pilih unit kerja...') }}</option>
+                                    @foreach($unitKerjas as $uk)
+                                        <option value="{{ $uk->id }}" data-branch-id="{{ $uk->branch_id ?? '' }}" {{ old('unit_kerja_id', $activeUkId ?? '') == $uk->id ? 'selected' : '' }}>
+                                            {{ $uk->kode_unit_kerja }} - {{ $uk->nama_unit_kerja }}
                                         </option>
                                     @endforeach
                                 </select>
-                                <p class="text-xs text-base-content/50 mt-1">{{ __('Pilih divisi pembuat dokumen.') }}</p>
+                                <p class="text-xs text-base-content/50 mt-1">{{ __('Unit kerja pembuat dokumen. Wajib untuk Dokumen Akreditasi.') }}</p>
                             @else
-                                <select name="division_id" id="division_id" class="select select-bordered w-full" required>
-                                    @if($divisions->count() > 1)
-                                        <option value="">{{ __('Pilih divisi...') }}</option>
+                                <select name="unit_kerja_id" id="unit_kerja_id" class="select select-bordered w-full">
+                                    @if($unitKerjas->count() > 1)
+                                        <option value="">{{ __('Pilih unit kerja...') }}</option>
                                     @endif
-                                    @foreach($divisions as $div)
-                                        <option value="{{ $div->id }}" {{ old('division_id', $activeDivisionId ?? '') == $div->id ? 'selected' : '' }}>
-                                            {{ $div->code }} - {{ $div->name }}
+                                    @foreach($unitKerjas as $uk)
+                                        <option value="{{ $uk->id }}" data-branch-id="{{ $uk->branch_id ?? '' }}" {{ old('unit_kerja_id', $activeUkId ?? '') == $uk->id ? 'selected' : '' }}>
+                                            {{ $uk->kode_unit_kerja }} - {{ $uk->nama_unit_kerja }}
                                         </option>
                                     @endforeach
                                 </select>
                                 <p class="text-xs text-base-content/50 mt-1">
-                                    {{ $divisions->count() > 1 ? __('Pilih divisi penugasan Anda yang menerbitkan dokumen ini.') : __('Sesuai divisi penugasan Anda.') }}
+                                    {{ $unitKerjas->count() > 1 ? __('Pilih unit kerja penugasan Anda yang menerbitkan dokumen ini.') : __('Sesuai unit kerja penugasan Anda.') }}
                                 </p>
                             @endif
-                            @error('division_id') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
-                        </div>
-
-                        {{-- Unit Kerja (Cabang PT) --}}
-                        <div id="container-unit-kerja" class="form-control w-full mb-4" style="display: none;">
-                            <label for="unit_kerja_id" class="label">
-                                <span class="label-text font-medium">{{ __('Unit Kerja') }} <span class="text-error">*</span></span>
-                            </label>
-                            <select name="unit_kerja_id" id="unit_kerja_id" class="select select-bordered w-full">
-                                <option value="">{{ __('Pilih unit kerja...') }}</option>
-                                @foreach($unitKerjas as $uk)
-                                    <option value="{{ $uk->id }}" {{ old('unit_kerja_id', $activeUnitKerjaId ?? $userUnitKerjaId ?? '') == $uk->id ? 'selected' : '' }}>
-                                        {{ $uk->kode_unit_kerja }} - {{ $uk->nama_unit_kerja }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            <p class="text-xs text-base-content/50 mt-1">
-                                @if(auth()->user()->isAdmin() || auth()->user()->isDirector())
-                                    {{ __('Unit kerja cabang yang menerbitkan dokumen ini.') }}
-                                @else
-                                    {{ __('Pilih unit kerja penugasan Anda di cabang ini yang menerbitkan dokumen.') }}
-                                @endif
-                            </p>
                             @error('unit_kerja_id') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                         </div>
 
@@ -503,94 +475,68 @@
             var lastPreview = numberField.value;
 
             var branchSelect = document.getElementById('branch_id');
-            var divisionSelect = document.getElementById('division_id');
             var unitKerjaSelect = document.getElementById('unit_kerja_id');
             var containerUnitKerja = document.getElementById('container-unit-kerja');
-            var containerDivision = document.getElementById('container-division');
 
-            window.branchMap = {
-                @foreach(\App\Models\Branch::all() as $br)
-                    '{{ $br->id }}': {
-                        id: {{ $br->id }},
-                        name: '{{ addslashes($br->name) }}',
-                        code: '{{ addslashes($br->code ?? $br->effective_code) }}',
-                        is_pusat: {{ $br->is_pusat ? 'true' : 'false' }}
-                    },
-                @endforeach
-            };
-
-            function isCurrentBranchPusat() {
-                var branchId = branchSelect ? branchSelect.value : '';
-                if (branchId && window.branchMap && window.branchMap[branchId]) {
-                    return window.branchMap[branchId].is_pusat;
+            function getSelectedDocType() {
+                var typeId = typeSelect ? typeSelect.value : '';
+                if (typeId && window.docTypeMap && window.docTypeMap[typeId]) {
+                    return window.docTypeMap[typeId];
                 }
-                @if($activeBranch)
-                    return {{ $activeBranch->is_pusat ? 'true' : 'false' }};
-                @else
-                    return true;
-                @endif
-            }
-
-            function getFormatChoice() {
-                return isCurrentBranchPusat() ? 'baru' : 'lama';
+                return null;
             }
 
             function updateTypeVisibility() {
-                var isPusat = isCurrentBranchPusat();
-                var format = isPusat ? 'baru' : 'lama';
+                var docType = getSelectedDocType();
+                var badgeDocCategory = document.getElementById('badge-doc-category');
+                var descDocCategory = document.getElementById('desc-doc-category');
+                var exampleDocFormat = document.getElementById('example-doc-format');
+                var ukAsterisk = document.getElementById('uk-required-asterisk');
 
-                var formatChoiceInput = document.getElementById('format_choice');
-                var badgeBranchType = document.getElementById('badge-branch-type');
-                var descBranchType = document.getElementById('desc-branch-type');
-                var exampleBranchType = document.getElementById('example-branch-type');
-
-                if (formatChoiceInput) formatChoiceInput.value = format;
-
-                if (isPusat) {
-                    if (badgeBranchType) {
-                        badgeBranchType.textContent = @json(__('Cabang Pusat'));
-                        badgeBranchType.className = 'badge badge-primary badge-sm font-semibold';
+                if (docType && docType.category === 'akreditasi') {
+                    if (badgeDocCategory) {
+                        badgeDocCategory.textContent = @json(__('Dokumen Akreditasi'));
+                        badgeDocCategory.className = 'badge badge-secondary badge-sm font-semibold';
                     }
-                    if (descBranchType) {
-                        descBranchType.textContent = @json(__('Penomoran Divisi: [No]/[Tipe]/[Divisi]/[Pusat]/[Bulan]/[Tahun]'));
+                    if (descDocCategory) {
+                        descDocCategory.textContent = @json(__('Penomoran: [No]/[Tipe]-[UnitKerja]/[Cabang]/[Bulan]/[Tahun]'));
                     }
-                    if (exampleBranchType) {
-                        exampleBranchType.textContent = 'Ex: 001/SK/SKRT/JBM/IX/2026';
+                    if (exampleDocFormat) {
+                        exampleDocFormat.textContent = 'Ex: 001/' + (docType.code || 'SOP') + '-01/KPS/IX/2026';
                     }
-                    if (containerDivision) {
-                        containerDivision.style.display = 'block';
-                        if (divisionSelect && divisionSelect.tagName === 'SELECT') {
-                            divisionSelect.setAttribute('required', 'required');
-                        }
+                    if (ukAsterisk) ukAsterisk.style.display = 'inline';
+                    if (unitKerjaSelect) {
+                        unitKerjaSelect.setAttribute('required', 'required');
                     }
-                    if (containerUnitKerja) {
-                        containerUnitKerja.style.display = 'none';
-                        if (unitKerjaSelect) {
-                            unitKerjaSelect.removeAttribute('required');
-                        }
+                } else if (docType && docType.category === 'naskah_dinas') {
+                    if (badgeDocCategory) {
+                        badgeDocCategory.textContent = @json(__('Naskah Dinas'));
+                        badgeDocCategory.className = 'badge badge-primary badge-sm font-semibold';
+                    }
+                    if (descDocCategory) {
+                        descDocCategory.textContent = @json(__('Penomoran: [No]/[Tipe]/[Cabang]/[Bulan]/[Tahun]'));
+                    }
+                    if (exampleDocFormat) {
+                        exampleDocFormat.textContent = 'Ex: 001/' + (docType.code || 'ST') + '/KPS/IX/2026';
+                    }
+                    if (ukAsterisk) ukAsterisk.style.display = 'none';
+                    if (unitKerjaSelect) {
+                        unitKerjaSelect.removeAttribute('required');
                     }
                 } else {
-                    if (badgeBranchType) {
-                        badgeBranchType.textContent = @json(__('Cabang PT'));
-                        badgeBranchType.className = 'badge badge-secondary badge-sm font-semibold';
+                    if (badgeDocCategory) {
+                        badgeDocCategory.textContent = @json(__('Format Penomoran'));
+                        badgeDocCategory.className = 'badge badge-primary badge-sm font-semibold';
                     }
-                    if (descBranchType) {
-                        descBranchType.textContent = @json(__('Penomoran Unit Kerja: [No]/[Tipe]-[UnitKerja]/[Cabang]/[Bulan]/[Tahun]'));
+                    if (descDocCategory) {
+                        descDocCategory.textContent = @json(__('Naskah Dinas: [No]/[Tipe]/[Cabang]/[Bulan]/[Tahun] | Akreditasi: [No]/[Tipe]-[UnitKerja]/[Cabang]/[Bulan]/[Tahun]'));
                     }
-                    if (exampleBranchType) {
-                        exampleBranchType.textContent = 'Ex: 001/SK-01/MMC/IX/2026';
+                    if (exampleDocFormat) {
+                        exampleDocFormat.textContent = 'Ex: 001/ST/KPS/IX/2026';
                     }
-                    if (containerDivision) {
-                        containerDivision.style.display = 'none';
-                        if (divisionSelect && divisionSelect.tagName === 'SELECT') {
-                            divisionSelect.removeAttribute('required');
-                        }
-                    }
-                    if (containerUnitKerja) {
-                        containerUnitKerja.style.display = 'block';
-                        if (unitKerjaSelect) {
-                            unitKerjaSelect.setAttribute('required', 'required');
-                        }
+                    if (ukAsterisk) ukAsterisk.style.display = 'none';
+                    if (unitKerjaSelect) {
+                        unitKerjaSelect.removeAttribute('required');
                     }
                 }
 
@@ -740,18 +686,12 @@
 
                 updateTypeVisibility();
 
-                var isPusat = isCurrentBranchPusat();
                 var branchId = branchSelect ? branchSelect.value : '';
-                var divisionId = isPusat && divisionSelect ? divisionSelect.value : '';
-                var unitKerjaId = !isPusat && unitKerjaSelect ? unitKerjaSelect.value : '';
-                var format = isPusat ? 'baru' : 'lama';
+                var unitKerjaId = unitKerjaSelect ? unitKerjaSelect.value : '';
 
-                var url = '{{ route('documents.next-number') }}?document_type_id=' + encodeURIComponent(typeId) + '&format_choice=' + encodeURIComponent(format);
+                var url = '{{ route('documents.next-number') }}?document_type_id=' + encodeURIComponent(typeId);
                 if (branchId) {
                     url += '&branch_id=' + encodeURIComponent(branchId);
-                }
-                if (divisionId) {
-                    url += '&division_id=' + encodeURIComponent(divisionId);
                 }
                 if (unitKerjaId) {
                     url += '&unit_kerja_id=' + encodeURIComponent(unitKerjaId);
@@ -785,9 +725,6 @@
                     updateTypeVisibility();
                     fetchPreview();
                 });
-            }
-            if (divisionSelect) {
-                divisionSelect.addEventListener('change', fetchPreview);
             }
             if (unitKerjaSelect) {
                 unitKerjaSelect.addEventListener('change', fetchPreview);

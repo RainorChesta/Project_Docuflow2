@@ -2,11 +2,14 @@
 
 namespace App\Services;
 
-use App\Models\Division;
 use App\Models\Document;
-use App\Models\DocumentDivisionShare;
 use App\Models\DocumentShare;
+use App\Models\DocumentUnitKerjaShare;
+use App\Models\UnitKerja;
 use App\Models\User;
+use App\Notifications\DocumentAccessRevoked;
+use App\Notifications\DocumentSharedWithUnitKerja;
+use App\Notifications\DocumentSharedWithUser;
 use Illuminate\Support\Str;
 
 class DocumentShareService
@@ -22,7 +25,7 @@ class DocumentShareService
 
     /**
      * Highest-weighted role the user has on the document, or null if none.
-     * Owner (weight 3) always wins; personal share beats division share;
+     * Owner (weight 3) always wins; personal share beats unit kerja share;
      * link_role only counts when general_access is 'anyone_with_link'.
      */
     public function resolveEffectiveRole(Document $document, User $user): ?string
@@ -43,18 +46,18 @@ class DocumentShareService
             $bestWeight = self::ROLE_WEIGHTS[$personal];
         }
 
-        $divisionIds = $user->allDivisionIds();
+        $unitKerjaIds = $user->allUnitKerjaIds();
 
-        if (!empty($divisionIds)) {
-            $divisionRole = DocumentDivisionShare::where('document_id', $document->id)
-                ->whereIn('division_id', $divisionIds)
+        if (!empty($unitKerjaIds)) {
+            $unitKerjaRole = DocumentUnitKerjaShare::where('document_id', $document->id)
+                ->whereIn('unit_kerja_id', $unitKerjaIds)
                 ->pluck('role')
-                ->map(fn($role) => self::ROLE_WEIGHTS[$role])
+                ->map(fn($role) => self::ROLE_WEIGHTS[$role] ?? 0)
                 ->max();
 
-            if ($divisionRole !== null && $divisionRole > $bestWeight) {
-                $best = array_search($divisionRole, self::ROLE_WEIGHTS, true);
-                $bestWeight = $divisionRole;
+            if ($unitKerjaRole !== null && $unitKerjaRole > $bestWeight) {
+                $best = array_search($unitKerjaRole, self::ROLE_WEIGHTS, true);
+                $bestWeight = $unitKerjaRole;
             }
         }
 
@@ -78,7 +81,7 @@ class DocumentShareService
         );
 
         if ($user->id !== $invitedBy->id) {
-            $user->notify(new \App\Notifications\DocumentSharedWithUser($document, $role, $invitedBy->name));
+            $user->notify(new DocumentSharedWithUser($document, $role, $invitedBy->name));
         }
 
         return $share;
@@ -105,30 +108,30 @@ class DocumentShareService
                 ->delete();
 
             if ($revokedBy && $user && $user->id !== $revokedBy->id && $document) {
-                $user->notify(new \App\Notifications\DocumentAccessRevoked($document, $revokedBy->name));
+                $user->notify(new DocumentAccessRevoked($document, $revokedBy->name));
             }
         }
     }
 
-    public function addDivisionShare(Document $document, Division $division, string $role, User $invitedBy): DocumentDivisionShare
+    public function addUnitKerjaShare(Document $document, UnitKerja $unitKerja, string $role, User $invitedBy): DocumentUnitKerjaShare
     {
-        $share = DocumentDivisionShare::updateOrCreate(
-            ['document_id' => $document->id, 'division_id' => $division->id],
+        $share = DocumentUnitKerjaShare::updateOrCreate(
+            ['document_id' => $document->id, 'unit_kerja_id' => $unitKerja->id],
             ['role' => $role, 'invited_by' => $invitedBy->id],
         );
 
-        $divisionUsers = User::where(function ($q) use ($division) {
-                $q->where('division_id', $division->id)
-                  ->orWhereHas('divisions', fn($dq) => $dq->where('divisions.id', $division->id));
+        $unitUsers = User::where(function ($q) use ($unitKerja) {
+                $q->where('unit_kerja_id', $unitKerja->id)
+                  ->orWhereHas('unitKerjas', fn($uq) => $uq->where('unit_kerjas.id', $unitKerja->id));
             })
             ->where('is_active', true)
             ->where('id', '!=', $invitedBy->id)
             ->get();
 
-        foreach ($divisionUsers as $member) {
-            $member->notify(new \App\Notifications\DocumentSharedWithDivision(
+        foreach ($unitUsers as $member) {
+            $member->notify(new DocumentSharedWithUnitKerja(
                 $document,
-                $division->name,
+                $unitKerja->nama_unit_kerja,
                 $role,
                 $invitedBy->name
             ));
@@ -137,36 +140,36 @@ class DocumentShareService
         return $share;
     }
 
-    public function updateDivisionShareRole(DocumentDivisionShare $share, string $newRole): void
+    public function updateUnitKerjaShareRole(DocumentUnitKerjaShare $share, string $newRole): void
     {
         $share->update(['role' => $newRole]);
     }
 
-    public function removeDivisionShare(DocumentDivisionShare $share, ?User $revokedBy = null): void
+    public function removeUnitKerjaShare(DocumentUnitKerjaShare $share, ?User $revokedBy = null): void
     {
         $documentId = $share->document_id;
-        $divisionId = $share->division_id;
+        $unitKerjaId = $share->unit_kerja_id;
         $document = $share->document ?? Document::withTrashed()->find($documentId);
-        $divisionName = $share->division?->name;
+        $unitKerjaName = $share->unitKerja?->nama_unit_kerja;
 
         $share->delete();
 
-        if ($divisionId && $documentId) {
-            $divisionUsers = User::where(function ($q) use ($divisionId) {
-                    $q->where('division_id', $divisionId)
-                      ->orWhereHas('divisions', fn($dq) => $dq->where('divisions.id', $divisionId));
+        if ($unitKerjaId && $documentId) {
+            $unitUsers = User::where(function ($q) use ($unitKerjaId) {
+                    $q->where('unit_kerja_id', $unitKerjaId)
+                      ->orWhereHas('unitKerjas', fn($uq) => $uq->where('unit_kerjas.id', $unitKerjaId));
                 })
                 ->where('is_active', true)
                 ->get();
 
-            foreach ($divisionUsers as $member) {
+            foreach ($unitUsers as $member) {
                 $member->unreadNotifications()
                     ->where('data->type', 'document_shared')
                     ->where('data->document_id', $documentId)
                     ->delete();
 
                 if ($revokedBy && $member->id !== $revokedBy->id && $document) {
-                    $member->notify(new \App\Notifications\DocumentAccessRevoked($document, $revokedBy->name, $divisionName));
+                    $member->notify(new DocumentAccessRevoked($document, $revokedBy->name, $unitKerjaName));
                 }
             }
         }

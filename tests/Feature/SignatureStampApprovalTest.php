@@ -4,12 +4,12 @@ namespace Tests\Feature;
 
 use App\Models\Branch;
 use App\Models\Company;
-use App\Models\Division;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\DocumentVersion;
 use App\Models\Signature;
 use App\Models\SignatureRequest;
+use App\Models\UnitKerja;
 use App\Models\User;
 use App\Services\DocumentProcessorService;
 use App\Services\OnlyOfficeService;
@@ -26,9 +26,9 @@ class SignatureStampApprovalTest extends TestCase
 
     protected Company $company;
     protected Branch $branch;
-    protected Division $division;
+    protected UnitKerja $unitKerja;
     protected User $requester;
-    protected User $headOfDivision;
+    protected User $headOfUnitKerja;
     protected DocumentType $docType;
     protected Signature $headOriginalSig;
     protected Signature $headCompanyStamp;
@@ -53,39 +53,40 @@ class SignatureStampApprovalTest extends TestCase
             'is_active' => true,
         ]);
 
-        $this->division = Division::create([
-            'name' => 'Divisi Teknologi Informasi',
-            'code' => 'TI',
+        $this->unitKerja = UnitKerja::create([
+            'nama_unit_kerja' => 'Unit Teknologi Informasi',
+            'kode_unit_kerja' => '08',
         ]);
 
         $this->requester = User::factory()->create([
             'name' => 'Staff Pembuat Dokumen',
             'email' => 'staff@docuflow.test',
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'system_role' => 'staff',
         ]);
         $this->requester->companies()->attach($this->company->id);
         $this->requester->branches()->attach($this->branch->id);
 
-        $this->headOfDivision = User::factory()->create([
-            'name' => 'Bapak Kepala Divisi',
+        $this->headOfUnitKerja = User::factory()->create([
+            'name' => 'Bapak Kepala Unit Kerja',
             'email' => 'kadiv@docuflow.test',
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'system_role' => 'head',
         ]);
-        $this->headOfDivision->companies()->attach($this->company->id);
-        $this->headOfDivision->branches()->attach($this->branch->id);
+        $this->headOfUnitKerja->companies()->attach($this->company->id);
+        $this->headOfUnitKerja->branches()->attach($this->branch->id);
 
         $this->docType = DocumentType::create([
             'name' => 'Surat Keputusan',
             'code' => 'SK',
+            'category' => 'akreditasi',
         ]);
 
         // Create distinct original signature (Blue colored)
         $origPath = 'signatures/head_orig_' . uniqid() . '.png';
         $this->createDistinctPng($origPath, 0, 0, 255); // Pure Blue
         $this->headOriginalSig = Signature::create([
-            'user_id' => $this->headOfDivision->id,
+            'user_id' => $this->headOfUnitKerja->id,
             'type' => 'original',
             'file_path' => $origPath,
             'created_via' => 'canvas',
@@ -95,7 +96,7 @@ class SignatureStampApprovalTest extends TestCase
         $stampPath = 'signatures/head_stamp_' . uniqid() . '.png';
         $this->createDistinctPng($stampPath, 255, 0, 0); // Pure Red
         $this->headCompanyStamp = Signature::create([
-            'user_id' => $this->headOfDivision->id,
+            'user_id' => $this->headOfUnitKerja->id,
             'type' => 'company_stamp',
             'company_id' => $this->company->id,
             'file_path' => $stampPath,
@@ -209,14 +210,14 @@ class SignatureStampApprovalTest extends TestCase
     public function test_docx_company_stamp_request_and_approval_applies_stamp(): void
     {
         $document = Document::create([
-            'document_number' => '001/SK/TI/2026',
+            'document_number' => '001/SK-08/KPJ/IX/2026',
             'title' => 'DOCX Surat Keputusan Stamp Test',
             'document_type_id' => $this->docType->id,
             'owner_id' => $this->requester->id,
             'company_id' => $this->company->id,
             'branch_id' => $this->branch->id,
-            'division_id' => $this->division->id,
-            'visibility' => 'division',
+            'unit_kerja_id' => $this->unitKerja->id,
+            'visibility' => 'unit_kerja',
         ]);
 
         $docxStoragePath = 'documents/' . $document->id . '/v1.docx';
@@ -232,10 +233,10 @@ class SignatureStampApprovalTest extends TestCase
             'file_original_name' => 'sample.docx',
         ]);
 
-        // Staff requests Head of Division's Company Stamp
+        // Staff requests Head of Unit Kerja's Company Stamp
         $this->actingAs($this->requester);
         $response = $this->getJson(route('profile.signature.show', [
-            'user_id' => $this->headOfDivision->id,
+            'user_id' => $this->headOfUnitKerja->id,
             'document_id' => $document->id,
             'signature_id' => $this->headCompanyStamp->id,
         ]));
@@ -253,8 +254,8 @@ class SignatureStampApprovalTest extends TestCase
         // Put DOCX with placeholder into storage
         $this->createTestDocxWithPlaceholder($docxStoragePath, $sigRequestId, true);
 
-        // Head of Division approves the stamp request
-        $this->actingAs($this->headOfDivision);
+        // Head of Unit Kerja approves the stamp request
+        $this->actingAs($this->headOfUnitKerja);
         $approveResponse = $this->post(route('signatures.requests.approve', $sigRequest));
         $approveResponse->assertRedirect();
         $approveResponse->assertSessionHas('success', __('Permintaan stempel perusahaan telah disetujui.'));
@@ -294,14 +295,14 @@ class SignatureStampApprovalTest extends TestCase
     public function test_docx_original_signature_request_and_approval_applies_signature(): void
     {
         $document = Document::create([
-            'document_number' => '002/SK/TI/2026',
+            'document_number' => '002/SK-08/KPJ/IX/2026',
             'title' => 'DOCX Surat Keputusan Signature Test',
             'document_type_id' => $this->docType->id,
             'owner_id' => $this->requester->id,
             'company_id' => $this->company->id,
             'branch_id' => $this->branch->id,
-            'division_id' => $this->division->id,
-            'visibility' => 'division',
+            'unit_kerja_id' => $this->unitKerja->id,
+            'visibility' => 'unit_kerja',
         ]);
 
         $docxStoragePath = 'documents/' . $document->id . '/v1.docx';
@@ -317,10 +318,10 @@ class SignatureStampApprovalTest extends TestCase
             'file_original_name' => 'sample.docx',
         ]);
 
-        // Staff requests Head of Division's Original Signature
+        // Staff requests Head of Unit Kerja's Original Signature
         $this->actingAs($this->requester);
         $response = $this->getJson(route('profile.signature.show', [
-            'user_id' => $this->headOfDivision->id,
+            'user_id' => $this->headOfUnitKerja->id,
             'document_id' => $document->id,
             'signature_id' => $this->headOriginalSig->id,
         ]));
@@ -333,8 +334,8 @@ class SignatureStampApprovalTest extends TestCase
         // Put DOCX with placeholder into storage
         $this->createTestDocxWithPlaceholder($docxStoragePath, $sigRequestId, false);
 
-        // Head of Division approves the signature request
-        $this->actingAs($this->headOfDivision);
+        // Head of Unit Kerja approves the signature request
+        $this->actingAs($this->headOfUnitKerja);
         $approveResponse = $this->post(route('signatures.requests.approve', $sigRequest));
         $approveResponse->assertRedirect();
         $approveResponse->assertSessionHas('success', __('Permintaan tanda tangan telah disetujui.'));
@@ -354,6 +355,7 @@ class SignatureStampApprovalTest extends TestCase
         $this->assertNotFalse($im);
         $centerRgb = imagecolorat($im, 40, 40);
         $r = ($centerRgb >> 16) & 0xFF;
+        $g = ($centerRgb >> 8) & 0xFF;
         $b = $centerRgb & 0xFF;
         imagedestroy($im);
 
@@ -367,14 +369,14 @@ class SignatureStampApprovalTest extends TestCase
     public function test_pdf_company_stamp_request_and_approval_applies_stamp(): void
     {
         $document = Document::create([
-            'document_number' => '003/SK/TI/2026',
+            'document_number' => '003/SK-08/KPJ/IX/2026',
             'title' => 'PDF Surat Keputusan Stamp Test',
             'document_type_id' => $this->docType->id,
             'owner_id' => $this->requester->id,
             'company_id' => $this->company->id,
             'branch_id' => $this->branch->id,
-            'division_id' => $this->division->id,
-            'visibility' => 'division',
+            'unit_kerja_id' => $this->unitKerja->id,
+            'visibility' => 'unit_kerja',
         ]);
 
         $pdfStoragePath = 'documents/' . $document->id . '/v1.pdf';
@@ -392,10 +394,10 @@ class SignatureStampApprovalTest extends TestCase
             'file_original_name' => 'sample.pdf',
         ]);
 
-        // Staff requests Head of Division's Company Stamp on PDF
+        // Staff requests Head of Unit Kerja's Company Stamp on PDF
         $this->actingAs($this->requester);
         $response = $this->getJson(route('profile.signature.show', [
-            'user_id' => $this->headOfDivision->id,
+            'user_id' => $this->headOfUnitKerja->id,
             'document_id' => $document->id,
             'signature_id' => $this->headCompanyStamp->id,
             'page_number' => 1,
@@ -409,8 +411,8 @@ class SignatureStampApprovalTest extends TestCase
         $sigRequest = SignatureRequest::find($sigRequestId);
         $this->assertTrue($sigRequest->isStamp());
 
-        // Head of Division approves the stamp request
-        $this->actingAs($this->headOfDivision);
+        // Head of Unit Kerja approves the stamp request
+        $this->actingAs($this->headOfUnitKerja);
         $approveResponse = $this->post(route('signatures.requests.approve', $sigRequest));
         $approveResponse->assertRedirect();
         $approveResponse->assertSessionHas('success', __('Permintaan stempel perusahaan telah disetujui.'));
@@ -436,17 +438,17 @@ class SignatureStampApprovalTest extends TestCase
     /**
      * Test 4: Direct stamping of current user's Company Stamp onto PDF via stampPdfSignature.
      */
-    public function test_direct_pdf_company_stamp_by_head_of_division(): void
+    public function test_direct_pdf_company_stamp_by_head_of_unit_kerja(): void
     {
         $document = Document::create([
-            'document_number' => '004/SK/TI/2026',
+            'document_number' => '004/SK-08/KPJ/IX/2026',
             'title' => 'Direct Stamp PDF Test',
             'document_type_id' => $this->docType->id,
-            'owner_id' => $this->headOfDivision->id,
+            'owner_id' => $this->headOfUnitKerja->id,
             'company_id' => $this->company->id,
             'branch_id' => $this->branch->id,
-            'division_id' => $this->division->id,
-            'visibility' => 'division',
+            'unit_kerja_id' => $this->unitKerja->id,
+            'visibility' => 'unit_kerja',
         ]);
 
         $pdfStoragePath = 'documents/' . $document->id . '/v1.pdf';
@@ -456,15 +458,15 @@ class SignatureStampApprovalTest extends TestCase
             'document_id' => $document->id,
             'version_number' => 1,
             'content' => '',
-            'author_id' => $this->headOfDivision->id,
-            'author_name' => $this->headOfDivision->name,
+            'author_id' => $this->headOfUnitKerja->id,
+            'author_name' => $this->headOfUnitKerja->name,
             'status' => 'draft',
             'file_path' => $pdfStoragePath,
             'file_mime' => 'application/pdf',
             'file_original_name' => 'sample.pdf',
         ]);
 
-        $this->actingAs($this->headOfDivision);
+        $this->actingAs($this->headOfUnitKerja);
         $response = $this->postJson(route('documents.stamp-signature', $document), [
             'signature_id' => $this->headCompanyStamp->id,
             'page_number' => 1,
@@ -488,20 +490,20 @@ class SignatureStampApprovalTest extends TestCase
     {
         $resolver = app(SignatureResolverService::class);
 
-        // Resolving stamp tag for head of division (as head of division themselves)
-        $htmlWithStamp = '<p>Ditetapkan oleh: [stamp:' . $this->headOfDivision->name . ']</p>';
-        $resolvedStamp = $resolver->resolve($htmlWithStamp, null, $this->headOfDivision);
+        // Resolving stamp tag for head of unit kerja (as head of unit kerja themselves)
+        $htmlWithStamp = '<p>Ditetapkan oleh: [stamp:' . $this->headOfUnitKerja->name . ']</p>';
+        $resolvedStamp = $resolver->resolve($htmlWithStamp, null, $this->headOfUnitKerja);
 
         $this->assertStringContainsString('doku-signature-img', $resolvedStamp);
         $this->assertStringContainsString('Stempel ' . $this->company->name, $resolvedStamp);
         $this->assertStringContainsString($this->headCompanyStamp->file_path, $resolvedStamp);
 
-        // Resolving original ttd tag for head of division
-        $htmlWithTtd = '<p>Tertanda: [ttd:' . $this->headOfDivision->name . ']</p>';
-        $resolvedTtd = $resolver->resolve($htmlWithTtd, null, $this->headOfDivision);
+        // Resolving original ttd tag for head of unit kerja
+        $htmlWithTtd = '<p>Tertanda: [ttd:' . $this->headOfUnitKerja->name . ']</p>';
+        $resolvedTtd = $resolver->resolve($htmlWithTtd, null, $this->headOfUnitKerja);
 
         $this->assertStringContainsString('doku-signature-img', $resolvedTtd);
-        $this->assertStringContainsString('TTD Bapak Kepala Divisi', $resolvedTtd);
+        $this->assertStringContainsString('TTD Bapak Kepala Unit Kerja', $resolvedTtd);
         $this->assertStringContainsString($this->headOriginalSig->file_path, $resolvedTtd);
     }
 
@@ -511,14 +513,14 @@ class SignatureStampApprovalTest extends TestCase
     public function test_multi_request_independence_in_same_docx(): void
     {
         $document = Document::create([
-            'document_number' => '005/SK/TI/2026',
+            'document_number' => '005/SK-08/KPJ/IX/2026',
             'title' => 'Multi-Request DOCX Test',
             'document_type_id' => $this->docType->id,
             'owner_id' => $this->requester->id,
             'company_id' => $this->company->id,
             'branch_id' => $this->branch->id,
-            'division_id' => $this->division->id,
-            'visibility' => 'division',
+            'unit_kerja_id' => $this->unitKerja->id,
+            'visibility' => 'unit_kerja',
         ]);
 
         $docxStoragePath = 'documents/' . $document->id . '/v1.docx';
@@ -526,7 +528,7 @@ class SignatureStampApprovalTest extends TestCase
         // Request 1: Original Signature
         $req1 = SignatureRequest::create([
             'requester_id' => $this->requester->id,
-            'target_user_id' => $this->headOfDivision->id,
+            'target_user_id' => $this->headOfUnitKerja->id,
             'requested_signature_id' => $this->headOriginalSig->id,
             'document_id' => $document->id,
             'status' => 'pending',
@@ -537,7 +539,7 @@ class SignatureStampApprovalTest extends TestCase
         // Request 2: Company Stamp
         $req2 = SignatureRequest::create([
             'requester_id' => $this->requester->id,
-            'target_user_id' => $this->headOfDivision->id,
+            'target_user_id' => $this->headOfUnitKerja->id,
             'requested_signature_id' => $this->headCompanyStamp->id,
             'document_id' => $document->id,
             'status' => 'pending',
@@ -588,7 +590,7 @@ class SignatureStampApprovalTest extends TestCase
         ]);
 
         // Approve Request 2 (Company Stamp) FIRST
-        $this->actingAs($this->headOfDivision);
+        $this->actingAs($this->headOfUnitKerja);
         $this->post(route('signatures.requests.approve', $req2));
 
         // Verify: image2.png was replaced with RED stamp, while image1.png remains placeholder

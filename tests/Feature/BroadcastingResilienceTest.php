@@ -4,10 +4,10 @@ namespace Tests\Feature;
 
 use App\Models\Branch;
 use App\Models\Company;
-use App\Models\Division;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\DocumentVersion;
+use App\Models\UnitKerja;
 use App\Models\User;
 use App\Notifications\DocumentApprovalResult;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -25,10 +25,10 @@ class BroadcastingResilienceTest extends TestCase
 
         $company = Company::create(['name' => 'PT Test', 'code' => 'TEST']);
         $branch = Branch::create(['company_id' => $company->id, 'name' => 'Pusat', 'is_pusat' => true]);
-        $division = Division::create(['name' => 'Finance', 'code' => 'FIN']);
+        $unitKerja = UnitKerja::create(['nama_unit_kerja' => 'Finance', 'kode_unit_kerja' => '01']);
 
-        $author = User::factory()->create(['division_id' => $division->id, 'name' => 'Author User']);
-        $reviewer = User::factory()->create(['division_id' => $division->id, 'name' => 'Reviewer Head', 'system_role' => 'head']);
+        $author = User::factory()->create(['unit_kerja_id' => $unitKerja->id, 'name' => 'Author User']);
+        $reviewer = User::factory()->create(['unit_kerja_id' => $unitKerja->id, 'name' => 'Reviewer Head', 'system_role' => 'head']);
 
         $docType = DocumentType::create(['name' => 'Standard SOP', 'code' => 'SOP']);
         $document = Document::create([
@@ -36,7 +36,7 @@ class BroadcastingResilienceTest extends TestCase
             'title' => 'Financial SOP',
             'document_type_id' => $docType->id,
             'owner_id' => $author->id,
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'company_id' => $company->id,
             'branch_id' => $branch->id,
             'visibility' => 'general',
@@ -79,14 +79,14 @@ class BroadcastingResilienceTest extends TestCase
     {
         $company = Company::create(['name' => 'PT Test', 'code' => 'TEST']);
         $branch = Branch::create(['company_id' => $company->id, 'name' => 'Pusat', 'is_pusat' => true]);
-        $division = Division::create(['name' => 'Finance', 'code' => 'FIN']);
+        $unitKerja = UnitKerja::create(['nama_unit_kerja' => 'Finance', 'kode_unit_kerja' => '01']);
 
-        $author = User::factory()->create(['division_id' => $division->id, 'name' => 'Author User']);
+        $author = User::factory()->create(['unit_kerja_id' => $unitKerja->id, 'name' => 'Author User']);
         $author->companies()->attach($company->id);
         $author->branches()->attach($branch->id);
 
         $reviewer = User::factory()->create([
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'name' => 'Reviewer Head',
             'system_role' => 'head',
         ]);
@@ -99,10 +99,10 @@ class BroadcastingResilienceTest extends TestCase
             'title' => 'Invoice Policy',
             'document_type_id' => $docType->id,
             'owner_id' => $author->id,
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'company_id' => $company->id,
             'branch_id' => $branch->id,
-            'visibility' => 'division',
+            'visibility' => 'unit_kerja',
             'approver_role' => 'head',
         ]);
 
@@ -120,7 +120,7 @@ class BroadcastingResilienceTest extends TestCase
             ->withSession([
                 'active_company_id' => $company->id,
                 'active_branch_id' => $branch->id,
-                'active_division_id' => $division->id,
+                'active_unit_kerja_id' => $unitKerja->id,
             ])
             ->post(route('approvals.approve', [$document, $version]), [
                 'notes' => 'Approved successfully via controller',

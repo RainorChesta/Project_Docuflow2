@@ -55,7 +55,7 @@ class ApprovalController extends Controller
         $counts['total'] = $counts['versions'] + $counts['renames'] + $counts['rollbacks'];
 
         $pendingVersions = $versionsQuery
-            ->with(['document.branch', 'document.company', 'document.division', 'author'])
+            ->with(['document.branch', 'document.company', 'document.unitKerja', 'author'])
             ->latest('id')
             ->paginate($perPage, ['*'], 'version_page')
             ->withQueryString();
@@ -91,7 +91,7 @@ class ApprovalController extends Controller
         $counts['total'] = $counts['versions'] + $counts['renames'] + $counts['rollbacks'];
 
         $pendingRenames = $renamesQuery
-            ->with(['renameRequestedBy', 'division', 'branch', 'company'])
+            ->with(['renameRequestedBy', 'unitKerja', 'branch', 'company'])
             ->latest('rename_requested_at')
             ->latest('id')
             ->paginate($perPage, ['*'], 'rename_page')
@@ -128,7 +128,7 @@ class ApprovalController extends Controller
         $counts['total'] = $counts['versions'] + $counts['renames'] + $counts['rollbacks'];
 
         $pendingRollbacks = $rollbacksQuery
-            ->with(['rollbackRequestedBy', 'pendingRollbackVersion', 'division', 'branch', 'company', 'currentVersion'])
+            ->with(['rollbackRequestedBy', 'pendingRollbackVersion', 'unitKerja', 'branch', 'company', 'currentVersion'])
             ->latest('rollback_requested_at')
             ->latest('id')
             ->paginate($perPage, ['*'], 'rollback_page')
@@ -169,12 +169,12 @@ class ApprovalController extends Controller
                 $pendingVersionsQuery->whereHas('document', $companyFilter);
             }
         } else {
-            $divisionIds = $user->allDivisionIds();
+            $unitKerjaIds = $user->allUnitKerjaIds();
 
             $pendingVersionsQuery = DocumentVersion::where('status', 'pending')
                 ->whereNull('discarded_at')
-                ->whereHas('document', function ($q) use ($user, $divisionIds, $roleFilter) {
-                    $q->whereIn('division_id', $divisionIds)
+                ->whereHas('document', function ($q) use ($user, $unitKerjaIds, $roleFilter) {
+                    $q->whereIn('unit_kerja_id', $unitKerjaIds)
                       ->visibleTo($user)
                       ->where($roleFilter);
 
@@ -196,11 +196,11 @@ class ApprovalController extends Controller
                 // 3. Original file name
                 $vq->orWhere('file_original_name', 'like', "%{$search}%");
 
-                // 4. Related document (title, document number, division, branch)
+                // 4. Related document (title, document number, unitKerja, branch)
                 $vq->orWhereHas('document', function ($dq) use ($search) {
                     $dq->where('title', 'like', "%{$search}%")
                        ->orWhere('document_number', 'like', "%{$search}%")
-                       ->orWhereHas('division', fn($divQ) => $divQ->where('name', 'like', "%{$search}%"))
+                       ->orWhereHas('unitKerja', fn($ukQ) => $ukQ->where('name', 'like', "%{$search}%"))
                        ->orWhereHas('branch', fn($brQ) => $brQ->where('name', 'like', "%{$search}%"));
                 });
 
@@ -242,9 +242,9 @@ class ApprovalController extends Controller
                 $pendingRenamesQuery->where($companyFilter);
             }
         } else {
-            $divisionIds = $user->allDivisionIds();
+            $unitKerjaIds = $user->allUnitKerjaIds();
 
-            $pendingRenamesQuery = Document::whereIn('division_id', $divisionIds)
+            $pendingRenamesQuery = Document::whereIn('unit_kerja_id', $unitKerjaIds)
                 ->visibleTo($user)
                 ->whereNotNull('pending_title')
                 ->where('pending_title', '!=', '')
@@ -262,7 +262,7 @@ class ApprovalController extends Controller
                        $uq->where('name', 'like', "%{$search}%")
                           ->orWhere('email', 'like', "%{$search}%");
                    })
-                   ->orWhereHas('division', fn($divQ) => $divQ->where('name', 'like', "%{$search}%"))
+                   ->orWhereHas('unitKerja', fn($ukQ) => $ukQ->where('name', 'like', "%{$search}%"))
                    ->orWhereHas('branch', fn($brQ) => $brQ->where('name', 'like', "%{$search}%"));
             });
         }
@@ -296,9 +296,9 @@ class ApprovalController extends Controller
                 $pendingRollbacksQuery->where($companyFilter);
             }
         } else {
-            $divisionIds = $user->allDivisionIds();
+            $unitKerjaIds = $user->allUnitKerjaIds();
 
-            $pendingRollbacksQuery = Document::whereIn('division_id', $divisionIds)
+            $pendingRollbacksQuery = Document::whereIn('unit_kerja_id', $unitKerjaIds)
                 ->visibleTo($user)
                 ->whereNotNull('pending_rollback_version_id')
                 ->where($roleFilter);
@@ -317,10 +317,10 @@ class ApprovalController extends Controller
                    ->orWhereHas('pendingRollbackVersion', function ($vq) use ($search) {
                        $trimmedVersion = ltrim(strtolower($search), 'v. ');
                        if (is_numeric($trimmedVersion)) {
-                           $vq->where('version_number', (int) $trimmedVersion);
+                            $vq->where('version_number', (int) $trimmedVersion);
                        }
                    })
-                   ->orWhereHas('division', fn($divQ) => $divQ->where('name', 'like', "%{$search}%"))
+                   ->orWhereHas('unitKerja', fn($ukQ) => $ukQ->where('name', 'like', "%{$search}%"))
                    ->orWhereHas('branch', fn($brQ) => $brQ->where('name', 'like', "%{$search}%"));
             });
         }

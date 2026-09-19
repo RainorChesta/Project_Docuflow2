@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Branch;
 use App\Models\Company;
-use App\Models\Division;
+use App\Models\UnitKerja;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\DocumentVersion;
@@ -28,26 +28,26 @@ class DocumentApprovalRejectionTest extends TestCase
         $company = Company::create(['name' => 'PT Test', 'code' => 'TEST']);
         $branch = Branch::create(['company_id' => $company->id, 'name' => 'Pusat', 'is_pusat' => true]);
 
-        $division = Division::create(['name' => 'Finance', 'code' => 'FIN']);
-        $author = User::factory()->create(['division_id' => $division->id, 'name' => 'Author User']);
+        $unitKerja = UnitKerja::create(['nama_unit_kerja' => 'Finance', 'kode_unit_kerja' => '05']);
+        $author = User::factory()->create(['unit_kerja_id' => $unitKerja->id, 'name' => 'Author User']);
         $author->companies()->attach($company->id);
         $author->branches()->attach($branch->id);
 
         $reviewer = User::factory()->create([
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'name' => 'Reviewer Head',
             'system_role' => 'head',
         ]);
         $reviewer->companies()->attach($company->id);
         $reviewer->branches()->attach($branch->id);
 
-        $docType = DocumentType::create(['name' => 'Standard SOP', 'code' => 'SOP']);
+        $docType = DocumentType::create(['name' => 'Standard SOP', 'code' => 'SOP', 'category' => 'akreditasi']);
         $document = Document::create([
-            'document_number' => '001/FIN/SOP/2026',
+            'document_number' => '001/SOP-05/TEST/IX/2026',
             'title' => 'Financial SOP',
             'document_type_id' => $docType->id,
             'owner_id' => $author->id,
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'company_id' => $company->id,
             'branch_id' => $branch->id,
             'visibility' => 'general',
@@ -59,22 +59,23 @@ class DocumentApprovalRejectionTest extends TestCase
             'author_id' => $author->id,
             'author_name' => $author->name,
             'status' => 'pending',
-            'content' => '<p>Initial Content</p>',
+            'content' => '<p>Financial SOP Content</p>',
         ]);
 
+        // Rejection action
         $response = $this->actingAs($reviewer)->post(route('approvals.reject', [$document, $version]), [
-            'notes' => 'Please revise section 3 and attach financial appendix.',
+            'notes' => 'Please revise section 3 regarding budget allocation.',
         ]);
 
         $response->assertRedirect(route('approvals.index'));
         $response->assertSessionHas('success');
 
         $this->assertSame('rejected', $version->fresh()->status);
-        $this->assertSame('Please revise section 3 and attach financial appendix.', $version->fresh()->notes);
+        $this->assertSame('Please revise section 3 regarding budget allocation.', $version->fresh()->rejection_notes);
 
-        Notification::assertSentTo($author, DocumentApprovalResult::class, function ($notification) {
+        Notification::assertSentTo($author, DocumentApprovalResult::class, function ($notification) use ($version) {
             return $notification->status === 'rejected' &&
-                str_contains($notification->notes, 'Please revise section 3');
+                $notification->notes === 'Please revise section 3 regarding budget allocation.';
         });
     }
 
@@ -84,27 +85,27 @@ class DocumentApprovalRejectionTest extends TestCase
 
         $company = Company::create(['name' => 'PT Test', 'code' => 'TEST']);
         $branch = Branch::create(['company_id' => $company->id, 'name' => 'Pusat', 'is_pusat' => true]);
+        $unitKerja = UnitKerja::create(['nama_unit_kerja' => 'HR', 'kode_unit_kerja' => '02']);
 
-        $division = Division::create(['name' => 'HR Dept', 'code' => 'HR']);
-        $author = User::factory()->create(['division_id' => $division->id, 'name' => 'HR Staff']);
+        $author = User::factory()->create(['unit_kerja_id' => $unitKerja->id, 'name' => 'Author User']);
         $author->companies()->attach($company->id);
         $author->branches()->attach($branch->id);
 
         $reviewer = User::factory()->create([
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'name' => 'HR Head',
             'system_role' => 'head',
         ]);
         $reviewer->companies()->attach($company->id);
         $reviewer->branches()->attach($branch->id);
 
-        $docType = DocumentType::create(['name' => 'Internal Policy', 'code' => 'POL']);
+        $docType = DocumentType::create(['name' => 'Internal Policy', 'code' => 'POL', 'category' => 'akreditasi']);
         $document = Document::create([
-            'document_number' => '002/HR/POL/2026',
+            'document_number' => '002/POL-02/TEST/IX/2026',
             'title' => 'Leave Policy',
             'document_type_id' => $docType->id,
             'owner_id' => $author->id,
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'company_id' => $company->id,
             'branch_id' => $branch->id,
             'visibility' => 'general',
@@ -155,27 +156,27 @@ class DocumentApprovalRejectionTest extends TestCase
     {
         $company = Company::create(['name' => 'PT Test', 'code' => 'TEST']);
         $branch = Branch::create(['company_id' => $company->id, 'name' => 'Pusat', 'is_pusat' => true]);
-        $division = Division::create(['name' => 'Operations', 'code' => 'OPS']);
+        $unitKerja = UnitKerja::create(['nama_unit_kerja' => 'Operations', 'kode_unit_kerja' => '03']);
 
         $reviewer = User::factory()->create([
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'name' => 'Ops Head',
             'system_role' => 'head',
         ]);
         $reviewer->companies()->attach($company->id);
         $reviewer->branches()->attach($branch->id);
 
-        $author = User::factory()->create(['division_id' => $division->id, 'name' => 'Staff Alice']);
+        $author = User::factory()->create(['unit_kerja_id' => $unitKerja->id, 'name' => 'Staff Alice']);
         $author->companies()->attach($company->id);
         $author->branches()->attach($branch->id);
 
-        $docType = DocumentType::create(['name' => 'Manual', 'code' => 'MNL']);
+        $docType = DocumentType::create(['name' => 'Manual', 'code' => 'MNL', 'category' => 'akreditasi']);
         $doc1 = Document::create([
-            'document_number' => '001/OPS/2026',
+            'document_number' => '001/MNL-03/TEST/IX/2026',
             'title' => 'Operating Standard Manual',
             'document_type_id' => $docType->id,
             'owner_id' => $author->id,
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'company_id' => $company->id,
             'branch_id' => $branch->id,
             'visibility' => 'general',
@@ -206,23 +207,23 @@ class DocumentApprovalRejectionTest extends TestCase
 
         $company = Company::create(['name' => 'PT Test', 'code' => 'TEST']);
         $branch = Branch::create(['company_id' => $company->id, 'name' => 'Pusat', 'is_pusat' => true]);
-        $division = Division::create(['name' => 'Engineering', 'code' => 'ENG']);
+        $unitKerja = UnitKerja::create(['nama_unit_kerja' => 'Engineering', 'kode_unit_kerja' => '04']);
 
         $reviewer = User::factory()->create([
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'name' => 'Lead Engineer',
             'system_role' => 'head',
         ]);
         $reviewer->companies()->attach($company->id);
         $reviewer->branches()->attach($branch->id);
 
-        $author = User::factory()->create(['division_id' => $division->id, 'name' => 'Junior Dev']);
+        $author = User::factory()->create(['unit_kerja_id' => $unitKerja->id, 'name' => 'Junior Dev']);
         $author->companies()->attach($company->id);
         $author->branches()->attach($branch->id);
 
-        $docType = DocumentType::create(['name' => 'Architecture Guide', 'code' => 'ARC']);
-        $doc1 = Document::create(['document_number' => '001/ARC/2026', 'title' => 'System Design A', 'document_type_id' => $docType->id, 'owner_id' => $author->id, 'division_id' => $division->id, 'company_id' => $company->id, 'branch_id' => $branch->id, 'visibility' => 'general']);
-        $doc2 = Document::create(['document_number' => '002/ARC/2026', 'title' => 'System Design B', 'document_type_id' => $docType->id, 'owner_id' => $author->id, 'division_id' => $division->id, 'company_id' => $company->id, 'branch_id' => $branch->id, 'visibility' => 'general']);
+        $docType = DocumentType::create(['name' => 'Architecture Guide', 'code' => 'ARC', 'category' => 'akreditasi']);
+        $doc1 = Document::create(['document_number' => '001/ARC-04/TEST/IX/2026', 'title' => 'System Design A', 'document_type_id' => $docType->id, 'owner_id' => $author->id, 'unit_kerja_id' => $unitKerja->id, 'company_id' => $company->id, 'branch_id' => $branch->id, 'visibility' => 'general']);
+        $doc2 = Document::create(['document_number' => '002/ARC-04/TEST/IX/2026', 'title' => 'System Design B', 'document_type_id' => $docType->id, 'owner_id' => $author->id, 'unit_kerja_id' => $unitKerja->id, 'company_id' => $company->id, 'branch_id' => $branch->id, 'visibility' => 'general']);
 
         $v1 = DocumentVersion::create(['document_id' => $doc1->id, 'version_number' => 1, 'author_id' => $author->id, 'author_name' => $author->name, 'status' => 'pending', 'content' => '<p>A</p>']);
         $v2 = DocumentVersion::create(['document_id' => $doc2->id, 'version_number' => 1, 'author_id' => $author->id, 'author_name' => $author->name, 'status' => 'pending', 'content' => '<p>B</p>']);
@@ -256,27 +257,27 @@ class DocumentApprovalRejectionTest extends TestCase
 
         $company = Company::create(['name' => 'PT Test', 'code' => 'TEST']);
         $branch = Branch::create(['company_id' => $company->id, 'name' => 'Pusat', 'is_pusat' => true]);
-        $division = Division::create(['name' => 'Finance', 'code' => 'FIN']);
+        $unitKerja = UnitKerja::create(['nama_unit_kerja' => 'Finance', 'kode_unit_kerja' => '05']);
 
         $reviewer = User::factory()->create([
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'name' => 'Reviewer Kadiv',
             'system_role' => 'head',
         ]);
         $reviewer->companies()->attach($company->id);
         $reviewer->branches()->attach($branch->id);
 
-        $author = User::factory()->create(['division_id' => $division->id, 'name' => 'Staff Finance']);
+        $author = User::factory()->create(['unit_kerja_id' => $unitKerja->id, 'name' => 'Staff Finance']);
         $author->companies()->attach($company->id);
         $author->branches()->attach($branch->id);
 
-        $docType = DocumentType::create(['name' => 'Standard SOP', 'code' => 'SOP']);
+        $docType = DocumentType::create(['name' => 'Standard SOP', 'code' => 'SOP', 'category' => 'akreditasi']);
         $document = Document::create([
-            'document_number' => '001/FIN/SOP/2026',
+            'document_number' => '001/SOP-05/TEST/IX/2026',
             'title' => 'Financial SOP Document',
             'document_type_id' => $docType->id,
             'owner_id' => $author->id,
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'company_id' => $company->id,
             'branch_id' => $branch->id,
             'visibility' => 'general',
@@ -329,14 +330,14 @@ class DocumentApprovalRejectionTest extends TestCase
 
         $company = Company::create(['name' => 'PT Demo', 'code' => 'DEMO']);
         $branch = Branch::create(['company_id' => $company->id, 'name' => 'Cabang Demo', 'is_pusat' => true]);
-        $division = Division::create(['name' => 'Legal', 'code' => 'LEG']);
+        $unitKerja = UnitKerja::create(['nama_unit_kerja' => 'Legal', 'kode_unit_kerja' => '06']);
 
-        $author = User::factory()->create(['division_id' => $division->id, 'name' => 'Legal Staff']);
+        $author = User::factory()->create(['unit_kerja_id' => $unitKerja->id, 'name' => 'Legal Staff']);
         $author->companies()->attach($company->id);
         $author->branches()->attach($branch->id);
 
         $head = User::factory()->create([
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'name' => 'Head Legal',
             'system_role' => 'head',
             'is_active' => true,
@@ -344,16 +345,16 @@ class DocumentApprovalRejectionTest extends TestCase
         $head->companies()->attach($company->id);
         $head->branches()->attach($branch->id);
 
-        $docType = DocumentType::create(['name' => 'Kontrak', 'code' => 'KTR']);
+        $docType = DocumentType::create(['name' => 'Kontrak', 'code' => 'KTR', 'category' => 'akreditasi']);
         $document = Document::create([
-            'document_number' => '001/LEG/KTR/2026',
+            'document_number' => '001/KTR-06/DEMO/IX/2026',
             'title' => 'Perjanjian Kerjasama PDF',
             'document_type_id' => $docType->id,
             'owner_id' => $author->id,
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'company_id' => $company->id,
             'branch_id' => $branch->id,
-            'visibility' => 'division',
+            'visibility' => 'unit_kerja',
         ]);
 
         $version = DocumentVersion::create([
@@ -378,7 +379,7 @@ class DocumentApprovalRejectionTest extends TestCase
         $response->assertRedirect(route('documents.show', $document));
         $response->assertSessionHas('success');
 
-        // Document approver should be resolved to the division head
+        // Document approver should be resolved to the unit kerja head
         $document->refresh();
         $this->assertSame($head->id, $document->approver_id);
         $this->assertSame('head', $document->approver_role);

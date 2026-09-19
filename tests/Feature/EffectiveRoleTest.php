@@ -2,10 +2,11 @@
 
 namespace Tests\Feature;
 
-use App\Models\Division;
 use App\Models\Document;
-use App\Models\DocumentDivisionShare;
 use App\Models\DocumentShare;
+use App\Models\DocumentType;
+use App\Models\DocumentUnitKerjaShare;
+use App\Models\UnitKerja;
 use App\Models\User;
 use App\Services\DocumentShareService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -25,13 +26,13 @@ class EffectiveRoleTest extends TestCase
 
     private function makeDocument(User $owner): Document
     {
-        $division = Division::create(['code' => 'DIV', 'name' => 'Divisi']);
-        $type = \App\Models\DocumentType::create(['code' => 'UMUM', 'name' => 'Umum']);
+        $unitKerja = UnitKerja::create(['kode_unit_kerja' => 'UK' . uniqid(), 'nama_unit_kerja' => 'Unit Kerja Test']);
+        $type = DocumentType::create(['code' => 'UMUM' . uniqid(), 'name' => 'Umum', 'category' => 'akreditasi']);
 
         return Document::create([
             'document_number' => 'DOC-' . uniqid(),
             'title' => 'Test Doc',
-            'division_id' => $division->id,
+            'unit_kerja_id' => $unitKerja->id,
             'document_type_id' => $type->id,
             'owner_id' => $owner->id,
             'general_access' => 'restricted',
@@ -60,61 +61,61 @@ class EffectiveRoleTest extends TestCase
         $this->assertSame('editor', $this->service->resolveEffectiveRole($doc, $user));
     }
 
-    public function test_division_viewer_only(): void
+    public function test_unit_kerja_viewer_only(): void
     {
         $owner = User::factory()->create();
         $user = User::factory()->create();
-        $division = Division::create(['code' => 'D1', 'name' => 'Div 1']);
-        $user->division_id = $division->id;
+        $unit = UnitKerja::create(['kode_unit_kerja' => 'U1', 'nama_unit_kerja' => 'Unit 1']);
+        $user->unit_kerja_id = $unit->id;
         $user->save();
         $doc = $this->makeDocument($owner);
 
-        DocumentDivisionShare::create(['document_id' => $doc->id, 'division_id' => $division->id, 'role' => 'viewer', 'invited_by' => $owner->id]);
+        DocumentUnitKerjaShare::create(['document_id' => $doc->id, 'unit_kerja_id' => $unit->id, 'role' => 'viewer', 'invited_by' => $owner->id]);
 
         $this->assertSame('viewer', $this->service->resolveEffectiveRole($doc, $user));
     }
 
-    public function test_division_editor_beats_personal_viewer(): void
+    public function test_unit_kerja_editor_beats_personal_viewer(): void
     {
         $owner = User::factory()->create();
         $user = User::factory()->create();
-        $division = Division::create(['code' => 'D1', 'name' => 'Div 1']);
-        $user->division_id = $division->id;
+        $unit = UnitKerja::create(['kode_unit_kerja' => 'U1', 'nama_unit_kerja' => 'Unit 1']);
+        $user->unit_kerja_id = $unit->id;
         $user->save();
         $doc = $this->makeDocument($owner);
 
         DocumentShare::create(['document_id' => $doc->id, 'user_id' => $user->id, 'role' => 'viewer', 'invited_by' => $owner->id]);
-        DocumentDivisionShare::create(['document_id' => $doc->id, 'division_id' => $division->id, 'role' => 'editor', 'invited_by' => $owner->id]);
+        DocumentUnitKerjaShare::create(['document_id' => $doc->id, 'unit_kerja_id' => $unit->id, 'role' => 'editor', 'invited_by' => $owner->id]);
 
         $this->assertSame('editor', $this->service->resolveEffectiveRole($doc, $user));
     }
 
-    public function test_personal_editor_beats_division_viewer(): void
+    public function test_personal_editor_beats_unit_kerja_viewer(): void
     {
         $owner = User::factory()->create();
         $user = User::factory()->create();
-        $division = Division::create(['code' => 'D1', 'name' => 'Div 1']);
-        $user->division_id = $division->id;
+        $unit = UnitKerja::create(['kode_unit_kerja' => 'U1', 'nama_unit_kerja' => 'Unit 1']);
+        $user->unit_kerja_id = $unit->id;
         $user->save();
         $doc = $this->makeDocument($owner);
 
         DocumentShare::create(['document_id' => $doc->id, 'user_id' => $user->id, 'role' => 'editor', 'invited_by' => $owner->id]);
-        DocumentDivisionShare::create(['document_id' => $doc->id, 'division_id' => $division->id, 'role' => 'viewer', 'invited_by' => $owner->id]);
+        DocumentUnitKerjaShare::create(['document_id' => $doc->id, 'unit_kerja_id' => $unit->id, 'role' => 'viewer', 'invited_by' => $owner->id]);
 
         $this->assertSame('editor', $this->service->resolveEffectiveRole($doc, $user));
     }
 
-    public function test_multiple_divisions_highest_wins(): void
+    public function test_multiple_unit_kerjas_highest_wins(): void
     {
         $owner = User::factory()->create();
         $user = User::factory()->create();
-        $d1 = Division::create(['code' => 'D1', 'name' => 'Div 1']);
-        $d2 = Division::create(['code' => 'D2', 'name' => 'Div 2']);
-        $user->divisions()->attach([$d1->id, $d2->id]);
+        $u1 = UnitKerja::create(['kode_unit_kerja' => 'U1', 'nama_unit_kerja' => 'Unit 1']);
+        $u2 = UnitKerja::create(['kode_unit_kerja' => 'U2', 'nama_unit_kerja' => 'Unit 2']);
+        $user->unitKerjas()->attach([$u1->id, $u2->id]);
         $doc = $this->makeDocument($owner);
 
-        DocumentDivisionShare::create(['document_id' => $doc->id, 'division_id' => $d1->id, 'role' => 'viewer', 'invited_by' => $owner->id]);
-        DocumentDivisionShare::create(['document_id' => $doc->id, 'division_id' => $d2->id, 'role' => 'editor', 'invited_by' => $owner->id]);
+        DocumentUnitKerjaShare::create(['document_id' => $doc->id, 'unit_kerja_id' => $u1->id, 'role' => 'viewer', 'invited_by' => $owner->id]);
+        DocumentUnitKerjaShare::create(['document_id' => $doc->id, 'unit_kerja_id' => $u2->id, 'role' => 'editor', 'invited_by' => $owner->id]);
 
         $this->assertSame('editor', $this->service->resolveEffectiveRole($doc, $user));
     }

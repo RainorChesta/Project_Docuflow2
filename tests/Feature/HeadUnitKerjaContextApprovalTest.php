@@ -4,15 +4,15 @@ namespace Tests\Feature;
 
 use App\Models\Branch;
 use App\Models\Company;
-use App\Models\Division;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\DocumentVersion;
+use App\Models\UnitKerja;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-class HeadDivisionContextApprovalTest extends TestCase
+class HeadUnitKerjaContextApprovalTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -20,7 +20,7 @@ class HeadDivisionContextApprovalTest extends TestCase
     protected Company $companyB;
     protected Branch $branchA1;
     protected Branch $branchB1;
-    protected Division $division;
+    protected UnitKerja $unitKerja;
     protected User $head;
     protected User $staffB;
     protected DocumentType $docType;
@@ -37,12 +37,12 @@ class HeadDivisionContextApprovalTest extends TestCase
         $this->companyB = Company::create(['name' => 'Company B', 'code' => 'CMPB']);
         $this->branchB1 = Branch::create(['company_id' => $this->companyB->id, 'name' => 'Branch B1', 'is_pusat' => true]);
 
-        // 3. Shared division
-        $this->division = Division::create(['name' => 'Finance', 'code' => 'FIN']);
+        // 3. Shared Unit Kerja
+        $this->unitKerja = UnitKerja::create(['nama_unit_kerja' => 'Finance', 'kode_unit_kerja' => '05']);
 
-        // 4. Head of Division assigned to both companies and branches
+        // 4. Head of Unit Kerja assigned to both companies and branches
         $this->head = User::factory()->create([
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'name' => 'Head Finance',
             'system_role' => 'head',
         ]);
@@ -51,17 +51,17 @@ class HeadDivisionContextApprovalTest extends TestCase
 
         // 5. Staff in Company B
         $this->staffB = User::factory()->create([
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'name' => 'Staff Finance B',
             'system_role' => 'staff',
         ]);
         $this->staffB->companies()->attach($this->companyB->id);
         $this->staffB->branches()->attach($this->branchB1->id);
 
-        $this->docType = DocumentType::create(['name' => 'Standard SOP', 'code' => 'SOP']);
+        $this->docType = DocumentType::create(['name' => 'Standard SOP', 'code' => 'SOP', 'category' => 'akreditasi']);
     }
 
-    public function test_head_division_sees_no_counter_or_request_on_approval_page_when_in_different_company_context(): void
+    public function test_head_unit_kerja_sees_no_counter_or_request_on_approval_page_when_in_different_company_context(): void
     {
         // Create a document in Company B / Branch B1 with a pending version approval
         $documentB = Document::create([
@@ -69,10 +69,10 @@ class HeadDivisionContextApprovalTest extends TestCase
             'title' => 'Invoice Policy B',
             'document_type_id' => $this->docType->id,
             'owner_id' => $this->staffB->id,
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'company_id' => $this->companyB->id,
             'branch_id' => $this->branchB1->id,
-            'visibility' => Document::VISIBILITY_DIVISION,
+            'visibility' => Document::VISIBILITY_UNIT_KERJA,
             'approver_role' => 'head',
         ]);
 
@@ -90,7 +90,7 @@ class HeadDivisionContextApprovalTest extends TestCase
             ->withSession([
                 'active_company_id' => $this->companyA->id,
                 'active_branch_id' => $this->branchA1->id,
-                'active_division_id' => $this->division->id,
+                'active_unit_kerja_id' => $this->unitKerja->id,
             ])
             ->get(route('approvals.versions'));
 
@@ -120,10 +120,10 @@ class HeadDivisionContextApprovalTest extends TestCase
             'title' => 'Company B Document',
             'document_type_id' => $this->docType->id,
             'owner_id' => $this->staffB->id,
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'company_id' => $this->companyB->id,
             'branch_id' => $this->branchB1->id,
-            'visibility' => Document::VISIBILITY_DIVISION,
+            'visibility' => Document::VISIBILITY_UNIT_KERJA,
             'approver_role' => 'head',
         ])->versions()->create([
             'version_number' => 1,
@@ -163,10 +163,10 @@ class HeadDivisionContextApprovalTest extends TestCase
             'title' => 'Payroll Document B',
             'document_type_id' => $this->docType->id,
             'owner_id' => $this->staffB->id,
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'company_id' => $this->companyB->id,
             'branch_id' => $this->branchB1->id,
-            'visibility' => Document::VISIBILITY_DIVISION,
+            'visibility' => Document::VISIBILITY_UNIT_KERJA,
             'approver_role' => 'head',
         ]);
 
@@ -183,7 +183,7 @@ class HeadDivisionContextApprovalTest extends TestCase
             ->withSession([
                 'active_company_id' => $this->companyB->id,
                 'active_branch_id' => $this->branchB1->id,
-                'active_division_id' => $this->division->id,
+                'active_unit_kerja_id' => $this->unitKerja->id,
             ])
             ->get(route('approvals.versions'));
 
@@ -210,10 +210,10 @@ class HeadDivisionContextApprovalTest extends TestCase
             'title' => 'Original Title B',
             'document_type_id' => $this->docType->id,
             'owner_id' => $this->staffB->id,
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'company_id' => $this->companyB->id,
             'branch_id' => $this->branchB1->id,
-            'visibility' => Document::VISIBILITY_DIVISION,
+            'visibility' => Document::VISIBILITY_UNIT_KERJA,
             'approver_role' => 'head',
             'pending_title' => 'Requested New Title B',
             'rename_requested_by_id' => $this->staffB->id,
@@ -267,10 +267,10 @@ class HeadDivisionContextApprovalTest extends TestCase
             'title' => 'Contract B',
             'document_type_id' => $this->docType->id,
             'owner_id' => $this->staffB->id,
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'company_id' => $this->companyB->id,
             'branch_id' => $this->branchB1->id,
-            'visibility' => Document::VISIBILITY_DIVISION,
+            'visibility' => Document::VISIBILITY_UNIT_KERJA,
         ]);
 
         // Signature request targeted to Head
@@ -304,10 +304,10 @@ class HeadDivisionContextApprovalTest extends TestCase
             'title' => 'Policy Document B',
             'document_type_id' => $this->docType->id,
             'owner_id' => $this->staffB->id,
-            'division_id' => $this->division->id,
+            'unit_kerja_id' => $this->unitKerja->id,
             'company_id' => $this->companyB->id,
             'branch_id' => $this->branchB1->id,
-            'visibility' => Document::VISIBILITY_DIVISION,
+            'visibility' => Document::VISIBILITY_UNIT_KERJA,
             'approver_role' => 'head',
         ]);
 

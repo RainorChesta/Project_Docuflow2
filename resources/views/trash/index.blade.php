@@ -108,7 +108,7 @@
                                 </th>
                                 <th>{{ __('Judul / Nomor Dokumen') }}</th>
                                 <th>{{ __('Pemilik') }}</th>
-                                <th>{{ __('Divisi / Lokasi') }}</th>
+                                <th>{{ __('Unit Kerja / Lokasi') }}</th>
                                 <th>{{ __('Tanggal Dihapus') }}</th>
                                 <th>{{ __('Sisa Waktu Auto-Delete') }}</th>
                                 <th class="text-right">{{ __('Aksi') }}</th>
@@ -151,7 +151,7 @@
                                     </td>
                                     <td>
                                         <div class="text-sm text-base-content/80 font-medium">
-                                            {{ $doc->division?->name ?? __('Tanpa Divisi') }}
+                                            {{ $doc->unitKerja?->nama_unit_kerja ?? __('Tanpa Unit Kerja') }}
                                         </div>
                                         <div class="text-xs text-base-content/50">
                                             {{ $doc->branch?->company?->name ?? '' }} {{ $doc->branch ? '('.$doc->branch->name.')' : '' }}

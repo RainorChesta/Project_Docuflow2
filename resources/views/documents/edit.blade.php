@@ -1416,7 +1416,7 @@
                     return (u.name && u.name.toLowerCase().includes(q)) ||
                            (u.email && u.email.toLowerCase().includes(q)) ||
                            (u.role && u.role.toLowerCase().includes(q)) ||
-                           (u.division && u.division.toLowerCase().includes(q));
+                           (u.unit_kerja && u.unit_kerja.toLowerCase().includes(q));
                 });
                 renderSignatureUsersList(filtered, !q);
             }
@@ -1557,7 +1557,7 @@
                                             <p class="text-sm font-semibold leading-tight text-base-content uppercase truncate" title="${escapeHtml(u.name || '')}">${escapeHtml(u.name || '')}</p>
                                             ${u.is_me ? '<span class="badge badge-primary badge-xs uppercase font-bold shrink-0">Saya</span>' : ''}
                                         </div>
-                                        <p class="text-xs text-base-content/60 uppercase truncate">${escapeHtml(u.role || '')} &bull; ${escapeHtml(u.division || '')}</p>
+                                        <p class="text-xs text-base-content/60 uppercase truncate">${escapeHtml(u.role || '')} &bull; ${escapeHtml(u.unit_kerja || '')}</p>
                                     </div>
                                 </div>
                             </div>

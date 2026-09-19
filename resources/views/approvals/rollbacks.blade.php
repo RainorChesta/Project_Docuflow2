@@ -156,9 +156,9 @@
                                             <span class="badge badge-ghost badge-xs font-mono font-medium text-base-content/70 border-base-300">
                                                 {{ $doc->document_number ?? '—' }}
                                             </span>
-                                            @if($doc->division)
+                                            @if($doc->unitKerja)
                                                 <span class="badge badge-ghost badge-xs text-base-content/60">
-                                                    {{ $doc->division->name }}
+                                                    {{ $doc->unitKerja->nama_unit_kerja }}
                                                 </span>
                                             @endif
                                             @if($doc->branch)

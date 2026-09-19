@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\Admin\DivisionController;
 use App\Http\Controllers\Admin\DocumentController as AdminDocumentController;
 use App\Http\Controllers\Admin\DocumentTemplateController;
 use App\Http\Controllers\Admin\RetentionController;
@@ -110,8 +109,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/documents/{document}/shares', [DocumentShareController::class, 'store'])->name('shares.store');
     Route::patch('/documents/{document}/shares/{share}', [DocumentShareController::class, 'updateUserShare'])->name('shares.update');
     Route::delete('/documents/{document}/shares/{share}', [DocumentShareController::class, 'destroyUserShare'])->name('shares.destroy');
-    Route::patch('/documents/{document}/division-shares/{divisionShare}', [DocumentShareController::class, 'updateDivisionShare'])->name('shares.division.update');
-    Route::delete('/documents/{document}/division-shares/{divisionShare}', [DocumentShareController::class, 'destroyDivisionShare'])->name('shares.division.destroy');
+    Route::patch('/documents/{document}/unit-kerja-shares/{unitKerjaShare}', [DocumentShareController::class, 'updateUnitKerjaShare'])->name('shares.unit-kerja.update');
+    Route::delete('/documents/{document}/unit-kerja-shares/{unitKerjaShare}', [DocumentShareController::class, 'destroyUnitKerjaShare'])->name('shares.unit-kerja.destroy');
     Route::patch('/documents/{document}/general-access', [DocumentShareController::class, 'updateGeneralAccess'])->name('shares.general-access.update');
     Route::post('/documents/{document}/regenerate-token', [DocumentShareController::class, 'regenerateToken'])->name('shares.regenerate-token');
     Route::get('/documents/{document}/share-data', [DocumentShareController::class, 'shareData'])->name('shares.data');
@@ -144,7 +143,6 @@ Route::middleware('auth')->group(function () {
         Route::resource('companies', \App\Http\Controllers\Admin\CompanyController::class);
         Route::resource('branches', \App\Http\Controllers\Admin\BranchController::class);
         Route::resource('unit-kerja', \App\Http\Controllers\Admin\UnitKerjaController::class);
-        Route::resource('divisions', DivisionController::class);
         Route::resource('users', UserController::class);
         Route::resource('signatures', \App\Http\Controllers\Admin\SignatureController::class)->except(['show']);
         Route::get('/retention', [RetentionController::class, 'edit'])->name('retention.edit');
