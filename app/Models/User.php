@@ -37,6 +37,16 @@ class User extends Authenticatable
         ];
     }
 
+    public function setNipAttribute($value): void
+    {
+        $this->attributes['nip'] = filled($value) ? trim($value) : null;
+    }
+
+    public function setPhoneNumberAttribute($value): void
+    {
+        $this->attributes['phone_number'] = filled($value) ? trim($value) : null;
+    }
+
     public function unitKerja(): BelongsTo
     {
         return $this->belongsTo(UnitKerja::class, 'unit_kerja_id');

@@ -106,7 +106,7 @@ class UserController extends Controller
         $this->authorize('admin');
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users',
+            'email' => 'required|email|unique:users,email',
             'nip' => 'nullable|string|max:50|unique:users,nip',
             'phone_number' => 'nullable|string|max:50',
             'password' => 'required|string|min:8|confirmed',
@@ -128,6 +128,9 @@ class UserController extends Controller
         $unitKerjaIds = $validated['unit_kerja_ids'] ?? [];
         $branchUnitKerjas = $request->input('branch_unit_kerjas', []);
         unset($validated['company_ids'], $validated['branch_ids'], $validated['unit_kerja_ids'], $validated['branch_unit_kerjas']);
+
+        $validated['nip'] = filled($validated['nip'] ?? null) ? trim($validated['nip']) : null;
+        $validated['phone_number'] = filled($validated['phone_number'] ?? null) ? trim($validated['phone_number']) : null;
 
         if ($validated['system_role'] === 'admin') {
             $companyIds = Company::pluck('id')->all();
@@ -180,6 +183,8 @@ class UserController extends Controller
             $unitKerjaIds
         );
 
+        event(new \App\Events\UserVerificationUpdated($user));
+
         return redirect()->route('admin.users.index')->with('success', __('Pengguna berhasil dibuat.'));
     }
 
@@ -197,8 +202,6 @@ class UserController extends Controller
     {
         $this->authorize('admin');
 
-        $allowedRoles = $user->isDirector() ? 'admin,direktur,head,user' : 'admin,head,user';
-
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email,' . $user->id,
@@ -209,7 +212,7 @@ class UserController extends Controller
             'unit_kerja_ids' => 'nullable|array',
             'unit_kerja_ids.*' => 'exists:unit_kerjas,id',
             'branch_unit_kerjas' => 'nullable|array',
-            'system_role' => 'required|in:' . $allowedRoles,
+            'system_role' => 'required|in:admin,direktur,head,user',
             'is_active' => 'boolean',
             'company_ids' => 'nullable|array',
             'company_ids.*' => 'exists:companies,id',
@@ -228,6 +231,9 @@ class UserController extends Controller
         $unitKerjaIds = $validated['unit_kerja_ids'] ?? [];
         $branchUnitKerjas = $request->input('branch_unit_kerjas', []);
         unset($validated['company_ids'], $validated['branch_ids'], $validated['unit_kerja_ids'], $validated['branch_unit_kerjas']);
+
+        $validated['nip'] = filled($validated['nip'] ?? null) ? trim($validated['nip']) : null;
+        $validated['phone_number'] = filled($validated['phone_number'] ?? null) ? trim($validated['phone_number']) : null;
 
         if ($validated['system_role'] === 'admin') {
             $companyIds = Company::pluck('id')->all();
