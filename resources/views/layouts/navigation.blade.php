@@ -135,12 +135,11 @@
         @php
             $navUser = auth()->user();
             $sharedDocsCount = $navUser ? $navUser->sharedDocumentsCount() : 0;
-            $pendingTtdCount = $navUser ? $navUser->receivedSignatureRequests()->where('status', 'pending')->count() : 0;
-            $pendingAdminTtdCount = $pendingTtdCount;
             $pendingVersionsCount = $navUser ? $navUser->pendingVersionApprovalsCount() : 0;
             $pendingRollbacksCount = $navUser ? $navUser->pendingRollbackApprovalsCount() : 0;
             $totalApprovalCount = $pendingVersionsCount + $pendingRollbacksCount;
             $isApprovalActive = request()->routeIs('approvals.*');
+            $canSeeApproval = $navUser && ($navUser->isHead() || $navUser->isPicKlinik() || $navUser->isDirector() || $navUser->isAdmin() || $totalApprovalCount > 0);
         @endphp
         
         <span class="px-2 text-[10px] font-extrabold text-base-content/40 uppercase tracking-[0.2em] whitespace-nowrap" :class="open ? 'block' : 'lg:hidden'">{{ __('Menu') }}</span>
@@ -231,30 +230,39 @@
         </a>
         @endif
 
-        <a href="{{ route('signatures.requests.index') }}"
+        @endif
+
+        @php
+            $isStaffOnly = $navUser && $navUser->isStaff() && !$navUser->isHead() && !$navUser->isPicKlinik() && !$navUser->isDirector() && !$navUser->isAdmin();
+        @endphp
+
+        @if($isStaffOnly && $canSeeApproval)
+        {{-- For Staff: Single "Signature" navigation item (no sub-menus, no rollback) --}}
+        <a href="{{ route('approvals.versions') }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
-                  {{ request()->routeIs('signatures.requests.*') ? 'nav-item-new-active' : '' }}"
+                  {{ $isApprovalActive ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
-           :title="open ? '' : '{{ __('Persetujuan TTD') }}'">
+           :title="open ? '' : '{{ __('Signature') }}'">
             <div class="icon-wrapper shrink-0 relative">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                @if($pendingTtdCount > 0)
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+                @if($totalApprovalCount > 0)
                     <span class="absolute -top-1 -right-1 flex h-3 w-3">
                       <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
                       <span class="relative inline-flex rounded-full h-3 w-3 border-2 border-base-100 bg-error"></span>
                     </span>
                 @endif
             </div>
-            <span class="text-label min-w-0 flex-1 flex items-center justify-between gap-2" :class="open ? '' : 'lg:hidden'">
-                <span class="truncate">{{ __('Persetujuan TTD') }}</span>
-                @if($pendingTtdCount > 0)
-                    <span class="badge badge-error badge-sm font-bold text-white px-1.5 shrink-0 shadow-sm shadow-error/50">{{ $pendingTtdCount }}</span>
+            <span class="text-label min-w-0 flex-1 flex items-center justify-between gap-1.5" :class="open ? '' : 'lg:hidden'">
+                <span class="truncate">{{ __('Signature') }}</span>
+                @if($totalApprovalCount > 0)
+                    <span class="badge badge-error badge-sm font-bold text-white px-1.5 shadow-sm shadow-error/50">{{ $totalApprovalCount }}</span>
                 @endif
             </span>
         </a>
-        @endif
-
-        @if(auth()->user()->isHead() || auth()->user()->isDirector() || auth()->user()->isAdmin())
+        @elseif($canSeeApproval)
+        {{-- For Management / Leaders: Multi-tier Approval Dropdown with Version and Rollback approvals --}}
         <div x-data="{ approvalOpen: {{ $isApprovalActive ? 'true' : 'false' }} }" class="space-y-1">
             <button type="button"
                     @click="open ? (approvalOpen = !approvalOpen) : (toggle(), approvalOpen = true)"
@@ -302,10 +310,10 @@
                 {{-- Sub-menu 1: Document Approval (Version) --}}
                 <a href="{{ route('approvals.versions') }}"
                    class="flex items-center justify-between gap-1.5 px-2 py-2 rounded-xl text-[12.5px] font-medium transition-all duration-200
-                          {{ request()->routeIs('approvals.versions') || (request()->routeIs('approvals.index') && request('tab') !== 'rollbacks') ? 'bg-primary/10 text-primary font-bold shadow-xs' : 'text-base-content/60 hover:text-base-content hover:bg-base-200/60' }}"
+                          {{ request()->routeIs('approvals.versions') || (request()->routeIs('approvals.index') && !in_array(request('tab'), ['rollbacks', 'renames'])) ? 'bg-primary/10 text-primary font-bold shadow-xs' : 'text-base-content/60 hover:text-base-content hover:bg-base-200/60' }}"
                    title="{{ __('Document Approval (Version)') }}">
                     <span class="flex items-center gap-2 min-w-0 flex-1">
-                        <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ request()->routeIs('approvals.versions') || (request()->routeIs('approvals.index') && request('tab') !== 'rollbacks') ? 'bg-primary' : 'bg-base-content/30' }}"></span>
+                        <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ request()->routeIs('approvals.versions') || (request()->routeIs('approvals.index') && !in_array(request('tab'), ['rollbacks', 'renames'])) ? 'bg-primary' : 'bg-base-content/30' }}"></span>
                         <span class="leading-tight break-words">{{ __('Document Approval (Version)') }}</span>
                     </span>
                     @if($pendingVersionsCount > 0)
@@ -399,27 +407,7 @@
             <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Unit Kerja') }}</span>
         </a>
 
-        <a href="{{ route('signatures.requests.index') }}"
-           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
-                  {{ request()->routeIs('signatures.requests.*') ? 'nav-item-new-active' : '' }}"
-           :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
-           :title="open ? '' : '{{ __('Tanda Tangan') }}'">
-            <div class="icon-wrapper shrink-0 relative">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                @if($pendingAdminTtdCount > 0)
-                    <span class="absolute -top-1 -right-1 flex h-3 w-3">
-                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
-                      <span class="relative inline-flex rounded-full h-3 w-3 border-2 border-base-100 bg-error"></span>
-                    </span>
-                @endif
-            </div>
-            <span class="text-label min-w-0 flex-1 flex items-center justify-between gap-2" :class="open ? '' : 'lg:hidden'">
-                <span class="truncate">{{ __('Tanda Tangan') }}</span>
-                @if($pendingAdminTtdCount > 0)
-                    <span class="badge badge-error badge-sm font-bold text-white px-1.5 shrink-0 shadow-sm shadow-error/50">{{ $pendingAdminTtdCount }}</span>
-                @endif
-            </span>
-        </a>
+
 
 
 

@@ -183,10 +183,17 @@
                                                                         <span class="font-semibold text-sm text-base-content truncate">{{ $branch->name }}</span>
                                                                         <span class="badge badge-outline badge-xs font-mono text-[10px]">{{ $branch->effective_code }}</span>
                                                                     </div>
-                                                                    <div class="text-xs text-base-content/50 mt-0.5 flex items-center gap-3">
+                                                                    <div class="text-xs text-base-content/50 mt-0.5 flex flex-wrap items-center gap-2">
                                                                         <span>{{ $branch->users_count }} {{ __('User') }}</span>
                                                                         <span class="text-base-content/20">•</span>
                                                                         <span>{{ $branch->documents_count }} {{ __('Dokumen') }}</span>
+                                                                        @if($branch->picKlinik)
+                                                                            <span class="text-base-content/20">•</span>
+                                                                            <span class="inline-flex items-center gap-1 text-primary font-medium">
+                                                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                                                                                PIC: {{ $branch->picKlinik->name }}
+                                                                            </span>
+                                                                        @endif
                                                                     </div>
                                                                 </div>
                                                             </div>

@@ -93,6 +93,7 @@ Route::middleware('auth')->group(function () {
     // Approvals
     Route::get('/approvals', [ApprovalController::class, 'index'])->name('approvals.index');
     Route::get('/approvals/versions', [ApprovalController::class, 'versions'])->name('approvals.versions');
+    Route::get('/approvals/signatures', [SignatureController::class, 'requestsIndex'])->name('approvals.signatures');
     Route::get('/approvals/renames', [ApprovalController::class, 'renames'])->name('approvals.renames');
     Route::get('/approvals/rollbacks', [ApprovalController::class, 'rollbacks'])->name('approvals.rollbacks');
     Route::post('/approvals/bulk-approve-versions', [ApprovalController::class, 'bulkApproveVersions'])->name('approvals.bulk-approve-versions');

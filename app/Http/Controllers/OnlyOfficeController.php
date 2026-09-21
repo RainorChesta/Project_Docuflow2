@@ -387,24 +387,9 @@ class OnlyOfficeController extends Controller
                 // Trigger approval routing and notifications if the version is pending
                 // ONLY when status is 2 (final save on close / finish editing) - NOT on status 6 (intermediate save / forcesave while editing)
                 if ($status === 2) {
-                    // Send signature and stamp request notifications for requests created/inserted during this editing session
-                    $unnotifiedSigRequests = \App\Models\SignatureRequest::where('document_id', $document->id)
-                        ->where('status', 'pending')
-                        ->whereNull('notified_at')
-                        ->get();
-
-                    foreach ($unnotifiedSigRequests as $sigReq) {
-                        $sigReq->sendNotification();
-                    }
-
                     if ($version->status === 'pending') {
                         \Illuminate\Support\Facades\Cache::forget('onlyoffice_pending_notif_' . $document->id);
-
-                        $notifKey = 'approval_notified_' . $document->id . '_v' . $version->id;
-                        if (!\Illuminate\Support\Facades\Cache::has($notifKey)) {
-                            \Illuminate\Support\Facades\Cache::put($notifKey, true, now()->addMinutes(10));
-                            $this->approvalRoutingService->compileWorkflowFromSignatures($document, $version, $author);
-                        }
+                        $this->approvalRoutingService->compileWorkflowFromSignatures($document, $version, $author);
                     }
                 } elseif ($status === 6 && $version->status === 'pending') {
                     // Mark that pending version was saved/modified in this session and will need notification when edit finishes
@@ -423,27 +408,13 @@ class OnlyOfficeController extends Controller
             }
         } elseif ($status === 4) {
             // Document closed without changes (or closed after previous forcesave status 6).
-            // Send any unnotified signature/stamp request notifications now that editing session has ended
-            $unnotifiedSigRequests = \App\Models\SignatureRequest::where('document_id', $document->id)
-                ->where('status', 'pending')
-                ->whereNull('notified_at')
-                ->get();
-
-            foreach ($unnotifiedSigRequests as $sigReq) {
-                $sigReq->sendNotification();
-            }
-
             // Check if there is a pending notification from status 6 that needs to be fired upon closing
             $pendingNotif = \Illuminate\Support\Facades\Cache::pull('onlyoffice_pending_notif_' . $document->id);
             if ($pendingNotif) {
                 $version = \App\Models\DocumentVersion::find($pendingNotif['version_id']);
                 $author = \App\Models\User::find($pendingNotif['author_id']) ?? $document->owner;
                 if ($version && $version->status === 'pending') {
-                    $notifKey = 'approval_notified_' . $document->id . '_v' . $version->id;
-                    if (!\Illuminate\Support\Facades\Cache::has($notifKey)) {
-                        \Illuminate\Support\Facades\Cache::put($notifKey, true, now()->addMinutes(10));
-                        $this->approvalRoutingService->compileWorkflowFromSignatures($document, $version, $author);
-                    }
+                    $this->approvalRoutingService->compileWorkflowFromSignatures($document, $version, $author);
                 }
             }
 

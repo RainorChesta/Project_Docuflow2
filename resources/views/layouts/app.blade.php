@@ -243,6 +243,7 @@
                             } elseif (str_starts_with($name, 'profile.')) {
                                 $crumbs[] = ['label' => __('Profil'), 'url' => null];
                             } elseif (str_starts_with($name, 'signatures.requests.')) {
+                                $crumbs[] = ['label' => __('Approval'), 'url' => route('approvals.versions')];
                                 $crumbs[] = ['label' => __('Persetujuan Tanda Tangan'), 'url' => null];
                             }
                         }

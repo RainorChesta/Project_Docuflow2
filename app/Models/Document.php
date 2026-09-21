@@ -234,6 +234,29 @@ class Document extends Model
     }
 
     /**
+     * Determine if the document is currently locked for editing because it has an active pending version in the approval pipeline.
+     */
+    public function isLockedForEditing(): bool
+    {
+        return $this->versions()
+            ->where('status', 'pending')
+            ->whereNull('discarded_at')
+            ->exists();
+    }
+
+    /**
+     * Get the newest pending version undergoing review.
+     */
+    public function pendingVersion(): ?DocumentVersion
+    {
+        return $this->versions()
+            ->where('status', 'pending')
+            ->whereNull('discarded_at')
+            ->latest('id')
+            ->first();
+    }
+
+    /**
      * Get the active pending approval step for this document's latest pending version.
      */
     public function currentApprovalStep(): ?DocumentApprovalStep
@@ -303,6 +326,21 @@ class Document extends Model
                 ->whereHas('versions', fn($q) => $q->where('status', 'active'));
         }
 
+        if ($user->isPicKlinik()) {
+            $directBranchIds = $user->allBranchIds();
+            $directCompanyIds = $user->allCompanyIds();
+
+            return $query->whereIn('visibility', [self::VISIBILITY_UNIT_KERJA, 'division'])
+                ->where(function ($q) use ($directBranchIds, $directCompanyIds) {
+                    if (!empty($directBranchIds)) {
+                        $q->whereIn('documents.branch_id', $directBranchIds);
+                    } elseif (!empty($directCompanyIds)) {
+                        $q->whereIn('documents.company_id', $directCompanyIds);
+                    }
+                })
+                ->whereHas('versions', fn($q) => $q->where('status', 'active'));
+        }
+
         $unitKerjaIds = $user->allUnitKerjaIds();
 
         if (empty($unitKerjaIds)) {
@@ -346,6 +384,29 @@ class Document extends Model
             ? Branch::whereIn('company_id', $companyIds)->pluck('id')->filter()->all()
             : [];
         $branchIds = array_values(array_unique(array_merge($directBranchIds, $allCompanyBranchIds)));
+
+        if ($user->isPicKlinik()) {
+            return $query->where(function (Builder $q) use ($user, $directBranchIds, $companyIds) {
+                // Shared directly with user
+                $q->whereHas('shares', fn(Builder $s) => $s->where('user_id', $user->id));
+
+                // Assigned branches
+                if (!empty($directBranchIds)) {
+                    $q->orWhereIn('documents.branch_id', $directBranchIds);
+                } elseif (!empty($companyIds)) {
+                    $q->orWhereIn('documents.company_id', $companyIds);
+                }
+
+                // Distributed to their branch or company
+                $q->orWhereHas('distributions', fn(Builder $dist) => $dist->where(function ($dq) use ($directBranchIds, $companyIds) {
+                    if (!empty($directBranchIds)) {
+                        $dq->whereIn('target_branch_id', $directBranchIds);
+                    } elseif (!empty($companyIds)) {
+                        $dq->orWhereHas('targetBranch', fn($tb) => $tb->whereIn('company_id', $companyIds));
+                    }
+                }));
+            });
+        }
 
         if ($user->isDirector()) {
             if (!empty($branchIds) || !empty($companyIds)) {

@@ -651,7 +651,8 @@ class DocumentController extends Controller
         $pendingVersion = $document->versions()->where('status', 'pending')->whereNull('discarded_at')->latest('id')->first();
         if ($pendingVersion) {
             $author = $document->owner ?? $currentUser;
-            if ($pendingVersion->approvalSteps()->count() === 0) {
+            $hasSteps = $pendingVersion->approvalSteps()->exists();
+            if (!$hasSteps) {
                 $this->approvalRoutingService->compileWorkflowFromSignatures($document, $pendingVersion, $author);
             }
         }
@@ -754,8 +755,13 @@ class DocumentController extends Controller
         ]);
     }
 
-    public function edit(Document $document): View
+    public function edit(Document $document): View|\Illuminate\Http\RedirectResponse
     {
+        if ($document->isLockedForEditing()) {
+            return redirect()->route('documents.show', $document)
+                ->with('error', __('Dokumen sedang dalam alur persetujuan dan terkunci dari pengeditan.'));
+        }
+
         $this->authorize('update', $document);
 
         $document->load('currentVersion', 'versions');
@@ -883,31 +889,7 @@ class DocumentController extends Controller
             'version_number' => $version->version_number,
         ]);
 
-        $unnotifiedSigRequests = SignatureRequest::where('document_id', $document->id)
-            ->where('status', 'pending')
-            ->whereNull('notified_at')
-            ->get();
-
-        foreach ($unnotifiedSigRequests as $sigReq) {
-            $sigReq->sendNotification();
-        }
-
-        $resolution = $this->approvalRoutingService->resolveApprover($document, $user);
-        $this->approvalRoutingService->applyToDocument($document, $resolution);
-
-        foreach ($resolution['approvers'] as $approver) {
-            $approver->notify(new \App\Notifications\DocumentApprovalRequested($document, $version, $user->name));
-        }
-
-        if ($resolution['role'] !== null) {
-            $user->notify(new \App\Notifications\ApprovalRouteResolved(
-                $document,
-                $resolution['role'],
-                $resolution['approvers']->pluck('name')->join(', '),
-                $resolution['message'],
-                $resolution['isFallback'],
-            ));
-        }
+        $this->approvalRoutingService->compileWorkflowFromSignatures($document, $version, $user);
 
         $message = $version->wasRecentlyCreated
             ? __('Perubahan disimpan. Menunggu persetujuan.')
@@ -990,15 +972,6 @@ class DocumentController extends Controller
         $user = auth()->user();
         $version = $document->displayVersion();
 
-        $unnotifiedSigRequests = SignatureRequest::where('document_id', $document->id)
-            ->where('status', 'pending')
-            ->whereNull('notified_at')
-            ->get();
-
-        foreach ($unnotifiedSigRequests as $sigReq) {
-            $sigReq->sendNotification();
-        }
-
         $routingMessage = null;
         if ($version) {
             if ($version->status === 'draft') {
@@ -1006,31 +979,9 @@ class DocumentController extends Controller
             }
 
             if ($version->status === 'pending') {
-                $notifKey = 'approval_notified_' . $document->id . '_v' . $version->id;
-
                 Cache::forget('onlyoffice_pending_notif_' . $document->id);
-
-                if (!Cache::has($notifKey)) {
-                    Cache::put($notifKey, true, now()->addMinutes(10));
-
-                    $resolution = $this->approvalRoutingService->resolveApprover($document, $user);
-                    $this->approvalRoutingService->applyToDocument($document, $resolution);
-
-                    foreach ($resolution['approvers'] as $approver) {
-                        $approver->notify(new \App\Notifications\DocumentApprovalRequested($document, $version, $user->name));
-                    }
-
-                    if ($resolution['role'] !== null) {
-                        $user->notify(new \App\Notifications\ApprovalRouteResolved(
-                            $document,
-                            $resolution['role'],
-                            $resolution['approvers']->pluck('name')->join(', '),
-                            $resolution['message'],
-                            $resolution['isFallback'],
-                        ));
-                        $routingMessage = $resolution['message'];
-                    }
-                }
+                $result = $this->approvalRoutingService->compileWorkflowFromSignatures($document, $version, $user);
+                $routingMessage = $result['message'] ?? null;
             }
         }
 
@@ -1082,6 +1033,11 @@ class DocumentController extends Controller
 
     public function uploadVersion(Request $request, Document $document): RedirectResponse
     {
+        if ($document->isLockedForEditing()) {
+            return redirect()->route('documents.show', $document)
+                ->with('error', __('Dokumen sedang dalam alur persetujuan dan terkunci dari pengeditan.'));
+        }
+
         $this->authorize('update', $document);
 
         $validated = $request->validate([
@@ -1096,22 +1052,7 @@ class DocumentController extends Controller
             'version_number' => $version->version_number,
         ]);
 
-        $resolution = $this->approvalRoutingService->resolveApprover($document, $user);
-        $this->approvalRoutingService->applyToDocument($document, $resolution);
-
-        foreach ($resolution['approvers'] as $approver) {
-            $approver->notify(new \App\Notifications\DocumentApprovalRequested($document, $version, $user->name));
-        }
-
-        if ($resolution['role'] !== null) {
-            $user->notify(new \App\Notifications\ApprovalRouteResolved(
-                $document,
-                $resolution['role'],
-                $resolution['approvers']->pluck('name')->join(', '),
-                $resolution['message'],
-                $resolution['isFallback'],
-            ));
-        }
+        $this->approvalRoutingService->compileWorkflowFromSignatures($document, $version, $user);
 
         return redirect()->route('documents.show', $document)->with('success', __('Versi baru diunggah. Menunggu persetujuan.'));
     }
@@ -1168,7 +1109,19 @@ class DocumentController extends Controller
             abort(404);
         }
 
-        $document = Document::with(['owner', 'unitKerja', 'documentType', 'currentVersion'])->findOrFail($id);
+        $document = Document::with([
+            'owner.unitKerja',
+            'unitKerja',
+            'documentType',
+            'currentVersion.author.unitKerja',
+            'currentVersion.reviewer.unitKerja',
+            'currentVersion.approvalSteps' => fn($q) => $q->orderBy('step_order'),
+            'currentVersion.approvalSteps.assignedUser.unitKerja',
+            'currentVersion.approvalSteps.actionBy.unitKerja',
+            'currentVersion.approvalSteps.signatureRequest.targetUser.unitKerja',
+            'signatureRequests.targetUser.unitKerja',
+            'signatureRequests.requestedSignature',
+        ])->findOrFail($id);
 
         return view('documents.verified', compact('document', 'token'));
     }
@@ -1328,22 +1281,7 @@ class DocumentController extends Controller
 
         if ($version && $version->status === 'pending') {
             if ($version->wasRecentlyCreated) {
-                $resolution = $this->approvalRoutingService->resolveApprover($document, $user);
-                $this->approvalRoutingService->applyToDocument($document, $resolution);
-
-                foreach ($resolution['approvers'] as $approver) {
-                    $approver->notify(new \App\Notifications\DocumentApprovalRequested($document, $version, $user->name));
-                }
-
-                if ($resolution['role'] !== null) {
-                    $user->notify(new \App\Notifications\ApprovalRouteResolved(
-                        $document,
-                        $resolution['role'],
-                        $resolution['approvers']->pluck('name')->join(', '),
-                        $resolution['message'],
-                        $resolution['isFallback'],
-                    ));
-                }
+                $this->approvalRoutingService->compileWorkflowFromSignatures($document, $version, $user);
 
                 return back()->with('success', __('Nama dokumen diperbarui dan versi v:version diajukan untuk persetujuan.', [
                     'version' => $version->version_number,

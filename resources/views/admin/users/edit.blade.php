@@ -88,6 +88,7 @@
                             <select name="system_role" id="system_role" x-model="role" class="select select-bordered w-full" required>
                                 <option value="user" {{ old('system_role', $user->system_role) === 'user' ? 'selected' : '' }}>User (Staff)</option>
                                 <option value="head" {{ old('system_role', $user->system_role) === 'head' ? 'selected' : '' }}>Head / Kepala Unit Kerja</option>
+                                <option value="pic_klinik" {{ old('system_role', $user->system_role) === 'pic_klinik' ? 'selected' : '' }}>PIC Klinik / Kepala Cabang</option>
                                 @if($user->system_role === 'direktur')
                                     <option value="direktur" {{ old('system_role', $user->system_role) === 'direktur' ? 'selected' : '' }}>Direktur</option>
                                 @endif
@@ -101,9 +102,9 @@
                         {{-- Status Akun --}}
                         <div class="form-control w-full">
                             <label class="label"><span class="label-text font-medium">{{ __('Status Akun') }}</span></label>
-                            <label class="label cursor-pointer justify-start gap-3 px-0 pt-2">
+                            <label class="flex items-center justify-between px-4 border border-base-300 rounded-lg bg-base-100 hover:bg-base-200/50 cursor-pointer transition-colors h-12">
+                                <span class="label-text font-medium text-sm">{{ __('Pengguna Aktif') }}</span>
                                 <input type="checkbox" name="is_active" value="1" {{ old('is_active', $user->is_active) ? 'checked' : '' }} class="checkbox checkbox-primary">
-                                <span class="label-text">{{ __('Pengguna Aktif') }}</span>
                             </label>
                         </div>
                     </div>
@@ -189,11 +190,41 @@
 
                             <div class="space-y-4">
                                 @foreach($companies as $company)
+                                    @php
+                                        $branchesList = $company->branches->map(function($b) {
+                                            return [
+                                                'id' => (string) $b->id,
+                                                'name' => $b->name,
+                                                'code' => $b->code,
+                                                'is_pusat' => (bool) $b->is_pusat,
+                                            ];
+                                        })->values();
+                                    @endphp
                                     <div class="border border-base-300 rounded-lg p-4 bg-base-200/30"
                                          x-show="selectedCompanies.includes(String({{ $company->id }}))"
                                          x-data="{ 
                                             companyId: {{ $company->id }},
+                                            isCollapsed: false,
+                                            branchDropdownOpen: false,
+                                            branchSearch: '',
+                                            branchesList: {{ $branchesList->toJson() }},
                                             branchIds: {{ $company->branches->pluck('id')->map(fn($id) => (string)$id)->toJson() }},
+                                            get filteredBranches() {
+                                                if (!this.branchSearch) return this.branchesList;
+                                                const q = this.branchSearch.toLowerCase();
+                                                return this.branchesList.filter(b => b.name.toLowerCase().includes(q) || (b.code && b.code.toLowerCase().includes(q)));
+                                            },
+                                            get assignedCount() {
+                                                return this.branchIds.filter(id => selectedBranches.includes(String(id))).length;
+                                            },
+                                            toggleBranch(id) {
+                                                id = String(id);
+                                                if (selectedBranches.includes(id)) {
+                                                    selectedBranches = selectedBranches.filter(b => b !== id);
+                                                } else {
+                                                    selectedBranches.push(id);
+                                                }
+                                            },
                                             toggleAllBranches(checked) {
                                                 if (checked) {
                                                     this.branchIds.forEach(id => {
@@ -206,18 +237,82 @@
                                             }
                                          }">
                                         
-                                        <div class="flex items-center justify-between border-b border-base-300 pb-2 mb-3">
-                                            <span class="font-medium text-sm">{{ $company->name }} ({{ $company->code }}) - Cabang</span>
-                                            <label class="flex items-center gap-2 cursor-pointer text-xs">
-                                                <input type="checkbox" 
-                                                       :checked="branchIds.length > 0 && branchIds.every(b => selectedBranches.includes(String(b)))"
-                                                       @change="toggleAllBranches($el.checked)"
-                                                       class="checkbox checkbox-xs checkbox-primary">
-                                                <span>{{ __('Pilih Semua Cabang') }}</span>
-                                            </label>
+                                        <div class="flex items-center justify-between border-b border-base-300 pb-2 mb-3 cursor-pointer select-none"
+                                             @click="isCollapsed = !isCollapsed">
+                                            <div class="flex items-center gap-2">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-base-content/60 transition-transform duration-200" :class="{ '-rotate-90': isCollapsed }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                                <span class="font-medium text-sm">{{ $company->name }} ({{ $company->code }}) - {{ __('Cabang') }}</span>
+                                                <span x-show="assignedCount > 0" class="badge badge-primary badge-xs" x-text="assignedCount"></span>
+                                            </div>
+                                            <div class="flex items-center gap-2" @click.stop>
+                                                <label class="flex items-center gap-2 cursor-pointer text-xs">
+                                                    <input type="checkbox" 
+                                                           :checked="branchIds.length > 0 && branchIds.every(b => selectedBranches.includes(String(b)))"
+                                                           @change="toggleAllBranches($el.checked)"
+                                                           class="checkbox checkbox-xs checkbox-primary">
+                                                    <span>{{ __('Pilih Semua Cabang') }}</span>
+                                                </label>
+                                            </div>
                                         </div>
 
-                                        <div class="space-y-3">
+                                        <div x-show="!isCollapsed" x-transition.opacity.duration.200ms class="space-y-3">
+                                            {{-- Dropdown Search & Select Branches --}}
+                                            <div class="relative" @click.away="branchDropdownOpen = false">
+                                                <div class="input input-sm input-bordered w-full flex items-center justify-between cursor-pointer bg-base-100 shadow-xs"
+                                                     @click="branchDropdownOpen = !branchDropdownOpen">
+                                                    <div class="flex items-center gap-2 truncate">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 opacity-50 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                                        </svg>
+                                                        <span class="text-xs truncate font-medium" 
+                                                              x-text="assignedCount > 0 ? assignedCount + ' {{ __('Cabang Terpilih') }}' : '{{ __('-- Cari & Pilih Cabang --') }}'"></span>
+                                                    </div>
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 opacity-50 shrink-0 transition-transform duration-200" :class="{ 'rotate-180': branchDropdownOpen }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                </div>
+
+                                                {{-- Dropdown Popup --}}
+                                                <div x-show="branchDropdownOpen" 
+                                                     x-transition
+                                                     class="absolute z-40 mt-1 w-full bg-base-100 border border-base-300 rounded-lg shadow-xl flex flex-col"
+                                                     style="display: none;">
+                                                    <div class="p-2 border-b border-base-200">
+                                                        <input type="text" x-model="branchSearch" class="input input-xs input-bordered w-full" placeholder="{{ __('Cari cabang...') }}" @click.stop>
+                                                    </div>
+                                                    <div class="max-h-52 overflow-y-auto p-1">
+                                                        <template x-if="filteredBranches.length === 0">
+                                                            <div class="p-3 text-xs text-base-content/60 text-center">{{ __('Tidak ada cabang yang cocok') }}</div>
+                                                        </template>
+                                                        <template x-for="branch in filteredBranches" :key="branch.id">
+                                                            <label class="p-2 hover:bg-base-200/80 rounded-md cursor-pointer text-xs flex items-center justify-between gap-2.5 transition select-none">
+                                                                <div class="flex items-center gap-2.5 min-w-0">
+                                                                    <input type="checkbox" 
+                                                                           :checked="selectedBranches.includes(branch.id)" 
+                                                                           @change="toggleBranch(branch.id)" 
+                                                                           class="checkbox checkbox-xs"
+                                                                           :class="branch.is_pusat ? 'checkbox-primary' : 'checkbox-secondary'">
+                                                                    <span x-text="branch.name" class="font-medium text-base-content truncate"></span>
+                                                                </div>
+                                                                <span class="badge badge-xs shrink-0" 
+                                                                      :class="branch.is_pusat ? 'badge-primary font-semibold' : 'badge-ghost text-[10px]'" 
+                                                                      x-text="branch.is_pusat ? '{{ __('Pusat') }}' : (branch.code || '{{ __('Cabang') }}')"></span>
+                                                            </label>
+                                                        </template>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {{-- Empty State Helper --}}
+                                            <div x-show="assignedCount === 0" class="text-center py-4 px-3 bg-base-100/60 rounded-lg border border-dashed border-base-300 text-xs text-base-content/60">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mx-auto mb-1 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                                </svg>
+                                                <span>{{ __('Belum ada cabang dipilih. Cari dan pilih cabang dari dropdown di atas.') }}</span>
+                                            </div>
+
                                             @foreach($company->branches as $branch)
                                                 @php
                                                     $isPusat = (bool) $branch->is_pusat;
@@ -225,6 +320,7 @@
                                                     $defaultSelectedJson = json_encode(array_values(array_map('strval', $defaultSelected ?: [])));
                                                 @endphp
                                                 <div class="border border-base-200 rounded-xl p-3 bg-base-100 shadow-xs transition-all duration-200 hover:border-base-300"
+                                                     x-show="selectedBranches.includes('{{ $branch->id }}')"
                                                      x-data="{
                                                         branchId: '{{ $branch->id }}',
                                                         isPusat: {{ $isPusat ? 'true' : 'false' }},
@@ -274,8 +370,20 @@
                                                         @endif
                                                     </div>
 
+                                                    {{-- Info Banner for PIC Klinik --}}
+                                                    <div x-show="selectedBranches.includes(branchId) && role === 'pic_klinik'" 
+                                                         x-transition
+                                                         class="mt-3 pt-3 border-t border-base-200">
+                                                        <div class="alert alert-info/10 border border-info/25 rounded-lg py-2 px-3 flex items-center gap-2 text-xs text-info-content">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-info shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                            </svg>
+                                                            <span>{{ __('Sebagai PIC Klinik / Kepala Cabang, pengguna otomatis memiliki wewenang pengesahan di seluruh Unit Kerja pada cabang ini.') }}</span>
+                                                        </div>
+                                                    </div>
+
                                                     {{-- Sub-Picker: Appears when Branch is Checked --}}
-                                                    <div x-show="selectedBranches.includes(branchId) && role !== 'direktur'" 
+                                                    <div x-show="selectedBranches.includes(branchId) && role !== 'direktur' && role !== 'pic_klinik'" 
                                                          x-transition:enter="transition ease-out duration-200"
                                                          x-transition:enter-start="opacity-0 -translate-y-1"
                                                          x-transition:enter-end="opacity-100 translate-y-0"

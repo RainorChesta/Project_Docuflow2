@@ -87,7 +87,7 @@ class SignatureRequest extends Model
         if ($user->isAdmin()) {
             return 50;
         }
-        if ($user->isHead()) {
+        if ($user->isPicKlinik() || $user->isHead()) {
             return 30;
         }
 

@@ -407,4 +407,68 @@ class DocumentApprovalRejectionTest extends TestCase
             }
         );
     }
+
+    public function test_document_is_locked_for_editing_when_version_is_pending_approval(): void
+    {
+        $company = Company::create(['name' => 'PT Test Lock', 'code' => 'LOCK']);
+        $branch = Branch::create(['company_id' => $company->id, 'name' => 'Pusat', 'is_pusat' => true]);
+        $unitKerja = UnitKerja::create(['nama_unit_kerja' => 'IT', 'kode_unit_kerja' => 'IT01']);
+
+        $author = User::factory()->create(['unit_kerja_id' => $unitKerja->id, 'name' => 'Author IT']);
+        $author->companies()->attach($company->id);
+        $author->branches()->attach($branch->id);
+
+        $docType = DocumentType::create(['name' => 'IT Policy', 'code' => 'POL', 'category' => 'internal']);
+        $document = Document::create([
+            'document_number' => '002/POL-IT/LOCK/IX/2026',
+            'title' => 'Security Policy',
+            'document_type_id' => $docType->id,
+            'owner_id' => $author->id,
+            'unit_kerja_id' => $unitKerja->id,
+            'company_id' => $company->id,
+            'branch_id' => $branch->id,
+            'visibility' => 'general',
+        ]);
+
+        $pendingVersion = DocumentVersion::create([
+            'document_id' => $document->id,
+            'version_number' => 1,
+            'author_id' => $author->id,
+            'author_name' => $author->name,
+            'status' => 'pending',
+            'document_name' => 'Security Policy',
+            'content' => '<p>Security Policy content</p>',
+            'file_path' => 'documents/test_lock.docx',
+        ]);
+
+        // Assert model method
+        $this->assertTrue($document->isLockedForEditing());
+        $this->assertEquals($pendingVersion->id, $document->pendingVersion()->id);
+
+        // Assert policy forbids edit
+        $this->assertFalse($author->can('edit', $document));
+
+        // Assert edit route redirects with error
+        $response = $this->actingAs($author)->get(route('documents.edit', $document));
+        $response->assertRedirect(route('documents.show', $document));
+        $response->assertSessionHas('error');
+
+        // Assert upload-version route redirects with error when locked
+        $uploadResponse = $this->actingAs($author)->post(route('documents.upload-version', $document));
+        $uploadResponse->assertRedirect(route('documents.show', $document));
+        $uploadResponse->assertSessionHas('error');
+
+        // When version is rejected, document is unlocked
+        $pendingVersion->update(['status' => 'rejected']);
+        $document->refresh();
+        $this->assertFalse($document->isLockedForEditing());
+        $this->assertTrue($author->can('edit', $document));
+
+        // When approved and becomes active, document is unlocked
+        $pendingVersion->update(['status' => 'active']);
+        $document->update(['current_version_id' => $pendingVersion->id]);
+        $document->refresh();
+        $this->assertFalse($document->isLockedForEditing());
+        $this->assertTrue($author->can('edit', $document));
+    }
 }
