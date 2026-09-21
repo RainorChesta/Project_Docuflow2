@@ -13,7 +13,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
             </svg>
         </span>
-        @if($doc->owner_id === auth()->id() || $isEditorShare)
+        @if(($doc->owner_id === auth()->id() || $isEditorShare) && !$doc->isLockedForEditing())
             <span onclick="event.preventDefault(); event.stopPropagation(); window.location='{{ route('documents.edit', ['document' => $doc, 'type' => request('type')]) }}'" class="btn btn-ghost btn-xs btn-square" title="{{ __('Edit') }}">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
             </span>
@@ -76,6 +76,9 @@
         </svg>
         {{-- Version badge --}}
         <div class="absolute -bottom-1 -right-2 flex flex-col items-end gap-0.5">
+            @if($doc->isLockedForEditing())
+                <span class="badge badge-warning badge-xs text-[9px] px-1" title="{{ __('Dokumen Terkunci (Sedang Ditinjau)') }}">🔒</span>
+            @endif
             @if($doc->hasPendingRename())
                 <span class="badge badge-warning badge-xs text-[9px] px-1" title="{{ __('Menunggu Persetujuan Ubah Nama') }}">✎</span>
             @endif

@@ -37,6 +37,16 @@ class User extends Authenticatable
         ];
     }
 
+    public function setNipAttribute($value): void
+    {
+        $this->attributes['nip'] = filled($value) ? trim($value) : null;
+    }
+
+    public function setPhoneNumberAttribute($value): void
+    {
+        $this->attributes['phone_number'] = filled($value) ? trim($value) : null;
+    }
+
     public function unitKerja(): BelongsTo
     {
         return $this->belongsTo(UnitKerja::class, 'unit_kerja_id');
@@ -189,16 +199,26 @@ class User extends Authenticatable
         return $this->system_role === 'direktur';
     }
 
+    public function isPicKlinik(): bool
+    {
+        return $this->system_role === 'pic_klinik';
+    }
+
     public function isHead(): bool
     {
         return $this->system_role === 'head';
+    }
+
+    public function isStaff(): bool
+    {
+        return $this->system_role === 'staff' || (!$this->isAdmin() && !$this->isDirector() && !$this->isPicKlinik() && !$this->isHead());
     }
 
     /**
      * Check if user account is verified by administrator.
      * An account is verified when:
      * - User is admin (global access)
-     * - User is direktur and assigned to at least one company and branch
+     * - User is direktur or pic_klinik and assigned to at least one company and branch
      * - User is head/staff and assigned to at least one unit kerja, company, and branch
      */
     public function isVerified(): bool
@@ -215,7 +235,7 @@ class User extends Authenticatable
             ? $this->branches->isNotEmpty()
             : $this->branches()->exists();
 
-        if ($this->isDirector()) {
+        if ($this->isDirector() || $this->isPicKlinik()) {
             return $hasCompany && $hasBranch;
         }
 
@@ -256,7 +276,7 @@ class User extends Authenticatable
                 $sq->where('documents.company_id', $companyId)
                    ->orWhereHas('branch', fn($bq) => $bq->where('company_id', $companyId));
             });
-        } elseif ($scopedToContext && $this->isHead()) {
+        } elseif ($scopedToContext && ($this->isHead() || $this->isPicKlinik())) {
             $contextService = app(\App\Services\CompanyContextService::class);
             $activeCompanyId = $contextService->getActiveCompanyId($this);
             $activeBranchId = $contextService->getActiveBranchId($this);
@@ -285,63 +305,82 @@ class User extends Authenticatable
      */
     public function pendingVersionApprovalsCount(?int $companyId = null, ?int $branchId = null, bool $scopedToContext = true): int
     {
-        if (!$this->isHead() && !$this->isDirector() && !$this->isAdmin()) {
-            return 0;
-        }
-
-        if ($this->isAdmin() || $this->isDirector()) {
-            $companyIds = $this->companies()->pluck('companies.id')->all();
-
-            $roleFilter = function ($q) {
-                $q->where('approver_role', $this->system_role)
-                  ->orWhereNull('approver_role');
-            };
-
-            $versionsQuery = DocumentVersion::where('status', 'pending')
-                ->whereNull('discarded_at')
-                ->whereHas('document', $roleFilter);
-
-            if ($companyId !== null) {
-                $companyFilter = function ($q) use ($companyId, $branchId) {
-                    if ($branchId !== null) {
-                        $q->where('branch_id', $branchId);
-                    } else {
-                        $q->where('company_id', $companyId)
-                          ->orWhereHas('branch', fn($bq) => $bq->where('company_id', $companyId));
-                    }
-                };
-                $versionsQuery->whereHas('document', $companyFilter);
-            } elseif (!$this->isAdmin() && !empty($companyIds)) {
-                $companyFilter = function ($q) use ($companyIds) {
-                    $q->whereIn('company_id', $companyIds)
-                      ->orWhereHas('branch', fn($bq) => $bq->whereIn('company_id', $companyIds));
-                };
-                $versionsQuery->whereHas('document', $companyFilter);
-            }
-
-            return $versionsQuery->count();
-        }
-
-        $unitKerjaIds = $this->allUnitKerjaIds($branchId);
-        if (empty($unitKerjaIds)) {
-            return 0;
-        }
-
-        $roleFilter = function ($q) {
-            $q->where('approver_role', 'head')
-              ->orWhereNull('approver_role');
-        };
-
-        return DocumentVersion::where('status', 'pending')
+        $query = DocumentVersion::where('status', 'pending')
             ->whereNull('discarded_at')
-            ->whereHas('document', function ($q) use ($unitKerjaIds, $roleFilter, $companyId, $branchId, $scopedToContext) {
-                $q->whereIn('unit_kerja_id', $unitKerjaIds)
-                  ->visibleTo($this)
-                  ->where($roleFilter);
+            ->where(function ($vq) use ($companyId, $branchId, $scopedToContext) {
+                // 1. Directly assigned multi-tier approval step (for ANY user: Staff, Colleague, Doctor, Head, etc.)
+                $vq->whereHas('approvalSteps', function ($sq) {
+                    $sq->where('assigned_user_id', $this->id)
+                       ->where('status', 'pending');
+                });
 
-                $this->applyContextFilterToDocumentQuery($q, $companyId, $branchId, $scopedToContext);
-            })
-            ->count();
+                // 2. Role-based fallback for leadership roles
+                if ($this->isAdmin() || $this->isDirector()) {
+                    $companyIds = $this->companies()->pluck('companies.id')->all();
+                    $vq->orWhereHas('document', function ($dq) use ($companyIds, $companyId, $branchId) {
+                        $dq->where(function ($q) {
+                            $q->where('approver_role', $this->system_role)
+                              ->orWhereNull('approver_role');
+                        });
+                        if ($companyId !== null) {
+                            if ($branchId !== null) {
+                                $dq->where('branch_id', $branchId);
+                            } else {
+                                $dq->where('company_id', $companyId)
+                                   ->orWhereHas('branch', fn($bq) => $bq->where('company_id', $companyId));
+                            }
+                        } elseif (!$this->isAdmin() && !empty($companyIds)) {
+                            $dq->whereIn('company_id', $companyIds)
+                               ->orWhereHas('branch', fn($bq) => $bq->whereIn('company_id', $companyIds));
+                        }
+                    });
+                } elseif ($this->isPicKlinik()) {
+                    $branchIds = $this->branches()->pluck('branches.id')->all();
+                    if (!empty($branchIds)) {
+                        $vq->orWhereHas('document', function ($dq) use ($branchIds, $companyId, $branchId, $scopedToContext) {
+                            if ($branchId !== null) {
+                                $dq->where('branch_id', $branchId);
+                            } else {
+                                $dq->whereIn('branch_id', $branchIds);
+                            }
+                            $dq->where(function ($sub) use ($branchIds) {
+                                $sub->where('approver_id', $this->id)
+                                    ->orWhere(function ($fallback) use ($branchIds) {
+                                        $fallback->whereNull('approver_id')
+                                                 ->whereIn('branch_id', $branchIds)
+                                                 ->where(function ($r) {
+                                                     $r->whereIn('approver_role', ['pic_klinik', 'head'])
+                                                       ->orWhereNull('approver_role');
+                                                 });
+                                    });
+                            });
+                            $dq->visibleTo($this);
+                            $this->applyContextFilterToDocumentQuery($dq, $companyId, $branchId, $scopedToContext);
+                        });
+                    }
+                } elseif ($this->isHead()) {
+                    $unitKerjaIds = $this->allUnitKerjaIds($branchId);
+                    if (!empty($unitKerjaIds)) {
+                        $vq->orWhereHas('document', function ($dq) use ($unitKerjaIds, $companyId, $branchId, $scopedToContext) {
+                            $dq->where(function ($sub) use ($unitKerjaIds) {
+                                $sub->where('approver_id', $this->id)
+                                    ->orWhere(function ($fallback) use ($unitKerjaIds) {
+                                        $fallback->whereNull('approver_id')
+                                                 ->whereIn('unit_kerja_id', $unitKerjaIds)
+                                                 ->where(function ($r) {
+                                                     $r->where('approver_role', 'head')
+                                                       ->orWhereNull('approver_role');
+                                                 });
+                                    });
+                            });
+                            $dq->visibleTo($this);
+                            $this->applyContextFilterToDocumentQuery($dq, $companyId, $branchId, $scopedToContext);
+                        });
+                    }
+                }
+            });
+
+        return $query->count();
     }
 
     /**
@@ -349,7 +388,7 @@ class User extends Authenticatable
      */
     public function pendingRenameApprovalsCount(?int $companyId = null, ?int $branchId = null, bool $scopedToContext = true): int
     {
-        if (!$this->isHead() && !$this->isDirector() && !$this->isAdmin()) {
+        if (!$this->isHead() && !$this->isPicKlinik() && !$this->isDirector() && !$this->isAdmin()) {
             return 0;
         }
 
@@ -385,6 +424,34 @@ class User extends Authenticatable
             return $renamesQuery->count();
         }
 
+        if ($this->isPicKlinik()) {
+            $branchIds = $this->branches()->pluck('branches.id')->all();
+            if (empty($branchIds)) {
+                return 0;
+            }
+
+            $roleFilter = function ($q) {
+                $q->whereIn('approver_role', ['pic_klinik', 'head'])
+                  ->orWhereNull('approver_role');
+            };
+
+            $renamesQuery = Document::whereNotNull('pending_title')
+                ->where('pending_title', '!=', '')
+                ->where(function ($q) use ($branchIds, $branchId) {
+                    if ($branchId !== null) {
+                        $q->where('branch_id', $branchId);
+                    } else {
+                        $q->whereIn('branch_id', $branchIds);
+                    }
+                })
+                ->visibleTo($this)
+                ->where($roleFilter);
+
+            $this->applyContextFilterToDocumentQuery($renamesQuery, $companyId, $branchId, $scopedToContext);
+
+            return $renamesQuery->count();
+        }
+
         $unitKerjaIds = $this->allUnitKerjaIds($branchId);
         if (empty($unitKerjaIds)) {
             return 0;
@@ -411,7 +478,7 @@ class User extends Authenticatable
      */
     public function pendingRollbackApprovalsCount(?int $companyId = null, ?int $branchId = null, bool $scopedToContext = true): int
     {
-        if (!$this->isHead() && !$this->isDirector() && !$this->isAdmin()) {
+        if (!$this->isHead() && !$this->isPicKlinik() && !$this->isDirector() && !$this->isAdmin()) {
             return 0;
         }
 
@@ -442,6 +509,33 @@ class User extends Authenticatable
                 };
                 $rollbacksQuery->where($companyFilter);
             }
+
+            return $rollbacksQuery->count();
+        }
+
+        if ($this->isPicKlinik()) {
+            $branchIds = $this->branches()->pluck('branches.id')->all();
+            if (empty($branchIds)) {
+                return 0;
+            }
+
+            $roleFilter = function ($q) {
+                $q->whereIn('approver_role', ['pic_klinik', 'head'])
+                  ->orWhereNull('approver_role');
+            };
+
+            $rollbacksQuery = Document::whereNotNull('pending_rollback_version_id')
+                ->where(function ($q) use ($branchIds, $branchId) {
+                    if ($branchId !== null) {
+                        $q->where('branch_id', $branchId);
+                    } else {
+                        $q->whereIn('branch_id', $branchIds);
+                    }
+                })
+                ->visibleTo($this)
+                ->where($roleFilter);
+
+            $this->applyContextFilterToDocumentQuery($rollbacksQuery, $companyId, $branchId, $scopedToContext);
 
             return $rollbacksQuery->count();
         }
@@ -482,7 +576,7 @@ class User extends Authenticatable
      */
     public function pendingApprovalsCountByCompany(): array
     {
-        if (!$this->isHead() && !$this->isDirector() && !$this->isAdmin()) {
+        if (!$this->isHead() && !$this->isPicKlinik() && !$this->isDirector() && !$this->isAdmin()) {
             return [];
         }
 

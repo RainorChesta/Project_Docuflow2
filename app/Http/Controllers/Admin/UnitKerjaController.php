@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\UnitKerja;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -16,7 +17,7 @@ class UnitKerjaController extends Controller
         $this->authorize('admin');
 
         $search = trim((string) $request->get('search', ''));
-        $query = UnitKerja::withCount(['documents', 'users'])->orderBy('kode_unit_kerja');
+        $query = UnitKerja::with('picUser')->withCount(['documents', 'users'])->orderBy('kode_unit_kerja');
 
         if (!empty($search)) {
             $query->where(function ($q) use ($search) {
@@ -34,7 +35,8 @@ class UnitKerjaController extends Controller
     public function create(): View
     {
         $this->authorize('admin');
-        return view('admin.unit_kerja.create');
+        $users = User::where('is_active', true)->orderBy('name')->get();
+        return view('admin.unit_kerja.create', compact('users'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -44,6 +46,7 @@ class UnitKerjaController extends Controller
         $validated = $request->validate([
             'kode_unit_kerja' => 'required|string|max:50|unique:unit_kerjas,kode_unit_kerja',
             'nama_unit_kerja' => 'required|string|max:255',
+            'pic_user_id' => 'nullable|exists:users,id',
         ], [
             'kode_unit_kerja.required' => __('Kode unit kerja wajib diisi.'),
             'kode_unit_kerja.unique' => __('Kode unit kerja sudah terdaftar di sistem.'),
@@ -51,6 +54,7 @@ class UnitKerjaController extends Controller
         ]);
 
         $validated['kode_unit_kerja'] = strtoupper(trim($validated['kode_unit_kerja']));
+        $validated['pic_user_id'] = $request->filled('pic_user_id') ? $request->input('pic_user_id') : null;
 
         UnitKerja::create($validated);
 
@@ -61,7 +65,8 @@ class UnitKerjaController extends Controller
     public function edit(UnitKerja $unitKerja): View
     {
         $this->authorize('admin');
-        return view('admin.unit_kerja.edit', compact('unitKerja'));
+        $users = User::where('is_active', true)->orderBy('name')->get();
+        return view('admin.unit_kerja.edit', compact('unitKerja', 'users'));
     }
 
     public function update(Request $request, UnitKerja $unitKerja): RedirectResponse
@@ -76,6 +81,7 @@ class UnitKerjaController extends Controller
                 Rule::unique('unit_kerjas', 'kode_unit_kerja')->ignore($unitKerja->id),
             ],
             'nama_unit_kerja' => 'required|string|max:255',
+            'pic_user_id' => 'nullable|exists:users,id',
         ], [
             'kode_unit_kerja.required' => __('Kode unit kerja wajib diisi.'),
             'kode_unit_kerja.unique' => __('Kode unit kerja sudah terdaftar di sistem.'),
@@ -83,6 +89,7 @@ class UnitKerjaController extends Controller
         ]);
 
         $validated['kode_unit_kerja'] = strtoupper(trim($validated['kode_unit_kerja']));
+        $validated['pic_user_id'] = $request->filled('pic_user_id') ? $request->input('pic_user_id') : null;
 
         $unitKerja->update($validated);
 

@@ -75,6 +75,13 @@
                             <span class="badge badge-sm {{ ($tab ?? '') === 'versions' ? 'bg-primary-content text-primary font-bold' : 'badge-ghost' }}">{{ $counts['versions'] }}</span>
                         @endif
                     </a>
+                    <a href="{{ route('signatures.requests.index') }}" 
+                       class="btn btn-xs sm:btn-sm gap-1.5 rounded-lg {{ ($tab ?? '') === 'signatures' ? 'btn-primary' : 'btn-ghost text-base-content/70' }}">
+                        <span>{{ __('Tanda Tangan') }}</span>
+                        @if(($counts['signatures'] ?? 0) > 0)
+                            <span class="badge badge-sm {{ ($tab ?? '') === 'signatures' ? 'bg-primary-content text-primary font-bold' : 'badge-ghost' }}">{{ $counts['signatures'] }}</span>
+                        @endif
+                    </a>
                     <a href="{{ route('approvals.index', array_merge(request()->query(), ['tab' => 'rollbacks'])) }}" 
                        class="btn btn-xs sm:btn-sm gap-1.5 rounded-lg {{ ($tab ?? '') === 'rollbacks' ? 'btn-warning text-warning-content' : 'btn-ghost text-base-content/70' }}">
                         <span>{{ __('Rollback') }}</span>

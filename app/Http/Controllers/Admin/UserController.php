@@ -46,7 +46,7 @@ class UserController extends Controller
                 $query->where('system_role', '!=', 'admin')
                       ->where(function ($q) {
                           $q->where(function ($sub) {
-                              $sub->where('system_role', '!=', 'direktur')
+                              $sub->whereNotIn('system_role', ['direktur', 'pic_klinik'])
                                   ->where(function ($missing) {
                                       $missing->where(function ($noUnit) {
                                           $noUnit->whereNull('unit_kerja_id')
@@ -56,7 +56,7 @@ class UserController extends Controller
                                       ->orWhereDoesntHave('branches');
                                   });
                           })->orWhere(function ($sub) {
-                              $sub->where('system_role', 'direktur')
+                              $sub->whereIn('system_role', ['direktur', 'pic_klinik'])
                                   ->where(function ($missing) {
                                       $missing->whereDoesntHave('companies')
                                               ->orWhereDoesntHave('branches');
@@ -68,12 +68,12 @@ class UserController extends Controller
                       ->where(function ($q) {
                           $q->where('system_role', 'admin')
                             ->orWhere(function ($sub) {
-                                $sub->where('system_role', 'direktur')
+                                $sub->whereIn('system_role', ['direktur', 'pic_klinik'])
                                     ->whereHas('companies')
                                     ->whereHas('branches');
                             })
                             ->orWhere(function ($sub) {
-                                $sub->whereNotIn('system_role', ['admin', 'direktur'])
+                                $sub->whereNotIn('system_role', ['admin', 'direktur', 'pic_klinik'])
                                     ->where(function ($unitQ) {
                                         $unitQ->whereNotNull('unit_kerja_id')
                                               ->orWhereHas('unitKerjas');
@@ -106,7 +106,7 @@ class UserController extends Controller
         $this->authorize('admin');
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users',
+            'email' => 'required|email|unique:users,email',
             'nip' => 'nullable|string|max:50|unique:users,nip',
             'phone_number' => 'nullable|string|max:50',
             'password' => 'required|string|min:8|confirmed',
@@ -114,7 +114,7 @@ class UserController extends Controller
             'unit_kerja_ids' => 'nullable|array',
             'unit_kerja_ids.*' => 'exists:unit_kerjas,id',
             'branch_unit_kerjas' => 'nullable|array',
-            'system_role' => 'required|in:admin,direktur,head,user',
+            'system_role' => 'required|in:admin,direktur,pic_klinik,head,user',
             'is_active' => 'boolean',
             'company_ids' => 'nullable|array',
             'company_ids.*' => 'exists:companies,id',
@@ -129,6 +129,9 @@ class UserController extends Controller
         $branchUnitKerjas = $request->input('branch_unit_kerjas', []);
         unset($validated['company_ids'], $validated['branch_ids'], $validated['unit_kerja_ids'], $validated['branch_unit_kerjas']);
 
+        $validated['nip'] = filled($validated['nip'] ?? null) ? trim($validated['nip']) : null;
+        $validated['phone_number'] = filled($validated['phone_number'] ?? null) ? trim($validated['phone_number']) : null;
+
         if ($validated['system_role'] === 'admin') {
             $companyIds = Company::pluck('id')->all();
             $branchIds = Branch::pluck('id')->all();
@@ -138,6 +141,13 @@ class UserController extends Controller
             $validated['nip'] = null;
             $validated['unit_kerja_id'] = null;
             $unitKerjaIds = [];
+        } elseif ($validated['system_role'] === 'pic_klinik') {
+            if (empty($branchIds)) {
+                return back()->withInput()->withErrors(['branch_ids' => __('Pilih minimal satu cabang untuk penempatan PIC Klinik.')]);
+            }
+            $validated['unit_kerja_id'] = null;
+            $unitKerjaIds = [];
+            $branchUnitKerjas = [];
         } else {
             if (in_array($validated['system_role'], ['user', 'head'], true)) {
                 if (empty($branchIds)) {
@@ -180,6 +190,8 @@ class UserController extends Controller
             $unitKerjaIds
         );
 
+        event(new \App\Events\UserVerificationUpdated($user));
+
         return redirect()->route('admin.users.index')->with('success', __('Pengguna berhasil dibuat.'));
     }
 
@@ -197,7 +209,7 @@ class UserController extends Controller
     {
         $this->authorize('admin');
 
-        $allowedRoles = $user->isDirector() ? 'admin,direktur,head,user' : 'admin,head,user';
+        $allowedRoles = $user->isDirector() ? 'admin,direktur,pic_klinik,head,user' : 'admin,pic_klinik,head,user';
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -209,7 +221,7 @@ class UserController extends Controller
             'unit_kerja_ids' => 'nullable|array',
             'unit_kerja_ids.*' => 'exists:unit_kerjas,id',
             'branch_unit_kerjas' => 'nullable|array',
-            'system_role' => 'required|in:' . $allowedRoles,
+            'system_role' => 'required|in:admin,direktur,head,user',
             'is_active' => 'boolean',
             'company_ids' => 'nullable|array',
             'company_ids.*' => 'exists:companies,id',
@@ -229,6 +241,9 @@ class UserController extends Controller
         $branchUnitKerjas = $request->input('branch_unit_kerjas', []);
         unset($validated['company_ids'], $validated['branch_ids'], $validated['unit_kerja_ids'], $validated['branch_unit_kerjas']);
 
+        $validated['nip'] = filled($validated['nip'] ?? null) ? trim($validated['nip']) : null;
+        $validated['phone_number'] = filled($validated['phone_number'] ?? null) ? trim($validated['phone_number']) : null;
+
         if ($validated['system_role'] === 'admin') {
             $companyIds = Company::pluck('id')->all();
             $branchIds = Branch::pluck('id')->all();
@@ -238,6 +253,13 @@ class UserController extends Controller
             $validated['nip'] = null;
             $validated['unit_kerja_id'] = null;
             $unitKerjaIds = [];
+        } elseif ($validated['system_role'] === 'pic_klinik') {
+            if (empty($branchIds)) {
+                return back()->withInput()->withErrors(['branch_ids' => __('Pilih minimal satu cabang untuk penempatan PIC Klinik.')]);
+            }
+            $validated['unit_kerja_id'] = null;
+            $unitKerjaIds = [];
+            $branchUnitKerjas = [];
         } else {
             if (in_array($validated['system_role'], ['user', 'head'], true)) {
                 if (!empty($branchIds)) {
@@ -313,7 +335,7 @@ class UserController extends Controller
             return;
         }
 
-        if ($systemRole === 'direktur') {
+        if ($systemRole === 'direktur' || $systemRole === 'pic_klinik') {
             $user->companies()->sync($companyIds);
             $user->branches()->sync($branchIds);
             DB::table('unit_kerja_user')->where('user_id', $user->id)->delete();

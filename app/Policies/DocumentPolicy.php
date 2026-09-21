@@ -88,6 +88,10 @@ class DocumentPolicy
             return true;
         }
 
+        if ($user->isPicKlinik()) {
+            return true;
+        }
+
         if ($document->isUnitKerja()
             && $document->unit_kerja_id
             && in_array($document->unit_kerja_id, $user->allUnitKerjaIds(), true)) {
@@ -114,6 +118,15 @@ class DocumentPolicy
         return in_array($role, ['owner', 'editor'], true);
     }
 
+    public function edit(User $user, Document $document): bool
+    {
+        if ($document->isLockedForEditing()) {
+            return false;
+        }
+
+        return $this->update($user, $document);
+    }
+
     public function manageAccess(User $user, Document $document): bool
     {
         if (!$this->view($user, $document)) return false;
@@ -134,15 +147,34 @@ class DocumentPolicy
         // Check if user is the assigned approver for the current pending step
         $currentStep = $document->currentApprovalStep();
         if ($currentStep) {
-            if ($currentStep->assigned_user_id === $user->id) {
-                return true;
+            if ($currentStep->assigned_user_id) {
+                return $currentStep->assigned_user_id === $user->id;
             }
-            if ($currentStep->assigned_role && $currentStep->assigned_role === $user->system_role) {
-                return true;
+            if ($currentStep->assigned_role) {
+                return $currentStep->assigned_role === $user->system_role;
             }
+            return false;
         }
 
-        if ($document->approver_id === $user->id) {
+        if ($document->approver_id) {
+            return $document->approver_id === $user->id;
+        }
+
+        if ($user->isPicKlinik() && in_array($document->branch_id, $user->allBranchIds(), true)) {
+            $contextService = app(\App\Services\CompanyContextService::class);
+            $activeCompanyId = $contextService->getActiveCompanyId($user);
+            $activeBranchId = $contextService->getActiveBranchId($user);
+
+            if ($activeBranchId && $document->branch_id && (int) $document->branch_id !== (int) $activeBranchId) {
+                return false;
+            }
+            if ($activeCompanyId) {
+                $docCompanyId = $document->company_id ?? $document->branch?->company_id;
+                if ($docCompanyId && (int) $docCompanyId !== (int) $activeCompanyId) {
+                    return false;
+                }
+            }
+
             return true;
         }
 
@@ -176,6 +208,9 @@ class DocumentPolicy
     {
         if (!$this->view($user, $document)) return false;
         if ($user->id === $document->owner_id || $user->isAdmin() || $user->isDirector()) return true;
+        if ($user->isPicKlinik() && in_array($document->branch_id, $user->allBranchIds(), true)) {
+            return true;
+        }
         if ($user->isHead() && ($user->unit_kerja_id === $document->unit_kerja_id || in_array($document->unit_kerja_id, $user->allUnitKerjaIds(), true))) {
             return true;
         }
@@ -186,6 +221,9 @@ class DocumentPolicy
     {
         if (!$this->view($user, $document)) return false;
         if ($user->id === $document->owner_id || $user->isAdmin() || $user->isDirector()) return true;
+        if ($user->isPicKlinik() && in_array($document->branch_id, $user->allBranchIds(), true)) {
+            return true;
+        }
         if ($user->isHead() && ($user->unit_kerja_id === $document->unit_kerja_id || in_array($document->unit_kerja_id, $user->allUnitKerjaIds(), true))) {
             return true;
         }
@@ -198,6 +236,25 @@ class DocumentPolicy
 
         // Admin and Director can approve rename requests (including their own)
         if ($user->isAdmin() || $user->isDirector()) {
+            return true;
+        }
+
+        // PIC Klinik can approve requests in their clinic branch within active context
+        if ($user->isPicKlinik() && in_array($document->branch_id, $user->allBranchIds(), true)) {
+            $contextService = app(\App\Services\CompanyContextService::class);
+            $activeCompanyId = $contextService->getActiveCompanyId($user);
+            $activeBranchId = $contextService->getActiveBranchId($user);
+
+            if ($activeBranchId && $document->branch_id && (int) $document->branch_id !== (int) $activeBranchId) {
+                return false;
+            }
+            if ($activeCompanyId) {
+                $docCompanyId = $document->company_id ?? $document->branch?->company_id;
+                if ($docCompanyId && (int) $docCompanyId !== (int) $activeCompanyId) {
+                    return false;
+                }
+            }
+
             return true;
         }
 
@@ -239,7 +296,7 @@ class DocumentPolicy
             return true;
         }
 
-        if ($user->isDirector()) {
+        if ($user->isDirector() || $user->isPicKlinik()) {
             if ($document->owner_id === $user->id) return true;
             $branchIds = $user->allBranchIds();
             $companyIds = $user->allCompanyIds();
@@ -262,7 +319,7 @@ class DocumentPolicy
             return true;
         }
 
-        if ($user->isDirector()) {
+        if ($user->isDirector() || $user->isPicKlinik()) {
             if ($document->owner_id === $user->id) return true;
             $branchIds = $user->allBranchIds();
             $companyIds = $user->allCompanyIds();

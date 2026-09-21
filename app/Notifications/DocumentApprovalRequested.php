@@ -28,31 +28,50 @@ class DocumentApprovalRequested extends Notification
     public function toArray(object $notifiable): array
     {
         $isRename = $this->version->isRename();
-        $title = $isRename
-            ? __('Permintaan Persetujuan Perubahan Nama Dokumen')
-            : __('Permintaan Persetujuan Dokumen');
+        $hasSignature = \App\Models\SignatureRequest::where('document_id', $this->document->id)
+            ->where('target_user_id', $notifiable->id)
+            ->where('status', 'pending')
+            ->exists();
 
-        $message = $isRename && $this->version->old_title
-            ? __(':author mengajukan perubahan nama dokumen dari ":old" menjadi ":doc" (v:ver) untuk persetujuan.', [
-                'author' => $this->authorName,
-                'old'    => $this->version->old_title,
-                'doc'    => $this->document->title,
-                'ver'    => $this->version->version_number,
-            ])
-            : __(':author mengajukan dokumen ":doc" (v:ver) untuk persetujuan.', [
+        if ($isRename) {
+            $title = __('Permintaan Persetujuan Perubahan Nama Dokumen');
+            $message = $this->version->old_title
+                ? __(':author mengajukan perubahan nama dokumen dari ":old" menjadi ":doc" (v:ver) untuk persetujuan.', [
+                    'author' => $this->authorName,
+                    'old'    => $this->version->old_title,
+                    'doc'    => $this->document->title,
+                    'ver'    => $this->version->version_number,
+                ])
+                : __(':author mengajukan perubahan nama dokumen ":doc" (v:ver) untuk persetujuan.', [
+                    'author' => $this->authorName,
+                    'doc'    => $this->document->title,
+                    'ver'    => $this->version->version_number,
+                ]);
+        } elseif ($hasSignature) {
+            $title = __('Permintaan Persetujuan & Tanda Tangan');
+            $message = __(':author mengajukan dokumen ":doc" (v:ver) untuk persetujuan dan tanda tangan Anda.', [
                 'author' => $this->authorName,
                 'doc'    => $this->document->title,
                 'ver'    => $this->version->version_number,
             ]);
+        } else {
+            $title = __('Permintaan Persetujuan Dokumen');
+            $message = __(':author mengajukan dokumen ":doc" (v:ver) untuk review dan persetujuan Anda.', [
+                'author' => $this->authorName,
+                'doc'    => $this->document->title,
+                'ver'    => $this->version->version_number,
+            ]);
+        }
 
         return [
             'type'            => 'approval_request',
             'title'           => $title,
             'message'         => $message,
             'is_rename'       => $isRename,
+            'has_signature'   => $hasSignature,
             'old_title'       => $this->version->old_title,
             'url'             => route('documents.show', $this->document->id, false),
-            'icon'            => 'approval',
+            'icon'            => $hasSignature ? 'signature' : 'approval',
             'document_id'     => $this->document->id,
             'document_title'  => $this->document->title,
             'document_number' => $this->document->document_number,

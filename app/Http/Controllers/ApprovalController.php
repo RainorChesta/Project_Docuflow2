@@ -22,6 +22,9 @@ class ApprovalController extends Controller
     public function index(Request $request): \Illuminate\View\View|\Illuminate\Http\RedirectResponse
     {
         $tab = $request->query('tab');
+        if ($tab === 'signatures') {
+            return redirect()->route('signatures.requests.index');
+        }
         if ($tab === 'renames') {
             return $this->renames($request);
         }
@@ -49,10 +52,11 @@ class ApprovalController extends Controller
 
         $counts = [
             'versions' => (clone $versionsQuery)->count(),
+            'signatures' => $user->receivedSignatureRequests()->where('status', 'pending')->count(),
             'renames' => $this->getPendingRenamesQuery($user)->count(),
             'rollbacks' => $this->getPendingRollbacksQuery($user)->count(),
         ];
-        $counts['total'] = $counts['versions'] + $counts['renames'] + $counts['rollbacks'];
+        $counts['total'] = $counts['versions'] + $counts['signatures'] + $counts['renames'] + $counts['rollbacks'];
 
         $pendingVersions = $versionsQuery
             ->with(['document.branch', 'document.company', 'document.unitKerja', 'author'])
@@ -85,10 +89,11 @@ class ApprovalController extends Controller
 
         $counts = [
             'versions' => $this->getPendingVersionsQuery($user)->count(),
+            'signatures' => $user->receivedSignatureRequests()->where('status', 'pending')->count(),
             'renames' => (clone $renamesQuery)->count(),
             'rollbacks' => $this->getPendingRollbacksQuery($user)->count(),
         ];
-        $counts['total'] = $counts['versions'] + $counts['renames'] + $counts['rollbacks'];
+        $counts['total'] = $counts['versions'] + $counts['signatures'] + $counts['renames'] + $counts['rollbacks'];
 
         $pendingRenames = $renamesQuery
             ->with(['renameRequestedBy', 'unitKerja', 'branch', 'company'])
@@ -122,10 +127,11 @@ class ApprovalController extends Controller
 
         $counts = [
             'versions' => $this->getPendingVersionsQuery($user)->count(),
+            'signatures' => $user->receivedSignatureRequests()->where('status', 'pending')->count(),
             'renames' => $this->getPendingRenamesQuery($user)->count(),
             'rollbacks' => (clone $rollbacksQuery)->count(),
         ];
-        $counts['total'] = $counts['versions'] + $counts['renames'] + $counts['rollbacks'];
+        $counts['total'] = $counts['versions'] + $counts['signatures'] + $counts['renames'] + $counts['rollbacks'];
 
         $pendingRollbacks = $rollbacksQuery
             ->with(['rollbackRequestedBy', 'pendingRollbackVersion', 'unitKerja', 'branch', 'company', 'currentVersion'])
@@ -144,43 +150,68 @@ class ApprovalController extends Controller
 
     protected function getPendingVersionsQuery($user, string $search = '')
     {
-        $roleFilter = function ($q) use ($user) {
-            if ($user->isAdmin() || $user->isDirector()) {
-                $q->where('approver_role', $user->system_role)
-                  ->orWhereNull('approver_role');
-            } else {
-                $q->where('approver_role', 'head')
-                  ->orWhereNull('approver_role');
-            }
-        };
-
-        if ($user->isAdmin() || $user->isDirector()) {
-            $companyIds = $user->companies()->pluck('companies.id')->all();
-
-            $pendingVersionsQuery = DocumentVersion::where('status', 'pending')
-                ->whereNull('discarded_at')
-                ->whereHas('document', $roleFilter);
-
-            if (!$user->isAdmin() && !empty($companyIds)) {
-                $companyFilter = function ($q) use ($companyIds) {
-                    $q->whereIn('company_id', $companyIds)
-                      ->orWhereHas('branch', fn($bq) => $bq->whereIn('company_id', $companyIds));
-                };
-                $pendingVersionsQuery->whereHas('document', $companyFilter);
-            }
-        } else {
-            $unitKerjaIds = $user->allUnitKerjaIds();
-
-            $pendingVersionsQuery = DocumentVersion::where('status', 'pending')
-                ->whereNull('discarded_at')
-                ->whereHas('document', function ($q) use ($user, $unitKerjaIds, $roleFilter) {
-                    $q->whereIn('unit_kerja_id', $unitKerjaIds)
-                      ->visibleTo($user)
-                      ->where($roleFilter);
-
-                    $this->applyContextFilterToDocumentQuery($q, $user);
+        $pendingVersionsQuery = DocumentVersion::where('status', 'pending')
+            ->whereNull('discarded_at')
+            ->where(function ($vq) use ($user) {
+                // 1. Directly assigned multi-tier approval step (for ANY user: Staff, Colleague, Doctor, Head, etc.)
+                $vq->whereHas('approvalSteps', function ($sq) use ($user) {
+                    $sq->where('assigned_user_id', $user->id)
+                       ->where('status', 'pending');
                 });
-        }
+
+                // 2. Role-based fallback for leadership roles
+                if ($user->isAdmin() || $user->isDirector()) {
+                    $companyIds = $user->companies()->pluck('companies.id')->all();
+                    $vq->orWhereHas('document', function ($dq) use ($user, $companyIds) {
+                        $dq->where(function ($q) use ($user) {
+                            $q->where('approver_role', $user->system_role)
+                              ->orWhereNull('approver_role');
+                        });
+                        if (!$user->isAdmin() && !empty($companyIds)) {
+                            $dq->where(function ($q) use ($companyIds) {
+                                $q->whereIn('company_id', $companyIds)
+                                  ->orWhereHas('branch', fn($bq) => $bq->whereIn('company_id', $companyIds));
+                            });
+                        }
+                    });
+                } elseif ($user->isPicKlinik()) {
+                    $branchIds = $user->branches()->pluck('branches.id')->all();
+                    if (!empty($branchIds)) {
+                        $vq->orWhereHas('document', function ($dq) use ($user, $branchIds) {
+                            $dq->where(function ($sub) use ($user, $branchIds) {
+                                $sub->where('approver_id', $user->id)
+                                    ->orWhere(function ($fallback) use ($branchIds) {
+                                        $fallback->whereNull('approver_id')
+                                                 ->whereIn('branch_id', $branchIds)
+                                                 ->where(function ($r) {
+                                                     $r->whereIn('approver_role', ['pic_klinik', 'head'])
+                                                       ->orWhereNull('approver_role');
+                                                 });
+                                    });
+                            })->visibleTo($user);
+                            $this->applyContextFilterToDocumentQuery($dq, $user);
+                        });
+                    }
+                } elseif ($user->isHead()) {
+                    $unitKerjaIds = $user->allUnitKerjaIds();
+                    if (!empty($unitKerjaIds)) {
+                        $vq->orWhereHas('document', function ($dq) use ($user, $unitKerjaIds) {
+                            $dq->where(function ($sub) use ($user, $unitKerjaIds) {
+                                $sub->where('approver_id', $user->id)
+                                    ->orWhere(function ($fallback) use ($unitKerjaIds) {
+                                        $fallback->whereNull('approver_id')
+                                                 ->whereIn('unit_kerja_id', $unitKerjaIds)
+                                                 ->where(function ($r) {
+                                                     $r->where('approver_role', 'head')
+                                                       ->orWhereNull('approver_role');
+                                                 });
+                                    });
+                            })->visibleTo($user);
+                            $this->applyContextFilterToDocumentQuery($dq, $user);
+                        });
+                    }
+                }
+            });
 
         if ($search !== '') {
             $pendingVersionsQuery->where(function ($vq) use ($search) {
@@ -221,6 +252,9 @@ class ApprovalController extends Controller
             if ($user->isAdmin() || $user->isDirector()) {
                 $q->where('approver_role', $user->system_role)
                   ->orWhereNull('approver_role');
+            } elseif ($user->isPicKlinik()) {
+                $q->whereIn('approver_role', ['pic_klinik', 'head'])
+                  ->orWhereNull('approver_role');
             } else {
                 $q->where('approver_role', 'head')
                   ->orWhereNull('approver_role');
@@ -241,6 +275,16 @@ class ApprovalController extends Controller
                 };
                 $pendingRenamesQuery->where($companyFilter);
             }
+        } elseif ($user->isPicKlinik()) {
+            $branchIds = $user->branches()->pluck('branches.id')->all();
+
+            $pendingRenamesQuery = Document::whereIn('branch_id', $branchIds)
+                ->visibleTo($user)
+                ->whereNotNull('pending_title')
+                ->where('pending_title', '!=', '')
+                ->where($roleFilter);
+
+            $this->applyContextFilterToDocumentQuery($pendingRenamesQuery, $user);
         } else {
             $unitKerjaIds = $user->allUnitKerjaIds();
 
@@ -276,6 +320,9 @@ class ApprovalController extends Controller
             if ($user->isAdmin() || $user->isDirector()) {
                 $q->where('approver_role', $user->system_role)
                   ->orWhereNull('approver_role');
+            } elseif ($user->isPicKlinik()) {
+                $q->whereIn('approver_role', ['pic_klinik', 'head'])
+                  ->orWhereNull('approver_role');
             } else {
                 $q->where('approver_role', 'head')
                   ->orWhereNull('approver_role');
@@ -295,6 +342,15 @@ class ApprovalController extends Controller
                 };
                 $pendingRollbacksQuery->where($companyFilter);
             }
+        } elseif ($user->isPicKlinik()) {
+            $branchIds = $user->branches()->pluck('branches.id')->all();
+
+            $pendingRollbacksQuery = Document::whereIn('branch_id', $branchIds)
+                ->visibleTo($user)
+                ->whereNotNull('pending_rollback_version_id')
+                ->where($roleFilter);
+
+            $this->applyContextFilterToDocumentQuery($pendingRollbacksQuery, $user);
         } else {
             $unitKerjaIds = $user->allUnitKerjaIds();
 
@@ -329,11 +385,11 @@ class ApprovalController extends Controller
     }
 
     /**
-     * Terapkan isolasi konteks cabang & perusahaan aktif untuk pengguna Kepala Divisi (Head).
+     * Terapkan isolasi konteks cabang & perusahaan aktif untuk pengguna Kepala Divisi (Head) dan PIC Klinik.
      */
     protected function applyContextFilterToDocumentQuery($query, $user): void
     {
-        if (!$user->isHead()) {
+        if (!$user->isHead() && !$user->isPicKlinik()) {
             return;
         }
 
@@ -495,14 +551,63 @@ class ApprovalController extends Controller
         $reviewer = auth()->user();
         $notes = $request->input('notes');
         $escalateToKacab = $request->boolean('escalate_to_kacab');
+        $includeSignature = $request->boolean('include_signature');
+        $signatureId = $request->filled('signature_id') ? (int) $request->input('signature_id') : null;
+        $pageNumber = (int) $request->input('signature_page_number', 1);
+        $presetPosition = $request->input('signature_preset_position', 'bottom-right');
+
+        // If direct signature canvas drawing or direct file upload was provided in modal
+        if ($request->filled('signature_data') || $request->hasFile('signature_image')) {
+            $includeSignature = true;
+            $newSig = $this->createSignatureFromInput($request, $reviewer);
+            if ($newSig) {
+                $signatureId = $newSig->id;
+            }
+        }
 
         $currentStep = $version->approvalSteps()->where('status', 'pending')->first();
         if ($currentStep) {
-            $isFinal = $this->approvalRoutingService->advanceApproval($currentStep, $reviewer, $notes, $escalateToKacab);
+            $isFinal = $this->approvalRoutingService->advanceApproval(
+                $currentStep,
+                $reviewer,
+                $notes,
+                $escalateToKacab,
+                $includeSignature,
+                $signatureId,
+                $pageNumber,
+                $presetPosition
+            );
             $message = $isFinal
                 ? __('Versi disetujui dan disahkan secara final.')
                 : __('Persetujuan dicatat. Dokumen diteruskan ke tahap persetujuan berikutnya.');
         } else {
+            $pendingSig = \App\Models\SignatureRequest::where('document_id', $document->id)
+                ->where('target_user_id', $reviewer->id)
+                ->where('status', 'pending')
+                ->first();
+
+            if (!$pendingSig && ($includeSignature || $signatureId)) {
+                $sig = $signatureId ? $reviewer->signatures()->find($signatureId) : ($reviewer->signatures()->where('type', 'original')->first() ?? $reviewer->signatures()->first());
+                if ($sig) {
+                    $pendingSig = \App\Models\SignatureRequest::create([
+                        'requester_id' => $version->author_id ?? $document->owner_id ?? $reviewer->id,
+                        'target_user_id' => $reviewer->id,
+                        'document_id' => $document->id,
+                        'requested_signature_id' => $sig->id,
+                        'status' => 'pending',
+                        'is_used' => false,
+                        'page_number' => $pageNumber ?: 1,
+                        'preset_position' => $presetPosition ?: 'bottom-right',
+                        'requested_at' => now(),
+                        'notified_at' => now(),
+                    ]);
+                }
+            }
+
+            if ($pendingSig) {
+                $this->approvalRoutingService->applyAndStampSignature($pendingSig, $reviewer);
+            }
+
             $this->versionService->approve($version, $reviewer, $notes);
             $message = __('Versi disetujui dan diaktifkan.');
 
@@ -527,6 +632,52 @@ class ApprovalController extends Controller
         $this->notifySiblingApprovers($document, $reviewer, 'approved');
 
         return redirect()->to($request->header('referer') ?: route('approvals.index'))->with('success', $message);
+    }
+
+    /**
+     * Helper to process directly drawn or uploaded signature from approval modal.
+     */
+    protected function createSignatureFromInput(Request $request, \App\Models\User $user): ?\App\Models\Signature
+    {
+        $onlyOfficeService = app(\App\Services\OnlyOfficeService::class);
+        $imageData = null;
+        $createdVia = 'canvas';
+
+        if ($request->hasFile('signature_image')) {
+            $file = $request->file('signature_image');
+            $imageData = file_get_contents($file->getRealPath());
+            $createdVia = 'upload';
+        } elseif ($request->filled('signature_data')) {
+            $dataUrl = $request->input('signature_data');
+            if (preg_match('/^data:image\/(\w+);base64,/', $dataUrl)) {
+                $imageData = substr($dataUrl, strpos($dataUrl, ',') + 1);
+                $imageData = base64_decode($imageData);
+            }
+            $createdVia = 'canvas';
+        }
+
+        if (!$imageData) {
+            return null;
+        }
+
+        $imageData = $onlyOfficeService->trimSignatureImage($imageData);
+        $filename = 'signatures/sig_' . $user->id . '_' . time() . '_' . uniqid() . '.png';
+        \Illuminate\Support\Facades\Storage::disk('public')->put($filename, $imageData);
+
+        $existing = $user->signatures()->where('type', 'original')->first();
+        if ($existing) {
+            $existing->update([
+                'file_path' => $filename,
+                'created_via' => $createdVia,
+            ]);
+            return $existing;
+        }
+
+        return $user->signatures()->create([
+            'file_path' => $filename,
+            'type' => 'original',
+            'created_via' => $createdVia,
+        ]);
     }
 
     public function reject(Request $request, Document $document, DocumentVersion $version): RedirectResponse

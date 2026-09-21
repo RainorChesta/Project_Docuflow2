@@ -25,6 +25,7 @@
                         <option value="">{{ __('Semua Peran') }}</option>
                         <option value="admin" {{ request('role') === 'admin' ? 'selected' : '' }}>Admin</option>
                         <option value="direktur" {{ request('role') === 'direktur' ? 'selected' : '' }}>Direktur</option>
+                        <option value="pic_klinik" {{ request('role') === 'pic_klinik' ? 'selected' : '' }}>PIC Klinik</option>
                         <option value="head" {{ request('role') === 'head' ? 'selected' : '' }}>Head</option>
                         <option value="user" {{ request('role') === 'user' ? 'selected' : '' }}>User</option>
                     </select>
@@ -89,6 +90,8 @@
                                     <td class="align-middle">
                                         @if($user->system_role === 'direktur')
                                             <span class="text-xs text-base-content/40 italic font-mono">{{ __('(N/A)') }}</span>
+                                        @elseif($user->system_role === 'pic_klinik')
+                                            <span class="text-xs text-primary font-medium italic">{{ __('(Seluruh Unit Kerja)') }}</span>
                                         @elseif($user->unitKerjas->isNotEmpty() || $user->unitKerja)
                                             <div class="flex flex-wrap items-center gap-1.5 max-w-[220px]">
                                                 @foreach($user->unitKerjas as $uk)
@@ -224,8 +227,8 @@
                                         @endif
                                     </td>
                                     <td class="align-middle whitespace-nowrap">
-                                        <span class="badge {{ $user->system_role === 'admin' ? 'badge-accent' : ($user->system_role === 'direktur' ? 'badge-info' : ($user->system_role === 'head' ? 'badge-warning' : 'badge-ghost')) }} badge-sm uppercase font-semibold">
-                                            {{ $user->system_role }}
+                                        <span class="badge {{ $user->system_role === 'admin' ? 'badge-accent' : ($user->system_role === 'direktur' ? 'badge-info' : ($user->system_role === 'pic_klinik' ? 'badge-secondary' : ($user->system_role === 'head' ? 'badge-warning' : 'badge-ghost'))) }} badge-sm uppercase font-semibold">
+                                            {{ str_replace('_', ' ', $user->system_role) }}
                                         </span>
                                     </td>
                                     <td class="align-middle whitespace-nowrap">

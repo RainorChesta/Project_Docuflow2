@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\Company;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -18,7 +19,8 @@ class BranchController extends Controller
         $companyId = $request->get('company_id');
 
         $companyQuery = Company::with(['branches' => function ($q) {
-            $q->withCount('users', 'documents')
+            $q->with('picKlinik')
+              ->withCount('users', 'documents')
               ->orderByDesc('is_pusat')
               ->orderBy('name');
         }]);
@@ -38,9 +40,10 @@ class BranchController extends Controller
     {
         $this->authorize('admin');
         $companies = Company::orderBy('name')->get();
+        $users = User::where('is_active', true)->orderBy('name')->get();
         $selectedCompanyId = $request->get('company_id');
 
-        return view('admin.branches.create', compact('companies', 'selectedCompanyId'));
+        return view('admin.branches.create', compact('companies', 'users', 'selectedCompanyId'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -52,6 +55,7 @@ class BranchController extends Controller
             'company_id' => 'required|exists:companies,id',
             'name' => 'required|string|max:255',
             'is_pusat' => 'boolean',
+            'pic_klinik_id' => 'nullable|exists:users,id',
         ];
 
         if ($isPusat) {
@@ -78,6 +82,7 @@ class BranchController extends Controller
         $validated['name'] = mb_strtoupper(trim($validated['name']));
         $validated['is_pusat'] = $isPusat;
         $validated['code'] = $isPusat ? null : strtoupper(trim($validated['code'] ?? ''));
+        $validated['pic_klinik_id'] = $request->filled('pic_klinik_id') ? $request->input('pic_klinik_id') : null;
 
         Branch::create($validated);
 
@@ -89,18 +94,20 @@ class BranchController extends Controller
     {
         $this->authorize('admin');
         $companies = Company::orderBy('name')->get();
-        return view('admin.branches.edit', compact('branch', 'companies'));
+        $users = User::where('is_active', true)->orderBy('name')->get();
+        return view('admin.branches.edit', compact('branch', 'companies', 'users'));
     }
 
     public function update(Request $request, Branch $branch): RedirectResponse
     {
         $this->authorize('admin');
-        $isPusat = $request->boolean('is_pusat');
+        $isPusat = (bool) ($branch->is_pusat || $request->boolean('is_pusat'));
 
         $rules = [
             'company_id' => 'required|exists:companies,id',
             'name' => 'required|string|max:255',
             'is_pusat' => 'boolean',
+            'pic_klinik_id' => 'nullable|exists:users,id',
         ];
 
         if ($isPusat) {
@@ -131,6 +138,7 @@ class BranchController extends Controller
         $validated['name'] = mb_strtoupper(trim($validated['name']));
         $validated['is_pusat'] = $isPusat;
         $validated['code'] = $isPusat ? null : strtoupper(trim($validated['code'] ?? ''));
+        $validated['pic_klinik_id'] = $isPusat ? null : ($request->filled('pic_klinik_id') ? $request->input('pic_klinik_id') : null);
 
         $branch->update($validated);
 

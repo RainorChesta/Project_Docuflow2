@@ -189,4 +189,34 @@ class DocumentQrVerificationTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee(__('Dokumen Belum Disetujui'));
     }
+
+    public function test_verification_page_displays_audit_signatures_and_approvers()
+    {
+        $approver = User::factory()->create([
+            'name' => 'Dr. Bambang Approver',
+            'unit_kerja_id' => $this->unitKerja1->id,
+            'system_role' => 'spv',
+            'is_active' => true,
+        ]);
+
+        $version = $this->document->currentVersion;
+        $version->approvalSteps()->create([
+            'document_id' => $this->document->id,
+            'step_order' => 1,
+            'step_type' => 'role',
+            'step_name' => 'Review & Pengesahan Kepala Unit',
+            'assigned_role' => 'spv',
+            'assigned_user_id' => $approver->id,
+            'action_by_id' => $approver->id,
+            'status' => 'approved',
+            'action_at' => now(),
+        ]);
+
+        $response = $this->get(route('documents.hash', ['token' => $this->qrToken]));
+
+        $response->assertStatus(200);
+        $response->assertSee(__('Signing history'));
+        $response->assertSee('Dr. Bambang Approver');
+        $response->assertSee(__('Approved'));
+    }
 }
