@@ -26,6 +26,7 @@
                     'id' => (string) $b->id,
                     'name' => $b->name . ($b->is_pusat ? ' (' . __('Pusat') . ')' : ($b->code ? ' (' . $b->code . ')' : '')),
                     'raw_name' => $b->name,
+                    'code' => $b->code,
                     'is_pusat' => (bool) $b->is_pusat,
                     'unit_kerjas' => $unitKerjas,
                 ];
@@ -55,9 +56,25 @@
         pendingUnitKerjaId: '{{ $activeUnitKerjaId }}',
         companies: {{ Js::from($companiesData) }},
         isSwitching: false,
+        companyDropdownOpen: false,
+        branchDropdownOpen: false,
+        unitKerjaDropdownOpen: false,
+        branchSearch: '',
 
         get currentCompany() {
             return this.companies.find(c => c.id === this.activeCompanyId) || null;
+        },
+        get currentBranches() {
+            return this.currentCompany ? this.currentCompany.branches : [];
+        },
+        get filteredCurrentBranches() {
+            if (!this.branchSearch.trim()) return this.currentBranches;
+            const q = this.branchSearch.toLowerCase();
+            return this.currentBranches.filter(b => 
+                (b.raw_name && b.raw_name.toLowerCase().includes(q)) ||
+                (b.name && b.name.toLowerCase().includes(q)) ||
+                (b.code && b.code.toLowerCase().includes(q))
+            );
         },
         get currentBranch() {
             if (!this.currentCompany) return null;
@@ -247,15 +264,20 @@
             <input type="hidden" name="unit_kerja_id">
         </form>
 
-        {{-- Desktop: inline dropdowns (visible xl+) --}}
-        <div class="hidden xl:flex items-center gap-1.5 2xl:gap-2 mr-1 shrink-0">
+        {{-- Desktop: inline cohesive dropdown group (visible xl+) --}}
+        <div class="hidden xl:flex items-center gap-1.5 p-1 rounded-xl bg-base-200/40 border border-base-300/60 shadow-2xs mr-1 shrink-0">
             {{-- Company Dropdown with Notification Counter --}}
-            <div class="relative" x-data="{ companyDropdownOpen: false }" @click.outside="companyDropdownOpen = false">
+            <div class="relative" @click.outside="companyDropdownOpen = false">
                 <button type="button" 
-                        @click="companyDropdownOpen = !companyDropdownOpen"
-                        class="btn btn-xs sm:btn-sm font-semibold bg-base-200/60 hover:bg-base-200 border-base-300/80 hover:border-base-300 w-auto min-w-[140px] max-w-[220px] 2xl:max-w-[280px] flex items-center justify-between gap-1.5 text-left rounded-lg text-xs normal-case shadow-2xs transition-all"
-                        title="{{ __('Pilih Perusahaan Aktif') }}">
-                    <span class="truncate" x-text="currentCompany ? (currentCompany.code + ' - ' + currentCompany.name) : '{{ __('Pilih Perusahaan') }}'"></span>
+                        @click="companyDropdownOpen = !companyDropdownOpen; branchDropdownOpen = false; unitKerjaDropdownOpen = false"
+                        class="btn btn-xs sm:btn-sm font-semibold bg-base-100 hover:bg-base-200 border-base-300/70 hover:border-base-300 w-auto min-w-[130px] max-w-[210px] 2xl:max-w-[270px] flex items-center justify-between gap-1.5 text-left rounded-lg text-xs normal-case shadow-2xs transition-all"
+                        :title="currentCompany ? (currentCompany.code + ' - ' + currentCompany.name) : '{{ __('Pilih Perusahaan Aktif') }}'">
+                    <div class="flex items-center gap-1.5 min-w-0 truncate">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-primary shrink-0 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                        <span class="truncate" x-text="currentCompany ? (currentCompany.code + ' - ' + currentCompany.name) : '{{ __('Pilih Perusahaan') }}'"></span>
+                    </div>
                     <div class="flex items-center gap-1 shrink-0 ml-1">
                         <template x-if="currentCompany && currentCompany.pending_approvals_count > 0">
                             <span class="badge badge-error badge-xs font-bold text-white px-1 shadow-xs" 
@@ -279,7 +301,7 @@
                     @endforeach
                 </select>
 
-                {{-- Dropdown Menu --}}
+                {{-- Company Dropdown Menu --}}
                 <div x-show="companyDropdownOpen" 
                      x-transition:enter="transition ease-out duration-100"
                      x-transition:enter-start="transform opacity-0 scale-95"
@@ -287,7 +309,7 @@
                      x-transition:leave="transition ease-in duration-75"
                      x-transition:leave-start="transform opacity-100 scale-100"
                      x-transition:leave-end="transform opacity-0 scale-95"
-                     class="absolute left-0 mt-1 w-72 bg-base-100 border border-base-300 rounded-xl shadow-xl z-50 p-1.5 space-y-1 max-h-80 overflow-y-auto"
+                     class="absolute left-0 mt-1.5 w-72 sm:w-80 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-xl shadow-xl z-50 p-1.5 space-y-1 max-h-80 overflow-y-auto"
                      style="display: none;">
                     <template x-for="comp in companies" :key="comp.id">
                         <button type="button"
@@ -296,68 +318,186 @@
                                 :class="comp.id === activeCompanyId ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-base-200/80 text-base-content'">
                             <div class="flex items-center gap-2 truncate min-w-0 mr-2">
                                 <span class="badge badge-sm badge-neutral/10 font-bold shrink-0 text-[10px]" x-text="comp.code"></span>
-                                <span class="truncate" x-text="comp.name"></span>
+                                <span class="truncate font-medium text-xs" x-text="comp.name"></span>
                             </div>
                             <template x-if="comp.pending_approvals_count > 0">
                                 <span class="badge badge-error badge-sm font-bold text-white px-1.5 shadow-sm shadow-error/40 shrink-0" 
                                       x-text="comp.pending_approvals_count" 
                                       :title="comp.pending_approvals_count + ' {{ __('persetujuan menunggu') }}'"></span>
                             </template>
+                            <template x-if="comp.id === activeCompanyId && (!comp.pending_approvals_count || comp.pending_approvals_count === 0)">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                                </svg>
+                            </template>
                         </button>
                     </template>
                 </div>
             </div>
 
-            {{-- Branch Dropdown --}}
-            @if($activeBranches->isNotEmpty())
-                <div class="relative">
-                    <select x-model="selectedBranchId" 
-                            @change="onDesktopBranchChange($event.target.value)" 
-                            class="select select-bordered select-xs sm:select-sm text-xs bg-base-200/60 w-auto min-w-[110px] max-w-[160px] 2xl:max-w-[200px] focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer truncate"
-                            title="{{ __('Pilih Cabang Aktif') }}">
-                        @foreach($activeBranches as $br)
-                            <option value="{{ $br->id }}">{{ $br->name }} @if($br->is_pusat)({{ __('Pusat') }})@else({{ $br->code }})@endif</option>
-                        @endforeach
-                    </select>
-                </div>
-            @endif
+            {{-- Arrow Separator --}}
+            <svg class="w-3.5 h-3.5 text-base-content/25 shrink-0 -mx-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
 
-            {{-- Unit Kerja Dropdown (Across all branches) --}}
-            <template x-if="currentUnitKerjas.length > 1">
-                <div class="relative">
-                    <select x-model="selectedUnitKerjaId" 
-                            @change="onDesktopUnitKerjaChange($event.target.value)" 
-                            class="select select-bordered select-xs sm:select-sm text-xs bg-base-200/60 w-auto min-w-[100px] max-w-[140px] 2xl:max-w-[180px] focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer truncate"
-                            title="{{ __('Pilih Unit Kerja Aktif') }}">
-                        <template x-for="uk in currentUnitKerjas" :key="uk.id">
-                            <option :value="uk.id" x-text="uk.code + ' - ' + uk.name"></option>
+            {{-- Branch Custom Dropdown (Handles Long Branch Names Elegantly) --}}
+            <div class="relative" @click.outside="branchDropdownOpen = false">
+                <button type="button" 
+                        @click="branchDropdownOpen = !branchDropdownOpen; companyDropdownOpen = false; unitKerjaDropdownOpen = false; branchSearch = ''"
+                        class="btn btn-xs sm:btn-sm font-semibold bg-base-100 hover:bg-base-200 border-base-300/70 hover:border-base-300 w-auto min-w-[140px] max-w-[220px] xl:max-w-[280px] 2xl:max-w-[360px] flex items-center justify-between gap-1.5 text-left rounded-lg text-xs normal-case shadow-2xs transition-all"
+                        :title="currentBranch ? ((currentBranch.raw_name || currentBranch.name) + (currentBranch.is_pusat ? ' ({{ __('Pusat') }})' : (currentBranch.code ? ' (' + currentBranch.code + ')' : ''))) : '{{ __('Pilih Cabang Aktif') }}'">
+                    <div class="flex items-center gap-1.5 min-w-0 truncate">
+                        <template x-if="currentBranch && currentBranch.is_pusat">
+                            <span class="badge badge-xs badge-primary font-bold shrink-0 text-[10px]">{{ __('Pusat') }}</span>
                         </template>
-                    </select>
+                        <template x-if="currentBranch && !currentBranch.is_pusat && currentBranch.code">
+                            <span class="badge badge-xs badge-neutral/10 font-bold shrink-0 text-[10px]" x-text="currentBranch.code"></span>
+                        </template>
+                        <span class="truncate font-medium" x-text="currentBranch ? (currentBranch.raw_name || currentBranch.name) : '{{ __('Pilih Cabang') }}'"></span>
+                    </div>
+                    <svg class="w-3 h-3 text-base-content/40 transition-transform duration-200 shrink-0 ml-1" :class="branchDropdownOpen ? 'rotate-180' : ''" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                </button>
+
+                {{-- Hidden select for form compatibility / fallback --}}
+                <select x-model="selectedBranchId" class="sr-only" aria-hidden="true" tabindex="-1">
+                    @foreach($activeBranches as $br)
+                        <option value="{{ $br->id }}">{{ $br->name }}</option>
+                    @endforeach
+                </select>
+
+                {{-- Branch Dropdown Menu with Search and Full-Name Display --}}
+                <div x-show="branchDropdownOpen" 
+                     x-transition:enter="transition ease-out duration-100"
+                     x-transition:enter-start="transform opacity-0 scale-95"
+                     x-transition:enter-end="transform opacity-100 scale-100"
+                     x-transition:leave="transition ease-in duration-75"
+                     x-transition:leave-start="transform opacity-100 scale-100"
+                     x-transition:leave-end="transform opacity-0 scale-95"
+                     class="absolute left-0 mt-1.5 w-80 sm:w-96 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-xl shadow-xl z-50 p-1.5 space-y-1 max-h-80 overflow-y-auto"
+                     style="display: none;">
+                    
+                    {{-- Search input when company has > 3 branches --}}
+                    <div class="px-2 py-1 pb-1.5 border-b border-base-200/80 mb-1" x-show="currentBranches.length > 3">
+                        <div class="relative">
+                            <input type="text" 
+                                   x-model="branchSearch" 
+                                   class="input input-xs input-bordered w-full rounded-lg text-xs pl-7 pr-2 focus:border-primary" 
+                                   placeholder="{{ __('Cari cabang...') }}" 
+                                   @click.stop>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-base-content/40 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+                    </div>
+
+                    <template x-for="br in filteredCurrentBranches" :key="br.id">
+                        <button type="button"
+                                @click="branchDropdownOpen = false; onDesktopBranchChange(br.id)"
+                                class="w-full flex items-center justify-between px-3 py-2 text-xs rounded-lg text-left transition-colors group"
+                                :class="br.id === activeBranchId ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-base-200/80 text-base-content'">
+                            <div class="flex items-center gap-2 min-w-0 mr-2">
+                                <span class="badge badge-sm font-bold shrink-0 text-[10px]" 
+                                      :class="br.is_pusat ? 'badge-primary' : (br.id === activeBranchId ? 'badge-primary/20 text-primary' : 'badge-neutral/10')" 
+                                      x-text="br.is_pusat ? '{{ __('Pusat') }}' : (br.code || 'CAB')"></span>
+                                <span class="font-medium text-xs leading-snug break-words" x-text="br.raw_name || br.name"></span>
+                            </div>
+                            <template x-if="br.id === activeBranchId">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                                </svg>
+                            </template>
+                        </button>
+                    </template>
+
+                    <div x-show="filteredCurrentBranches.length === 0" class="p-3 text-center text-xs text-base-content/50">
+                        {{ __('Tidak ada cabang ditemukan') }}
+                    </div>
+                </div>
+            </div>
+
+            {{-- Unit Kerja Dropdown (Across branches with multiple UK) --}}
+            <template x-if="currentUnitKerjas.length > 1">
+                <div class="flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-base-content/25 shrink-0 -mx-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                    </svg>
+
+                    <div class="relative" @click.outside="unitKerjaDropdownOpen = false">
+                        <button type="button" 
+                                @click="unitKerjaDropdownOpen = !unitKerjaDropdownOpen; companyDropdownOpen = false; branchDropdownOpen = false"
+                                class="btn btn-xs sm:btn-sm font-semibold bg-base-100 hover:bg-base-200 border-base-300/70 hover:border-base-300 w-auto min-w-[110px] max-w-[180px] xl:max-w-[220px] 2xl:max-w-[260px] flex items-center justify-between gap-1.5 text-left rounded-lg text-xs normal-case shadow-2xs transition-all"
+                                :title="currentUnitKerja ? (currentUnitKerja.code + ' - ' + currentUnitKerja.name) : '{{ __('Pilih Unit Kerja Aktif') }}'">
+                            <div class="flex items-center gap-1.5 min-w-0 truncate">
+                                <span class="badge badge-xs badge-neutral/10 font-bold shrink-0 text-[10px]" x-text="'UK: ' + (currentUnitKerja?.code || '-')"></span>
+                                <span class="truncate font-medium" x-text="currentUnitKerja?.name || '{{ __('Pilih UK') }}'"></span>
+                            </div>
+                            <svg class="w-3 h-3 text-base-content/40 transition-transform duration-200 shrink-0 ml-1" :class="unitKerjaDropdownOpen ? 'rotate-180' : ''" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                        </button>
+
+                        {{-- Hidden select for fallback --}}
+                        <select x-model="selectedUnitKerjaId" class="sr-only" aria-hidden="true" tabindex="-1">
+                            <template x-for="uk in currentUnitKerjas" :key="uk.id">
+                                <option :value="uk.id" x-text="uk.code + ' - ' + uk.name"></option>
+                            </template>
+                        </select>
+
+                        {{-- Unit Kerja Dropdown Menu --}}
+                        <div x-show="unitKerjaDropdownOpen" 
+                             x-transition:enter="transition ease-out duration-100"
+                             x-transition:enter-start="transform opacity-0 scale-95"
+                             x-transition:enter-end="transform opacity-100 scale-100"
+                             x-transition:leave="transition ease-in duration-75"
+                             x-transition:leave-start="transform opacity-100 scale-100"
+                             x-transition:leave-end="transform opacity-0 scale-95"
+                             class="absolute left-0 mt-1.5 w-72 sm:w-80 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-xl shadow-xl z-50 p-1.5 space-y-1 max-h-80 overflow-y-auto"
+                             style="display: none;">
+                            <template x-for="uk in currentUnitKerjas" :key="uk.id">
+                                <button type="button"
+                                        @click="unitKerjaDropdownOpen = false; onDesktopUnitKerjaChange(uk.id)"
+                                        class="w-full flex items-center justify-between px-3 py-2 text-xs rounded-lg text-left transition-colors"
+                                        :class="uk.id === activeUnitKerjaId ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-base-200/80 text-base-content'">
+                                    <div class="flex items-center gap-2 min-w-0 mr-2">
+                                        <span class="badge badge-sm badge-neutral/10 font-bold shrink-0 text-[10px]" x-text="uk.code"></span>
+                                        <span class="font-medium text-xs leading-snug break-words" x-text="uk.name"></span>
+                                    </div>
+                                    <template x-if="uk.id === activeUnitKerjaId">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </template>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
                 </div>
             </template>
         </div>
 
-        {{-- Tablet / Medium Screen: Compact pill button (visible sm to xl) --}}
+        {{-- Tablet / Medium Screen: Responsive compact pill button (visible sm to xl) --}}
         <div class="hidden sm:flex xl:hidden shrink-0">
             <button type="button"
-                    class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-base-200/60 hover:bg-base-200 border border-base-300/60 hover:border-base-300 text-xs text-base-content/80 hover:text-base-content transition-all shadow-2xs group cursor-pointer max-w-[180px] md:max-w-[220px]"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-base-200/60 hover:bg-base-200 border border-base-300/60 hover:border-base-300 text-xs text-base-content/80 hover:text-base-content transition-all shadow-2xs group cursor-pointer max-w-[240px] md:max-w-[320px] lg:max-w-[380px]"
                     @click="openMobileModal()"
-                    title="{{ __('Ganti Perusahaan & Cabang') }}"
+                    :title="(currentCompany ? (currentCompany.code + ' - ' + currentCompany.name) : '') + ' • ' + (currentBranch ? (currentBranch.raw_name || currentBranch.name) : '') + (currentUnitKerja && currentUnitKerjas.length > 1 ? ' • UK: ' + (currentUnitKerja.code || currentUnitKerja.name) : '')"
                     aria-label="{{ __('Pilih Perusahaan & Cabang') }}">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
-                <span class="font-semibold truncate text-[11px]">{{ $activeCompany?->code ?? '-' }}</span>
-                <span class="text-base-content/30">•</span>
-                <span class="truncate text-[11px] text-base-content/70">{{ $activeBranch?->name ?? '-' }}</span>
-                @if($activeBranchUnitKerjas->count() > 1)
-                    <span class="text-base-content/30">•</span>
-                    <span class="truncate text-[11px] text-base-content/70">UK: {{ $activeUnitKerja?->code ?? '-' }}</span>
-                @endif
-                @if($totalCompanyApprovals > 0)
-                    <span class="badge badge-error badge-xs font-bold text-white px-1 shadow-xs ml-0.5" title="{{ $totalCompanyApprovals }} {{ __('persetujuan menunggu') }}">{{ $totalCompanyApprovals }}</span>
-                @endif
-                <svg class="w-3 h-3 text-base-content/40 group-hover:text-base-content/70 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                <span class="badge badge-neutral/10 badge-xs font-bold text-[10px] shrink-0" x-text="currentCompany?.code || '-'"></span>
+                <span class="text-base-content/30 shrink-0">•</span>
+                <span class="truncate font-medium text-[11px] text-base-content/90 flex-1 text-left" x-text="currentBranch?.raw_name || currentBranch?.name || '-'"></span>
+                <template x-if="currentUnitKerjas.length > 1">
+                    <span class="text-base-content/30 shrink-0">•</span>
+                </template>
+                <template x-if="currentUnitKerjas.length > 1">
+                    <span class="truncate text-[10px] text-base-content/70 shrink-0" x-text="'UK: ' + (currentUnitKerja?.code || '-')"></span>
+                </template>
+                <template x-if="currentCompany && currentCompany.pending_approvals_count > 0">
+                    <span class="badge badge-error badge-xs font-bold text-white px-1 shadow-xs ml-0.5 shrink-0" 
+                          x-text="currentCompany.pending_approvals_count" 
+                          :title="currentCompany.pending_approvals_count + ' {{ __('persetujuan menunggu') }}'"></span>
+                </template>
+                <svg class="w-3 h-3 text-base-content/40 group-hover:text-base-content/70 shrink-0 ml-0.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
             </button>
         </div>
 
@@ -366,14 +506,14 @@
             <button type="button"
                     class="btn btn-ghost btn-circle btn-sm hover:bg-base-200 transition-colors relative"
                     @click="openMobileModal()"
-                    title="{{ __('Pilih Perusahaan & Cabang') }}"
+                    :title="(currentCompany ? currentCompany.name : '') + ' • ' + (currentBranch ? (currentBranch.raw_name || currentBranch.name) : '')"
                     aria-label="{{ __('Pilih Perusahaan & Cabang') }}">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-base-content/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
-                @if($totalCompanyApprovals > 0)
-                    <span class="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-error ring-2 ring-base-100" title="{{ $totalCompanyApprovals }} {{ __('persetujuan menunggu') }}"></span>
-                @endif
+                <template x-if="currentCompany && currentCompany.pending_approvals_count > 0">
+                    <span class="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-error ring-2 ring-base-100" :title="currentCompany.pending_approvals_count + ' {{ __('persetujuan menunggu') }}'"></span>
+                </template>
             </button>
         </div>
 

@@ -305,7 +305,6 @@ class DocumentController extends Controller
             'availableCreators'
         ));
     }
-    }
 
     public function destroy(Document $document): RedirectResponse
     {
