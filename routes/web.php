@@ -127,8 +127,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/context/switch', [\App\Http\Controllers\ContextSwitchController::class, 'switch'])->name('context.switch');
     Route::get('/companies/{company}/branches', [\App\Http\Controllers\ContextSwitchController::class, 'branchesForCompany'])->name('companies.branches');
 
-    // Director Accordion Browsing & Tembusan Feed
+    // Director Active Documents Review & Accordion Browsing
+    Route::get('/director/active-documents', [\App\Http\Controllers\DirectorDocumentController::class, 'activeDocuments'])->name('director.active-documents.index');
     Route::get('/director/documents', [\App\Http\Controllers\DirectorDocumentController::class, 'index'])->name('director.documents.index');
+    Route::post('/director/documents/bulk-acknowledge', [\App\Http\Controllers\DirectorDocumentController::class, 'bulkAcknowledge'])->name('director.documents.bulk-acknowledge');
     Route::post('/director/documents/{document}/acknowledge', [\App\Http\Controllers\DirectorDocumentController::class, 'acknowledgeRead'])->name('director.documents.acknowledge');
 
     // Trash (Sampah Dokumen) - Accessible to all roles

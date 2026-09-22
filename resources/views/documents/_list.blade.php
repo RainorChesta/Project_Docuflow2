@@ -80,6 +80,12 @@
             @else
                 <span class="badge badge-ghost badge-sm w-16 justify-center">{{ __('Tanpa versi') }}</span>
             @endif
+            @if($doc->isDirectorRead())
+                <span class="badge badge-success badge-sm gap-1 text-white font-semibold shrink-0" title="{{ __('Ditinjau oleh Direktur') }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                    {{ __('Ditinjau Direktur') }}
+                </span>
+            @endif
         </div>
     </div>
 </div>

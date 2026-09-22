@@ -561,6 +561,11 @@
                                                         @elseif($hasDraft)
                                                             <span class="badge badge-info badge-xs font-semibold">{{ __('Draf') }}</span>
                                                         @endif
+                                                        @if($doc->isDirectorRead())
+                                                            <span class="badge badge-success badge-xs text-white font-medium block mt-1" title="{{ __('Ditinjau oleh Direktur') }}">
+                                                                ✓ {{ __('Ditinjau') }}
+                                                            </span>
+                                                        @endif
                                                     </td>
                                                     <td class="text-right">
                                                         <div class="flex items-center justify-end gap-1">

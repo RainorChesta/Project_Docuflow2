@@ -838,6 +838,19 @@
                                     {{ __('Route: :role', ['role' => $badgeLabel]) }}
                                 </span>
                             @endif
+
+                            {{-- Director Seen Status Badge --}}
+                            @if($document->isDirectorRead())
+                                <span class="badge badge-success badge-sm text-white font-bold gap-1 shrink-0 shadow-2xs" title="{{ __('Ditinjau oleh Direktur pada :time', ['time' => $document->director_read_at?->format('d/m/Y H:i')]) }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                                    {{ __('Ditinjau oleh Direktur') }}
+                                </span>
+                            @elseif(auth()->user()->isDirector() || auth()->user()->isAdmin())
+                                <span class="badge badge-warning/20 border border-warning/40 text-warning badge-sm font-semibold gap-1 shrink-0" title="{{ __('Belum ditinjau oleh Direktur') }}">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-warning animate-pulse"></span>
+                                    {{ __('Belum Ditinjau Direktur') }}
+                                </span>
+                            @endif
                         </div>
                         @if($document->document_number)
                             <div class="shrink-0 self-start sm:self-center flex items-center gap-2 flex-wrap">
@@ -869,20 +882,28 @@
                         </div>
                         <div>
                             <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Status') }}</span>
-                            <p class="font-medium mt-0.5">
-                                @if($document->is_expired)
-                                    <span class="badge badge-error badge-sm mb-1">{{ __('Kedaluwarsa') }}</span><br>
+                            <div class="font-medium mt-0.5 space-y-1">
+                                <div>
+                                    @if($document->is_expired)
+                                        <span class="badge badge-error badge-sm mb-1">{{ __('Kedaluwarsa') }}</span><br>
+                                    @endif
+                                    @if($document->currentVersion)
+                                        {{ __('Aktif') }} (v{{ $document->currentVersion->version_number }})
+                                    @elseif($pendingVersion)
+                                        <span class="text-warning">{{ __('Menunggu Persetujuan') }} (v{{ $pendingVersion->version_number }})</span>
+                                    @elseif($hasDraft)
+                                        <span class="text-warning">{{ __('Draf') }}</span>
+                                    @else
+                                        <span class="text-warning">{{ __('Menunggu Persetujuan Pertama') }}</span>
+                                    @endif
+                                </div>
+                                @if($document->isDirectorRead())
+                                    <div class="text-[11px] text-success font-semibold flex items-center gap-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-success shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                                        <span>{{ __('Ditinjau Direktur') }}</span>
+                                    </div>
                                 @endif
-                                @if($document->currentVersion)
-                                    {{ __('Aktif') }} (v{{ $document->currentVersion->version_number }})
-                                @elseif($pendingVersion)
-                                    <span class="text-warning">{{ __('Menunggu Persetujuan') }} (v{{ $pendingVersion->version_number }})</span>
-                                @elseif($hasDraft)
-                                    <span class="text-warning">{{ __('Draf') }}</span>
-                                @else
-                                    <span class="text-warning">{{ __('Menunggu Persetujuan Pertama') }}</span>
-                                @endif
-                            </p>
+                            </div>
                         </div>
                         <div>
                             <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Visibilitas') }}</span>
@@ -995,6 +1016,25 @@
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                                 <span class="hidden sm:inline">{{ __('Summarize Document') }}</span>
                             </button>
+
+                            {{-- Director Seen Quick Action Button --}}
+                            @if(auth()->user()->isDirector() || auth()->user()->isAdmin())
+                                <form method="POST" action="{{ route('director.documents.acknowledge', $document) }}" class="inline">
+                                    @csrf
+                                    <input type="hidden" name="action" value="{{ $document->isDirectorRead() ? 'unseen' : 'seen' }}">
+                                    <button type="submit" 
+                                            class="btn btn-sm gap-1.5 shrink-0 {{ $document->isDirectorRead() ? 'btn-ghost text-base-content/60 hover:text-error hover:bg-error/10 border border-base-300' : 'btn-success text-white shadow-xs' }}" 
+                                            title="{{ $document->isDirectorRead() ? __('Batalkan status tinjauan Direktur') : __('Tandai telah ditinjau oleh Direktur') }}">
+                                        @if($document->isDirectorRead())
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                            <span class="hidden sm:inline">{{ __('Batal Ditinjau') }}</span>
+                                        @else
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                                            <span class="hidden sm:inline">{{ __('Tandai Ditinjau') }}</span>
+                                        @endif
+                                    </button>
+                                </form>
+                            @endif
                         </div>
                     </div>
 

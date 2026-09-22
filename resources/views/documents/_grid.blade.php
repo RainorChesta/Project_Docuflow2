@@ -102,7 +102,7 @@
         <div class="text-[10px] text-base-content/60 mt-1 line-clamp-2 leading-tight" title="{{ $doc->document_number }} · {{ $doc->branch?->name }} · {{ $doc->owner->name }}">
             {{ $doc->document_number }}
             @if($doc->branch)
-                <span class="font-medium text-base-content/80">· {{ $doc->branch->name }}</span>
+                <span class="font-medium text-base-content/80">· {{ $doc->branch->effective_code ?? $doc->branch->code ?? $doc->branch->name }}</span>
             @endif
             @if($doc->isGeneral()) <span class="text-success">· {{ __('Umum') }}</span>
             @elseif($doc->isPersonal()) <span class="text-info">· {{ __('Personal') }}</span>
@@ -121,6 +121,12 @@
         @if($doc->documentType)
             <span class="badge badge-ghost badge-xs max-w-[110px] inline-flex items-center text-base-content/70 border border-base-300/40 shrink-0" title="{{ $doc->documentType->name ?? $doc->documentType->code }}">
                 <span class="truncate">{{ $doc->documentType->code }}</span>
+            </span>
+        @endif
+        @if($doc->isDirectorRead())
+            <span class="badge badge-success badge-xs text-[9px] text-white font-semibold inline-flex items-center gap-0.5 border border-success/40 shrink-0" title="{{ __('Ditinjau oleh Direktur') }}">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                <span>{{ __('Ditinjau Direktur') }}</span>
             </span>
         @endif
     </div>

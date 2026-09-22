@@ -205,8 +205,10 @@
                                 } elseif ($name === 'documents.index') {
                                     $crumbs[] = ['label' => $docTypeLabel, 'url' => null];
                                 }
+                            } elseif (str_starts_with($name, 'director.active-documents.')) {
+                                $crumbs[] = ['label' => __('Dokumen Aktif'), 'url' => null];
                             } elseif (str_starts_with($name, 'director.documents.')) {
-                                $crumbs[] = ['label' => __('Semua Dokumen'), 'url' => null];
+                                $crumbs[] = ['label' => __('Direktori Folder'), 'url' => null];
                             } elseif (str_starts_with($name, 'admin.')) {
                                 $section = match (true) {
                                     str_contains($name, 'unit-kerja') => __('Unit Kerja'),
