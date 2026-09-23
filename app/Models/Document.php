@@ -71,6 +71,17 @@ class Document extends Model
         );
     }
 
+    /**
+     * Get the effective activation / approval timestamp.
+     */
+    public function getActivatedAtAttribute(): \Carbon\Carbon
+    {
+        return $this->currentVersion?->reviewed_at 
+            ?? $this->currentVersion?->created_at 
+            ?? $this->created_at 
+            ?? now();
+    }
+
     public const SUMMARY_PENDING = 'pending';
     public const SUMMARY_PROCESSING = 'processing';
     public const SUMMARY_COMPLETED = 'completed';

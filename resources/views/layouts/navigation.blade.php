@@ -140,6 +140,9 @@
             $totalApprovalCount = $pendingVersionsCount + $pendingRollbacksCount;
             $isApprovalActive = request()->routeIs('approvals.*');
             $canSeeApproval = $navUser && ($navUser->isHead() || $navUser->isPicKlinik() || $navUser->isDirector() || $navUser->isAdmin() || $totalApprovalCount > 0);
+            $unseenActiveDirectorDocsCount = ($navUser && ($navUser->isDirector() || $navUser->isAdmin()))
+                ? \App\Models\Document::whereHas('currentVersion', fn($q) => $q->where('status', 'active'))->where('is_expired', false)->whereNull('director_read_at')->count()
+                : 0;
         @endphp
         
         <span class="px-2 text-[10px] font-extrabold text-base-content/40 uppercase tracking-[0.2em] whitespace-nowrap" :class="open ? 'block' : 'lg:hidden'">{{ __('Menu') }}</span>
@@ -155,16 +158,42 @@
             <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Dashboard') }}</span>
         </a>
 
+        @if(auth()->user()->isDirector() || auth()->user()->isAdmin())
+        <a href="{{ route('director.active-documents.index') }}"
+           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+                  {{ request()->routeIs('director.active-documents.*') ? 'nav-item-new-active' : '' }}"
+           :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
+           :title="open ? '' : '{{ __('Dokumen Aktif') }}'">
+            <div class="icon-wrapper shrink-0 relative">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+                @if($unseenActiveDirectorDocsCount > 0)
+                    <span class="absolute -top-1 -right-1 flex h-3 w-3">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-warning opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-3 w-3 border-2 border-base-100 bg-warning"></span>
+                    </span>
+                @endif
+            </div>
+            <span class="text-label min-w-0 flex-1 flex items-center justify-between gap-2" :class="open ? '' : 'lg:hidden'">
+                <span class="truncate">{{ __('Dokumen Aktif') }}</span>
+                @if($unseenActiveDirectorDocsCount > 0)
+                    <span class="badge badge-warning badge-sm font-bold px-1.5 shrink-0 shadow-sm">{{ $unseenActiveDirectorDocsCount }}</span>
+                @endif
+            </span>
+        </a>
+        @endif
+
         @if(auth()->user()->isDirector())
         <a href="{{ route('director.documents.index') }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('director.documents.*') ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
-           :title="open ? '' : '{{ __('Semua Dokumen') }}'">
+           :title="open ? '' : '{{ __('Direktori Folder') }}'">
             <div class="icon-wrapper shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
             </div>
-            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Semua Dokumen') }}</span>
+            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Direktori Folder') }}</span>
         </a>
         @endif
 

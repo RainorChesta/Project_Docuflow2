@@ -32,6 +32,14 @@
                         <div class="text-sm">
                             <div><span class="text-base-content/60">{{ __('Unit Kerja') }}:</span> {{ $document->unitKerja?->nama_unit_kerja ?? $document->unitKerja?->kode_unit_kerja ?? '—' }}</div>
                             <div class="flex items-center gap-1.5 mt-0.5"><span class="text-base-content/60">{{ __('Pemilik') }}:</span> <x-user-avatar :user="$document->owner" size="w-4 h-4" text-size="text-[9px]" /> <span class="font-medium text-base-content">{{ $document->owner->name }}</span></div>
+                            @if($document->isDirectorRead())
+                                <div class="mt-1 flex items-center gap-1.5">
+                                    <span class="badge badge-success badge-sm text-white font-bold gap-1 shadow-2xs">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                                        {{ __('Ditinjau oleh Direktur') }}
+                                    </span>
+                                </div>
+                            @endif
                         </div>
                         @php
                             $isFileBased = $document->displayVersion()?->file_path;
@@ -389,6 +397,25 @@
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                     {{ __('Edit Dokumen') }}
                                 </a>
+                            @endif
+
+                            {{-- Director Seen Quick Action Button --}}
+                            @if(auth()->user() && (auth()->user()->isDirector() || auth()->user()->isAdmin()))
+                                <form method="POST" action="{{ route('director.documents.acknowledge', $document) }}" class="inline">
+                                    @csrf
+                                    <input type="hidden" name="action" value="{{ $document->isDirectorRead() ? 'unseen' : 'seen' }}">
+                                    <button type="submit" 
+                                            class="btn btn-sm gap-1.5 {{ $document->isDirectorRead() ? 'btn-ghost text-base-content/60 hover:text-error' : 'btn-success text-white shadow-xs' }}" 
+                                            title="{{ $document->isDirectorRead() ? __('Batalkan status tinjauan Direktur') : __('Tandai telah ditinjau oleh Direktur') }}">
+                                        @if($document->isDirectorRead())
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                            <span>{{ __('Batal Ditinjau') }}</span>
+                                        @else
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                                            <span>{{ __('Tandai Ditinjau') }}</span>
+                                        @endif
+                                    </button>
+                                </form>
                             @endif
 
                             <a href="{{ $backUrl }}" class="btn btn-ghost btn-sm">
