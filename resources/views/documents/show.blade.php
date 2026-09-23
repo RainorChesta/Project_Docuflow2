@@ -487,7 +487,7 @@
                                             @if($isStepApproved && $step->action_at)
                                                 <div class="text-emerald-700 dark:text-emerald-400 flex items-center justify-between gap-1">
                                                     <span class="truncate">{{ __('Disetujui oleh :name', ['name' => $step->actionBy?->name ?? 'Approver']) }}</span>
-                                                    <span class="font-medium shrink-0">{{ $step->action_at->format('d/m/Y H:i') }}</span>
+                                                    <span class="font-medium shrink-0">{{ $step->action_at->format('d/m/Y H:i') }} WIB</span>
                                                 </div>
                                             @elseif($isStepBypassed)
                                                 <div class="text-base-content/50 italic truncate">
@@ -841,7 +841,7 @@
 
                             {{-- Director Seen Status Badge --}}
                             @if($document->isDirectorRead())
-                                <span class="badge badge-success badge-sm text-white font-bold gap-1 shrink-0 shadow-2xs" title="{{ __('Ditinjau oleh Direktur pada :time', ['time' => $document->director_read_at?->format('d/m/Y H:i')]) }}">
+                                <span class="badge badge-success badge-sm text-white font-bold gap-1 shrink-0 shadow-2xs" title="{{ __('Ditinjau oleh Direktur pada :time', ['time' => $document->director_read_at?->format('d/m/Y H:i') . ' WIB']) }}">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
                                     {{ __('Ditinjau oleh Direktur') }}
                                 </span>
@@ -888,7 +888,10 @@
                                         <span class="badge badge-error badge-sm mb-1">{{ __('Kedaluwarsa') }}</span><br>
                                     @endif
                                     @if($document->currentVersion)
-                                        {{ __('Aktif') }} (v{{ $document->currentVersion->version_number }})
+                                        <div>{{ __('Aktif') }} (v{{ $document->currentVersion->version_number }})</div>
+                                        <div class="text-[11px] text-base-content/60 font-normal" title="{{ __('Waktu Aktif:') }} {{ $document->activated_at->format('d/m/Y H:i') }} WIB">
+                                            {{ $document->activated_at->translatedFormat('d M Y, H:i') }} WIB
+                                        </div>
                                     @elseif($pendingVersion)
                                         <span class="text-warning">{{ __('Menunggu Persetujuan') }} (v{{ $pendingVersion->version_number }})</span>
                                     @elseif($hasDraft)
@@ -1978,7 +1981,7 @@
                                     <strong class="font-medium text-base-content/80">{{ $version->author_name }}</strong>
                                 </div>
                                 <span>•</span>
-                                <span>{{ $version->created_at->format('d M Y, H:i') }}</span>
+                                <span>{{ $version->created_at->format('d M Y, H:i') }} WIB</span>
                                 @if($version->isRename() && $version->old_title)
                                     <span>•</span>
                                     <span class="text-info font-medium">{{ __('Semula:') }} <span class="line-through text-base-content/50">{{ $version->old_title }}</span></span>

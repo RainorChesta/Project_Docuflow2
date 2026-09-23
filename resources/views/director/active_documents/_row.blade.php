@@ -26,7 +26,7 @@
     </td>
     <td class="whitespace-nowrap">
         <span class="font-medium text-base-content/90 block">{{ $doc->activated_at->translatedFormat('d M Y') }}</span>
-        <span class="text-[10px] text-base-content/50 block">{{ $doc->activated_at->format('H:i') }}</span>
+        <span class="text-[10px] text-base-content/50 block">{{ $doc->activated_at->format('H:i') }} WIB</span>
     </td>
     <td>
         <span class="font-medium block">{{ $doc->branch?->name ?? '—' }}</span>

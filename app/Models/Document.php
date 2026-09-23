@@ -72,14 +72,16 @@ class Document extends Model
     }
 
     /**
-     * Get the effective activation / approval timestamp.
+     * Get the effective activation / approval timestamp in WIB (Asia/Jakarta).
      */
     public function getActivatedAtAttribute(): \Carbon\Carbon
     {
-        return $this->currentVersion?->reviewed_at 
+        $date = $this->currentVersion?->reviewed_at 
             ?? $this->currentVersion?->created_at 
             ?? $this->created_at 
             ?? now();
+
+        return $date->copy()->timezone('Asia/Jakarta');
     }
 
     public const SUMMARY_PENDING = 'pending';

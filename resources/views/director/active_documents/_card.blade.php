@@ -65,7 +65,7 @@
             </div>
             <div class="flex items-center justify-between gap-2">
                 <span class="text-base-content/50 text-[11px]">{{ __('Tgl. Aktif:') }}</span>
-                <span class="font-medium text-right text-[11px] text-base-content/80" title="{{ $doc->activated_at->format('d/m/Y H:i') }}">
+                <span class="font-medium text-right text-[11px] text-base-content/80" title="{{ $doc->activated_at->format('d/m/Y H:i') }} WIB">
                     {{ $doc->activated_at->translatedFormat('d M Y') }}
                 </span>
             </div>
@@ -84,7 +84,7 @@
                         </svg>
                         <span class="truncate">{{ __('Sudah Ditinjau') }}</span>
                     </span>
-                    <span class="text-[10px] text-secondary/70 shrink-0 font-normal" title="{{ __('Ditinjau pada:') }} {{ $doc->director_read_at?->format('d/m/Y H:i') }}">
+                    <span class="text-[10px] text-secondary/70 shrink-0 font-normal" title="{{ __('Ditinjau pada:') }} {{ $doc->director_read_at?->format('d/m/Y H:i') }} WIB">
                         {{ $doc->director_read_at?->diffForHumans() }}
                     </span>
                 </div>
