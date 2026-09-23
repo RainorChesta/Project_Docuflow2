@@ -286,7 +286,7 @@ class DocumentRenameTest extends TestCase
         $this->assertEquals('draft', $draftVersion->fresh()->status);
     }
 
-    public function test_renaming_pending_document_updates_title_in_place(): void
+    public function test_renaming_document_with_pending_approval_or_rename_is_locked_and_rejected(): void
     {
         // Document already has pending v2
         $pendingVersion = DocumentVersion::create([
@@ -303,19 +303,13 @@ class DocumentRenameTest extends TestCase
                 'title' => 'Renamed Pending Document',
             ]);
 
-        $response->assertRedirect();
-        $this->assertDatabaseHas('documents', [
-            'id' => $this->document->id,
-            'title' => 'Renamed Pending Document',
-        ]);
-
-        // Total versions is still 2 (v1 active, v2 pending updated)
-        $this->assertEquals(2, $this->document->versions()->count());
+        $response->assertSessionHas('error');
+        $this->assertEquals('Original Document Title', $this->document->fresh()->title);
     }
 
-    public function test_repeated_renaming_of_pending_document_automatically_updates_reviewer_notifications(): void
+    public function test_show_page_displays_lock_icon_when_rename_request_is_pending(): void
     {
-        // 1. Staff renames active document first time (without Notification::fake so DB row is saved)
+        // 1. Staff renames active document (v2 pending rename is created)
         $this->actingAs($this->staff)
             ->post(route('documents.rename', $this->document), [
                 'title' => 'First Rename Title',
@@ -323,34 +317,11 @@ class DocumentRenameTest extends TestCase
 
         $this->assertEquals('First Rename Title', $this->document->fresh()->title);
 
-        // Verify head received notification in DB
-        $headNotifs = $this->head->notifications()->get();
-        $this->assertCount(1, $headNotifs);
-        $this->assertStringContainsString('First Rename Title', $headNotifs->first()->data['message']);
-
-        // 2. Staff renames AGAIN to a second title while v2 is still pending
-        $this->actingAs($this->staff)
-            ->post(route('documents.rename', $this->document), [
-                'title' => 'Second Rename Title JJJJ',
-            ]);
-
-        $this->assertEquals('Second Rename Title JJJJ', $this->document->fresh()->title);
-
-        // 3. Verify notification in DB is automatically updated to the new title
-        $headNotifFresh = $this->head->notifications()->first();
-        $this->assertStringContainsString('Second Rename Title JJJJ', $headNotifFresh->data['message']);
-        $this->assertEquals('Second Rename Title JJJJ', $headNotifFresh->data['document_title']);
-        $this->assertEquals('Original Document Title', $headNotifFresh->data['old_title']);
-
-        // 4. Verify /notifications API endpoint also dynamically returns the new title
-        $apiResponse = $this->actingAs($this->head)
-            ->getJson(route('notifications.index'));
-
-        $apiResponse->assertOk();
-        $apiNotifs = $apiResponse->json('notifications');
-        $this->assertCount(1, $apiNotifs);
-        $this->assertStringContainsString('Second Rename Title JJJJ', $apiNotifs[0]['message']);
-        $this->assertEquals('Second Rename Title JJJJ', $apiNotifs[0]['document_title']);
+        // 2. Load show page: should render lock icon and NOT the rename button
+        $showResponse = $this->actingAs($this->staff)->get(route('documents.show', $this->document));
+        $showResponse->assertOk();
+        $showResponse->assertSee(__('Nama dokumen terkunci karena pengajuan perubahan nama sedang dalam proses persetujuan.'));
+        $showResponse->assertDontSee('openModal(\'rename-document-modal-' . $this->document->id . '\')', false);
     }
 
     public function test_rollback_to_previous_version_restores_original_document_title(): void

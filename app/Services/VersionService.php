@@ -621,4 +621,74 @@ class VersionService
             ->where('version_number', '>', $sourceVersion->version_number)
             ->delete();
     }
+
+    /**
+     * Prepare a new working revision version from a rejected version.
+     * Clones the rejected file to a new revision (e.g. v2), reverts previously stamped
+     * signatures to placeholders, resets signature requests, and returns the new version.
+     */
+    public function prepareRevisionFromRejected(Document $document, User $author): DocumentVersion
+    {
+        return DB::transaction(function () use ($document, $author) {
+            // Check if there is already an active pending or draft version
+            $existing = $document->versions()
+                ->whereIn('status', ['pending', 'draft'])
+                ->whereNull('discarded_at')
+                ->orderBy('version_number', 'desc')
+                ->first();
+
+            if ($existing) {
+                return $existing;
+            }
+
+            // Find the newest rejected version to base the revision on
+            $baseVersion = $document->versions()
+                ->where('status', 'rejected')
+                ->orderBy('version_number', 'desc')
+                ->first() ?? $document->displayVersion();
+
+            $versionNumber = ($document->versions()->max('version_number') ?? 0) + 1;
+            $disk = config('onlyoffice.storage_disk', 'local');
+
+            $storedPath = null;
+            $fileOriginalName = $document->title . '.docx';
+            $fileMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+            if ($baseVersion && $baseVersion->file_path && Storage::disk($disk)->exists($baseVersion->file_path)) {
+                $storedPath = 'documents/' . $document->id . '/v' . $versionNumber . '.docx';
+                $baseContent = Storage::disk($disk)->get($baseVersion->file_path);
+                Storage::disk($disk)->put($storedPath, $baseContent);
+                $fileOriginalName = $baseVersion->file_original_name ?? $fileOriginalName;
+                $fileMime = $baseVersion->file_mime ?? $fileMime;
+            }
+
+            $newVersion = $document->versions()->create([
+                'version_number' => $versionNumber,
+                'content' => $baseVersion?->content ?? '',
+                'file_path' => $storedPath,
+                'file_original_name' => $fileOriginalName,
+                'file_mime' => $fileMime,
+                'author_id' => $author->id,
+                'author_name' => $author->name,
+                'status' => 'draft',
+            ]);
+
+            // Revert any previously stamped signatures on this new version to placeholders
+            app(DocumentProcessorService::class)->revertSignaturesToPlaceholders($document, $newVersion);
+
+            // Reset all SignatureRequest records on this document to pending/unused for this new revision run
+            // (since all placeholders including previously approved and rejected are preserved in the document)
+            \App\Models\SignatureRequest::where('document_id', $document->id)->update([
+                'status' => 'pending',
+                'is_used' => false,
+                'rejected_reason' => null,
+                'responded_at' => null,
+            ]);
+
+            $document->touch();
+            app(OnlyOfficeService::class)->rotateDocumentKey($document, $newVersion);
+
+            return $newVersion;
+        });
+    }
 }

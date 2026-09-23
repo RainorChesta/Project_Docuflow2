@@ -79,7 +79,7 @@ class DocumentProcessorService
             file_put_contents($tempDocxPath, $fileContent);
 
             // Pre-process Word OpenXML to ensure content controls, text badges, or inserted placeholder images are handled
-            $mediaReplaced = $this->prepareDocxContentControls($tempDocxPath, $requestId, $signaturePath);
+            $mediaReplaced = $this->prepareDocxContentControls($tempDocxPath, $requestId, $signaturePath, $signatureRequest);
 
             // If media was not replaced in word/media/, process the document using PHPWord TemplateProcessor
             if (!$mediaReplaced) {
@@ -190,6 +190,260 @@ class DocumentProcessorService
     }
 
     /**
+     * Revert any previously stamped signatures on this document version back to their pending placeholder badges.
+     * Used when initializing a new revision (e.g. V2) from a rejected or unfinalized version.
+     */
+    public function revertSignaturesToPlaceholders(Document $document, DocumentVersion $version): bool
+    {
+        try {
+            $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
+            $filePath = $version->file_path;
+
+            // 1. Handle HTML content
+            if ($version->content) {
+                // Revert any rendered signature img tags back to [ttd:Name] or [stamp:Name] tags
+                $newContent = preg_replace_callback('/<img\b[^>]*?data-ttd-user="([^"]+)"[^>]*\/?>/i', function ($m) {
+                    return '[ttd:' . $m[1] . ']';
+                }, $version->content);
+
+                $newContent = preg_replace('/<span\b[^>]*?class="doku-signature-badge[^>]*>.*?\[(?:TTD|Stempel)\s+Ditolak:\s*([^\]]+)\].*?<\/span>/is', '[ttd:$1]', $newContent);
+
+                if ($newContent !== $version->content) {
+                    $version->update(['content' => $newContent]);
+                }
+            }
+
+            if (!$filePath || !$disk->exists($filePath)) {
+                return true;
+            }
+
+            // Determine if the file is PDF or DOCX
+            if (str_ends_with(strtolower($filePath), '.pdf') || ($version->file_mime && str_contains(strtolower($version->file_mime), 'pdf'))) {
+                return true;
+            }
+
+            // 2. Handle DOCX
+            $tempDocxPath = storage_path('app/temp_rev_sig_' . uniqid() . '.docx');
+            $fileContent = $disk->get($filePath);
+            file_put_contents($tempDocxPath, $fileContent);
+
+            $zip = new \ZipArchive();
+            if ($zip->open($tempDocxPath) !== true) {
+                @unlink($tempDocxPath);
+                return false;
+            }
+
+            // Fetch all signature requests for this document
+            $sigRequests = SignatureRequest::where('document_id', $document->id)
+                ->with(['targetUser', 'requestedSignature'])
+                ->get();
+
+            if ($sigRequests->isEmpty()) {
+                $zip->close();
+                @unlink($tempDocxPath);
+                return true;
+            }
+
+            // Scan word/media/ and map each signature/placeholder to its signature request
+            $replacedAny = false;
+            $usedRequestIds = [];
+
+            for ($i = 0; $i < $zip->numFiles; $i++) {
+                $entryName = $zip->getNameIndex($i);
+                if (!str_starts_with($entryName, 'word/media/')) {
+                    continue;
+                }
+
+                $imgBytes = $zip->getFromIndex($i);
+                if (!$imgBytes) {
+                    continue;
+                }
+
+                // Identify which SignatureRequest this image corresponds to
+                $matchedRequest = null;
+                $extractedId = $this->extractRequestIdFromImage($imgBytes);
+                if ($extractedId) {
+                    $matchedRequest = $sigRequests->firstWhere('id', $extractedId);
+                }
+
+                // If matched, replace this media entry with a fresh pending placeholder PNG
+                if ($matchedRequest) {
+                    $signerName = $matchedRequest->targetUser?->name ?? 'Approver';
+                    $placeholderBytes = $this->onlyOfficeService
+                        ? $this->onlyOfficeService->generatePlaceholderPngBytes($signerName, $matchedRequest->id, $matchedRequest->isStamp())
+                        : '';
+
+                    if (!empty($placeholderBytes)) {
+                        $zip->addFromString($entryName, $placeholderBytes);
+                        $replacedAny = true;
+                        $usedRequestIds[] = $matchedRequest->id;
+                    }
+                }
+            }
+
+            // Fallback: If some 400x400 square images had no metadata marker, map remaining requests sequentially
+            $remainingRequests = $sigRequests->filter(fn($r) => !in_array($r->id, $usedRequestIds, true))->values();
+            if ($remainingRequests->isNotEmpty()) {
+                $remIndex = 0;
+                for ($i = 0; $i < $zip->numFiles && $remIndex < $remainingRequests->count(); $i++) {
+                    $entryName = $zip->getNameIndex($i);
+                    if (!str_starts_with($entryName, 'word/media/')) {
+                        continue;
+                    }
+                    $imgBytes = $zip->getFromIndex($i);
+                    $size = $imgBytes ? @getimagesizefromstring($imgBytes) : null;
+                    if ($size && $size[0] >= 350 && $size[0] <= 450 && $size[1] >= 350 && $size[1] <= 450) {
+                        // Check if not already a freshly replaced placeholder
+                        if (!str_contains($imgBytes, "MENUNGGU PERSETUJUAN")) {
+                            $req = $remainingRequests[$remIndex++];
+                            $signerName = $req->targetUser?->name ?? 'Approver';
+                            $placeholderBytes = $this->onlyOfficeService
+                                ? $this->onlyOfficeService->generatePlaceholderPngBytes($signerName, $req->id, $req->isStamp())
+                                : '';
+                            if (!empty($placeholderBytes)) {
+                                $zip->addFromString($entryName, $placeholderBytes);
+                                $replacedAny = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            $zip->close();
+
+            if ($replacedAny) {
+                $modifiedContent = file_get_contents($tempDocxPath);
+                $disk->put($filePath, $modifiedContent);
+            }
+            @unlink($tempDocxPath);
+
+            $this->onlyOfficeService?->rotateDocumentKey($document, $version);
+            Log::info("DocumentProcessorService: Reverted signatures to placeholders for document ID {$document->id}, version ID {$version->id}");
+            return true;
+
+        } catch (\Throwable $e) {
+            Log::error("DocumentProcessorService: Error reverting signatures to placeholders: " . $e->getMessage(), [
+                'exception' => $e,
+            ]);
+            if (isset($tempDocxPath) && file_exists($tempDocxPath)) {
+                @unlink($tempDocxPath);
+            }
+            return false;
+        }
+    }
+
+    /**
+     * Extract embedded DocuFlow signature request ID from an image binary (via text chunks or steganographic pixel blocks).
+     */
+    public function extractRequestIdFromImage(string $imgBytes): ?int
+    {
+        if (empty($imgBytes)) {
+            return null;
+        }
+
+        // 1. Precise PNG Chunk Parser (100% immune to CRC byte collisions)
+        if (str_starts_with($imgBytes, "\x89PNG\r\n\x1a\n")) {
+            $offset = 8;
+            $len = strlen($imgBytes);
+            while ($offset + 8 <= $len) {
+                $chunkLen = unpack('N', substr($imgBytes, $offset, 4))[1];
+                $chunkType = substr($imgBytes, $offset + 4, 4);
+                $offset += 8;
+
+                if ($offset + $chunkLen > $len) {
+                    break;
+                }
+
+                if ($chunkType === 'tEXt' || $chunkType === 'iTXt') {
+                    $chunkData = substr($imgBytes, $offset, $chunkLen);
+                    $nullPos = strpos($chunkData, "\0");
+                    if ($nullPos !== false) {
+                        $keyword = substr($chunkData, 0, $nullPos);
+                        $text = substr($chunkData, $nullPos + 1);
+                        if (in_array(strtolower($keyword), ['docuflowsigreq', 'df-req'], true)) {
+                            if (preg_match('/(\d+)/', $text, $m)) {
+                                return (int) $m[1];
+                            }
+                        }
+                    }
+                }
+
+                $offset += $chunkLen + 4; // Skip chunk data + 4 bytes CRC
+                if ($chunkType === 'IEND') {
+                    break;
+                }
+            }
+        }
+
+        // 2. Safe bounded delimiter regex on binary string
+        if (preg_match('/DocuFlowSigReq(?:\0|:|#)+(\d+)(?:\0|#|\s|\]|$)/i', $imgBytes, $m)) {
+            return (int) $m[1];
+        }
+        if (preg_match('/\[DF-REQ:(?:#)?(\d+)(?:#)?\]/i', $imgBytes, $m)) {
+            return (int) $m[1];
+        }
+        if (preg_match('/DF-REQ(?:\0|:|#)+(\d+)(?:\0|#|\s|\]|$)/i', $imgBytes, $m)) {
+            return (int) $m[1];
+        }
+        if (preg_match('/(?:PENDING_SIG_|request_id=)(\d+)/i', $imgBytes, $m)) {
+            return (int) $m[1];
+        }
+
+        // 3. Fallback steganographic inspection
+        $size = @getimagesizefromstring($imgBytes);
+        if ($size && $size[0] >= 100 && $size[1] >= 100) {
+            $im = @imagecreatefromstring($imgBytes);
+            if ($im) {
+                $w = imagesx($im);
+                $h = imagesy($im);
+
+                // Check 8x8 block steganography at (12, 12)
+                if ($w >= 48 && $h >= 20) {
+                    $magicRgb = imagecolorat($im, 12, 12);
+                    $mr = ($magicRgb >> 16) & 0xFF;
+                    $mg = ($magicRgb >> 8) & 0xFF;
+                    $mb = $magicRgb & 0xFF;
+
+                    if (abs($mr - 222) <= 18 && abs($mg - 173) <= 18 && abs($mb - 190) <= 18) {
+                        $b0 = (imagecolorat($im, 20, 12) >> 16) & 0xFF;
+                        $b1 = (imagecolorat($im, 28, 12) >> 16) & 0xFF;
+                        $b2 = (imagecolorat($im, 36, 12) >> 16) & 0xFF;
+                        $embeddedId = $b0 | ($b1 << 8) | ($b2 << 16);
+                        imagedestroy($im);
+                        if ($embeddedId > 0) {
+                            return $embeddedId;
+                        }
+                    }
+                }
+
+                // Check single-pixel steganography at (8, 8)
+                if ($w >= 11 && $h >= 10) {
+                    $magicRgb = imagecolorat($im, 8, 8);
+                    $mr = ($magicRgb >> 16) & 0xFF;
+                    $mg = ($magicRgb >> 8) & 0xFF;
+                    $mb = $magicRgb & 0xFF;
+
+                    if (abs($mr - 222) <= 18 && abs($mg - 173) <= 18 && abs($mb - 190) <= 18) {
+                        $reqRgb = imagecolorat($im, 9, 8);
+                        $rr = ($reqRgb >> 16) & 0xFF;
+                        $rg = ($reqRgb >> 8) & 0xFF;
+                        $rb = $reqRgb & 0xFF;
+                        $embeddedId = $rr | ($rg << 8) | ($rb << 16);
+                        imagedestroy($im);
+                        if ($embeddedId > 0) {
+                            return $embeddedId;
+                        }
+                    }
+                }
+
+                imagedestroy($im);
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Remove any placeholder images in word/media/, their drawing references in word/document.xml,
      * relationships in word/_rels/document.xml.rels, Content Controls, or text badges for the rejected request ID.
      */
@@ -209,55 +463,8 @@ class DocumentProcessorService
                 if (str_starts_with($entryName, 'word/media/')) {
                     $imgBytes = $zip->getFromIndex($i);
                     if ($imgBytes) {
-                        $isTarget = false;
-                        // 1. Check if PNG contains the DocuFlowSigReq tag for this request
-                        if (str_contains($imgBytes, "DocuFlowSigReq\0" . $requestId) || 
-                            str_contains($imgBytes, "DocuFlowSigReq:" . $requestId) || 
-                            str_contains($imgBytes, "request_id=" . $requestId) ||
-                            str_contains($imgBytes, "PENDING_SIG_" . $requestId)) {
-                            $isTarget = true;
-                        } elseif ($size = @getimagesizefromstring($imgBytes)) {
-                            // Check steganographic metadata pixels or fallback
-                            if ($size[0] >= 350 && $size[0] <= 450 && $size[1] >= 350 && $size[1] <= 450) {
-                                $im = @imagecreatefromstring($imgBytes);
-                                if ($im) {
-                                    $w = imagesx($im);
-                                    $h = imagesy($im);
-                                    $hasMagic = false;
-                                    if ($w >= 11 && $h >= 10) {
-                                        $magicRgb = imagecolorat($im, 8, 8);
-                                        $mr = ($magicRgb >> 16) & 0xFF;
-                                        $mg = ($magicRgb >> 8) & 0xFF;
-                                        $mb = $magicRgb & 0xFF;
-                                        if ($mr === 222 && $mg === 173 && $mb === 190) {
-                                            $hasMagic = true;
-                                            $reqRgb = imagecolorat($im, 9, 8);
-                                            $rr = ($reqRgb >> 16) & 0xFF;
-                                            $rg = ($reqRgb >> 8) & 0xFF;
-                                            $rb = $reqRgb & 0xFF;
-                                            $embeddedId = $rr | ($rg << 8) | ($rb << 16);
-                                            if ($embeddedId === $requestId) {
-                                                $isTarget = true;
-                                            }
-                                        }
-                                    }
-                                    if (!$isTarget && !$hasMagic) {
-                                        $rgb = imagecolorat($im, 20, 20);
-                                        $r = ($rgb >> 16) & 0xFF;
-                                        $g = ($rgb >> 8) & 0xFF;
-                                        $b = $rgb & 0xFF;
-                                        if ($r >= 245 && $r <= 255 && $g >= 235 && $g <= 252 && $b >= 190 && $b <= 210) {
-                                            $isTarget = true;
-                                        }
-                                    }
-                                    imagedestroy($im);
-                                }
-                            }
-                        } elseif (str_contains($imgBytes, "DocuFlowSigReq") && !preg_match('/DocuFlowSigReq[^\d]*(\d+)/', $imgBytes)) {
-                            $isTarget = true;
-                        }
-
-                        if ($isTarget) {
+                        $extractedId = $this->extractRequestIdFromImage($imgBytes);
+                        if ($extractedId !== null && $extractedId === $requestId) {
                             $targetMediaEntries[] = $entryName;
                         }
                     }
@@ -374,7 +581,7 @@ class DocumentProcessorService
      * Also replaces any inserted placeholder PNGs in word/media/ with the approved signature image.
      * If no placeholder exists in the document, appends a dedicated signature paragraph at the bottom.
      */
-    protected function prepareDocxContentControls(string $docxPath, int $requestId, ?string $signaturePath = null): bool
+    protected function prepareDocxContentControls(string $docxPath, int $requestId, ?string $signaturePath = null, ?SignatureRequest $signatureRequest = null): bool
     {
         try {
             $zip = new \ZipArchive();
@@ -387,71 +594,38 @@ class DocumentProcessorService
             // Direct in-place replacement of placeholder images in word/media/
             if ($signaturePath && file_exists($signaturePath)) {
                 $rawSigBytes = file_get_contents($signaturePath);
-                $sigBytes = $this->onlyOfficeService ? $this->onlyOfficeService->formatSquareSignature($rawSigBytes, 400, 24) : $rawSigBytes;
+                $isStamp = $signatureRequest ? $signatureRequest->isStamp() : false;
+                $sigBytes = $this->onlyOfficeService ? $this->onlyOfficeService->formatSquareSignature($rawSigBytes, 400, 24, $requestId, $isStamp) : $rawSigBytes;
                 
+                $unidentifiedMedia = [];
+
                 for ($i = 0; $i < $zip->numFiles; $i++) {
                     $entryName = $zip->getNameIndex($i);
                     if (str_starts_with($entryName, 'word/media/')) {
                         $imgBytes = $zip->getFromIndex($i);
                         if ($imgBytes) {
-                            $size = @getimagesizefromstring($imgBytes);
-                            $isTargetPlaceholder = false;
-
-                            // 1. Check if PNG contains the DocuFlowSigReq tag for this request
-                            if (str_contains($imgBytes, "DocuFlowSigReq\0" . $requestId) || 
-                                str_contains($imgBytes, "DocuFlowSigReq:" . $requestId) || 
-                                str_contains($imgBytes, "request_id=" . $requestId) ||
-                                str_contains($imgBytes, "PENDING_SIG_" . $requestId)) {
-                                $isTargetPlaceholder = true;
-                            }
-                            // 2. Steganographic pixel marker embedded at (8..10, 8)
-                            elseif ($size && $size[0] >= 350 && $size[0] <= 450 && $size[1] >= 350 && $size[1] <= 450) {
-                                $im = @imagecreatefromstring($imgBytes);
-                                if ($im) {
-                                    $w = imagesx($im);
-                                    $h = imagesy($im);
-                                    $hasMagic = false;
-                                    if ($w >= 11 && $h >= 10) {
-                                        $magicRgb = imagecolorat($im, 8, 8);
-                                        $mr = ($magicRgb >> 16) & 0xFF;
-                                        $mg = ($magicRgb >> 8) & 0xFF;
-                                        $mb = $magicRgb & 0xFF;
-                                        if ($mr === 222 && $mg === 173 && $mb === 190) {
-                                            $hasMagic = true;
-                                            $reqRgb = imagecolorat($im, 9, 8);
-                                            $rr = ($reqRgb >> 16) & 0xFF;
-                                            $rg = ($reqRgb >> 8) & 0xFF;
-                                            $rb = $reqRgb & 0xFF;
-                                            $embeddedId = $rr | ($rg << 8) | ($rb << 16);
-                                            if ($embeddedId === $requestId) {
-                                                $isTargetPlaceholder = true;
-                                            }
-                                        }
-                                    }
-                                    // 3. Fallback to amber background if no steganographic marker was found (legacy)
-                                    if (!$isTargetPlaceholder && !$hasMagic) {
-                                        $rgb = imagecolorat($im, 20, 20);
-                                        $r = ($rgb >> 16) & 0xFF;
-                                        $g = ($rgb >> 8) & 0xFF;
-                                        $b = $rgb & 0xFF;
-                                        if ($r >= 245 && $r <= 255 && $g >= 235 && $g <= 252 && $b >= 190 && $b <= 210) {
-                                            $isTargetPlaceholder = true;
-                                        }
-                                    }
-                                    imagedestroy($im);
-                                }
-                            }
-                            // 4. If the image is a generic DocuFlow placeholder without specific request id tag (fallback)
-                            elseif (str_contains($imgBytes, "DocuFlowSigReq") && !preg_match('/DocuFlowSigReq[^\d]*(\d+)/', $imgBytes)) {
-                                $isTargetPlaceholder = true;
-                            }
-
-                            if ($isTargetPlaceholder) {
+                            $extractedId = $this->extractRequestIdFromImage($imgBytes);
+                            
+                            // Exact match on request ID
+                            if ($extractedId !== null && $extractedId === $requestId) {
                                 $zip->addFromString($entryName, $sigBytes);
                                 $mediaReplaced = true;
+                                break; // Stop! Replaced only the placeholder belonging to this request
+                            } elseif ($extractedId === null) {
+                                $size = @getimagesizefromstring($imgBytes);
+                                if ($size && $size[0] >= 350 && $size[0] <= 450 && $size[1] >= 350 && $size[1] <= 450) {
+                                    $unidentifiedMedia[] = $entryName;
+                                }
                             }
                         }
                     }
+                }
+
+                // Fallback: If no exact ID match was found, BUT there is EXACTLY 1 unidentified square placeholder image in the entire document
+                // (e.g. single-signatory document where PNG chunks/steganography were stripped), replace that single image.
+                if (!$mediaReplaced && count($unidentifiedMedia) === 1) {
+                    $zip->addFromString($unidentifiedMedia[0], $sigBytes);
+                    $mediaReplaced = true;
                 }
             }
 

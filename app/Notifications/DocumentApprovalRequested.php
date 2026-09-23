@@ -28,10 +28,14 @@ class DocumentApprovalRequested extends Notification
     public function toArray(object $notifiable): array
     {
         $isRename = $this->version->isRename();
-        $hasSignature = \App\Models\SignatureRequest::where('document_id', $this->document->id)
+        $sigReq = \App\Models\SignatureRequest::with('requestedSignature.company')
+            ->where('document_id', $this->document->id)
             ->where('target_user_id', $notifiable->id)
             ->where('status', 'pending')
-            ->exists();
+            ->first();
+        $hasSignature = !is_null($sigReq);
+        $isStamp = $sigReq?->isStamp() ?? false;
+        $companyName = $sigReq?->requestedSignature?->company?->name;
 
         if ($isRename) {
             $title = __('Permintaan Persetujuan Perubahan Nama Dokumen');
@@ -43,6 +47,20 @@ class DocumentApprovalRequested extends Notification
                     'ver'    => $this->version->version_number,
                 ])
                 : __(':author mengajukan perubahan nama dokumen ":doc" (v:ver) untuk persetujuan.', [
+                    'author' => $this->authorName,
+                    'doc'    => $this->document->title,
+                    'ver'    => $this->version->version_number,
+                ]);
+        } elseif ($isStamp) {
+            $title = __('Permintaan Persetujuan & Stempel Perusahaan');
+            $message = $companyName
+                ? __(':author mengajukan dokumen ":doc" (v:ver) untuk persetujuan dan stempel perusahaan (:company) Anda.', [
+                    'author'  => $this->authorName,
+                    'company' => $companyName,
+                    'doc'     => $this->document->title,
+                    'ver'     => $this->version->version_number,
+                ])
+                : __(':author mengajukan dokumen ":doc" (v:ver) untuk persetujuan dan stempel perusahaan Anda.', [
                     'author' => $this->authorName,
                     'doc'    => $this->document->title,
                     'ver'    => $this->version->version_number,
@@ -64,18 +82,24 @@ class DocumentApprovalRequested extends Notification
         }
 
         return [
-            'type'            => 'approval_request',
-            'title'           => $title,
-            'message'         => $message,
-            'is_rename'       => $isRename,
-            'has_signature'   => $hasSignature,
-            'old_title'       => $this->version->old_title,
-            'url'             => route('documents.show', $this->document->id, false),
-            'icon'            => $hasSignature ? 'signature' : 'approval',
-            'document_id'     => $this->document->id,
-            'document_title'  => $this->document->title,
-            'document_number' => $this->document->document_number,
-            'actor_name'      => $this->authorName,
+            'type'                 => 'approval_request',
+            'title'                => $title,
+            'message'              => $message,
+            'is_rename'            => $isRename,
+            'has_signature'        => $hasSignature,
+            'is_stamp'             => $isStamp,
+            'request_type'         => $isStamp ? 'stamp' : ($hasSignature ? 'signature' : 'approval'),
+            'signature_request_id' => $sigReq?->id,
+            'company_name'         => $companyName,
+            'old_title'            => $this->version->old_title,
+            'url'                  => route('documents.show', $this->document->id, false),
+            'icon'                 => $isStamp ? 'stamp' : ($hasSignature ? 'signature' : 'approval'),
+            'document_id'          => $this->document->id,
+            'version_id'           => $this->version->id,
+            'version_number'       => $this->version->version_number,
+            'document_title'       => $this->document->title,
+            'document_number'      => $this->document->document_number,
+            'actor_name'           => $this->authorName,
         ];
     }
 

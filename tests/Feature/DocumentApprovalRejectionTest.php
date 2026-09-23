@@ -376,7 +376,7 @@ class DocumentApprovalRejectionTest extends TestCase
         $response = $this->actingAs($author)
             ->post(route('documents.finish-editing', $document));
 
-        $response->assertRedirect(route('documents.show', $document));
+        $response->assertRedirect(route('documents.show', ['document' => $document, 'saving' => 1]));
         $response->assertSessionHas('success');
 
         // Document approver should be resolved to the unit kerja head
@@ -470,5 +470,239 @@ class DocumentApprovalRejectionTest extends TestCase
         $document->refresh();
         $this->assertFalse($document->isLockedForEditing());
         $this->assertTrue($author->can('edit', $document));
+    }
+
+    public function test_revision_reverts_signatures_to_placeholders_while_keeping_rejected_version_intact(): void
+    {
+        $company = Company::create(['name' => 'PT Test', 'code' => 'TEST']);
+        $branch = Branch::create(['company_id' => $company->id, 'name' => 'Klinik Surabaya', 'is_pusat' => false]);
+
+        $unitKerja = UnitKerja::create(['nama_unit_kerja' => 'K3', 'kode_unit_kerja' => '04']);
+        $unitMutu = UnitKerja::create(['nama_unit_kerja' => 'Manajemen Mutu', 'kode_unit_kerja' => '01']);
+
+        $author = User::factory()->create(['unit_kerja_id' => $unitKerja->id, 'name' => 'Author User']);
+        $author->companies()->attach($company->id);
+        $author->branches()->attach($branch->id);
+
+        $spv = User::factory()->create(['unit_kerja_id' => $unitKerja->id, 'name' => 'SPV User', 'system_role' => 'head']);
+        $spv->companies()->attach($company->id);
+        $spv->branches()->attach($branch->id);
+
+        $mutu = User::factory()->create(['unit_kerja_id' => $unitMutu->id, 'name' => 'Mutu User', 'system_role' => 'head']);
+        $mutu->companies()->attach($company->id);
+        $mutu->branches()->attach($branch->id);
+
+        $pjKlinik = User::factory()->create(['name' => 'PJ Klinik User', 'system_role' => 'pic_klinik']);
+        $pjKlinik->companies()->attach($company->id);
+        $pjKlinik->branches()->attach($branch->id);
+        $branch->update(['pic_klinik_id' => $pjKlinik->id]);
+        $personalSigPj = $pjKlinik->signatures()->create([
+            'type' => 'original',
+            'file_path' => 'signatures/pj_klinik.png',
+        ]);
+
+        $docType = DocumentType::create(['name' => 'KAK', 'code' => 'KAK', 'category' => 'akreditasi']);
+        $document = Document::create([
+            'document_number' => '001/KAK-04/TEST/IX/2026',
+            'title' => 'Dokumen Uji',
+            'document_type_id' => $docType->id,
+            'owner_id' => $author->id,
+            'unit_kerja_id' => $unitKerja->id,
+            'company_id' => $company->id,
+            'branch_id' => $branch->id,
+            'visibility' => 'general',
+        ]);
+
+        $v1 = DocumentVersion::create([
+            'document_id' => $document->id,
+            'version_number' => 1,
+            'author_id' => $author->id,
+            'author_name' => $author->name,
+            'status' => 'pending',
+            'content' => '<p>Konten Dokumen</p><img data-ttd-user="SPV User" src="spv.png"><img data-ttd-user="Mutu User" src="mutu.png">',
+        ]);
+
+        $sigReqSpv = \App\Models\SignatureRequest::create([
+            'requester_id' => $author->id,
+            'target_user_id' => $spv->id,
+            'document_id' => $document->id,
+            'status' => 'approved',
+            'is_used' => true,
+        ]);
+
+        $sigReqMutu = \App\Models\SignatureRequest::create([
+            'requester_id' => $author->id,
+            'target_user_id' => $mutu->id,
+            'document_id' => $document->id,
+            'status' => 'approved',
+            'is_used' => true,
+        ]);
+
+        $sigReqPj = \App\Models\SignatureRequest::create([
+            'requester_id' => $author->id,
+            'target_user_id' => $pjKlinik->id,
+            'document_id' => $document->id,
+            'status' => 'pending',
+        ]);
+
+        // Step 1 SPV is approved
+        $step1 = \App\Models\DocumentApprovalStep::create([
+            'document_id' => $document->id,
+            'version_id' => $v1->id,
+            'signature_request_id' => $sigReqSpv->id,
+            'step_order' => 1,
+            'step_type' => 'head_approval',
+            'step_name' => 'Review SPV',
+            'assigned_user_id' => $spv->id,
+            'assigned_role' => 'head',
+            'status' => 'approved',
+            'action_by_id' => $spv->id,
+            'action_at' => now(),
+        ]);
+
+        // Step 2 Mutu is approved
+        $step2 = \App\Models\DocumentApprovalStep::create([
+            'document_id' => $document->id,
+            'version_id' => $v1->id,
+            'signature_request_id' => $sigReqMutu->id,
+            'step_order' => 2,
+            'step_type' => 'head_approval',
+            'step_name' => 'Review Mutu',
+            'assigned_user_id' => $mutu->id,
+            'assigned_role' => 'head',
+            'status' => 'approved',
+            'action_by_id' => $mutu->id,
+            'action_at' => now(),
+        ]);
+
+        // Step 3 PJ Klinik rejects
+        $step3 = \App\Models\DocumentApprovalStep::create([
+            'document_id' => $document->id,
+            'version_id' => $v1->id,
+            'signature_request_id' => $sigReqPj->id,
+            'step_order' => 3,
+            'step_type' => 'pic_klinik_approval',
+            'step_name' => 'Pengesahan PJ Klinik',
+            'assigned_user_id' => $pjKlinik->id,
+            'assigned_role' => 'pic_klinik',
+            'status' => 'pending',
+        ]);
+
+        // PJ Klinik rejects
+        app(\App\Services\ApprovalRoutingService::class)->rejectApproval($step3, $pjKlinik, 'Perlu perbaikan format');
+
+        // Assert v1 is marked rejected
+        $v1->refresh();
+        $this->assertEquals('rejected', $v1->status);
+        $this->assertEquals('Perlu perbaikan format', $v1->review_notes);
+
+        // Assert author accesses edit -> prepares v2 revision
+        $response = $this->actingAs($author)->get(route('documents.edit', $document));
+        $response->assertOk();
+
+        // Assert v2 was created as draft with reverted content / placeholders intact
+        $v2 = $document->versions()->where('version_number', 2)->first();
+        $this->assertNotNull($v2);
+        $this->assertStringContainsString('[ttd:SPV User]', $v2->content);
+        $this->assertStringContainsString('[ttd:Mutu User]', $v2->content);
+
+        // Assert all signature requests (SPV, Mutu, PJ Klinik) are reset to pending for v2 so layout & workflow remain intact
+        $this->assertEquals('pending', $sigReqSpv->fresh()->status);
+        $this->assertEquals('pending', $sigReqMutu->fresh()->status);
+        $this->assertEquals('pending', $sigReqPj->fresh()->status);
+        $this->assertFalse($sigReqSpv->fresh()->is_used);
+        $this->assertFalse($sigReqMutu->fresh()->is_used);
+        $this->assertFalse($sigReqPj->fresh()->is_used);
+
+        // Assert v1 content remained unchanged for historical audit
+        $this->assertStringContainsString('data-ttd-user="Mutu User"', $v1->fresh()->content);
+    }
+
+    public function test_rollback_request_sends_notification_to_head_and_shows_requester_in_notification_and_banner(): void
+    {
+        $company = Company::create(['name' => 'PT Test CMH', 'code' => 'CMH']);
+        $branch = Branch::create(['company_id' => $company->id, 'name' => 'Cabang Utama', 'is_pusat' => true]);
+        $unitKerja = UnitKerja::create(['nama_unit_kerja' => 'Tim K3', 'kode_unit_kerja' => '04']);
+
+        $author = User::factory()->create([
+            'unit_kerja_id' => $unitKerja->id,
+            'name' => 'Staff Agus',
+            'email' => 'agus.k3@cmh.test',
+            'system_role' => 'staff',
+            'is_active' => true,
+        ]);
+        $author->companies()->attach($company->id);
+        $author->branches()->attach($branch->id);
+        $author->unitKerjas()->attach($unitKerja->id);
+
+        $head = User::factory()->create([
+            'unit_kerja_id' => $unitKerja->id,
+            'name' => 'Fajri SPV',
+            'email' => 'fajri.spv@cmh.test',
+            'system_role' => 'head',
+            'is_active' => true,
+        ]);
+        $head->companies()->attach($company->id);
+        $head->branches()->attach($branch->id);
+        $head->unitKerjas()->attach($unitKerja->id);
+        $unitKerja->update(['pic_user_id' => $head->id]);
+
+        $docType = DocumentType::create(['name' => 'SOP Medis', 'code' => 'SOP']);
+        $document = Document::create([
+            'document_number' => '009/K3/SOP/2026',
+            'title' => 'SOP Penanganan Limbah Medis',
+            'document_type_id' => $docType->id,
+            'owner_id' => $author->id,
+            'unit_kerja_id' => $unitKerja->id,
+            'company_id' => $company->id,
+            'branch_id' => $branch->id,
+            'visibility' => 'general',
+        ]);
+
+        $v1 = DocumentVersion::create([
+            'document_id' => $document->id,
+            'version_number' => 1,
+            'author_id' => $author->id,
+            'author_name' => $author->name,
+            'status' => 'active',
+            'content' => '<p>Versi 1</p>',
+        ]);
+
+        $v2 = DocumentVersion::create([
+            'document_id' => $document->id,
+            'version_number' => 2,
+            'author_id' => $author->id,
+            'author_name' => $author->name,
+            'status' => 'active',
+            'content' => '<p>Versi 2</p>',
+        ]);
+
+        $document->update(['current_version_id' => $v2->id]);
+
+        // 1. Staff requests rollback to v1
+        $response = $this->actingAs($author)->post(route('approvals.rollback', [$document, $v1]));
+        $response->assertRedirect(route('documents.show', $document));
+
+        // 2. Head receives notification in DB
+        $headNotifs = $head->notifications()->get();
+        $this->assertCount(1, $headNotifs);
+        $notifData = $headNotifs->first()->data;
+        $this->assertEquals('rollback_request', $notifData['type']);
+        $this->assertEquals('Staff Agus', $notifData['actor_name']);
+        $this->assertStringContainsString('Staff Agus', $notifData['message']);
+
+        // 3. /notifications API endpoint returns notification for Head with requester name
+        $apiResponse = $this->actingAs($head)->getJson(route('notifications.index'));
+        $apiResponse->assertOk();
+        $apiNotifs = $apiResponse->json('notifications');
+        $this->assertCount(1, $apiNotifs);
+        $this->assertEquals('Staff Agus', $apiNotifs[0]['actor_name']);
+        $this->assertEquals('rollback_request', $apiNotifs[0]['type']);
+
+        // 4. Head visits document show page: sees pending rollback banner with requester name
+        $showResponse = $this->actingAs($head)->get(route('documents.show', $document));
+        $showResponse->assertOk();
+        $showResponse->assertSee(__('Menunggu Persetujuan Rollback'));
+        $showResponse->assertSee('Staff Agus');
     }
 }

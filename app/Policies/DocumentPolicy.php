@@ -206,6 +206,10 @@ class DocumentPolicy
 
     public function rename(User $user, Document $document): bool
     {
+        if ($document->hasPendingRename() || $document->isLockedForEditing()) {
+            return false;
+        }
+
         if (!$this->view($user, $document)) return false;
         if ($user->id === $document->owner_id || $user->isAdmin() || $user->isDirector()) return true;
         if ($user->isPicKlinik() && in_array($document->branch_id, $user->allBranchIds(), true)) {
@@ -219,6 +223,10 @@ class DocumentPolicy
 
     public function requestRename(User $user, Document $document): bool
     {
+        if ($document->hasPendingRename() || $document->isLockedForEditing()) {
+            return false;
+        }
+
         if (!$this->view($user, $document)) return false;
         if ($user->id === $document->owner_id || $user->isAdmin() || $user->isDirector()) return true;
         if ($user->isPicKlinik() && in_array($document->branch_id, $user->allBranchIds(), true)) {

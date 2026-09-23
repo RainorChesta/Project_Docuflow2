@@ -82,6 +82,47 @@
                 ?? $document->currentVersion?->reviewed_at 
                 ?? $document->currentVersion?->created_at;
 
+            // Helper function to resolve clean official role / position
+            $resolveOfficialRole = function($step, $user, $document) {
+                if ($step) {
+                    $stepName = $step->step_name ?? '';
+                    $assignedRole = $step->assigned_role ?? '';
+                    $unitName = $user?->unitKerja?->nama_unit_kerja ?? $step->actionBy?->unitKerja?->nama_unit_kerja ?? $document->unitKerja?->nama_unit_kerja;
+                    $branchName = $document->branch?->name ?? $user?->branches?->first()?->name ?? '';
+
+                    if (str_contains($stepName, 'Kepala Cabang') || str_contains($stepName, 'PJ Klinik') || $assignedRole === 'pic_klinik' || $user?->system_role === 'pic_klinik') {
+                        return __('PJ Klinik / Kepala Cabang') . ($branchName ? (' • ' . $branchName) : '');
+                    }
+                    if (str_contains($stepName, 'Kepala Unit') || $assignedRole === 'kepala_unit_kerja' || $user?->system_role === 'kepala_unit_kerja') {
+                        return __('Kepala Unit Kerja') . ($unitName ? (' • ' . $unitName) : '');
+                    }
+                    if ($assignedRole === 'direktur' || $user?->system_role === 'direktur') {
+                        return __('Direktur Perusahaan');
+                    }
+                    if ($assignedRole === 'admin' || $user?->system_role === 'admin') {
+                        return __('Administrator Dokumen');
+                    }
+                    
+                    $cleanStep = preg_replace('/\s*\([^)]*\)$/', '', $stepName);
+                    if ($cleanStep && !in_array(strtolower($cleanStep), ['approval', 'review', 'step'])) {
+                        return $cleanStep . ($unitName ? (' • ' . $unitName) : '');
+                    }
+                }
+
+                if ($user?->system_role) {
+                    $unitName = $user->unitKerja?->nama_unit_kerja ?? $document->unitKerja?->nama_unit_kerja;
+                    return match($user->system_role) {
+                        'pic_klinik' => __('PJ Klinik / Kepala Cabang') . ($document->branch?->name ? (' • ' . $document->branch->name) : ''),
+                        'kepala_unit_kerja' => __('Kepala Unit Kerja') . ($unitName ? (' • ' . $unitName) : ''),
+                        'direktur' => __('Direktur Perusahaan'),
+                        'admin' => __('Administrator'),
+                        default => ucfirst(str_replace('_', ' ', $user->system_role)) . ($unitName ? (' • ' . $unitName) : ''),
+                    };
+                }
+
+                return null;
+            };
+
             $timelineItems = [];
 
             // 1. Completed Node
@@ -90,6 +131,7 @@
                     'type' => 'completed',
                     'action' => __('Digital signing completed'),
                     'by' => $document->owner?->name ?? __('System'),
+                    'role' => __('Pengesahan Selesai & Terenkripsi Digital'),
                     'email' => $document->owner?->email,
                     'unit' => null,
                     'time' => $lastActionTime ? ($lastActionTime->format('d M Y \a\t H:i') . ' (WIB)') : null,
@@ -113,6 +155,7 @@
                             ? ($step->signature_request_id ? __('Signed') : __('Approved')) 
                             : ($isBypassed ? __('Auto-approved') : ($isPending ? __('Signature requested') : __('Rejected'))),
                         'by' => $user?->name ?? __('Pejabat Terkait'),
+                        'role' => $resolveOfficialRole($step, $user, $document),
                         'email' => $user?->email,
                         'unit' => $user?->unitKerja?->nama_unit_kerja ?? $step->actionBy?->unitKerja?->nama_unit_kerja,
                         'time' => $actionTime ? ($actionTime->format('d M Y \a\t H:i') . ' (WIB)') : ($isPending ? __('Menunggu respon penandatangan') : null),
@@ -120,12 +163,14 @@
                     ];
                 }
             } elseif ($document->currentVersion?->reviewer) {
+                $revUser = $document->currentVersion->reviewer;
                 $timelineItems[] = [
                     'type' => 'reviewer',
                     'action' => __('Approved'),
-                    'by' => $document->currentVersion->reviewer->name,
-                    'email' => $document->currentVersion->reviewer->email,
-                    'unit' => $document->currentVersion->reviewer->unitKerja?->nama_unit_kerja,
+                    'by' => $revUser->name,
+                    'role' => $resolveOfficialRole(null, $revUser, $document),
+                    'email' => $revUser->email,
+                    'unit' => $revUser->unitKerja?->nama_unit_kerja,
                     'time' => $document->currentVersion->reviewed_at ? ($document->currentVersion->reviewed_at->format('d M Y \a\t H:i') . ' (WIB)') : null,
                     'status' => 'approved',
                 ];
@@ -134,12 +179,14 @@
             // 3. Bottom Initial Creation Node
             $creator = $document->currentVersion?->author ?? $document->owner;
             $createdTime = $document->currentVersion?->created_at ?? $document->created_at;
+            $creatorUnit = $document->unitKerja?->nama_unit_kerja ?? $creator?->unitKerja?->nama_unit_kerja;
             $timelineItems[] = [
                 'type' => 'receive',
                 'action' => __('Receive document'),
                 'by' => $creator?->name ?? __('System'),
+                'role' => __('Pembuat Dokumen') . ($creatorUnit ? (' • ' . $creatorUnit) : ''),
                 'email' => $creator?->email,
-                'unit' => $document->unitKerja?->nama_unit_kerja,
+                'unit' => $creatorUnit,
                 'time' => $createdTime ? ($createdTime->format('d M Y \a\t H:i') . ' (WIB)') : null,
                 'status' => 'receive',
             ];
@@ -193,23 +240,41 @@
                         </div>
 
                         {{-- Column 2: Content --}}
-                        <div class="flex-1 text-xs {{ !$isLast ? 'pb-4' : 'pb-0' }} pt-0.5 space-y-0.5">
+                        <div class="flex-1 text-xs {{ !$isLast ? 'pb-4' : 'pb-0' }} pt-0.5 space-y-1">
                             <div class="text-[13px] leading-snug">
                                 <span class="font-bold text-base-content">{{ $item['action'] }}</span>
                                 <span class="text-base-content/60 font-normal">{{ $item['type'] === 'receive' ? __('from') : __('by') }}</span>
                                 <span class="font-semibold text-base-content">{{ $item['by'] }}</span>
                             </div>
 
-                            @if(!empty($item['email']) || !empty($item['unit']))
-                                <div class="text-base-content/60 text-[11px] font-mono break-all">
-                                    @if(!empty($item['email'])) ({{ $item['email'] }}) @endif
-                                    @if(!empty($item['unit'])) • <span class="font-sans">{{ $item['unit'] }}</span> @endif
+                            {{-- Official Role / Jabatan Resmi Penandatangan --}}
+                            @if(!empty($item['role']))
+                                <div class="text-primary font-medium text-[11px] flex items-center gap-1.5 flex-wrap">
+                                    <span class="inline-flex items-center gap-1">
+                                        <svg class="w-3 h-3 text-primary/75 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                        </svg>
+                                        {{ $item['role'] }}
+                                    </span>
                                 </div>
                             @endif
 
+                            {{-- Email --}}
+                            @if(!empty($item['email']))
+                                <div class="text-base-content/50 text-[11px] font-mono break-all">
+                                    {{ $item['email'] }}
+                                </div>
+                            @endif
+
+                            {{-- Timestamp & Verification Badge --}}
                             @if(!empty($item['time']))
-                                <div class="text-base-content/50 text-[11px] pt-0.5">
-                                    {{ $item['time'] }}
+                                <div class="text-base-content/50 text-[11px] pt-0.5 flex items-center gap-1.5 flex-wrap">
+                                    <span>{{ $item['time'] }}</span>
+                                    @if($item['status'] === 'approved' && $item['type'] === 'step')
+                                        <span class="badge badge-success/15 text-success border border-success/20 text-[9px] font-semibold px-1.5 py-0 h-4">
+                                            {{ __('Tanda Tangan Terverifikasi') }}
+                                        </span>
+                                    @endif
                                 </div>
                             @endif
                         </div>

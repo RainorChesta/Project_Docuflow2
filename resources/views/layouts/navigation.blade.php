@@ -266,12 +266,12 @@
         @endphp
 
         @if($isStaffOnly && $canSeeApproval)
-        {{-- For Staff: Single "Signature" navigation item (no sub-menus, no rollback) --}}
+        {{-- For Staff: Single unified navigation item (no sub-menus, no rollback) --}}
         <a href="{{ route('approvals.versions') }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ $isApprovalActive ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
-           :title="open ? '' : '{{ __('Signature') }}'">
+           :title="open ? '' : '{{ __('Document Approval & Signature') }}'">
             <div class="icon-wrapper shrink-0 relative">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -284,7 +284,7 @@
                 @endif
             </div>
             <span class="text-label min-w-0 flex-1 flex items-center justify-between gap-1.5" :class="open ? '' : 'lg:hidden'">
-                <span class="truncate">{{ __('Signature') }}</span>
+                <span class="truncate">{{ __('Document Approval & Signature') }}</span>
                 @if($totalApprovalCount > 0)
                     <span class="badge badge-error badge-sm font-bold text-white px-1.5 shadow-sm shadow-error/50">{{ $totalApprovalCount }}</span>
                 @endif
@@ -336,14 +336,14 @@
                  x-transition:leave-end="opacity-0 -translate-y-1"
                  class="pl-2.5 pr-1 space-y-1 border-l-2 border-base-300/60 ml-3.5 my-1"
                  x-cloak>
-                {{-- Sub-menu 1: Document Approval (Version) --}}
+                {{-- Sub-menu 1: Document Approval & Signature --}}
                 <a href="{{ route('approvals.versions') }}"
                    class="flex items-center justify-between gap-1.5 px-2 py-2 rounded-xl text-[12.5px] font-medium transition-all duration-200
                           {{ request()->routeIs('approvals.versions') || (request()->routeIs('approvals.index') && !in_array(request('tab'), ['rollbacks', 'renames'])) ? 'bg-primary/10 text-primary font-bold shadow-xs' : 'text-base-content/60 hover:text-base-content hover:bg-base-200/60' }}"
-                   title="{{ __('Document Approval (Version)') }}">
+                   title="{{ __('Document Approval & Signature') }}">
                     <span class="flex items-center gap-2 min-w-0 flex-1">
                         <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ request()->routeIs('approvals.versions') || (request()->routeIs('approvals.index') && !in_array(request('tab'), ['rollbacks', 'renames'])) ? 'bg-primary' : 'bg-base-content/30' }}"></span>
-                        <span class="leading-tight break-words">{{ __('Document Approval (Version)') }}</span>
+                        <span class="leading-tight break-words">{{ __('Document Approval & Signature') }}</span>
                     </span>
                     @if($pendingVersionsCount > 0)
                         <span class="badge badge-primary text-white font-bold badge-xs px-1.5 py-2 shrink-0 self-center ml-1">

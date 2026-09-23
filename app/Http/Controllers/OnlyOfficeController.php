@@ -197,19 +197,8 @@ class OnlyOfficeController extends Controller
 
         $requestId = (int) $request->query('request_id', 0);
         if ($requestId > 0) {
-            imagestring($image, 1, 10, 380, "DocuFlowSigReq:" . $requestId, $bgColor);
-
-            // Steganographic metadata in top-inner border pixels (x=8..10, y=8)
-            // Pixel 0: Magic marker DF (222, 173, 190)
-            // Pixel 1: Request ID low/mid/high bytes
-            // Pixel 2: isStamp flag
-            $magicColor = imagecolorallocate($image, 222, 173, 190);
-            $reqColor   = imagecolorallocate($image, ($requestId & 0xFF), (($requestId >> 8) & 0xFF), (($requestId >> 16) & 0xFF));
-            $stampColor = imagecolorallocate($image, $isStamp ? 1 : 0, 88, 99);
-
-            imagesetpixel($image, 8, 8, $magicColor);
-            imagesetpixel($image, 9, 8, $reqColor);
-            imagesetpixel($image, 10, 8, $stampColor);
+            // Embed invisible identifier text using background color
+            imagestring($image, 1, 10, 380, "DocuFlowSigReq:#" . $requestId . "# [DF-REQ:#" . $requestId . "#]", $bgColor);
         }
 
         ob_start();
@@ -219,7 +208,7 @@ class OnlyOfficeController extends Controller
 
         if ($requestId > 0) {
             $keyword = "DocuFlowSigReq";
-            $text = (string) $requestId;
+            $text = "#" . $requestId . "#";
             $chunkData = $keyword . "\0" . $text;
             $chunkLen = pack('N', strlen($chunkData));
             $chunkType = 'tEXt';
@@ -364,18 +353,6 @@ class OnlyOfficeController extends Controller
                         if ($signaturePath && file_exists($signaturePath)) {
                             $processor->processSignature($document, $version, $req->id, $signaturePath, $req);
                         }
-                    }
-                }
-
-                // Automatically remove any rejected signature placeholders from the document
-                $rejectedRequests = \App\Models\SignatureRequest::where('document_id', $document->id)
-                    ->where('status', 'rejected')
-                    ->get();
-
-                if ($rejectedRequests->isNotEmpty()) {
-                    $processor = app(\App\Services\DocumentProcessorService::class);
-                    foreach ($rejectedRequests as $req) {
-                        $processor->removeSignaturePlaceholder($document, $version, $req->id);
                     }
                 }
 

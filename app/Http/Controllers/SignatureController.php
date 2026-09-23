@@ -120,16 +120,15 @@ class SignatureController extends Controller
                 ]);
             }
 
-            // For direct PDF placement, dispatch notification immediately
-            if ($isDirectPdfPlacement) {
-                $requestRecord->sendNotification();
-            }
-
             if ($doc) {
                 $pendingVersion = $doc->versions()->where('status', 'pending')->latest('id')->first();
                 if ($pendingVersion) {
                     app(\App\Services\ApprovalRoutingService::class)->compileWorkflowFromSignatures($doc, $pendingVersion, $doc->owner ?? Auth::user());
+                } elseif ($isDirectPdfPlacement) {
+                    $requestRecord->sendNotification();
                 }
+            } elseif ($isDirectPdfPlacement) {
+                $requestRecord->sendNotification();
             }
 
             $isStamp = $requestedSig->type === 'company_stamp';
