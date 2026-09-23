@@ -647,6 +647,9 @@ class OnlyOfficeService
                     'comments' => false,
                     'toolbarNoTabs' => false,
                     'feedback' => false,
+                    'logo' => [
+                        'url' => 'https://cmhgroup.id/',
+                    ],
                     'goback' => [
                         'url' => route('documents.show', $document),
                         'text' => __('Kembali ke Detail Dokumen'),
@@ -728,6 +731,9 @@ class OnlyOfficeService
                     'comments' => false,
                     'toolbarNoTabs' => false,
                     'feedback' => false,
+                    'logo' => [
+                        'url' => 'https://cmhgroup.id/',
+                    ],
                     'goback' => [
                         'url' => route('admin.templates.index'),
                         'text' => __('Kembali ke Daftar Template'),

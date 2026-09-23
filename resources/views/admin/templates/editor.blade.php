@@ -68,7 +68,7 @@
     </div>
 
     @push('scripts')
-        <script src="{{ rtrim(config('onlyoffice.url'), '/') }}/web-apps/apps/api/documents/api.js?v=9.4.0-f4-v2"
+        <script src="{{ rtrim(config('onlyoffice.url'), '/') }}/web-apps/apps/api/documents/api.js?v=9.4.0-cmh-v2"
                 onerror="document.getElementById('onlyoffice-fallback').classList.remove('hidden');"></script>
         <script>
             const mainScrollContainer = document.querySelector('main') || document.documentElement;

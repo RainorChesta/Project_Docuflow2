@@ -272,9 +272,20 @@ define([
                     Common.Gateway.on('grabfocus',      _.bind(this.onGrabFocus, this));
                     Common.Gateway.appReady();
 
-//                $(window.top).resize(_.bind(this.onDocumentResize, this));
                     this.getApplication().getController('Viewport').setApi(this.api);
                     this.getApplication().getController('Statusbar').setApi(this.api);
+
+                    // CMHGROUP Logo: click to open website
+                    $(document).on('click', '#header-logo, #header-logo i, #header-logo img, .logo', function(e) {
+                        if (e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                        }
+                        window.open('https://cmhgroup.id/', '_blank');
+                    });
+                    $(function() {
+                        $('#header-logo, #header-logo i, .logo').css('cursor', 'pointer').attr('title', 'CMHGROUP');
+                    });
 
                     /** coauthoring begin **/
                     this.contComments = this.getApplication().getController('Common.Controllers.Comments');
