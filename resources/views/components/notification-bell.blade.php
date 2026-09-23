@@ -257,10 +257,10 @@
                                             <template x-if="notif.status === 'approved' || (notif.type || '').includes('approved')">
                                                 <span class="badge badge-success badge-xs font-bold text-white uppercase shrink-0">{{ __('Disetujui') }}</span>
                                             </template>
-                                            <template x-if="(notif.type || '').includes('stamp_request')">
+                                            <template x-if="(notif.type || '').includes('stamp_request') || notif.request_type === 'stamp' || notif.icon === 'stamp' || notif.is_stamp">
                                                 <span class="badge badge-secondary badge-xs font-bold uppercase shrink-0">{{ __('Stempel') }}</span>
                                             </template>
-                                            <template x-if="(notif.type || '').includes('signature_request') && !(notif.type || '').includes('stamp') && !(notif.type || '').includes('approved') && !(notif.type || '').includes('rejected')">
+                                            <template x-if="((notif.type || '').includes('signature_request') || notif.has_signature || notif.request_type === 'signature' || notif.icon === 'signature') && !(notif.type || '').includes('stamp') && notif.request_type !== 'stamp' && notif.icon !== 'stamp' && !notif.is_stamp && !(notif.type || '').includes('approved') && !(notif.type || '').includes('rejected') && notif.status !== 'approved' && notif.status !== 'rejected'">
                                                 <span class="badge badge-primary badge-xs font-bold uppercase shrink-0">{{ __('TTD') }}</span>
                                             </template>
                                         </div>

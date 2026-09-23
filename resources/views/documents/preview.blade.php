@@ -109,7 +109,7 @@
                                         </p>
                                         <div class="modal-action">
                                             <button type="button" onclick="document.getElementById('approve-sig-modal-{{ $pendingSigRequest->id }}').close()" class="btn btn-ghost btn-sm">{{ __('Batal') }}</button>
-                                            <form method="POST" action="{{ route('signatures.requests.approve', $pendingSigRequest) }}" onsubmit="document.getElementById('approve-sig-modal-{{ $pendingSigRequest->id }}')?.close(); document.getElementById('loading-modal')?.showModal();" class="inline">
+                                            <form method="POST" action="{{ route('signatures.requests.approve', $pendingSigRequest) }}" data-prevent-double-submit="true" onsubmit="const btn = this.querySelector('button[type=submit]'); if(btn){ btn.disabled = true; btn.classList.add('opacity-75', 'cursor-not-allowed'); } document.getElementById('approve-sig-modal-{{ $pendingSigRequest->id }}')?.close(); document.getElementById('loading-modal')?.showModal();" class="inline">
                                                 @csrf
                                                 <button type="submit" class="btn btn-success btn-sm gap-1.5 font-semibold text-white">
                                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -168,7 +168,7 @@
                                         </div>
 
                                         {{-- Form --}}
-                                        <form method="POST" action="{{ route('signatures.requests.reject', $pendingSigRequest) }}">
+                                        <form method="POST" action="{{ route('signatures.requests.reject', $pendingSigRequest) }}" data-prevent-double-submit="true" onsubmit="const btn = this.querySelector('button[type=submit]'); if(btn){ btn.disabled = true; btn.classList.add('opacity-75', 'cursor-not-allowed'); }">
                                             @csrf
                                             <div class="px-6 pb-5 space-y-2">
                                                 <div class="flex items-center justify-between">
@@ -213,30 +213,32 @@
                                 </dialog>
                             @elseif($pendingVersion && auth()->user() && auth()->user()->can('approve', $document))
                                 @php
-                                    $userSignatures = auth()->user() ? auth()->user()->signatures()->where('status', 'active')->get() : collect();
+                                    $hasPendingSignature = \App\Models\SignatureRequest::where('document_id', $document->id)
+                                        ->where('target_user_id', auth()->id())
+                                        ->where('status', 'pending')
+                                        ->exists();
                                 @endphp
                                 <button type="button" onclick="document.getElementById('approve-version-preview-modal-{{ $pendingVersion->id }}').showModal()" class="btn btn-success btn-sm rounded-xl text-white font-semibold gap-1.5 px-4 shadow-xs hover:shadow-md transition-all">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
-                                    {{ __('Setujui Dokumen') }}
+                                    {{ $hasPendingSignature ? __('Setujui & Tandatangani') : __('Setujui Dokumen') }}
                                 </button>
                                 <button type="button" onclick="document.getElementById('reject-version-preview-modal-{{ $pendingVersion->id }}').showModal()" class="btn btn-error btn-sm rounded-xl text-white font-semibold gap-1 px-3 shadow-xs hover:shadow-md transition-all">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
                                     {{ __('Tolak') }}
                                 </button>
 
-                                {{-- Enhanced Reusable Approve Version Modal with Direct Signature Options --}}
+                                {{-- Reusable Approve Version Modal --}}
                                 @include('approvals._approve_modal', [
                                     'document' => $document,
                                     'version' => $pendingVersion,
                                     'modalId' => 'approve-version-preview-modal-' . $pendingVersion->id,
-                                    'hasPendingSignature' => false,
-                                    'userSignatures' => $userSignatures,
+                                    'hasPendingSignature' => $hasPendingSignature,
                                 ])
 
                                 {{-- Reject Version Modal --}}
                                 <dialog id="reject-version-preview-modal-{{ $pendingVersion->id }}" class="modal modal-bottom sm:modal-middle text-left whitespace-normal backdrop-blur-xs">
                                     <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-lg">
-                                        <form method="POST" action="{{ route('approvals.reject', [$document, $pendingVersion]) }}">
+                                        <form method="POST" action="{{ route('approvals.reject', [$document, $pendingVersion]) }}" data-prevent-double-submit="true" onsubmit="const btn = this.querySelector('button[type=submit]'); if(btn){ btn.disabled = true; btn.classList.add('opacity-75', 'cursor-not-allowed'); }">
                                             @csrf
                                             <div class="p-6 pb-4">
                                                 <div class="flex items-start justify-between gap-4">

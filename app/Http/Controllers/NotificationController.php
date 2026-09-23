@@ -50,8 +50,10 @@ class NotificationController extends Controller
                 'signature_request_approved',
                 'signature_request_rejected',
                 'approval_result',
+                'rollback_request',
                 'rollback_approved',
                 'rollback_rejected',
+                'rename_request',
                 'rename_approved',
                 'rename_rejected',
                 'document_opened',
@@ -158,8 +160,37 @@ class NotificationController extends Controller
         $rawNotifications = $request->user()->notifications()->latest()->limit(100)->get();
         $filtered = $this->filterNotifications($request->user(), $rawNotifications);
 
+        // Deduplicate unread notifications of the same type/action for the same document/version so user never sees duplicate alerts
+        $seen = [];
+        $uniqueFiltered = $filtered->filter(function ($n) use (&$seen) {
+            $type = $n->data['type'] ?? '';
+            $docId = $n->data['document_id'] ?? null;
+            $verNum = $n->data['version_number'] ?? ($n->data['version_id'] ?? null);
+            $actorName = $n->data['actor_name'] ?? '';
+            $isUnread = is_null($n->read_at);
+
+            if ($isUnread && $docId) {
+                if (in_array($type, ['approval_request', 'signature_request', 'route_resolved'], true)) {
+                    $dedupKey = "req_{$type}_{$docId}_{$verNum}";
+                    if (isset($seen[$dedupKey])) {
+                        return false;
+                    }
+                    $seen[$dedupKey] = true;
+                } elseif (in_array($type, ['approval_result', 'signature_request_approved', 'stamp_request_approved'], true)) {
+                    // Consolidate simultaneous approval outcome notifications for the same document & signer
+                    $timeKey = $n->created_at ? $n->created_at->format('Y-m-d H:i') : '';
+                    $dedupKey = "outcome_{$docId}_{$actorName}_{$timeKey}";
+                    if (isset($seen[$dedupKey])) {
+                        return false;
+                    }
+                    $seen[$dedupKey] = true;
+                }
+            }
+            return true;
+        });
+
         $docIds = [];
-        foreach ($filtered as $n) {
+        foreach ($uniqueFiltered as $n) {
             $docId = $n->data['document_id'] ?? null;
             if (!$docId) {
                 $url = $n->data['url'] ?? '';
@@ -176,7 +207,7 @@ class NotificationController extends Controller
             ? \App\Models\Document::withTrashed()->with('versions')->whereIn('id', array_unique(array_values($docIds)))->get()->keyBy('id')
             : collect();
 
-        $notifications = $filtered->take(20)->map(function ($n) use ($docIds, $documents) {
+        $notifications = $uniqueFiltered->take(20)->map(function ($n) use ($docIds, $documents) {
             $docId = $docIds[$n->id] ?? ($n->data['document_id'] ?? null);
             $doc = $docId ? $documents->get($docId) : null;
             $type = $n->data['type'] ?? 'general';
@@ -226,10 +257,13 @@ class NotificationController extends Controller
                 'reason'          => $n->data['reason'] ?? ($n->data['notes'] ?? null),
                 'document_id'     => $docId,
                 'document_title'  => $documentTitle,
-                'document_number' => $n->data['document_number'] ?? ($doc?->document_number ?? null),
-                'request_type'    => $n->data['request_type'] ?? null,
-                'company_name'    => $n->data['company_name'] ?? null,
-                'actor_name'      => $n->data['actor_name'] ?? ($n->data['author'] ?? ($n->data['reviewer'] ?? ($n->data['requester_name'] ?? ($n->data['shared_by'] ?? null)))),
+                'document_number'      => $n->data['document_number'] ?? ($doc?->document_number ?? null),
+                'request_type'         => $n->data['request_type'] ?? null,
+                'company_name'         => $n->data['company_name'] ?? null,
+                'signature_request_id' => $n->data['signature_request_id'] ?? null,
+                'has_signature'        => (bool) ($n->data['has_signature'] ?? false),
+                'is_stamp'             => (bool) ($n->data['is_stamp'] ?? false),
+                'actor_name'           => $n->data['actor_name'] ?? ($n->data['author'] ?? ($n->data['reviewer'] ?? ($n->data['requester_name'] ?? ($n->data['shared_by'] ?? null)))),
             ];
         })->values();
 
@@ -291,6 +325,31 @@ class NotificationController extends Controller
     private function getUnreadCount($user): int
     {
         $rawUnread = $user->unreadNotifications()->latest()->limit(100)->get();
-        return $this->filterNotifications($user, $rawUnread)->count();
+        $filtered = $this->filterNotifications($user, $rawUnread);
+        $seen = [];
+        return $filtered->filter(function ($n) use (&$seen) {
+            $type = $n->data['type'] ?? '';
+            $docId = $n->data['document_id'] ?? null;
+            $verNum = $n->data['version_number'] ?? ($n->data['version_id'] ?? null);
+            $actorName = $n->data['actor_name'] ?? '';
+
+            if ($docId) {
+                if (in_array($type, ['approval_request', 'signature_request', 'route_resolved'], true)) {
+                    $dedupKey = "req_{$type}_{$docId}_{$verNum}";
+                    if (isset($seen[$dedupKey])) {
+                        return false;
+                    }
+                    $seen[$dedupKey] = true;
+                } elseif (in_array($type, ['approval_result', 'signature_request_approved', 'stamp_request_approved'], true)) {
+                    $timeKey = $n->created_at ? $n->created_at->format('Y-m-d H:i') : '';
+                    $dedupKey = "outcome_{$docId}_{$actorName}_{$timeKey}";
+                    if (isset($seen[$dedupKey])) {
+                        return false;
+                    }
+                    $seen[$dedupKey] = true;
+                }
+            }
+            return true;
+        })->count();
     }
 }

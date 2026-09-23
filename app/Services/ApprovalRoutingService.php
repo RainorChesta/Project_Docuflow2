@@ -49,6 +49,15 @@ class ApprovalRoutingService
                 $isPusat = true;
             }
 
+            // Reset any previous signature requests on this document to pending/unused for this new approval run
+            SignatureRequest::where('document_id', $document->id)
+                ->where('status', '!=', 'pending')
+                ->update([
+                    'status' => 'pending',
+                    'is_used' => false,
+                    'rejected_reason' => null,
+                ]);
+
             // Fetch signature requests attached to this document
             $signatureRequests = SignatureRequest::where('document_id', $document->id)
                 ->with(['targetUser.unitKerjas', 'targetUser.unitKerja', 'requestedSignature'])
@@ -72,7 +81,7 @@ class ApprovalRoutingService
                                 $q->where('unit_kerja_id', $originUnit->id)
                                   ->orWhereHas('unitKerjas', fn($uq) => $uq->where('unit_kerjas.id', $originUnit->id));
                             })
-                            ->first() ?? $this->findActiveUsers($document, 'head')->first();
+                            ->first();
                     }
                 }
 
@@ -214,6 +223,8 @@ class ApprovalRoutingService
                 }
             } else {
                 // ── Fallback when NO signature boxes are in the document ──
+                // Dokumen tanpa kotak TTD hanya memerlukan Persetujuan / Review Kepala Unit Kerja (PIC Unit).
+                // Pengesahan PIC Klinik hanya dibuat apabila kotak TTD PIC Klinik disematkan ke dalam dokumen.
                 $picUnit = null;
                 $docUnitKerjaId = $document->unit_kerja_id ?? $creator->unit_kerja_id ?? ($creator->allUnitKerjaIds()[0] ?? null);
                 $originUnit = $document->unitKerja ?? ($docUnitKerjaId ? UnitKerja::find($docUnitKerjaId) : null);
@@ -227,51 +238,51 @@ class ApprovalRoutingService
                                 $q->where('unit_kerja_id', $originUnit->id)
                                   ->orWhereHas('unitKerjas', fn($uq) => $uq->where('unit_kerjas.id', $originUnit->id));
                             })
-                            ->first() ?? $this->findActiveUsers($document, 'head')->first();
+                            ->first();
                     }
+                }
+
+                if (!$picUnit) {
+                    $picUnit = $this->findActiveUsers($document, 'pic_klinik', $creator)->first()
+                        ?? $this->findActiveUsers($document, 'head', $creator)->first()
+                        ?? $this->findActiveUsers($document, 'admin', $creator)->first();
                 }
 
                 if ($picUnit) {
                     $isCreatorPicUnit = ($creator->id === $picUnit->id);
                     $unitName = $originUnit?->nama_unit_kerja ?? 'Unit Kerja';
 
+                    $stepName = $picUnit->isPicKlinik()
+                        ? __('Pengesahan Kepala Cabang :branch (:name)', [
+                            'branch' => $document->branch?->name ?? 'Cabang',
+                            'name' => $picUnit->name,
+                        ])
+                        : ($picUnit->isAdmin()
+                            ? __('Review & Pengesahan Admin (:name)', ['name' => $picUnit->name])
+                            : ($picUnit->isDirector()
+                                ? __('Pengesahan Direktur PT (:name)', ['name' => $picUnit->name])
+                                : __('Persetujuan Kepala Unit :unit (:name)', [
+                                    'unit' => $unitName,
+                                    'name' => $picUnit->name,
+                                ])));
+
+                    $stepType = $picUnit->isPicKlinik()
+                        ? 'pic_klinik_approval'
+                        : ($picUnit->isAdmin()
+                            ? 'admin_approval'
+                            : ($picUnit->isDirector() ? 'director_approval' : 'pic_unit_acknowledge'));
+
                     $stepsToCreate[] = [
                         'step_order' => $order++,
                         'signature_request_id' => null,
-                        'step_type' => 'pic_unit_acknowledge',
-                        'step_name' => __('Persetujuan Kepala Unit :unit (:name)', [
-                            'unit' => $unitName,
-                            'name' => $picUnit->name,
-                        ]),
+                        'step_type' => $stepType,
+                        'step_name' => $stepName,
                         'assigned_user_id' => $picUnit->id,
-                        'assigned_role' => 'head',
+                        'assigned_role' => $picUnit->system_role ?? 'head',
                         'status' => $isCreatorPicUnit ? 'bypassed' : 'waiting',
                         'action_by_id' => $isCreatorPicUnit ? $creator->id : null,
                         'action_at' => $isCreatorPicUnit ? now() : null,
-                        'notes' => $isCreatorPicUnit ? __('Dilewati otomatis (Pembuat adalah Kepala Unit Kerja)') : null,
-                    ];
-                }
-
-                $picKlinik = $document->branch?->picKlinik
-                    ?? ($document->branch ? $document->branch->users()->where('system_role', 'pic_klinik')->where('is_active', true)->first() : null)
-                    ?? ($isPusat ? null : $this->findActiveUsers($document, 'head')->first())
-                    ?? $this->findActiveUsers($document, 'admin')->first();
-
-                if ($picKlinik && (!$picUnit || $picKlinik->id !== $picUnit->id)) {
-                    $isCreatorPicKlinik = ($creator->id === $picKlinik->id);
-                    $branchName = $document->branch?->name ?? 'Cabang';
-
-                    $stepsToCreate[] = [
-                        'step_order' => $order++,
-                        'signature_request_id' => null,
-                        'step_type' => 'pic_klinik_approval',
-                        'step_name' => __('Pengesahan Kepala :branch', ['branch' => $branchName]),
-                        'assigned_user_id' => $picKlinik->id,
-                        'assigned_role' => $picKlinik->system_role ?? 'pic_klinik',
-                        'status' => $isCreatorPicKlinik ? 'bypassed' : 'waiting',
-                        'action_by_id' => $isCreatorPicKlinik ? $creator->id : null,
-                        'action_at' => $isCreatorPicKlinik ? now() : null,
-                        'notes' => $isCreatorPicKlinik ? __('Dilewati otomatis (Pembuat adalah Kepala Cabang)') : null,
+                        'notes' => $isCreatorPicUnit ? __('Dilewati otomatis (Pembuat dokumen)') : null,
                     ];
                 }
             }
@@ -303,16 +314,33 @@ class ApprovalRoutingService
                     'approver_role' => $firstActiveStep->assigned_role ?? $firstActiveStep->assignedUser?->system_role,
                 ]);
 
-                // Notify active approver
+                // Notify active approver / signer with unified DocumentApprovalRequested (prevent duplicate dispatch)
                 if ($firstActiveStep->assignedUser) {
-                    $firstActiveStep->assignedUser->notify(
-                        new DocumentApprovalRequested($document, $version, $creator->name)
-                    );
+                    $hasUnreadNotif = $firstActiveStep->assignedUser->unreadNotifications()
+                        ->where('type', DocumentApprovalRequested::class)
+                        ->where(function ($q) use ($document, $version) {
+                            $q->where('data->version_id', (string) $version->id)
+                              ->orWhere('data->version_id', (int) $version->id)
+                              ->orWhere(function ($sub) use ($document, $version) {
+                                  $sub->where('data->document_id', (string) $document->id)
+                                      ->where('data->version_number', (int) $version->version_number);
+                              });
+                        })
+                        ->exists();
+
+                    if (!$hasUnreadNotif) {
+                        $firstActiveStep->assignedUser->notify(
+                            new DocumentApprovalRequested($document, $version, $creator->name)
+                        );
+                    }
                 }
 
-                // If the first active step is linked to a signature request, notify that signer now
+                // If the first active step is linked to a signature request, mark it notified
                 if ($firstActiveStep->signature_request_id) {
-                    $firstActiveStep->signatureRequest?->sendNotification();
+                    $firstActiveStep->signatureRequest?->update([
+                        'notified_at' => now(),
+                        'requested_at' => now(),
+                    ]);
                 }
 
                 $stepLabel = $firstActiveStep->step_name;
@@ -324,13 +352,24 @@ class ApprovalRoutingService
                     'step' => $stepLabel,
                 ]);
 
-                $creator->notify(new ApprovalRouteResolved(
-                    $document,
-                    $firstActiveStep->assigned_role ?? 'head',
-                    $firstActiveStep->assignedUser?->name ?? 'Approver',
-                    $message,
-                    false
-                ));
+                $hasCreatorNotif = $creator->unreadNotifications()
+                    ->where('type', ApprovalRouteResolved::class)
+                    ->where(function ($q) use ($document) {
+                        $q->where('data->document_id', (string) $document->id)
+                          ->orWhere('data->document_id', (int) $document->id);
+                    })
+                    ->where('created_at', '>=', now()->subSeconds(30))
+                    ->exists();
+
+                if (!$hasCreatorNotif) {
+                    $creator->notify(new ApprovalRouteResolved(
+                        $document,
+                        $firstActiveStep->assigned_role ?? 'head',
+                        $firstActiveStep->assignedUser?->name ?? 'Approver',
+                        $message,
+                        false
+                    ));
+                }
 
                 return [
                     'steps' => $createdSteps,
@@ -393,41 +432,22 @@ class ApprovalRoutingService
             $document = $step->document;
             $version = $step->version;
 
-            // Merge with Signature: Automatically apply and stamp any pending signature request of this approver
-            $sigRequests = SignatureRequest::where('document_id', $document->id)
-                ->where('target_user_id', $actor->id)
-                ->where('status', 'pending')
-                ->get();
+            // Merge with Signature: Automatically apply and stamp any pending signature request specifically assigned to this approver/step
+            $sigRequests = collect();
 
             if ($step->signature_request_id && $step->signatureRequest && $step->signatureRequest->status === 'pending') {
-                if (!$sigRequests->contains(fn($r) => $r->id === $step->signature_request_id)) {
-                    $sigRequests->push($step->signatureRequest);
-                }
-            }
-
-            // Optional Signature Insertion: If review-only step had no pre-placed signature box, but the reviewer opted to attach their signature directly on modal
-            if ($sigRequests->isEmpty() && ($includeSignature || $signatureId)) {
-                $sig = $signatureId ? $actor->signatures()->find($signatureId) : ($actor->signatures()->where('type', 'original')->first() ?? $actor->signatures()->first());
-                if ($sig) {
-                    $newSigReq = SignatureRequest::create([
-                        'requester_id' => $version->author_id ?? $document->owner_id ?? $actor->id,
-                        'target_user_id' => $actor->id,
-                        'document_id' => $document->id,
-                        'requested_signature_id' => $sig->id,
-                        'status' => 'pending',
-                        'is_used' => false,
-                        'page_number' => $pageNumber ?: 1,
-                        'preset_position' => $presetPosition ?: 'bottom-right',
-                        'requested_at' => now(),
-                        'notified_at' => now(),
-                    ]);
-                    $step->update(['signature_request_id' => $newSigReq->id]);
-                    $sigRequests->push($newSigReq);
-                }
+                $sigRequests->push($step->signatureRequest);
+            } else {
+                $userSigRequests = SignatureRequest::where('document_id', $document->id)
+                    ->where('target_user_id', $actor->id)
+                    ->where('status', 'pending')
+                    ->get();
+                $sigRequests = $userSigRequests;
             }
 
             foreach ($sigRequests as $sigReq) {
-                $this->applyAndStampSignature($sigReq, $actor);
+                // In workflow progression, the workflow itself notifies author/requester via DocumentApprovalResult upon completion
+                $this->applyAndStampSignature($sigReq, $actor, notifyRequester: false);
             }
 
             // Handle dynamic escalation from PIC Unit to Kepala Cabang if requested
@@ -473,14 +493,31 @@ class ApprovalRoutingService
 
                 if ($nextStep->assignedUser) {
                     $authorName = $version->author?->name ?? 'User';
-                    $nextStep->assignedUser->notify(
-                        new DocumentApprovalRequested($document, $version, $authorName)
-                    );
+                    $hasUnreadNotif = $nextStep->assignedUser->unreadNotifications()
+                        ->where('type', DocumentApprovalRequested::class)
+                        ->where(function ($q) use ($document, $version) {
+                            $q->where('data->version_id', (string) $version->id)
+                              ->orWhere('data->version_id', (int) $version->id)
+                              ->orWhere(function ($sub) use ($document, $version) {
+                                  $sub->where('data->document_id', (string) $document->id)
+                                      ->where('data->version_number', (int) $version->version_number);
+                              });
+                        })
+                        ->exists();
+
+                    if (!$hasUnreadNotif) {
+                        $nextStep->assignedUser->notify(
+                            new DocumentApprovalRequested($document, $version, $authorName)
+                        );
+                    }
                 }
 
-                // If next step is linked to a signature request, notify that signer now
+                // If next step is linked to a signature request, mark it notified
                 if ($nextStep->signature_request_id) {
-                    $nextStep->signatureRequest?->sendNotification();
+                    $nextStep->signatureRequest?->update([
+                        'notified_at' => now(),
+                        'requested_at' => now(),
+                    ]);
                 }
 
                 return false; // Workflow still has pending steps
@@ -522,7 +559,7 @@ class ApprovalRoutingService
     /**
      * Apply and stamp user signature/stamp directly onto the document and mark SignatureRequest approved.
      */
-    public function applyAndStampSignature(SignatureRequest $signatureRequest, ?User $actor = null): void
+    public function applyAndStampSignature(SignatureRequest $signatureRequest, ?User $actor = null, bool $notifyRequester = true): void
     {
         $actor = $actor ?? auth()->user();
 
@@ -578,7 +615,7 @@ class ApprovalRoutingService
         }
 
         $signatureRequest->loadMissing(['requester', 'document', 'targetUser', 'requestedSignature.company']);
-        if ($signatureRequest->requester && $signatureRequest->document && $signatureRequest->requester_id !== $actor?->id) {
+        if ($notifyRequester && $signatureRequest->requester && $signatureRequest->document && $signatureRequest->requester_id !== $actor?->id) {
             $signatureRequest->requester->notify(
                 new \App\Notifications\SignatureRequestApprovedNotification(
                     $signatureRequest,
@@ -624,8 +661,6 @@ class ApprovalRoutingService
                 ]);
 
                 if ($document && $version) {
-                    $processor = app(DocumentProcessorService::class);
-                    $processor->removeSignaturePlaceholder($document, $version, $sigReq->id);
                     app(OnlyOfficeService::class)->rotateDocumentKey($document, $version);
                 }
 
@@ -797,5 +832,56 @@ class ApprovalRoutingService
             'approver_id' => $firstApprover?->id,
             'approver_role' => $resolution['role'],
         ]);
+    }
+
+    /**
+     * Resolve all authorized approvers to notify when a document rollback is requested.
+     */
+    public function resolveRollbackApprovers(Document $document, ?User $excludeUser = null): Collection
+    {
+        $approvers = collect();
+
+        // 1. Origin Unit Head (Kepala Unit Kerja)
+        if ($document->unit_kerja_id) {
+            $originUnit = $document->unitKerja ?? UnitKerja::find($document->unit_kerja_id);
+            if ($originUnit) {
+                if ($originUnit->pic_user_id) {
+                    $unitPic = $originUnit->picUser;
+                    if ($unitPic && $unitPic->is_active && (!$excludeUser || $unitPic->id !== $excludeUser->id)) {
+                        $approvers->push($unitPic);
+                    }
+                }
+                $heads = $this->findActiveUsers($document, 'head', $excludeUser);
+                foreach ($heads as $h) {
+                    $approvers->push($h);
+                }
+            }
+        }
+
+        // 2. PIC Klinik (Kepala Cabang)
+        if ($document->branch_id) {
+            $picKlinik = $document->branch?->picKlinik;
+            if ($picKlinik && $picKlinik->is_active && (!$excludeUser || $picKlinik->id !== $excludeUser->id)) {
+                $approvers->push($picKlinik);
+            }
+            $picKliniks = $this->findActiveUsers($document, 'pic_klinik', $excludeUser);
+            foreach ($picKliniks as $pk) {
+                $approvers->push($pk);
+            }
+        }
+
+        // 3. Fallback to Admins / Directors if no specific unit or branch head found
+        if ($approvers->isEmpty()) {
+            $admins = $this->findActiveUsers($document, 'admin', $excludeUser);
+            foreach ($admins as $adm) {
+                $approvers->push($adm);
+            }
+            $directors = $this->findActiveUsers($document, 'direktur', $excludeUser);
+            foreach ($directors as $dir) {
+                $approvers->push($dir);
+            }
+        }
+
+        return $approvers->unique('id');
     }
 }

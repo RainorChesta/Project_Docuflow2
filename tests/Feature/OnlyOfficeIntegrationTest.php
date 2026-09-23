@@ -594,10 +594,10 @@ class OnlyOfficeIntegrationTest extends TestCase
             'key' => 'doc_test_key_final',
         ]);
 
-        // Notification IS sent after editing finishes and document is saved
+        // Unified Notification IS sent after editing finishes and document is saved
         \Illuminate\Support\Facades\Notification::assertSentTo(
             $signerUser,
-            \App\Notifications\SignatureRequested::class
+            \App\Notifications\DocumentApprovalRequested::class
         );
 
         $this->assertNotNull($sigRequest->fresh()->notified_at);

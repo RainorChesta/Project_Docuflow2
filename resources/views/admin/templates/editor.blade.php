@@ -177,7 +177,10 @@
                 })
                 .then(res => res.json())
                 .then(data => {
-                    window.location.href = data.redirect_url || targetUrl;
+                    const redirectUrl = data.redirect_url || targetUrl;
+                    setTimeout(() => {
+                        window.location.href = redirectUrl;
+                    }, 500);
                 })
                 .catch(err => {
                     console.warn('finish-editing template request error:', err);

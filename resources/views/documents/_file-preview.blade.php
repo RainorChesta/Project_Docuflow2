@@ -1,6 +1,6 @@
 @php
     $isPdf = str_contains($version->file_mime ?? '', 'pdf');
-    $fileUrl = route('documents.file', [$document, $version]);
+    $fileUrl = route('documents.file', [$document, $version]) . '?t=' . ($version->updated_at?->timestamp ?? time());
 @endphp
 
 <div class="w-full">
@@ -51,18 +51,15 @@
                         }
 
                         const mainEl = document.querySelector('main') || document.documentElement;
-                        const initialScrollTop = mainEl.scrollTop || 0;
+                        const initialScrollTop = mainEl ? mainEl.scrollTop : 0;
                         let guardActive = true;
 
-                        // Allow normal user scrolling immediately upon any user interaction
+                        // Only actual wheel/touch gestures release the autofocus guard (not button clicks)
                         const releaseGuard = function() {
                             guardActive = false;
                         };
                         window.addEventListener('wheel', releaseGuard, { passive: true, capture: true });
                         window.addEventListener('touchmove', releaseGuard, { passive: true, capture: true });
-                        window.addEventListener('pointerdown', releaseGuard, { passive: true, capture: true });
-                        window.addEventListener('mousedown', releaseGuard, { passive: true, capture: true });
-                        window.addEventListener('keydown', releaseGuard, { passive: true, capture: true });
 
                         function restoreScrollIfAutofocused() {
                             if (guardActive && mainEl && mainEl.scrollTop !== initialScrollTop) {
@@ -70,8 +67,8 @@
                             }
                         }
 
-                        // Release guard after 1.5s max so it never blocks scrolling
-                        setTimeout(releaseGuard, 1500);
+                        // Release guard after 4s max so it never interferes with user scrolling
+                        setTimeout(releaseGuard, 4000);
 
                         config.events = config.events || {};
                         const origOnAppReady = config.events.onAppReady;
@@ -84,7 +81,8 @@
                         config.events.onDocumentReady = function() {
                             restoreScrollIfAutofocused();
                             setTimeout(restoreScrollIfAutofocused, 50);
-                            setTimeout(releaseGuard, 300);
+                            setTimeout(restoreScrollIfAutofocused, 200);
+                            setTimeout(restoreScrollIfAutofocused, 500);
 
                             if (typeof origOnDocumentReady === 'function') origOnDocumentReady();
                         };

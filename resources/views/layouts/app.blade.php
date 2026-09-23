@@ -138,7 +138,7 @@
                 </header>
 
                 <!-- Page Content -->
-                <main class="flex-1 p-3 sm:p-6 overflow-y-auto print:block print:h-auto print:overflow-visible print:p-0">
+                <main class="flex-1 p-3 sm:p-6 overflow-y-auto print:block print:h-auto print:overflow-visible print:p-0 [overflow-anchor:none]">
                     <div class="print:hidden max-w-7xl mx-auto w-full pt-2 sm:pt-4">
                     @php
                         $crumbs = [];
@@ -234,7 +234,7 @@
                             } elseif (str_starts_with($name, 'approvals.')) {
                                 $crumbs[] = ['label' => __('Approval'), 'url' => route('approvals.versions')];
                                 if ($name === 'approvals.versions') {
-                                    $crumbs[] = ['label' => __('Document Approval (Version)'), 'url' => null];
+                                    $crumbs[] = ['label' => __('Document Approval & Signature'), 'url' => null];
                                 } elseif ($name === 'approvals.renames') {
                                     $crumbs[] = ['label' => __('Rename Approval'), 'url' => null];
                                 } elseif ($name === 'approvals.rollbacks') {

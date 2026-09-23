@@ -551,14 +551,12 @@ class ApprovalController extends Controller
         $reviewer = auth()->user();
         $notes = $request->input('notes');
         $escalateToKacab = $request->boolean('escalate_to_kacab');
-        $includeSignature = $request->boolean('include_signature');
         $signatureId = $request->filled('signature_id') ? (int) $request->input('signature_id') : null;
         $pageNumber = (int) $request->input('signature_page_number', 1);
         $presetPosition = $request->input('signature_preset_position', 'bottom-right');
 
         // If direct signature canvas drawing or direct file upload was provided in modal
         if ($request->filled('signature_data') || $request->hasFile('signature_image')) {
-            $includeSignature = true;
             $newSig = $this->createSignatureFromInput($request, $reviewer);
             if ($newSig) {
                 $signatureId = $newSig->id;
@@ -572,7 +570,7 @@ class ApprovalController extends Controller
                 $reviewer,
                 $notes,
                 $escalateToKacab,
-                $includeSignature,
+                false,
                 $signatureId,
                 $pageNumber,
                 $presetPosition
@@ -585,24 +583,6 @@ class ApprovalController extends Controller
                 ->where('target_user_id', $reviewer->id)
                 ->where('status', 'pending')
                 ->first();
-
-            if (!$pendingSig && ($includeSignature || $signatureId)) {
-                $sig = $signatureId ? $reviewer->signatures()->find($signatureId) : ($reviewer->signatures()->where('type', 'original')->first() ?? $reviewer->signatures()->first());
-                if ($sig) {
-                    $pendingSig = \App\Models\SignatureRequest::create([
-                        'requester_id' => $version->author_id ?? $document->owner_id ?? $reviewer->id,
-                        'target_user_id' => $reviewer->id,
-                        'document_id' => $document->id,
-                        'requested_signature_id' => $sig->id,
-                        'status' => 'pending',
-                        'is_used' => false,
-                        'page_number' => $pageNumber ?: 1,
-                        'preset_position' => $presetPosition ?: 'bottom-right',
-                        'requested_at' => now(),
-                        'notified_at' => now(),
-                    ]);
-                }
-            }
 
             if ($pendingSig) {
                 $this->approvalRoutingService->applyAndStampSignature($pendingSig, $reviewer);
@@ -741,9 +721,9 @@ class ApprovalController extends Controller
         ]);
 
         // Dynamic approval routing for rollback notifications
-        $resolution = $this->approvalRoutingService->resolveApprover($document, $user);
+        $approvers = $this->approvalRoutingService->resolveRollbackApprovers($document, $user);
 
-        foreach ($resolution['approvers'] as $approver) {
+        foreach ($approvers as $approver) {
             $approver->notify(new \App\Notifications\DocumentRollbackRequested($document, $version, $user->name));
         }
 

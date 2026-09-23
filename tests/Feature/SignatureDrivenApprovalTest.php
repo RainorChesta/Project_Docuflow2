@@ -684,12 +684,10 @@ class SignatureDrivenApprovalTest extends TestCase
         $tabResponse->assertRedirect(route('signatures.requests.index'));
     }
 
-    public function test_review_only_step_can_optionally_insert_signature_when_approved(): void
+    public function test_review_only_step_approves_cleanly_without_signature_request(): void
     {
         $k3UnitKerja = UnitKerja::create(['nama_unit_kerja' => 'Tim K3', 'kode_unit_kerja' => '04']);
-        $mutuUnitKerja = UnitKerja::create(['nama_unit_kerja' => 'Tim Manajemen Mutu', 'kode_unit_kerja' => '01']);
 
-        // Head of Tim K3 (Fajri)
         $headK3 = User::factory()->create([
             'name' => 'Fajri Reviewer',
             'email' => 'fajri.reviewer@dhu.com',
@@ -701,17 +699,9 @@ class SignatureDrivenApprovalTest extends TestCase
         $headK3->branches()->sync([$this->pusatBranch->id]);
         $headK3->unitKerjas()->sync([$k3UnitKerja->id]);
 
-        // Fajri has a registered signature
-        $fajriSig = $headK3->signatures()->create([
-            'type' => 'original',
-            'file_path' => 'signatures/fajri_sig.png',
-            'created_via' => 'upload',
-        ]);
-
-        // Staff creates document without [ttd:Fajri] tag
         $document = Document::create([
             'document_number' => '008/K3/SOP/2026',
-            'title' => 'SOP Review Only with Optional Signature',
+            'title' => 'SOP Review Only',
             'company_id' => $this->company->id,
             'branch_id' => $this->pusatBranch->id,
             'unit_kerja_id' => $k3UnitKerja->id,
@@ -735,68 +725,7 @@ class SignatureDrivenApprovalTest extends TestCase
         $this->assertEquals($headK3->id, $step->assigned_user_id);
         $this->assertNull($step->signature_request_id); // Initially no signature request
 
-        // Fajri approves WITH include_signature = 1
-        $this->actingAs($headK3);
-        $response = $this->post(route('approvals.approve', [$document, $version]), [
-            'notes' => 'Review disetujui dan TTD dilampirkan',
-            'include_signature' => '1',
-            'signature_id' => $fajriSig->id,
-        ]);
-        $response->assertSessionHas('success');
-
-        $step->refresh();
-        $this->assertEquals('approved', $step->status);
-        $this->assertNotNull($step->signature_request_id);
-
-        // Verify that SignatureRequest was dynamically created and approved
-        $createdSigReq = SignatureRequest::find($step->signature_request_id);
-        $this->assertNotNull($createdSigReq);
-        $this->assertEquals($headK3->id, $createdSigReq->target_user_id);
-        $this->assertEquals('approved', $createdSigReq->status);
-        $this->assertEquals($fajriSig->id, $createdSigReq->requested_signature_id);
-    }
-
-    public function test_review_only_step_approves_without_signature_when_unchecked(): void
-    {
-        $k3UnitKerja = UnitKerja::create(['nama_unit_kerja' => 'Tim K3', 'kode_unit_kerja' => '04']);
-
-        $headK3 = User::factory()->create([
-            'name' => 'Fajri Reviewer 2',
-            'email' => 'fajri.reviewer2@dhu.com',
-            'system_role' => 'head',
-            'unit_kerja_id' => $k3UnitKerja->id,
-            'is_active' => true,
-        ]);
-        $headK3->companies()->sync([$this->company->id]);
-        $headK3->branches()->sync([$this->pusatBranch->id]);
-        $headK3->unitKerjas()->sync([$k3UnitKerja->id]);
-
-        $document = Document::create([
-            'document_number' => '009/K3/SOP/2026',
-            'title' => 'SOP Review Only without Signature',
-            'company_id' => $this->company->id,
-            'branch_id' => $this->pusatBranch->id,
-            'unit_kerja_id' => $k3UnitKerja->id,
-            'document_type_id' => $this->sopType->id,
-            'owner_id' => $this->staffUser->id,
-            'visibility' => 'unit_kerja',
-        ]);
-
-        $version = $document->versions()->create([
-            'version_number' => 1,
-            'content' => '<p>Konten SOP Polos 2</p>',
-            'author_id' => $this->staffUser->id,
-            'author_name' => $this->staffUser->name,
-            'status' => 'pending',
-        ]);
-
-        $this->routingService->compileWorkflowFromSignatures($document, $version, $this->staffUser);
-
-        $step = DocumentApprovalStep::where('version_id', $version->id)->first();
-        $this->assertNotNull($step);
-        $this->assertNull($step->signature_request_id);
-
-        // Fajri approves WITHOUT include_signature
+        // Fajri approves as review-only
         $this->actingAs($headK3);
         $response = $this->post(route('approvals.approve', [$document, $version]), [
             'notes' => 'Review disetujui tanpa TTD',
@@ -807,122 +736,6 @@ class SignatureDrivenApprovalTest extends TestCase
         $this->assertEquals('approved', $step->status);
         $this->assertNull($step->signature_request_id);
         $this->assertEmpty(SignatureRequest::where('document_id', $document->id)->get());
-    }
-
-    public function test_review_only_step_can_draw_signature_directly_on_modal_when_approved(): void
-    {
-        $k3UnitKerja = UnitKerja::create(['nama_unit_kerja' => 'Tim K3', 'kode_unit_kerja' => '04']);
-
-        $headK3 = User::factory()->create([
-            'name' => 'Fajri Canvas Reviewer',
-            'email' => 'fajri.canvas@dhu.com',
-            'system_role' => 'head',
-            'unit_kerja_id' => $k3UnitKerja->id,
-            'is_active' => true,
-        ]);
-        $headK3->companies()->sync([$this->company->id]);
-        $headK3->branches()->sync([$this->pusatBranch->id]);
-        $headK3->unitKerjas()->sync([$k3UnitKerja->id]);
-
-        $document = Document::create([
-            'document_number' => '010/K3/SOP/2026',
-            'title' => 'SOP Review with Canvas Signature',
-            'company_id' => $this->company->id,
-            'branch_id' => $this->pusatBranch->id,
-            'unit_kerja_id' => $k3UnitKerja->id,
-            'document_type_id' => $this->sopType->id,
-            'owner_id' => $this->staffUser->id,
-            'visibility' => 'unit_kerja',
-        ]);
-
-        $version = $document->versions()->create([
-            'version_number' => 1,
-            'content' => '<p>Konten Dokumen Review</p>',
-            'author_id' => $this->staffUser->id,
-            'author_name' => $this->staffUser->name,
-            'status' => 'pending',
-        ]);
-
-        $this->routingService->compileWorkflowFromSignatures($document, $version, $this->staffUser);
-
-        // Generate a 1x1 transparent PNG data URL
-        $pngBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
-
-        $this->actingAs($headK3);
-        $response = $this->post(route('approvals.approve', [$document, $version]), [
-            'notes' => 'Disetujui via gores TTD langsung di modal',
-            'include_signature' => '1',
-            'signature_data' => $pngBase64,
-        ]);
-        $response->assertSessionHas('success');
-
-        $step = DocumentApprovalStep::where('version_id', $version->id)->first();
-        $this->assertEquals('approved', $step->status);
-        $this->assertNotNull($step->signature_request_id);
-
-        $createdSigReq = SignatureRequest::find($step->signature_request_id);
-        $this->assertNotNull($createdSigReq);
-        $this->assertEquals($headK3->id, $createdSigReq->target_user_id);
-        $this->assertEquals('approved', $createdSigReq->status);
-        $this->assertTrue($headK3->hasSignature('original'));
-    }
-
-    public function test_review_only_step_can_upload_signature_directly_on_modal_when_approved(): void
-    {
-        \Illuminate\Support\Facades\Storage::fake('public');
-        $k3UnitKerja = UnitKerja::create(['nama_unit_kerja' => 'Tim K3', 'kode_unit_kerja' => '04']);
-
-        $headK3 = User::factory()->create([
-            'name' => 'Fajri Upload Reviewer',
-            'email' => 'fajri.upload@dhu.com',
-            'system_role' => 'head',
-            'unit_kerja_id' => $k3UnitKerja->id,
-            'is_active' => true,
-        ]);
-        $headK3->companies()->sync([$this->company->id]);
-        $headK3->branches()->sync([$this->pusatBranch->id]);
-        $headK3->unitKerjas()->sync([$k3UnitKerja->id]);
-
-        $document = Document::create([
-            'document_number' => '011/K3/SOP/2026',
-            'title' => 'SOP Review with Uploaded Signature',
-            'company_id' => $this->company->id,
-            'branch_id' => $this->pusatBranch->id,
-            'unit_kerja_id' => $k3UnitKerja->id,
-            'document_type_id' => $this->sopType->id,
-            'owner_id' => $this->staffUser->id,
-            'visibility' => 'unit_kerja',
-        ]);
-
-        $version = $document->versions()->create([
-            'version_number' => 1,
-            'content' => '<p>Konten Dokumen Review Upload</p>',
-            'author_id' => $this->staffUser->id,
-            'author_name' => $this->staffUser->name,
-            'status' => 'pending',
-        ]);
-
-        $this->routingService->compileWorkflowFromSignatures($document, $version, $this->staffUser);
-
-        $file = \Illuminate\Http\UploadedFile::fake()->image('signature.png', 100, 50);
-
-        $this->actingAs($headK3);
-        $response = $this->post(route('approvals.approve', [$document, $version]), [
-            'notes' => 'Disetujui via unggah TTD langsung di modal',
-            'include_signature' => '1',
-            'signature_image' => $file,
-        ]);
-        $response->assertSessionHas('success');
-
-        $step = DocumentApprovalStep::where('version_id', $version->id)->first();
-        $this->assertEquals('approved', $step->status);
-        $this->assertNotNull($step->signature_request_id);
-
-        $createdSigReq = SignatureRequest::find($step->signature_request_id);
-        $this->assertNotNull($createdSigReq);
-        $this->assertEquals($headK3->id, $createdSigReq->target_user_id);
-        $this->assertEquals('approved', $createdSigReq->status);
-        $this->assertTrue($headK3->hasSignature('original'));
     }
 
     public function test_document_with_colleague_signature_requires_head_of_unit_review_first_before_colleague_signs(): void
@@ -1034,6 +847,78 @@ class SignatureDrivenApprovalTest extends TestCase
         $this->assertEquals('approved', $steps[1]->status);
         $this->assertEquals('active', $version->status);
         $this->assertEquals($version->id, $document->current_version_id);
+    }
+
+    public function test_branch_document_without_signatures_only_requires_pic_unit_and_does_not_require_pic_klinik(): void
+    {
+        $cabang = Branch::create([
+            'company_id' => $this->company->id,
+            'name' => 'Klinik Pratama Citra Medika',
+            'code' => 'KPCM',
+            'is_pusat' => false,
+        ]);
+
+        $branchUnit = UnitKerja::create(['nama_unit_kerja' => 'Poli Umum', 'kode_unit_kerja' => '05']);
+
+        $headPoli = User::factory()->create([
+            'name' => 'Dr. Budi Head Poli',
+            'email' => 'budi.poli@cmh.test',
+            'system_role' => 'head',
+            'unit_kerja_id' => $branchUnit->id,
+            'is_active' => true,
+        ]);
+        $headPoli->companies()->sync([$this->company->id]);
+        $headPoli->branches()->sync([$cabang->id]);
+        $headPoli->unitKerjas()->sync([$branchUnit->id]);
+
+        $picKlinik = User::factory()->create([
+            'name' => 'Dr. PIC Klinik',
+            'email' => 'pic.klinik@cmh.test',
+            'system_role' => 'pic_klinik',
+            'is_active' => true,
+        ]);
+        $picKlinik->companies()->sync([$this->company->id]);
+        $picKlinik->branches()->sync([$cabang->id]);
+        $cabang->update(['pic_klinik_id' => $picKlinik->id]);
+
+        $author = User::factory()->create([
+            'name' => 'Perawat Siti',
+            'email' => 'siti@cmh.test',
+            'system_role' => 'staff',
+            'unit_kerja_id' => $branchUnit->id,
+            'is_active' => true,
+        ]);
+        $author->companies()->sync([$this->company->id]);
+        $author->branches()->sync([$cabang->id]);
+        $author->unitKerjas()->sync([$branchUnit->id]);
+
+        $document = Document::create([
+            'document_number' => '015/POLI/SOP/2026',
+            'title' => 'SOP Internal Poli Tanpa TTD',
+            'company_id' => $this->company->id,
+            'branch_id' => $cabang->id,
+            'unit_kerja_id' => $branchUnit->id,
+            'document_type_id' => $this->sopType->id,
+            'owner_id' => $author->id,
+            'visibility' => 'unit_kerja',
+        ]);
+
+        $version = $document->versions()->create([
+            'version_number' => 1,
+            'content' => '<p>Konten Dokumen Internal</p>',
+            'author_id' => $author->id,
+            'author_name' => $author->name,
+            'status' => 'pending',
+        ]);
+
+        $result = $this->routingService->compileWorkflowFromSignatures($document, $version, $author);
+        $steps = $result['steps'];
+
+        // Must ONLY have 1 step for Head of Unit (pic_unit_acknowledge), and NOT include PIC Klinik
+        $this->assertCount(1, $steps);
+        $this->assertEquals('pic_unit_acknowledge', $steps[0]->step_type);
+        $this->assertEquals($headPoli->id, $steps[0]->assigned_user_id);
+        $this->assertEquals('pending', $steps[0]->status);
     }
 }
 

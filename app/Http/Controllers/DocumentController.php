@@ -627,7 +627,7 @@ class DocumentController extends Controller
             }
         }
 
-        $document->load('owner', 'unitKerja', 'documentType', 'currentVersion', 'versions.author', 'shares.user', 'unitKerjaShares.unitKerja');
+        $document->load('owner', 'unitKerja', 'documentType', 'currentVersion', 'versions.author', 'shares.user', 'unitKerjaShares.unitKerja', 'rollbackRequestedBy', 'pendingRollbackVersion');
 
         $unitKerjas = auth()->user()->isAdmin()
             ? UnitKerja::orderBy('kode_unit_kerja')->get()
@@ -657,7 +657,9 @@ class DocumentController extends Controller
             }
         }
 
-        return view('documents.show', compact('document', 'unitKerjas', 'onlyOfficeConfig', 'version', 'approvedSignatures', 'companies'));
+        $auditTrail = $this->auditService->getDocumentAuditTrail($document);
+
+        return view('documents.show', compact('document', 'unitKerjas', 'onlyOfficeConfig', 'version', 'approvedSignatures', 'companies', 'auditTrail'));
     }
 
     public function summarize(Request $request, Document $document): JsonResponse
@@ -764,20 +766,29 @@ class DocumentController extends Controller
 
         $this->authorize('update', $document);
 
-        $document->load('currentVersion', 'versions');
+        $currentUser = auth()->user();
 
-        $version = $document->displayVersion();
+        // If the latest version was rejected and no active pending/draft version exists, prepare a new revision version with reverted placeholders
+        $latestVersion = $document->versions()->orderBy('version_number', 'desc')->first();
+        if ($latestVersion && $latestVersion->status === 'rejected') {
+            $version = $this->versionService->prepareRevisionFromRejected($document, $currentUser);
+        } else {
+            $version = $document->displayVersion();
+        }
 
         if (!$version) {
             abort(404, 'Document version not found.');
         }
 
-        $this->autoApplyApprovedSignatures($document, $version);
+        // Only auto-apply approved signatures if this version is an active approved document, not an unfinalized revision
+        if ($version->status !== 'draft' && $version->status !== 'rejected') {
+            $this->autoApplyApprovedSignatures($document, $version);
+        }
 
         $onlyOfficeConfig = $this->onlyOfficeService->generateEditorConfig(
             $document,
             $version,
-            auth()->user(),
+            $currentUser,
             'edit'
         );
 
@@ -972,6 +983,8 @@ class DocumentController extends Controller
         $user = auth()->user();
         $version = $document->displayVersion();
 
+        $this->onlyOfficeService->rotateDocumentKey($document, $version);
+
         $routingMessage = null;
         if ($version) {
             if ($version->status === 'draft') {
@@ -983,21 +996,27 @@ class DocumentController extends Controller
                 $result = $this->approvalRoutingService->compileWorkflowFromSignatures($document, $version, $user);
                 $routingMessage = $result['message'] ?? null;
             }
+
+            $version->touch();
         }
+
+        $document->touch();
 
         $successMessage = $routingMessage ?? __('Perubahan disimpan. Menunggu persetujuan.');
 
         session()->flash('success', $successMessage);
 
+        $redirectUrl = route('documents.show', ['document' => $document, 'saving' => 1]);
+
         if ($request->expectsJson() || $request->wantsJson()) {
             return response()->json([
                 'success' => true,
                 'message' => $successMessage,
-                'redirect_url' => route('documents.show', $document),
+                'redirect_url' => $redirectUrl,
             ]);
         }
 
-        return redirect()->route('documents.show', $document)->with('success', $successMessage);
+        return redirect()->to($redirectUrl)->with('success', $successMessage);
     }
 
     public function saveDraft(Request $request, Document $document): RedirectResponse
@@ -1257,6 +1276,10 @@ class DocumentController extends Controller
 
     public function rename(Request $request, Document $document): RedirectResponse
     {
+        if ($document->hasPendingRename() || $document->isLockedForEditing()) {
+            return back()->with('error', __('Nama dokumen terkunci karena sedang dalam proses persetujuan.'));
+        }
+
         $this->authorize('rename', $document);
 
         $validated = $request->validate([
@@ -1335,6 +1358,10 @@ class DocumentController extends Controller
 
     public function requestRename(Request $request, Document $document): RedirectResponse
     {
+        if ($document->hasPendingRename() || $document->isLockedForEditing()) {
+            return back()->with('error', __('Nama dokumen terkunci karena sedang dalam proses persetujuan.'));
+        }
+
         $this->authorize('requestRename', $document);
 
         $validated = $request->validate([

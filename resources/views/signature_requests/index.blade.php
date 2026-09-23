@@ -421,7 +421,7 @@
                                                             </div>
                                                         </div>
 
-                                                        <form method="POST" action="{{ route('signatures.requests.approve', $req) }}" onsubmit="document.getElementById('approve-modal-{{ $req->id }}').close(); document.getElementById('loading-modal').showModal();">
+                                                        <form method="POST" action="{{ route('signatures.requests.approve', $req) }}" data-prevent-double-submit="true" onsubmit="const btn = this.querySelector('button[type=submit]'); if(btn){ btn.disabled = true; btn.classList.add('opacity-75', 'cursor-not-allowed'); } document.getElementById('approve-modal-{{ $req->id }}')?.close(); document.getElementById('loading-modal')?.showModal();">
                                                             @csrf
                                                             <div class="bg-base-200/40 px-6 py-4 border-t border-base-200 flex items-center justify-end gap-2.5">
                                                                 <button type="button" onclick="document.getElementById('approve-modal-{{ $req->id }}').close()" class="btn btn-ghost btn-sm sm:btn-md rounded-xl font-medium text-base-content/70 hover:text-base-content px-4">
@@ -494,7 +494,7 @@
                                                             </div>
                                                         </div>
 
-                                                        <form method="POST" action="{{ route('signatures.requests.reject', $req) }}">
+                                                        <form method="POST" action="{{ route('signatures.requests.reject', $req) }}" data-prevent-double-submit="true" onsubmit="const btn = this.querySelector('button[type=submit]'); if(btn){ btn.disabled = true; btn.classList.add('opacity-75', 'cursor-not-allowed'); }">
                                                             @csrf
                                                             <div class="px-6 pb-5 space-y-2">
                                                                 <div class="flex items-center justify-between">
@@ -596,7 +596,7 @@
                     </div>
                 </div>
 
-                <form method="POST" action="{{ route('signatures.requests.bulk-approve') }}" onsubmit="document.getElementById('bulk-approve-modal').close(); document.getElementById('loading-modal').showModal();">
+                <form method="POST" action="{{ route('signatures.requests.bulk-approve') }}" data-prevent-double-submit="true" onsubmit="const btn = this.querySelector('button[type=submit]'); if(btn){ btn.disabled = true; btn.classList.add('opacity-75', 'cursor-not-allowed'); } document.getElementById('bulk-approve-modal')?.close(); document.getElementById('loading-modal')?.showModal();">
                     @csrf
                     <template x-for="id in selected" :key="id">
                         <input type="hidden" name="request_ids[]" :value="id">
@@ -655,7 +655,7 @@
                     </div>
                 </div>
 
-                <form method="POST" action="{{ route('signatures.requests.bulk-reject') }}">
+                <form method="POST" action="{{ route('signatures.requests.bulk-reject') }}" data-prevent-double-submit="true" onsubmit="const btn = this.querySelector('button[type=submit]'); if(btn){ btn.disabled = true; btn.classList.add('opacity-75', 'cursor-not-allowed'); }">
                     @csrf
                     <template x-for="id in selected" :key="id">
                         <input type="hidden" name="request_ids[]" :value="id">
@@ -726,7 +726,7 @@
                     </div>
                 </div>
 
-                <form method="POST" action="{{ route('signatures.requests.approve-all-pending') }}" onsubmit="document.getElementById('approve-all-modal').close(); document.getElementById('loading-modal').showModal();">
+                <form method="POST" action="{{ route('signatures.requests.approve-all-pending') }}" data-prevent-double-submit="true" onsubmit="const btn = this.querySelector('button[type=submit]'); if(btn){ btn.disabled = true; btn.classList.add('opacity-75', 'cursor-not-allowed'); } document.getElementById('approve-all-modal')?.close(); document.getElementById('loading-modal')?.showModal();">
                     @csrf
                     <div class="bg-base-200/40 px-6 py-4 border-t border-base-200 flex items-center justify-end gap-2.5">
                         <button type="button" onclick="document.getElementById('approve-all-modal').close()" class="btn btn-ghost btn-sm sm:btn-md rounded-xl font-medium text-base-content/70 hover:text-base-content px-4">
