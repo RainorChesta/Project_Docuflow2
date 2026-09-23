@@ -23,6 +23,12 @@ services:
       - ./docker/onlyoffice/app/controller/Main.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/controller/Main.js.gz:ro
       - ./docker/onlyoffice/code.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/code.js:ro
       - ./docker/onlyoffice/code.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/code.js.gz:ro
+      - ./docker/onlyoffice/common/img/header/header-logo_s.svg:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/header/header-logo_s.svg:ro
+      - ./docker/onlyoffice/common/img/header/header-logo_s.svg.gz:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/header/header-logo_s.svg.gz:ro
+      - ./docker/onlyoffice/common/img/header/dark-logo_s.svg:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/header/dark-logo_s.svg:ro
+      - ./docker/onlyoffice/common/img/header/dark-logo_s.svg.gz:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/header/dark-logo_s.svg.gz:ro
+      - ./docker/onlyoffice/common/lib/view/Header.js:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/lib/view/Header.js:ro
+      - ./docker/onlyoffice/common/lib/view/Header.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/lib/view/Header.js.gz:ro
 
 volumes:
   onlyoffice_data:
