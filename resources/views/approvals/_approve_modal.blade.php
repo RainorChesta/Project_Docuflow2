@@ -14,7 +14,7 @@
             <div class="p-6 pb-4">
                 <div class="flex items-start justify-between gap-4">
                     <div class="flex items-center gap-3.5">
-                        <div class="w-11 h-11 rounded-2xl bg-success/10 text-success flex items-center justify-center shrink-0 ring-4 ring-success/5 shadow-xs">
+                        <div class="w-11 h-11 rounded-2xl bg-secondary/10 text-secondary flex items-center justify-center shrink-0 ring-4 ring-secondary/5 shadow-xs">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
@@ -56,8 +56,8 @@
 
                 {{-- Signature Info Notice (when document includes a signature request) --}}
                 @if($hasPendingSignature)
-                    <div class="mt-4 p-3 rounded-xl bg-success/10 border border-success/20 text-xs text-success-content flex items-center gap-2.5">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-success shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div class="mt-4 p-3 rounded-xl bg-secondary/10 border border-secondary/20 text-xs text-secondary flex items-center gap-2.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-secondary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                         </svg>
                         <span class="font-medium leading-relaxed">
@@ -73,7 +73,7 @@
                 <button type="button" onclick="document.getElementById('{{ $modalId }}').close()" class="btn btn-ghost btn-sm sm:btn-md rounded-xl font-medium text-base-content/70 hover:text-base-content px-4">
                     {{ __('Batal') }}
                 </button>
-                <button type="submit" class="btn btn-success btn-sm sm:btn-md text-white font-semibold rounded-xl px-5 shadow-xs hover:shadow-md transition-all flex items-center gap-1.5">
+                <button type="submit" class="btn btn-secondary btn-sm sm:btn-md text-white font-semibold rounded-xl px-5 shadow-xs hover:shadow-md transition-all flex items-center gap-1.5">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                     </svg>

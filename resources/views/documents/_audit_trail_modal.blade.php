@@ -28,9 +28,9 @@
                     <div class="text-[10px] uppercase font-semibold text-base-content/50">{{ __('Status Saat Ini') }}</div>
                     <div class="font-bold text-base-content mt-0.5">
                         @if($document->currentVersion)
-                            <span class="text-success">{{ __('Aktif (v:v)', ['v' => $document->currentVersion->version_number]) }}</span>
+                            <span class="text-secondary font-semibold">{{ __('Aktif (v:v)', ['v' => $document->currentVersion->version_number]) }}</span>
                         @elseif($pendingVersion)
-                            <span class="text-warning">{{ __('Menunggu (v:v)', ['v' => $pendingVersion->version_number]) }}</span>
+                            <span class="text-primary font-semibold">{{ __('Menunggu (v:v)', ['v' => $pendingVersion->version_number]) }}</span>
                         @else
                             <span class="text-base-content/70">{{ __('Draf') }}</span>
                         @endif
@@ -107,11 +107,11 @@
                             $eventTitle = preg_replace('/\s*\([^)]*\)$/', '', $eventTitle);
 
                             $badgeClass = match(true) {
-                                $isApproved => 'badge-success text-white',
+                                $isApproved => 'badge-secondary text-white',
                                 $isRejected => 'badge-error text-white',
-                                $isRollback => 'badge-warning',
-                                $isRename => 'badge-info text-white',
-                                $isRevision => 'badge-accent text-accent-content',
+                                $isRollback => 'badge-primary text-white',
+                                $isRename => 'badge-primary/15 text-primary border border-primary/20',
+                                $isRevision => 'badge-primary text-white',
                                 $isCreate => 'badge-primary text-white',
                                 default => 'badge-neutral',
                             };
@@ -146,25 +146,25 @@
 
                                 {{-- Node Circle --}}
                                 @if($isApproved || $isBypassed)
-                                    <div class="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-xs ring-4 ring-emerald-500/15 z-10">
+                                    <div class="w-7 h-7 rounded-full bg-secondary text-white flex items-center justify-center shrink-0 shadow-xs ring-4 ring-secondary/15 z-10">
                                         <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                                         </svg>
                                     </div>
                                 @elseif($isRejected)
-                                    <div class="w-7 h-7 rounded-full bg-rose-600 text-white flex items-center justify-center shrink-0 ring-4 ring-rose-600/20 shadow-xs z-10">
+                                    <div class="w-7 h-7 rounded-full bg-error text-white flex items-center justify-center shrink-0 ring-4 ring-error/20 shadow-xs z-10">
                                         <svg class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                                         </svg>
                                     </div>
                                 @elseif($isRollback)
-                                    <div class="w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0 ring-4 ring-amber-500/20 shadow-xs z-10">
+                                    <div class="w-7 h-7 rounded-full bg-primary text-white flex items-center justify-center shrink-0 ring-4 ring-primary/15 shadow-xs z-10">
                                         <svg class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                         </svg>
                                     </div>
                                 @elseif($isRename)
-                                    <div class="w-7 h-7 rounded-full bg-info text-white flex items-center justify-center shrink-0 ring-4 ring-info/20 shadow-xs z-10">
+                                    <div class="w-7 h-7 rounded-full bg-primary text-white flex items-center justify-center shrink-0 ring-4 ring-primary/15 shadow-xs z-10">
                                         <svg class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                         </svg>
@@ -262,7 +262,7 @@
 
                                     {{-- Row 5: Rename Details (if rename event) --}}
                                     @if(!empty($item['metadata']['old_title']))
-                                        <div class="mt-2.5 p-2 rounded-xl bg-info/10 border border-info/20 text-xs text-info flex items-center gap-1.5">
+                                        <div class="mt-2.5 p-2 rounded-xl bg-primary/10 border border-primary/20 text-xs text-primary flex items-center gap-1.5">
                                             <span class="font-semibold">{{ __('Nama Semula:') }}</span>
                                             <span class="line-through text-base-content/60">{{ $item['metadata']['old_title'] }}</span>
                                         </div>
