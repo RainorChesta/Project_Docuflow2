@@ -133,9 +133,75 @@ class DocumentTemplateController extends Controller
     public function editor(DocumentTemplate $template, \App\Services\OnlyOfficeService $onlyOfficeService): View
     {
         $user = auth()->user();
+        $template->load('corporateSoftFile');
         $onlyOfficeConfig = $onlyOfficeService->generateTemplateEditorConfig($template, $user, 'edit');
+        $corporateSoftFiles = \App\Models\CorporateSoftFile::active()->latest()->get();
 
-        return view('admin.templates.editor', compact('template', 'onlyOfficeConfig'));
+        return view('admin.templates.editor', compact('template', 'onlyOfficeConfig', 'corporateSoftFiles'));
+    }
+
+    public function applyCorporateSoftFile(Request $request, DocumentTemplate $template, \App\Models\CorporateSoftFile $corporateSoftFile): \Illuminate\Http\JsonResponse
+    {
+        $this->authorize('admin');
+
+        $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
+        if (!$disk->exists($corporateSoftFile->file_path)) {
+            return response()->json(['error' => __('Berkas soft file korporat tidak ditemukan di storage.')], 404);
+        }
+
+        $onlyOfficeService = app(\App\Services\OnlyOfficeService::class);
+        $onlyOfficeService->forceSaveTemplate($template);
+        usleep(300000);
+        $template->refresh();
+
+        $existingDocx = ($template->file_path && $disk->exists($template->file_path))
+            ? $disk->get($template->file_path)
+            : '';
+
+        if (!empty($existingDocx)) {
+            $mergedDocx = $onlyOfficeService->applyCorporateSoftFileToDocx($existingDocx, $corporateSoftFile);
+            $disk->put($template->file_path, $mergedDocx);
+        }
+        $template->touch();
+
+        // Update template reference to indicate which corporate soft file was applied
+        $template->update(['corporate_soft_file_id' => $corporateSoftFile->id]);
+
+        $onlyOfficeService->rotateTemplateKey($template);
+
+        return response()->json([
+            'success' => true,
+            'message' => __('Soft File Korporat ":title" berhasil diterapkan ke template.', ['title' => $corporateSoftFile->title]),
+            'redirect_url' => route('admin.templates.editor', $template),
+        ]);
+    }
+
+    public function removeCorporateSoftFile(Request $request, DocumentTemplate $template): \Illuminate\Http\JsonResponse
+    {
+        $this->authorize('admin');
+
+        $template->update(['corporate_soft_file_id' => null]);
+
+        $onlyOfficeService = app(\App\Services\OnlyOfficeService::class);
+        $onlyOfficeService->forceSaveTemplate($template);
+        usleep(300000);
+        $template->refresh();
+
+        $disk = \Illuminate\Support\Facades\Storage::disk(config('onlyoffice.storage_disk', 'local'));
+        if ($template->file_path && $disk->exists($template->file_path)) {
+            $rawDocx = $disk->get($template->file_path);
+            $cleanedDocx = $onlyOfficeService->removeHeaderAndFooterFromDocx($rawDocx);
+            $disk->put($template->file_path, $cleanedDocx);
+        }
+
+        $template->touch();
+        $onlyOfficeService->rotateTemplateKey($template);
+
+        return response()->json([
+            'success' => true,
+            'message' => __('Pilihan soft file korporat berhasil dibatalkan dari template.'),
+            'redirect_url' => route('admin.templates.editor', $template),
+        ]);
     }
 
     public function edit(DocumentTemplate $template): View

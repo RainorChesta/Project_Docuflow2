@@ -303,7 +303,7 @@
             </dialog>
             {{-- Template Preview Modal (Direct ONLYOFFICE, no iframe) --}}
             <dialog x-ref="previewModal" class="modal" @close="closePreview()">
-                <div class="modal-box w-11/12 max-w-5xl h-[85vh] p-0 flex flex-col overflow-hidden relative rounded-xl border border-base-300">
+                <div class="modal-box w-[96vw] max-w-[96vw] h-[94vh] p-0 flex flex-col overflow-hidden relative rounded-2xl sm:rounded-3xl border border-base-300 shadow-2xl">
                     {{-- Modal Header --}}
                     <div class="flex items-center justify-between p-4 bg-base-100 border-b border-base-200 z-20 shrink-0 shadow-sm relative">
                         <h3 class="font-bold text-lg flex items-center gap-2 text-base-content">

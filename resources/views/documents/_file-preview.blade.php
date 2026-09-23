@@ -5,10 +5,10 @@
 
 <div class="w-full">
     @if($isPdf)
-        <iframe src="{{ $fileUrl }}" class="w-full border-0 h-[72vh] sm:h-[80vh] lg:h-[85vh] min-h-[520px] sm:min-h-[650px] lg:min-h-[700px] block" title="{{ __('Pratinjau dokumen') }}"></iframe>
+        <iframe src="{{ $fileUrl }}" class="w-full border-0 h-[80vh] sm:h-[88vh] lg:h-[92vh] min-h-[620px] sm:min-h-[750px] lg:min-h-[820px] block rounded-2xl shadow-xs" title="{{ __('Pratinjau dokumen') }}"></iframe>
     @else
         @if(isset($onlyOfficeConfig))
-            <div class="w-full bg-base-100 h-[72vh] sm:h-[80vh] lg:h-[85vh] min-h-[520px] sm:min-h-[650px] lg:min-h-[700px]">
+            <div class="w-full bg-base-100 h-[80vh] sm:h-[88vh] lg:h-[92vh] min-h-[620px] sm:min-h-[750px] lg:min-h-[820px] rounded-2xl overflow-hidden border border-base-300/80 shadow-xs">
                 <div id="docx-preview-{{ $version->id }}" class="w-full h-full"></div>
             </div>
 

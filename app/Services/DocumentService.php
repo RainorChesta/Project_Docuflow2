@@ -274,10 +274,22 @@ class DocumentService
         $data['owner_id'] = $ownerId;
         $data['paper_size'] ??= 'A4';
 
+        if (!empty($data['corporate_soft_file_id'])) {
+            $data['format_choice'] = 'F4';
+            $data['paper_size'] = 'F4';
+        }
+
         return DB::transaction(function () use ($data) {
             $doc = Document::create($data);
 
             $storedPath = $this->createBlankDocx($doc->id, 1);
+
+            if (!empty($data['corporate_soft_file_id'])) {
+                $softFile = \App\Models\CorporateSoftFile::find($data['corporate_soft_file_id']);
+                if ($softFile) {
+                    $this->initializeDocxWithSoftFile($storedPath, $softFile);
+                }
+            }
 
             $doc->versions()->create([
                 'version_number' => 1,
@@ -292,6 +304,22 @@ class DocumentService
 
             return $doc;
         });
+    }
+
+    /**
+     * Initialize a newly created document DOCX with corporate soft file content (DOCX, PDF, or Image).
+     */
+    public function initializeDocxWithSoftFile(string $targetRelativePath, \App\Models\CorporateSoftFile $corporateSoftFile): void
+    {
+        $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
+        if (!$disk->exists($corporateSoftFile->file_path)) {
+            return;
+        }
+
+        $onlyOfficeService = app(OnlyOfficeService::class);
+        $existingDocx = $disk->exists($targetRelativePath) ? $disk->get($targetRelativePath) : '';
+        $mergedDocx = $onlyOfficeService->applyCorporateSoftFileToDocx($existingDocx, $corporateSoftFile);
+        $disk->put($targetRelativePath, $mergedDocx);
     }
 
     /**

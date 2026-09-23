@@ -63,11 +63,7 @@
                                         <span class="badge badge-ghost badge-xs font-mono shrink-0">{{ $document->document_number }}</span>
                                     @endif
                                     <span class="badge badge-ghost badge-xs shrink-0">v{{ $version->version_number }}</span>
-                                    @if($pending)
-                                        <span class="badge badge-warning badge-xs shrink-0">{{ __('Pending') }}</span>
-                                    @elseif($hasDraftOnly)
-                                        <span class="badge badge-info badge-xs shrink-0">{{ __('Draft') }}</span>
-                                    @endif
+                                    <span class="hidden" id="applied-corp-softfile-badge"><strong id="applied-corp-softfile-name">{{ $document->corporateSoftFile?->title }}</strong></span>
                                 </div>
                             </div>
 
@@ -147,6 +143,145 @@
                                     <span class="hidden sm:inline">{{ __('Sisip TTD') }}</span>
                                     <span class="sm:hidden">{{ __('TTD') }}</span>
                                 </button>
+
+                                {{-- Quick Actions: Corporate Soft File Dropdown (Accessible to privileged users & admins) --}}
+                                @if(!empty($canAccessSoftFiles))
+                                    <div class="dropdown dropdown-end dropdown-bottom z-30" id="corporate-soft-file-dropdown-container">
+                                        <label tabindex="0" class="btn btn-xs {{ $document->corporateSoftFile ? 'btn-accent text-accent-content font-bold shadow-xs' : 'btn-outline btn-accent font-medium' }} gap-1.5 shrink-0 cursor-pointer" title="{{ __('Pilih Soft File Korporat / Kop Surat') }}" id="corporate-softfile-btn">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                            </svg>
+                                            <span class="hidden sm:inline" id="corporate-softfile-btn-text">{{ $document->corporateSoftFile ? 'Kop: ' . \Illuminate\Support\Str::limit($document->corporateSoftFile->title, 14) : __('Soft File Korporat') }}</span>
+                                            <span class="sm:hidden" id="corporate-softfile-btn-mobile-text">{{ $document->corporateSoftFile ? 'Kop: ' . \Illuminate\Support\Str::limit($document->corporateSoftFile->title, 8) : __('Kop') }}</span>
+                                            @if($document->corporateSoftFile)
+                                                <span class="badge badge-xs bg-white text-accent font-extrabold px-1.5 py-0 shadow-2xs" id="corporate-softfile-btn-badge">✓ Terpilih</span>
+                                            @else
+                                                <span class="badge badge-xs bg-white text-accent font-extrabold px-1.5 py-0 shadow-2xs hidden" id="corporate-softfile-btn-badge">✓ Terpilih</span>
+                                            @endif
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </label>
+                                        <div tabindex="0" class="dropdown-content z-40 p-3 shadow-2xl bg-base-100/98 backdrop-blur-md border border-base-300 rounded-2xl w-80 sm:w-[420px] max-h-[480px] flex flex-col gap-2 mt-2">
+                                            <div class="px-1 py-1 border-b border-base-200/80 flex items-center justify-between shrink-0">
+                                                <div>
+                                                    <span class="text-xs font-bold text-base-content uppercase tracking-wider block">{{ __('Pilih Soft File Korporat') }}</span>
+                                                    <span class="text-[11px] text-base-content/50 block">{{ __('Pilih kop surat resmi untuk dokumen ini') }}</span>
+                                                </div>
+                                                <span class="badge badge-accent badge-xs font-bold">{{ isset($corporateSoftFiles) ? $corporateSoftFiles->count() : 0 }}</span>
+                                            </div>
+
+                                            {{-- Banner Active Soft File Indicator --}}
+                                            <div id="applied-corp-sf-banner" class="px-3 py-2 rounded-xl bg-accent/10 border border-accent/30 text-accent flex items-center justify-between gap-2 shrink-0 {{ $document->corporateSoftFile ? '' : 'hidden' }}">
+                                                <div class="flex items-center gap-2 min-w-0">
+                                                    <div class="w-6 h-6 rounded-md bg-accent text-accent-content flex items-center justify-center shrink-0">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                                                        </svg>
+                                                    </div>
+                                                    <div class="min-w-0">
+                                                        <span class="text-[9px] uppercase font-extrabold tracking-wider opacity-70 block">{{ __('Kop Surat Aktif:') }}</span>
+                                                        <span class="text-xs font-bold truncate block text-base-content" id="applied-corp-sf-banner-title">{{ $document->corporateSoftFile?->title }}</span>
+                                                    </div>
+                                                </div>
+                                                <div class="flex items-center gap-1 shrink-0">
+                                                    <button type="button" 
+                                                            onclick="event.stopPropagation(); openRemoveCorporateSoftFileModal();" 
+                                                            class="btn btn-ghost btn-xs text-error hover:bg-error/15 px-2 py-1 h-auto min-h-0 rounded-lg flex items-center gap-1 font-bold border border-error/20" 
+                                                            title="{{ __('Batalkan / Hapus Pilihan Kop Surat') }}">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                        <span class="text-[10px]">{{ __('Hapus Kop') }}</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            @if(isset($corporateSoftFiles) && $corporateSoftFiles->isNotEmpty())
+                                                @if($corporateSoftFiles->count() > 3)
+                                                    <div class="relative shrink-0">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-base-content/40 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                                        </svg>
+                                                        <input type="text" 
+                                                               oninput="filterCorporateSoftFileItems(this.value)" 
+                                                               placeholder="{{ __('Cari soft file...') }}" 
+                                                               class="input input-bordered input-xs w-full pl-8 pr-2.5 rounded-lg text-xs bg-base-200/50 focus:bg-base-100">
+                                                    </div>
+                                                @endif
+                                                <ul class="flex-1 overflow-y-auto overflow-x-hidden space-y-1.5 pr-1 max-h-[260px] custom-scrollbar" id="corporate-softfile-list-items">
+                                                    @foreach($corporateSoftFiles as $sf)
+                                                        @php
+                                                            $isApplied = ($document->corporate_soft_file_id == $sf->id);
+                                                            $hasAnyApplied = !empty($document->corporate_soft_file_id);
+                                                        @endphp
+                                                        <li class="corp-softfile-item" data-id="{{ $sf->id }}" data-raw-title="{{ $sf->title }}" data-title="{{ strtolower($sf->title . ' ' . $sf->file_original_name) }}">
+                                                            <div class="corp-sf-container flex items-center justify-between gap-2.5 p-2 rounded-xl transition-all {{ $isApplied ? 'bg-accent/15 border border-accent/40 text-accent shadow-2xs ring-1 ring-accent/20' : 'bg-base-200/40 hover:bg-base-200/80 border border-base-200/60' }}">
+                                                                <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                                                                    <div class="corp-sf-icon w-8 h-8 rounded-lg {{ $isApplied ? 'bg-accent text-accent-content font-bold shadow-xs' : 'bg-base-300 text-base-content/70' }} flex items-center justify-center shrink-0">
+                                                                        @if($isApplied)
+                                                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                                                                            </svg>
+                                                                        @else
+                                                                            @if($sf->isPdf())
+                                                                                <span class="text-[9px] font-extrabold text-error">PDF</span>
+                                                                            @elseif($sf->isImage())
+                                                                                <span class="text-[9px] font-extrabold text-warning">IMG</span>
+                                                                            @else
+                                                                                <span class="text-[9px] font-extrabold text-primary">DOCX</span>
+                                                                            @endif
+                                                                        @endif
+                                                                    </div>
+                                                                    <div class="min-w-0 flex-1 cursor-pointer" 
+                                                                          ondblclick="event.stopPropagation(); executeApplySoftFileDirect({{ $sf->id }}, @json($sf->title));"
+                                                                          onclick="openCorporateSoftFileConfirmModal({{ $sf->id }}, @json($sf->title), @json(app(\App\Services\OnlyOfficeService::class)->getCorporateSoftFileUrl($sf)), {{ $sf->isImage() ? 'true' : 'false' }})">
+                                                                         <div class="flex items-center gap-1.5">
+                                                                             <span class="corp-sf-title font-bold text-xs {{ $isApplied ? 'text-accent' : 'text-base-content' }} truncate">{{ $sf->title }}</span>
+                                                                             <span class="badge badge-outline badge-xs text-[9px] opacity-70 shrink-0 uppercase">{{ $sf->file_type ?? 'DOCX' }}</span>
+                                                                         </div>
+                                                                         @if($sf->description)
+                                                                             <div class="text-[11px] text-base-content/60 truncate mt-0.5">{{ $sf->description }}</div>
+                                                                         @endif
+                                                                         <div class="text-[10px] text-base-content/40 truncate mt-0.5">
+                                                                             {{ $sf->file_original_name }}
+                                                                         </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="corp-sf-action shrink-0">
+                                                                    @if($isApplied)
+                                                                        <span class="badge badge-accent badge-sm font-bold text-[10px] gap-1 px-2.5 py-1 shadow-2xs cursor-default">
+                                                                            ✓ Digunakan
+                                                                        </span>
+                                                                    @else
+                                                                        <button type="button" 
+                                                                                data-id="{{ $sf->id }}"
+                                                                                data-title="{{ $sf->title }}"
+                                                                                onclick="event.stopPropagation(); executeApplySoftFileDirect({{ $sf->id }}, @json($sf->title));" 
+                                                                                class="btn-apply-softfile-direct btn {{ $hasAnyApplied ? 'btn-outline btn-accent' : 'btn-accent' }} btn-xs rounded-lg font-bold shadow-xs px-2.5"
+                                                                                title="{{ $hasAnyApplied ? __('Ganti kop aktif dengan kop surat ini') : __('Langsung terapkan kop surat ini ke dokumen') }}">
+                                                                            {{ $hasAnyApplied ? __('Ganti Kop') : __('Terapkan') }}
+                                                                        </button>
+                                                                    @endif
+                                                                </div>
+                                                            </div>
+                                                        </li>
+                                                    @endforeach
+                                                </ul>
+                                            @else
+                                                <div class="py-4 text-center text-xs text-base-content/60 space-y-2">
+                                                    <p>{{ __('Belum ada soft file korporat yang tersedia.') }}</p>
+                                                    @can('admin')
+                                                        <a href="{{ route('admin.corporate-soft-files.create') }}" class="btn btn-accent btn-xs rounded-lg gap-1">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                                                            {{ __('Tambah Soft File Baru') }}
+                                                        </a>
+                                                    @endcan
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endif
 
                                 @if($isPdf)
                                     {{-- PDF Revert Last Signature Button --}}
@@ -385,6 +520,58 @@
                 <button type="button" id="signature-alert-action-btn" class="btn btn-primary btn-sm px-6 uppercase" onclick="document.getElementById('signature-alert-modal').close()">
                     {{ __('OK') }}
                 </button>
+            </div>
+        </div>
+    </dialog>
+
+    {{-- Corporate Soft File Confirmation Modal --}}
+    <dialog id="corporate-softfile-modal" class="modal modal-bottom sm:modal-middle backdrop-blur-xs">
+        <div class="modal-box p-6 rounded-3xl border border-base-300/80 shadow-2xl bg-base-100 max-w-md w-full text-center">
+            <div class="mx-auto mb-3 flex items-center justify-center h-12 w-12 rounded-full bg-accent/20 text-accent">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+            </div>
+            <h3 id="corporate-sf-modal-title" class="font-bold text-lg text-base-content uppercase leading-tight mb-2">{{ __('TERAPKAN SOFT FILE KORPORAT') }}</h3>
+            <p id="corporate-sf-modal-message" class="text-xs sm:text-sm text-base-content/70 leading-relaxed break-words mb-4"></p>
+            
+            <div class="flex flex-col gap-2 pt-3 border-t border-base-200">
+                <button type="button" id="btn-apply-as-master" onclick="executeApplySoftFileMaster()" class="btn btn-accent btn-sm rounded-xl font-bold uppercase gap-1.5 shadow-xs">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                    <span>{{ __('Terapkan Sebagai Master Dokumen') }}</span>
+                </button>
+                <button type="button" id="btn-insert-via-connector" onclick="executeInsertSoftFileConnector()" class="btn btn-outline btn-accent btn-sm rounded-xl font-semibold gap-1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                    <span>{{ __('Sisipkan Konten / Kop Dokumen') }}</span>
+                </button>
+                <form method="dialog" class="mt-1">
+                    <button class="btn btn-ghost btn-xs text-base-content/50 hover:text-base-content">{{ __('Batal') }}</button>
+                </form>
+            </div>
+        </div>
+    </dialog>
+
+    {{-- Corporate Soft File Remove Confirmation Modal --}}
+    <dialog id="remove-corporate-softfile-modal" class="modal modal-bottom sm:modal-middle backdrop-blur-xs">
+        <div class="modal-box p-6 rounded-3xl border border-base-300/80 shadow-2xl bg-base-100 max-w-md w-full text-center">
+            <div class="mx-auto mb-3 flex items-center justify-center h-12 w-12 rounded-full bg-error/20 text-error">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+            </div>
+            <h3 class="font-bold text-lg text-base-content uppercase leading-tight mb-2">{{ __('BATALKAN PILIHAN KOP SURAT') }}</h3>
+            <p id="remove-corporate-sf-modal-message" class="text-xs sm:text-sm text-base-content/70 leading-relaxed break-words mb-4">
+                {{ __('Apakah Anda yakin ingin membatalkan dan melepas penggunaan kop surat dari dokumen ini?') }}
+            </p>
+            
+            <div class="flex flex-col gap-2 pt-3 border-t border-base-200">
+                <button type="button" id="btn-confirm-remove-sf" onclick="executeRemoveCorporateSoftFile()" class="btn btn-error btn-sm rounded-xl font-bold uppercase gap-1.5 shadow-xs text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    <span>{{ __('Ya, Batalkan / Hapus Kop') }}</span>
+                </button>
+                <form method="dialog" class="mt-1">
+                    <button class="btn btn-ghost btn-xs text-base-content/50 hover:text-base-content">{{ __('Kembali') }}</button>
+                </form>
             </div>
         </div>
     </dialog>
@@ -681,6 +868,373 @@
                 }
                 insertImageIntoOnlyOffice(qrCodeUrl, 18, 18, qrCodeToken);
             }
+
+            // --- Corporate Soft File Selection & Application Logic ---
+            let activeSelectedSoftFile = null;
+            let currentAppliedSoftFileId = {{ $document->corporate_soft_file_id ? $document->corporate_soft_file_id : 'null' }};
+            let currentAppliedSoftFileTitle = @json($document->corporateSoftFile?->title);
+
+            function escapeHtml(str) {
+                if (!str) return '';
+                return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            }
+
+            function filterCorporateSoftFileItems(query) {
+                const q = (query || '').toLowerCase().trim();
+                const items = document.querySelectorAll('#corporate-softfile-list-items .corp-softfile-item');
+                items.forEach(el => {
+                    const title = el.getAttribute('data-title') || '';
+                    el.style.display = (!q || title.includes(q)) ? '' : 'none';
+                });
+            }
+
+            function openCorporateSoftFileConfirmModal(id, title, fileUrl, isImage = false) {
+                activeSelectedSoftFile = { id: id, title: title, fileUrl: fileUrl, isImage: isImage };
+                const modal = document.getElementById('corporate-softfile-modal');
+                const titleEl = document.getElementById('corporate-sf-modal-title');
+                const msgEl = document.getElementById('corporate-sf-modal-message');
+                const btnMaster = document.getElementById('btn-apply-as-master');
+
+                const isSwitching = currentAppliedSoftFileId && currentAppliedSoftFileId != id;
+
+                if (titleEl) {
+                    titleEl.textContent = isSwitching ? 'GANTI KOP SURAT' : 'TERAPKAN SOFT FILE KORPORAT';
+                }
+                if (msgEl) {
+                    if (isSwitching) {
+                        msgEl.innerHTML = `Dokumen saat ini menggunakan kop <strong>${escapeHtml(currentAppliedSoftFileTitle)}</strong>.<br>Apakah Anda ingin menggantinya dengan kop <strong>${escapeHtml(title)}</strong>?`;
+                    } else {
+                        msgEl.innerHTML = `Anda memilih kop surat <strong>${escapeHtml(title)}</strong>.<br><span class="text-xs text-base-content/60 mt-1 block">Pilih metode penerapan ke dokumen:</span>`;
+                    }
+                }
+                if (btnMaster) {
+                    const span = btnMaster.querySelector('span');
+                    if (span) {
+                        span.textContent = isSwitching ? 'Ganti Sebagai Master Dokumen' : 'Terapkan Sebagai Master Dokumen';
+                    }
+                }
+
+                if (modal && typeof modal.showModal === 'function') modal.showModal();
+            }
+
+            function openRemoveCorporateSoftFileModal() {
+                const modal = document.getElementById('remove-corporate-softfile-modal');
+                const msgEl = document.getElementById('remove-corporate-sf-modal-message');
+                if (msgEl) {
+                    msgEl.innerHTML = `Apakah Anda yakin ingin membatalkan/melepas penggunaan kop surat <strong>${escapeHtml(currentAppliedSoftFileTitle || '')}</strong> dari dokumen ini?`;
+                }
+                if (modal && typeof modal.showModal === 'function') modal.showModal();
+            }
+
+            function executeRemoveCorporateSoftFile() {
+                const modal = document.getElementById('remove-corporate-softfile-modal');
+                if (modal && typeof modal.close === 'function') modal.close();
+
+                showSignatureScreenAlert('SEDANG MEMBATALKAN', 'Membatalkan pilihan kop surat...', true);
+
+                const removeUrl = "{{ route('documents.corporate-soft-files.remove', $document) }}";
+                const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
+
+                fetch(removeUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json'
+                    }
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        resetUsedSoftFileUI();
+                        showSignatureScreenAlert('BERHASIL DIBATALKAN', data.message || 'Pilihan kop surat berhasil dibatalkan.', true);
+
+                        window._hasSessionChanges = false;
+                        if (typeof window.allowIntentionalLeave === 'function') {
+                            window.allowIntentionalLeave();
+                        }
+                        if (window.docEditor) {
+                            try { window.docEditor.destroyEditor(); } catch(e) {}
+                        }
+
+                        setTimeout(() => {
+                            const target = data.redirect_url || window.location.href.split('?')[0];
+                            window.location.href = target + (target.includes('?') ? '&' : '?') + 't=' + Date.now();
+                        }, 600);
+                    } else {
+                        showSignatureScreenAlert('GAGAL MEMBATALKAN', data.error || 'Gagal membatalkan kop surat.', false);
+                    }
+                })
+                .catch(err => {
+                    console.error('remove soft file error:', err);
+                    showSignatureScreenAlert('KESALAHAN SISTEM', 'Terjadi kesalahan saat membatalkan kop surat.', false);
+                });
+            }
+
+            function resetUsedSoftFileUI() {
+                currentAppliedSoftFileId = null;
+                currentAppliedSoftFileTitle = null;
+
+                // 1. Header info badge
+                const badge = document.getElementById('applied-corp-softfile-badge');
+                if (badge) badge.classList.add('hidden');
+
+                // 2. Dropdown button at top
+                const btn = document.getElementById('corporate-softfile-btn');
+                const btnText = document.getElementById('corporate-softfile-btn-text');
+                const btnMobileText = document.getElementById('corporate-softfile-btn-mobile-text');
+                const btnBadge = document.getElementById('corporate-softfile-btn-badge');
+                if (btn) {
+                    btn.className = "btn btn-xs btn-outline btn-accent font-medium gap-1.5 shrink-0 cursor-pointer";
+                }
+                if (btnText) {
+                    btnText.innerText = "{{ __('Soft File Korporat') }}";
+                }
+                if (btnMobileText) {
+                    btnMobileText.innerText = "{{ __('Kop') }}";
+                }
+                if (btnBadge) {
+                    btnBadge.classList.add('hidden');
+                }
+
+                // 3. Dropdown banner
+                const banner = document.getElementById('applied-corp-sf-banner');
+                if (banner) {
+                    banner.classList.add('hidden');
+                }
+
+                // 4. Dropdown items list
+                document.querySelectorAll('#corporate-softfile-list-items .corp-softfile-item').forEach(item => {
+                    const itemId = item.getAttribute('data-id');
+                    const itemRawTitle = item.getAttribute('data-raw-title') || '';
+                    const container = item.querySelector('.corp-sf-container') || item.querySelector('div.flex');
+                    const iconBox = item.querySelector('.corp-sf-icon') || item.querySelector('.w-7.h-7') || item.querySelector('.shrink-0');
+                    const titleEl = item.querySelector('.corp-sf-title') || item.querySelector('span.font-bold');
+                    const badgeEl = item.querySelector('.corp-sf-badge') || item.querySelector('.badge-xs');
+                    const actionCol = item.querySelector('.corp-sf-action') || item.querySelector('div.shrink-0:last-child') || item.lastElementChild;
+
+                    if (container) {
+                        container.className = "corp-sf-container flex items-center justify-between gap-2.5 p-2 rounded-xl transition-all bg-base-200/40 hover:bg-base-200/80 border border-base-200/60";
+                    }
+                    if (iconBox) {
+                        iconBox.className = "corp-sf-icon w-8 h-8 rounded-lg bg-base-300 text-base-content/70 flex items-center justify-center shrink-0";
+                    }
+                    if (titleEl) {
+                        titleEl.className = "corp-sf-title font-bold text-xs text-base-content truncate";
+                    }
+                    if (badgeEl) {
+                        badgeEl.classList.add('hidden');
+                    }
+                    if (actionCol) {
+                        actionCol.innerHTML = `<button type="button" data-id="${itemId}" data-title="${encodeURIComponent(itemRawTitle)}" onclick="event.stopPropagation(); executeApplySoftFileDirect(${itemId}, ${JSON.stringify(itemRawTitle)})" class="btn-apply-softfile-direct btn btn-accent btn-xs rounded-lg font-bold shadow-xs px-2.5" title="Langsung terapkan kop surat ini ke dokumen">Terapkan</button>`;
+                    }
+                });
+            }
+
+            function executeApplySoftFileDirect(id, title) {
+                activeSelectedSoftFile = { id: id, title: title };
+                const isSwitching = currentAppliedSoftFileId && currentAppliedSoftFileId != id;
+                updateUsedSoftFileUI(id, title);
+                showSignatureScreenAlert('SEDANG MENERAPKAN', (isSwitching ? 'Mengganti ke Kop Surat "' : 'Menerapkan Kop Surat "') + title + '" ke dokumen...', true);
+                executeApplySoftFileMaster();
+            }
+
+            function handleCorporateSoftFileDblClick(id, title, fileUrl, isImage = false) {
+                activeSelectedSoftFile = { id: id, title: title, fileUrl: fileUrl, isImage: isImage };
+                executeApplySoftFileDirect(id, title);
+            }
+
+            function executeApplySoftFileMaster() {
+                if (!activeSelectedSoftFile || !activeSelectedSoftFile.id) return;
+
+                const selectedId = activeSelectedSoftFile.id;
+                const selectedTitle = activeSelectedSoftFile.title;
+
+                // 1. Immediately reflect UI changes everywhere
+                updateUsedSoftFileUI(selectedId, selectedTitle);
+
+                const modal = document.getElementById('corporate-softfile-modal');
+                if (modal && typeof modal.close === 'function') modal.close();
+
+                const applyUrl = "{{ url('/documents/' . $document->id . '/corporate-soft-files') }}/" + selectedId + "/apply";
+                const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
+
+                fetch(applyUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json'
+                    }
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        updateUsedSoftFileUI(selectedId, selectedTitle);
+                        showSignatureScreenAlert('BERHASIL DITERAPKAN', data.message || ('Kop Surat "' + selectedTitle + '" berhasil diterapkan.'), true);
+                        
+                        // Prevent navigation guard discard on intentional reload
+                        window._hasSessionChanges = false;
+                        if (typeof window.allowIntentionalLeave === 'function') {
+                            window.allowIntentionalLeave();
+                        }
+                        if (window.docEditor) {
+                            try {
+                                window.docEditor.destroyEditor();
+                            } catch(e) {}
+                        }
+
+                        setTimeout(() => {
+                            const target = data.redirect_url || window.location.href.split('?')[0];
+                            window.location.href = target + (target.includes('?') ? '&' : '?') + 't=' + Date.now();
+                        }, 600);
+                    } else {
+                        showSignatureScreenAlert('GAGAL MENERAPKAN', data.error || 'Gagal menerapkan kop surat ke dokumen.', false);
+                    }
+                })
+                .catch(err => {
+                    console.error('apply soft file error:', err);
+                    showSignatureScreenAlert('KESALAHAN SISTEM', 'Terjadi kesalahan saat menerapkan kop surat.', false);
+                });
+            }
+
+            function executeInsertSoftFileConnector() {
+                if (!activeSelectedSoftFile) return;
+
+                const modal = document.getElementById('corporate-softfile-modal');
+                if (modal && typeof modal.close === 'function') modal.close();
+
+                const isImg = activeSelectedSoftFile.isImage || (activeSelectedSoftFile.fileUrl && /\.(jpe?g|png|webp|gif)(\?.*)?$/i.test(activeSelectedSoftFile.fileUrl));
+
+                if (isImg && window.docEditor && typeof window.docEditor.createConnector === 'function') {
+                    preserveParentScroll(() => {
+                        try {
+                            const connector = window.docEditor.createConnector();
+                            const softFileUrl = activeSelectedSoftFile.fileUrl;
+                            const script = `
+                                var oDocument = Api.GetDocument();
+                                try {
+                                    var oParagraph = Api.CreateParagraph();
+                                    var oDrawing = Api.CreateImage("${softFileUrl}", 170 * 36000, 45 * 36000);
+                                    oParagraph.AddDrawing(oDrawing);
+                                    oParagraph.SetJc("center");
+                                    oDocument.InsertContent([oParagraph], 0);
+                                } catch(e) {
+                                    console.warn("InsertImage script error:", e);
+                                }
+                            `;
+                            connector.callCommand(new Function(script), function() {
+                                showSignatureScreenAlert('BERHASIL', 'KONTEN GAMBAR KOP SURAT TELAH DISISIPKAN KE DOKUMEN.', true);
+                                updateUsedSoftFileUI(activeSelectedSoftFile.id, activeSelectedSoftFile.title);
+                            });
+                        } catch (err) {
+                            console.warn('insert soft file error:', err);
+                            executeApplySoftFileMaster();
+                        }
+                    });
+                } else {
+                    // For DOCX and PDF, applying as master document preserves all header letterhead graphics and F4 page size
+                    showSignatureScreenAlert('SEDANG MENERAPKAN', 'Menerapkan Kop Surat "' + (activeSelectedSoftFile.title || '') + '" ke dokumen...', true);
+                    executeApplySoftFileMaster();
+                }
+            }
+
+            function updateUsedSoftFileUI(id, title) {
+                currentAppliedSoftFileId = id;
+                currentAppliedSoftFileTitle = title;
+
+                // 1. Header info badge
+                const badge = document.getElementById('applied-corp-softfile-badge');
+                const nameEl = document.getElementById('applied-corp-softfile-name');
+                if (badge && nameEl) {
+                    nameEl.innerText = title;
+                    badge.classList.remove('hidden');
+                    badge.title = 'Kop Surat yang digunakan: ' + title;
+                }
+
+                // 2. Dropdown button at top
+                const btn = document.getElementById('corporate-softfile-btn');
+                const btnText = document.getElementById('corporate-softfile-btn-text');
+                const btnMobileText = document.getElementById('corporate-softfile-btn-mobile-text');
+                const btnBadge = document.getElementById('corporate-softfile-btn-badge');
+                if (btn) {
+                    btn.className = "btn btn-xs btn-accent text-accent-content font-bold shadow-xs gap-1.5 shrink-0 cursor-pointer";
+                }
+                if (btnText) {
+                    btnText.innerText = "Kop: " + (title.length > 14 ? title.substring(0, 14) + '...' : title);
+                }
+                if (btnMobileText) {
+                    btnMobileText.innerText = "Kop: " + (title.length > 8 ? title.substring(0, 8) + '...' : title);
+                }
+                if (btnBadge) {
+                    btnBadge.classList.remove('hidden');
+                    btnBadge.textContent = "✓ Terpilih";
+                }
+
+                // 3. Dropdown banner
+                const banner = document.getElementById('applied-corp-sf-banner');
+                const bannerTitle = document.getElementById('applied-corp-sf-banner-title');
+                if (banner && bannerTitle) {
+                    bannerTitle.innerText = title;
+                    banner.classList.remove('hidden');
+                }
+
+                // 4. Dropdown items list
+                document.querySelectorAll('#corporate-softfile-list-items .corp-softfile-item').forEach(item => {
+                    const itemId = item.getAttribute('data-id');
+                    const itemRawTitle = item.getAttribute('data-raw-title') || '';
+                    const isTarget = (itemId == id);
+                    const container = item.querySelector('.corp-sf-container') || item.querySelector('div.flex');
+                    const iconBox = item.querySelector('.corp-sf-icon') || item.querySelector('.w-7.h-7') || item.querySelector('.shrink-0');
+                    const titleEl = item.querySelector('.corp-sf-title') || item.querySelector('span.font-bold');
+                    const badgeEl = item.querySelector('.corp-sf-badge') || item.querySelector('.badge-xs');
+                    const actionCol = item.querySelector('.corp-sf-action') || item.querySelector('div.shrink-0:last-child') || item.lastElementChild;
+                    
+                    if (isTarget) {
+                        if (container) {
+                            container.className = "corp-sf-container flex items-center justify-between gap-2.5 p-2 rounded-xl transition-all bg-accent/15 border border-accent/40 text-accent shadow-2xs ring-1 ring-accent/20";
+                        }
+                        if (iconBox) {
+                            iconBox.className = "corp-sf-icon w-8 h-8 rounded-lg bg-accent text-accent-content font-bold shadow-xs flex items-center justify-center shrink-0";
+                            iconBox.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>';
+                        }
+                        if (titleEl) {
+                            titleEl.className = "corp-sf-title font-bold text-xs text-accent truncate";
+                        }
+                        if (actionCol) {
+                            actionCol.innerHTML = '<span class="badge badge-accent badge-sm font-bold text-[10px] gap-1 px-2.5 py-1 shadow-2xs cursor-default">✓ Digunakan</span>';
+                        }
+                    } else {
+                        if (container) {
+                            container.className = "corp-sf-container flex items-center justify-between gap-2.5 p-2 rounded-xl transition-all bg-base-200/40 hover:bg-base-200/80 border border-base-200/60";
+                        }
+                        if (iconBox) {
+                            iconBox.className = "corp-sf-icon w-8 h-8 rounded-lg bg-base-300 text-base-content/70 flex items-center justify-center shrink-0";
+                        }
+                        if (titleEl) {
+                            titleEl.className = "corp-sf-title font-bold text-xs text-base-content truncate";
+                        }
+                        if (actionCol) {
+                            actionCol.innerHTML = `<button type="button" data-id="${itemId}" data-title="${encodeURIComponent(itemRawTitle)}" onclick="event.stopPropagation(); executeApplySoftFileDirect(${itemId}, ${JSON.stringify(itemRawTitle)})" class="btn-apply-softfile-direct btn btn-outline btn-accent btn-xs rounded-lg font-bold shadow-xs px-2.5" title="Ganti kop aktif dengan kop surat ini">Ganti Kop</button>`;
+                        }
+                    }
+                });
+            }
+
+            // Global click listener for fail-safe application
+            document.addEventListener('click', function(e) {
+                const btn = e.target.closest('.btn-apply-softfile-direct');
+                if (btn) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const sfId = btn.getAttribute('data-id');
+                    let sfTitle = btn.getAttribute('data-title') || '';
+                    try { sfTitle = decodeURIComponent(sfTitle); } catch(err) {}
+                    if (sfId) {
+                        executeApplySoftFileDirect(sfId, sfTitle);
+                    }
+                }
+            });
 
             // --- PDF Visual Interactive Drag & Drop / Resizing Placement Tool ---
             let activeVisualType = 'signature'; // 'signature' | 'qrcode'

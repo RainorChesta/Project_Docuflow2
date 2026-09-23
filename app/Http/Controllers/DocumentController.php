@@ -518,6 +518,7 @@ class DocumentController extends Controller
             'company_ids' => 'nullable|array',
             'expiration_date' => 'nullable|date',
             'template_id' => 'nullable|exists:document_templates,id',
+            'corporate_soft_file_id' => 'nullable|exists:corporate_soft_files,id',
         ];
 
         // Dokumen Akreditasi requires unit_kerja_id
@@ -627,7 +628,7 @@ class DocumentController extends Controller
             }
         }
 
-        $document->load('owner', 'unitKerja', 'documentType', 'currentVersion', 'versions.author', 'shares.user', 'unitKerjaShares.unitKerja');
+        $document->load('owner', 'unitKerja', 'documentType', 'currentVersion', 'corporateSoftFile', 'versions.author', 'shares.user', 'unitKerjaShares.unitKerja');
 
         $unitKerjas = auth()->user()->isAdmin()
             ? UnitKerja::orderBy('kode_unit_kerja')->get()
@@ -758,7 +759,7 @@ class DocumentController extends Controller
     {
         $this->authorize('update', $document);
 
-        $document->load('currentVersion', 'versions');
+        $document->load('currentVersion', 'versions', 'corporateSoftFile');
 
         $version = $document->displayVersion();
 
@@ -794,6 +795,15 @@ class DocumentController extends Controller
 
         $approvedSignatures = $this->getApprovedSignatures($document);
 
+        $canAccessSoftFiles = $currentUser->canAccessCorporateSoftFiles();
+        $corporateSoftFiles = collect();
+        if ($canAccessSoftFiles) {
+            $corporateSoftFiles = \App\Models\CorporateSoftFile::query()
+                ->accessibleBy($currentUser, $document->company_id, $document->branch_id)
+                ->latest()
+                ->get();
+        }
+
         return view('documents.edit', compact(
             'document',
             'version',
@@ -805,15 +815,141 @@ class DocumentController extends Controller
             'userSignatureToken',
             'userSignatureClientUrl',
             'userSignatureDataUri',
-            'approvedSignatures'
+            'approvedSignatures',
+            'canAccessSoftFiles',
+            'corporateSoftFiles'
         ));
+    }
+
+    /**
+     * Get accessible corporate soft files for a document in JSON format.
+     */
+    public function corporateSoftFiles(Document $document): JsonResponse
+    {
+        $this->authorize('update', $document);
+        $user = auth()->user();
+
+        if (!$user->canAccessCorporateSoftFiles()) {
+            return response()->json(['corporate_soft_files' => []]);
+        }
+
+        $files = \App\Models\CorporateSoftFile::query()
+            ->accessibleBy($user, $document->company_id, $document->branch_id)
+            ->latest()
+            ->get()
+            ->map(function ($file) {
+                return [
+                    'id' => $file->id,
+                    'title' => $file->title,
+                    'description' => $file->description,
+                    'original_name' => $file->file_original_name,
+                    'file_url' => $this->onlyOfficeService->getCorporateSoftFileUrl($file),
+                ];
+            });
+
+        return response()->json(['corporate_soft_files' => $files]);
+    }
+
+    /**
+     * Apply a corporate soft file to current document version.
+     */
+    public function applyCorporateSoftFile(Request $request, Document $document, \App\Models\CorporateSoftFile $corporateSoftFile): JsonResponse
+    {
+        $this->authorize('update', $document);
+        $user = auth()->user();
+
+        if (!$user->canAccessCorporateSoftFiles($corporateSoftFile)) {
+            return response()->json(['error' => __('Anda tidak memiliki hak akses untuk soft file ini.')], 403);
+        }
+
+        $version = $document->displayVersion();
+        if (!$version) {
+            return response()->json(['error' => __('Versi dokumen tidak ditemukan.')], 404);
+        }
+
+        $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
+        if (!$disk->exists($corporateSoftFile->file_path)) {
+            return response()->json(['error' => __('Berkas soft file korporat tidak ditemukan di storage.')], 404);
+        }
+
+        // Flush any active in-memory edits from ONLYOFFICE to server storage first
+        $this->onlyOfficeService->forceSaveDocument($document, $version);
+        usleep(300000);
+        $version->refresh();
+
+        // Apply corporate soft file (Header & Footer) to current version's DOCX while preserving existing content
+        $existingDocx = ($version->file_path && $disk->exists($version->file_path))
+            ? $disk->get($version->file_path)
+            : '';
+
+        if (empty($existingDocx)) {
+            $existingDocx = app(\App\Services\DocumentService::class)->createBlankDocx($document->id, $version->version_number);
+            $existingDocx = $disk->get($version->file_path);
+        }
+
+        $mergedDocx = $this->onlyOfficeService->applyCorporateSoftFileToDocx($existingDocx, $corporateSoftFile);
+        $disk->put($version->file_path, $mergedDocx);
+        $version->touch();
+
+        // Update document reference to indicate which corporate soft file was applied
+        $document->update([
+            'corporate_soft_file_id' => $corporateSoftFile->id,
+            'format_choice' => 'F4',
+            'paper_size' => 'F4',
+        ]);
+
+        // Invalidate ONLYOFFICE cached keys so editor reloads new content
+        $this->onlyOfficeService->rotateDocumentKey($document, $version);
+
+        return response()->json([
+            'success' => true,
+            'message' => __('Soft File Korporat ":title" berhasil diterapkan ke dokumen.', ['title' => $corporateSoftFile->title]),
+            'redirect_url' => route('documents.edit', $document),
+        ]);
+    }
+
+    /**
+     * Remove / cancel the corporate soft file applied to document.
+     */
+    public function removeCorporateSoftFile(Request $request, Document $document): JsonResponse
+    {
+        $this->authorize('update', $document);
+
+        $document->update([
+            'corporate_soft_file_id' => null,
+            'format_choice' => 'A4',
+            'paper_size' => 'A4',
+        ]);
+
+        $version = $document->displayVersion();
+        if ($version) {
+            // Flush any active in-memory edits from ONLYOFFICE to server storage first
+            $this->onlyOfficeService->forceSaveDocument($document, $version);
+            usleep(300000);
+            $version->refresh();
+
+            $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
+            if ($version->file_path && $disk->exists($version->file_path)) {
+                $rawDocx = $disk->get($version->file_path);
+                $cleanedDocx = $this->onlyOfficeService->removeHeaderAndFooterFromDocx($rawDocx);
+                $disk->put($version->file_path, $cleanedDocx);
+            }
+            $version->touch();
+            $this->onlyOfficeService->rotateDocumentKey($document, $version);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => __('Pilihan kop surat korporat berhasil dibatalkan dari dokumen.'),
+            'redirect_url' => route('documents.edit', $document),
+        ]);
     }
 
     public function preview(Document $document): View
     {
         $this->authorize('view', $document);
 
-        $document->load('owner', 'unitKerja', 'documentType', 'currentVersion');
+        $document->load('owner', 'unitKerja', 'documentType', 'currentVersion', 'corporateSoftFile');
 
         $version = $document->displayVersion();
         $onlyOfficeConfig = null;

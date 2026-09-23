@@ -204,6 +204,27 @@ class User extends Authenticatable
         return $this->system_role === 'head';
     }
 
+    public function isStaff(): bool
+    {
+        return $this->system_role === 'staff' || $this->system_role === 'user';
+    }
+
+    /**
+     * Check if user can access corporate soft files feature.
+     */
+    public function canAccessCorporateSoftFiles(?CorporateSoftFile $file = null): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        if ($file !== null) {
+            return $file->isActive() && $file->isRoleAllowed($this->system_role);
+        }
+
+        return true;
+    }
+
     /**
      * Check if user account is verified by administrator.
      * An account is verified when:
