@@ -317,11 +317,14 @@ class DocumentService
                 'content' => '',
                 'author_id' => $ownerId,
                 'author_name' => User::find($ownerId)->name,
-                'status' => 'pending',
+                'status' => 'draft',
                 'file_path' => $storedPath,
                 'file_original_name' => $file->getClientOriginalName(),
                 'file_mime' => $file->getClientMimeType(),
             ]);
+
+            // Clear any cached key for the new document so ONLYOFFICE loads cleanly
+            app(OnlyOfficeService::class)->rotateDocumentKey($doc);
 
             return $doc;
         });

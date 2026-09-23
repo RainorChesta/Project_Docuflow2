@@ -538,7 +538,6 @@
                                                 @endif
                                             </div>
 
-<<<<<<< ours
                                         {{-- Footer Info: Notes or Completed Timestamp (Anchored to Bottom) --}}
                                         <div class="mt-3 pt-2.5 border-t border-base-200/80 text-[11px]">
                                             @if($isStepApproved && $step->action_at)
@@ -558,31 +557,12 @@
                                             @else
                                                 <div class="text-base-content/40 truncate">
                                                     {{ __('Menunggu giliran tahap sebelumnya') }}
-||||||| base
-                                        {{-- Footer Info: Notes or Completed Timestamp (Anchored to Bottom) --}}
-                                        <div class="mt-3 pt-2.5 border-t border-base-200/80 text-[11px]">
-                                            @if($isStepApproved && $step->action_at)
-                                                <div class="text-emerald-700 dark:text-emerald-400 flex items-center justify-between gap-1">
-                                                    <span class="truncate">{{ __('Disetujui oleh :name', ['name' => $step->actionBy?->name ?? 'Approver']) }}</span>
-                                                    <span class="font-medium shrink-0">{{ $step->action_at->format('d/m/Y H:i') }}</span>
                                                 </div>
-                                            @elseif($isStepBypassed)
-                                                <div class="text-base-content/50 italic truncate">
-                                                    {{ __('Pembuat dokumen (Otomatis)') }}
-                                                </div>
-                                            @elseif($isStepPending)
-                                                <div class="text-amber-700 dark:text-amber-400 font-medium flex items-center gap-1 truncate">
-                                                    <svg class="w-3 h-3 animate-spin shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                                    <span class="truncate">{{ __('Sedang ditinjau oleh pejabat terkait') }}</span>
-                                                </div>
-                                            @else
-                                                <div class="text-base-content/40 truncate">
-                                                    {{ __('Menunggu giliran tahap sebelumnya') }}
-=======
+                                            @endif
+
                                             @if($step->notes)
                                                 <div class="mt-2 p-2.5 rounded-xl bg-base-200/60 border border-base-300 text-xs text-base-content/80">
                                                     <span class="font-semibold text-base-content/90">{{ __('Catatan:') }}</span> {{ $step->notes }}
->>>>>>> theirs
                                                 </div>
                                             @endif
                                         </div>
