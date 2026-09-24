@@ -84,8 +84,15 @@
                                     </td>
                                     <td>
                                         <div class="font-semibold text-sm text-base-content">{{ $unit->nama_unit_kerja }}</div>
-                                        <div class="text-[11px] text-base-content/50 font-mono">
-                                            {{ __('Format penomoran: [No]/[Tipe]-') }}{{ $unit->kode_unit_kerja }}{{ __('/[Cabang]/[Bulan]/[Tahun]') }}
+                                        <div class="text-[11px] text-base-content/50 font-mono flex flex-wrap items-center gap-2 mt-0.5">
+                                            <span>{{ __('Format: [No]/[Tipe]-') }}{{ $unit->kode_unit_kerja }}{{ __('/[Cabang]/...') }}</span>
+                                            @if($unit->picUser)
+                                                <span class="text-base-content/20">•</span>
+                                                <span class="inline-flex items-center gap-1 text-primary font-medium">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                                                    PIC: {{ $unit->picUser->name }}
+                                                </span>
+                                            @endif
                                         </div>
                                     </td>
                                     <td class="text-center">

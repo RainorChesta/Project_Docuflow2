@@ -3,10 +3,10 @@
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
                 <h2 class="text-xl font-bold text-base-content leading-tight">
-                    {{ __('Persetujuan Dokumen') }}
+                    {{ __('Persetujuan & Tanda Tangan Dokumen') }}
                 </h2>
                 <p class="text-xs text-base-content/60 mt-0.5">
-                    {{ __('Kelola permintaan persetujuan versi dokumen, rollback, dan perubahan nama') }}
+                    {{ __('Kelola permintaan persetujuan dan tanda tangan versi dokumen, rollback, dan perubahan nama') }}
                 </p>
             </div>
             @if(($counts['total'] ?? 0) > 0)
@@ -73,6 +73,13 @@
                         <span>{{ __('Versi Baru') }}</span>
                         @if(($counts['versions'] ?? 0) > 0)
                             <span class="badge badge-sm {{ ($tab ?? '') === 'versions' ? 'bg-primary-content text-primary font-bold' : 'badge-ghost' }}">{{ $counts['versions'] }}</span>
+                        @endif
+                    </a>
+                    <a href="{{ route('signatures.requests.index') }}" 
+                       class="btn btn-xs sm:btn-sm gap-1.5 rounded-lg {{ ($tab ?? '') === 'signatures' ? 'btn-primary' : 'btn-ghost text-base-content/70' }}">
+                        <span>{{ __('Tanda Tangan') }}</span>
+                        @if(($counts['signatures'] ?? 0) > 0)
+                            <span class="badge badge-sm {{ ($tab ?? '') === 'signatures' ? 'bg-primary-content text-primary font-bold' : 'badge-ghost' }}">{{ $counts['signatures'] }}</span>
                         @endif
                     </a>
                     <a href="{{ route('approvals.index', array_merge(request()->query(), ['tab' => 'rollbacks'])) }}" 
@@ -584,11 +591,11 @@
                         </div>
                         <div>
                             <h3 class="font-bold text-base text-base-content flex items-center gap-2">
-                                {{ __('Menunggu Persetujuan Versi Dokumen') }}
+                                {{ __('Menunggu Persetujuan & Tanda Tangan Dokumen') }}
                                 <span class="badge badge-primary badge-sm font-semibold">{{ $pendingVersions->total() }}</span>
                             </h3>
                             <p class="text-xs text-base-content/60">
-                                {{ __('Daftar pembaruan konten dan draf revisi yang diajukan untuk disetujui.') }}
+                                {{ __('Daftar pembaruan konten, tanda tangan, dan draf revisi yang diajukan untuk disetujui.') }}
                             </p>
                         </div>
                     </div>
@@ -599,8 +606,8 @@
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-base-content/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        <p class="text-sm font-medium">{{ __('Semua versi dokumen telah ditinjau') }}</p>
-                        <p class="text-xs text-base-content/40">{{ __('Tidak ada versi dokumen yang sedang menunggu persetujuan.') }}</p>
+                        <p class="text-sm font-medium">{{ __('Semua dokumen telah ditinjau') }}</p>
+                        <p class="text-xs text-base-content/40">{{ __('Tidak ada dokumen yang sedang menunggu persetujuan atau tanda tangan Anda.') }}</p>
                     </div>
                 @else
                     <div class="overflow-x-auto">

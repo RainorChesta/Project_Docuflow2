@@ -120,16 +120,15 @@ class SignatureController extends Controller
                 ]);
             }
 
-            // For direct PDF placement, dispatch notification immediately
-            if ($isDirectPdfPlacement) {
-                $requestRecord->sendNotification();
-            }
-
             if ($doc) {
                 $pendingVersion = $doc->versions()->where('status', 'pending')->latest('id')->first();
                 if ($pendingVersion) {
                     app(\App\Services\ApprovalRoutingService::class)->compileWorkflowFromSignatures($doc, $pendingVersion, $doc->owner ?? Auth::user());
+                } elseif ($isDirectPdfPlacement) {
+                    $requestRecord->sendNotification();
                 }
+            } elseif ($isDirectPdfPlacement) {
+                $requestRecord->sendNotification();
             }
 
             $isStamp = $requestedSig->type === 'company_stamp';
@@ -522,6 +521,8 @@ class SignatureController extends Controller
                     'avatar_url' => $u->avatar_url,
                     'role' => match($u->system_role) {
                         'admin' => 'Admin',
+                        'direktur' => 'Direktur',
+                        'pic_klinik' => 'PIC Klinik',
                         'head' => 'Kepala Unit Kerja',
                         default => 'Staff',
                     },
@@ -908,6 +909,12 @@ class SignatureController extends Controller
             abort(403, 'Anda tidak berhak menyetujui permintaan ini.');
         }
 
+        // Prevent early approval if document step is still waiting for prior tier reviews
+        $step = $signatureRequest->approvalStep;
+        if ($step && $step->status === 'waiting') {
+            return back()->with('error', __('Dokumen ini masih menunggu review atau persetujuan pada tahap sebelumnya.'));
+        }
+
         $this->executeApproval($signatureRequest);
 
         $isStamp = $signatureRequest->isStamp();
@@ -1042,62 +1049,15 @@ class SignatureController extends Controller
     {
         $actor = $actor ?? Auth::user();
 
-        $signatureRequest->update([
-            'status' => 'approved',
-            'responded_at' => now(),
-        ]);
-        
+        app(\App\Services\ApprovalRoutingService::class)->applyAndStampSignature($signatureRequest, $actor);
+
         $document = $signatureRequest->document;
         $version = $document?->displayVersion();
-        $targetUser = $signatureRequest->targetUser ?? $actor;
-        
-        if ($document && $version && $targetUser) {
-            $requestId = $signatureRequest->id;
-            
-            // Resolve the exact requested signature or stamp (with fallback to any available signature of the user)
-            $sig = null;
-            if ($signatureRequest->isStamp() && $signatureRequest->requestedSignature) {
-                $sig = $signatureRequest->requestedSignature;
-            } elseif ($signatureRequest->requestedSignature) {
-                $sig = $signatureRequest->requestedSignature;
-            } else {
-                $sig = $targetUser->signatures()->where('type', 'original')->first()
-                    ?? $targetUser->signatures()->first();
+        if ($document && $version) {
+            $currentStep = $version->approvalSteps()->where('status', 'pending')->where('assigned_user_id', $actor->id)->first();
+            if ($currentStep) {
+                app(\App\Services\ApprovalRoutingService::class)->advanceApproval($currentStep, $actor);
             }
-            
-            $signaturePath = null;
-            if ($sig && $sig->file_path) {
-                if (Storage::disk('public')->exists($sig->file_path)) {
-                    $signaturePath = Storage::disk('public')->path($sig->file_path);
-                } elseif (file_exists(storage_path('app/public/' . ltrim($sig->file_path, '/')))) {
-                    $signaturePath = storage_path('app/public/' . ltrim($sig->file_path, '/'));
-                } elseif (file_exists(public_path('storage/' . ltrim($sig->file_path, '/')))) {
-                    $signaturePath = public_path('storage/' . ltrim($sig->file_path, '/'));
-                } elseif (file_exists($sig->file_path)) {
-                    $signaturePath = $sig->file_path;
-                }
-            }
-
-            if ($signaturePath && file_exists($signaturePath)) {
-                // Process the signature synchronously using PHPWord or FPDI
-                $processor = app(\App\Services\DocumentProcessorService::class);
-                $processor->processSignature($document, $version, $requestId, $signaturePath, $signatureRequest);
-
-                app(\App\Services\OnlyOfficeService::class)->rotateDocumentKey($document, $version);
-            } else {
-                \Illuminate\Support\Facades\Log::warning("executeApproval: Signature image not found for user {$targetUser->id}, sig ID: " . ($sig?->id ?? 'null') . ", path: " . ($sig?->file_path ?? 'null'));
-            }
-        }
-
-        $signatureRequest->loadMissing(['requester', 'document', 'targetUser', 'requestedSignature.company']);
-        if ($signatureRequest->requester && $signatureRequest->document) {
-            $signatureRequest->requester->notify(
-                new \App\Notifications\SignatureRequestApprovedNotification(
-                    $signatureRequest,
-                    $signatureRequest->document,
-                    $signatureRequest->targetUser?->name ?? $actor->name
-                )
-            );
         }
     }
 
@@ -1109,14 +1069,21 @@ class SignatureController extends Controller
         $actor = $actor ?? Auth::user();
         $reason = $reason ?: __('Ditolak oleh pemilik tanda tangan.');
 
+        $document = $signatureRequest->document;
+        $version = $document?->displayVersion();
+        if ($document && $version) {
+            $currentStep = $version->approvalSteps()->where('status', 'pending')->where('assigned_user_id', $actor->id)->first();
+            if ($currentStep) {
+                app(\App\Services\ApprovalRoutingService::class)->rejectApproval($currentStep, $actor, $reason);
+                return;
+            }
+        }
+
         $signatureRequest->update([
             'status' => 'rejected',
             'rejected_reason' => $reason,
             'responded_at' => now(),
         ]);
-
-        $document = $signatureRequest->document;
-        $version = $document?->displayVersion();
 
         if ($document && $version) {
             $processor = app(\App\Services\DocumentProcessorService::class);

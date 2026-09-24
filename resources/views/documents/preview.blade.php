@@ -32,6 +32,14 @@
                         <div class="text-sm">
                             <div><span class="text-base-content/60">{{ __('Unit Kerja') }}:</span> {{ $document->unitKerja?->nama_unit_kerja ?? $document->unitKerja?->kode_unit_kerja ?? '—' }}</div>
                             <div class="flex items-center gap-1.5 mt-0.5"><span class="text-base-content/60">{{ __('Pemilik') }}:</span> <x-user-avatar :user="$document->owner" size="w-4 h-4" text-size="text-[9px]" /> <span class="font-medium text-base-content">{{ $document->owner->name }}</span></div>
+                            @if($document->isDirectorRead())
+                                <div class="mt-1 flex items-center gap-1.5">
+                                    <span class="badge badge-success badge-sm text-white font-bold gap-1 shadow-2xs">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                                        {{ __('Ditinjau oleh Direktur') }}
+                                    </span>
+                                </div>
+                            @endif
                         </div>
                         @php
                             $isFileBased = $document->displayVersion()?->file_path;
@@ -109,7 +117,7 @@
                                         </p>
                                         <div class="modal-action">
                                             <button type="button" onclick="document.getElementById('approve-sig-modal-{{ $pendingSigRequest->id }}').close()" class="btn btn-ghost btn-sm">{{ __('Batal') }}</button>
-                                            <form method="POST" action="{{ route('signatures.requests.approve', $pendingSigRequest) }}" onsubmit="document.getElementById('approve-sig-modal-{{ $pendingSigRequest->id }}')?.close(); document.getElementById('loading-modal')?.showModal();" class="inline">
+                                            <form method="POST" action="{{ route('signatures.requests.approve', $pendingSigRequest) }}" data-prevent-double-submit="true" onsubmit="const btn = this.querySelector('button[type=submit]'); if(btn){ btn.disabled = true; btn.classList.add('opacity-75', 'cursor-not-allowed'); } document.getElementById('approve-sig-modal-{{ $pendingSigRequest->id }}')?.close(); document.getElementById('loading-modal')?.showModal();" class="inline">
                                                 @csrf
                                                 <button type="submit" class="btn btn-success btn-sm gap-1.5 font-semibold text-white">
                                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -168,7 +176,7 @@
                                         </div>
 
                                         {{-- Form --}}
-                                        <form method="POST" action="{{ route('signatures.requests.reject', $pendingSigRequest) }}">
+                                        <form method="POST" action="{{ route('signatures.requests.reject', $pendingSigRequest) }}" data-prevent-double-submit="true" onsubmit="const btn = this.querySelector('button[type=submit]'); if(btn){ btn.disabled = true; btn.classList.add('opacity-75', 'cursor-not-allowed'); }">
                                             @csrf
                                             <div class="px-6 pb-5 space-y-2">
                                                 <div class="flex items-center justify-between">
@@ -203,6 +211,87 @@
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                                                     </svg>
                                                     {{ __('Tolak Permintaan') }}
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                    <form method="dialog" class="modal-backdrop">
+                                        <button>{{ __('Batal') }}</button>
+                                    </form>
+                                </dialog>
+                            @elseif($pendingVersion && auth()->user() && auth()->user()->can('approve', $document))
+                                @php
+                                    $hasPendingSignature = \App\Models\SignatureRequest::where('document_id', $document->id)
+                                        ->where('target_user_id', auth()->id())
+                                        ->where('status', 'pending')
+                                        ->exists();
+                                @endphp
+                                <button type="button" onclick="document.getElementById('approve-version-preview-modal-{{ $pendingVersion->id }}').showModal()" class="btn btn-success btn-sm rounded-xl text-white font-semibold gap-1.5 px-4 shadow-xs hover:shadow-md transition-all">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                                    {{ $hasPendingSignature ? __('Setujui & Tandatangani') : __('Setujui Dokumen') }}
+                                </button>
+                                <button type="button" onclick="document.getElementById('reject-version-preview-modal-{{ $pendingVersion->id }}').showModal()" class="btn btn-error btn-sm rounded-xl text-white font-semibold gap-1 px-3 shadow-xs hover:shadow-md transition-all">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                                    {{ __('Tolak') }}
+                                </button>
+
+                                {{-- Reusable Approve Version Modal --}}
+                                @include('approvals._approve_modal', [
+                                    'document' => $document,
+                                    'version' => $pendingVersion,
+                                    'modalId' => 'approve-version-preview-modal-' . $pendingVersion->id,
+                                    'hasPendingSignature' => $hasPendingSignature,
+                                ])
+
+                                {{-- Reject Version Modal --}}
+                                <dialog id="reject-version-preview-modal-{{ $pendingVersion->id }}" class="modal modal-bottom sm:modal-middle text-left whitespace-normal backdrop-blur-xs">
+                                    <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-lg">
+                                        <form method="POST" action="{{ route('approvals.reject', [$document, $pendingVersion]) }}" data-prevent-double-submit="true" onsubmit="const btn = this.querySelector('button[type=submit]'); if(btn){ btn.disabled = true; btn.classList.add('opacity-75', 'cursor-not-allowed'); }">
+                                            @csrf
+                                            <div class="p-6 pb-4">
+                                                <div class="flex items-start justify-between gap-4">
+                                                    <div class="flex items-center gap-3.5">
+                                                        <div class="w-11 h-11 rounded-2xl bg-error/10 text-error flex items-center justify-center shrink-0 ring-4 ring-error/5 shadow-xs">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                            </svg>
+                                                        </div>
+                                                        <div>
+                                                            <h3 class="font-bold text-lg text-base-content leading-snug">{{ __('Tolak Versi Dokumen') }}</h3>
+                                                            <p class="text-xs text-base-content/60 mt-0.5">{{ __('Tolak pengajuan versi v:version dokumen ini', ['version' => $pendingVersion->version_number]) }}</p>
+                                                        </div>
+                                                    </div>
+                                                    <button type="button" onclick="document.getElementById('reject-version-preview-modal-{{ $pendingVersion->id }}').close()" class="btn btn-ghost btn-sm btn-circle text-base-content/50 hover:text-base-content hover:bg-base-200">
+                                                        ✕
+                                                    </button>
+                                                </div>
+
+                                                <div class="mt-4 p-3.5 rounded-xl bg-base-200/60 border border-base-300/60 flex items-start gap-3">
+                                                    <div class="min-w-0 flex-1">
+                                                        <span class="font-semibold text-sm text-base-content break-words">{{ $document->title }}</span>
+                                                        <p class="text-xs text-base-content/60 mt-1">
+                                                            {{ __('Penulis Versi') }}: <span class="font-medium text-base-content/80">{{ $pendingVersion->author_name }}</span> &bull; <span class="badge badge-sm badge-ghost font-mono">v{{ $pendingVersion->version_number }}</span>
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <div class="mt-3">
+                                                    <label class="text-xs font-semibold text-base-content uppercase tracking-wider block mb-1">
+                                                        {{ __('Alasan Penolakan') }} <span class="text-error">*</span>
+                                                    </label>
+                                                    <textarea name="notes" rows="3" required class="textarea textarea-bordered textarea-sm w-full rounded-xl text-xs" placeholder="{{ __('Tuliskan alasan penolakan versi dokumen ini...') }}"></textarea>
+                                                </div>
+                                            </div>
+
+                                            <div class="bg-base-200/40 px-6 py-4 border-t border-base-200 flex items-center justify-end gap-2.5">
+                                                <button type="button" onclick="document.getElementById('reject-version-preview-modal-{{ $pendingVersion->id }}').close()" class="btn btn-ghost btn-sm sm:btn-md rounded-xl font-medium text-base-content/70 hover:text-base-content px-4">
+                                                    {{ __('Batal') }}
+                                                </button>
+                                                <button type="submit" class="btn btn-error btn-sm sm:btn-md text-white font-semibold rounded-xl px-5 shadow-xs hover:shadow-md transition-all flex items-center gap-1.5">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                    {{ __('Tolak Dokumen') }}
                                                 </button>
                                             </div>
                                         </form>
@@ -302,12 +391,31 @@
                                 </dialog>
                             @endif
 
-                            {{-- Edit Dokumen: only when NOT in signature review context and user has update permissions --}}
-                            @if(!$isSignatureContext && auth()->user()->can('update', $document))
+                            {{-- Edit Dokumen: only when NOT in signature review context, NOT locked, and user has edit permissions --}}
+                            @if(!$isSignatureContext && auth()->user()->can('edit', $document))
                                 <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                     {{ __('Edit Dokumen') }}
                                 </a>
+                            @endif
+
+                            {{-- Director Seen Quick Action Button --}}
+                            @if(auth()->user() && (auth()->user()->isDirector() || auth()->user()->isAdmin()))
+                                <form method="POST" action="{{ route('director.documents.acknowledge', $document) }}" class="inline">
+                                    @csrf
+                                    <input type="hidden" name="action" value="{{ $document->isDirectorRead() ? 'unseen' : 'seen' }}">
+                                    <button type="submit" 
+                                            class="btn btn-sm gap-1.5 {{ $document->isDirectorRead() ? 'btn-ghost text-base-content/60 hover:text-error' : 'btn-success text-white shadow-xs' }}" 
+                                            title="{{ $document->isDirectorRead() ? __('Batalkan status tinjauan Direktur') : __('Tandai telah ditinjau oleh Direktur') }}">
+                                        @if($document->isDirectorRead())
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                            <span>{{ __('Batal Ditinjau') }}</span>
+                                        @else
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                                            <span>{{ __('Tandai Ditinjau') }}</span>
+                                        @endif
+                                    </button>
+                                </form>
                             @endif
 
                             <a href="{{ $backUrl }}" class="btn btn-ghost btn-sm">

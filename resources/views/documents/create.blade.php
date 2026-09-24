@@ -111,21 +111,6 @@
                             @error('document_type_id') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                         </div>
 
-                        {{-- Format Penomoran Dokumen --}}
-                        <div class="mb-4 p-3.5 rounded-xl border border-base-300 bg-base-200/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                            <div class="flex items-center gap-2.5">
-                                <span class="badge badge-primary badge-sm font-semibold" id="badge-doc-category">
-                                    {{ __('Format Penomoran') }}
-                                </span>
-                                <span class="text-xs text-base-content/80" id="desc-doc-category">
-                                    {{ __('Naskah Dinas: [No]/[Tipe]/[Cabang]/[Bulan]/[Tahun] | Akreditasi: [No]/[Tipe]-[UnitKerja]/[Cabang]/[Bulan]/[Tahun]') }}
-                                </span>
-                            </div>
-                            <span class="text-xs font-mono text-base-content/60" id="example-doc-format">
-                                Ex: 001/ST/KPS/IX/2026 atau 001/SOP-01/KPS/IX/2026
-                            </span>
-                        </div>
-
                         {{-- Document Number --}}
                         <div class="form-control w-full mb-4">
                             <label for="document_number_field" class="label">
@@ -488,52 +473,14 @@
 
             function updateTypeVisibility() {
                 var docType = getSelectedDocType();
-                var badgeDocCategory = document.getElementById('badge-doc-category');
-                var descDocCategory = document.getElementById('desc-doc-category');
-                var exampleDocFormat = document.getElementById('example-doc-format');
                 var ukAsterisk = document.getElementById('uk-required-asterisk');
 
                 if (docType && docType.category === 'akreditasi') {
-                    if (badgeDocCategory) {
-                        badgeDocCategory.textContent = @json(__('Dokumen Akreditasi'));
-                        badgeDocCategory.className = 'badge badge-secondary badge-sm font-semibold';
-                    }
-                    if (descDocCategory) {
-                        descDocCategory.textContent = @json(__('Penomoran: [No]/[Tipe]-[UnitKerja]/[Cabang]/[Bulan]/[Tahun]'));
-                    }
-                    if (exampleDocFormat) {
-                        exampleDocFormat.textContent = 'Ex: 001/' + (docType.code || 'SOP') + '-01/KPS/IX/2026';
-                    }
                     if (ukAsterisk) ukAsterisk.style.display = 'inline';
                     if (unitKerjaSelect) {
                         unitKerjaSelect.setAttribute('required', 'required');
                     }
-                } else if (docType && docType.category === 'naskah_dinas') {
-                    if (badgeDocCategory) {
-                        badgeDocCategory.textContent = @json(__('Naskah Dinas'));
-                        badgeDocCategory.className = 'badge badge-primary badge-sm font-semibold';
-                    }
-                    if (descDocCategory) {
-                        descDocCategory.textContent = @json(__('Penomoran: [No]/[Tipe]/[Cabang]/[Bulan]/[Tahun]'));
-                    }
-                    if (exampleDocFormat) {
-                        exampleDocFormat.textContent = 'Ex: 001/' + (docType.code || 'ST') + '/KPS/IX/2026';
-                    }
-                    if (ukAsterisk) ukAsterisk.style.display = 'none';
-                    if (unitKerjaSelect) {
-                        unitKerjaSelect.removeAttribute('required');
-                    }
                 } else {
-                    if (badgeDocCategory) {
-                        badgeDocCategory.textContent = @json(__('Format Penomoran'));
-                        badgeDocCategory.className = 'badge badge-primary badge-sm font-semibold';
-                    }
-                    if (descDocCategory) {
-                        descDocCategory.textContent = @json(__('Naskah Dinas: [No]/[Tipe]/[Cabang]/[Bulan]/[Tahun] | Akreditasi: [No]/[Tipe]-[UnitKerja]/[Cabang]/[Bulan]/[Tahun]'));
-                    }
-                    if (exampleDocFormat) {
-                        exampleDocFormat.textContent = 'Ex: 001/ST/KPS/IX/2026';
-                    }
                     if (ukAsterisk) ukAsterisk.style.display = 'none';
                     if (unitKerjaSelect) {
                         unitKerjaSelect.removeAttribute('required');

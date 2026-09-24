@@ -20,8 +20,8 @@
     
     // Color schemes
     if ($isOld) {
-        $colorClasses = 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/15';
-        $dotColor = 'bg-amber-500';
+        $colorClasses = 'bg-secondary/10 text-secondary border border-secondary/20 hover:bg-secondary/15';
+        $dotColor = 'bg-secondary';
         $label = __('Format Lama');
         $title = __('Format Penomoran Lama');
     } else {

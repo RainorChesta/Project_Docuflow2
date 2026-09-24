@@ -287,9 +287,10 @@
         var scope = btn.closest('.doku-paper-scope');
         if (!scope) return;
         
-        // Find scroll container (<main> or window)
-        var mainEl = btn.closest('main') || document.querySelector('main') || document.documentElement;
-        var btnRectBefore = btn.getBoundingClientRect();
+        // Preserve scroll container position (<main> or window)
+        var mainEl = document.querySelector('main');
+        var mainScroll = mainEl ? mainEl.scrollTop : 0;
+        var winScroll = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
         
         scope.dataset.manualZoom = 'true';
         
@@ -304,31 +305,33 @@
         }
         
         setDokuPaperZoom(scope, zoom);
+
+        if (mainEl && mainEl.scrollTop !== mainScroll) {
+            mainEl.scrollTop = mainScroll;
+        }
+        if ((window.scrollY || document.documentElement.scrollTop || document.body.scrollTop) !== winScroll) {
+            window.scrollTo({ top: winScroll, behavior: 'instant' });
+        }
     });
 
     document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.doku-paper-scope').forEach(function(scope) {
-            setDokuPaperZoom(scope, 100);
-        });
-    });
-
-    const paperDomObserver = new MutationObserver(function(mutations) {
-        mutations.forEach(function(mutation) {
-            if (mutation.type === 'childList') {
-                mutation.addedNodes.forEach(function(node) {
-                    if (node.nodeType === 1) {
-                        if (node.classList && node.classList.contains('doku-paper-scope')) {
-                            setDokuPaperZoom(node, 100);
-                        } else if (node.querySelectorAll) {
-                            node.querySelectorAll('.doku-paper-scope').forEach(function(scope) {
-                                setDokuPaperZoom(scope, 100);
-                            });
-                        }
-                    }
-                });
+            if (!scope.dataset.zoom) {
+                setDokuPaperZoom(scope, 100);
             }
         });
+
+        var liveContainer = document.getElementById('live-preview-content');
+        if (liveContainer) {
+            var paperDomObserver = new MutationObserver(function() {
+                liveContainer.querySelectorAll('.doku-paper-scope').forEach(function(scope) {
+                    if (!scope.dataset.zoom) {
+                        setDokuPaperZoom(scope, 100);
+                    }
+                });
+            });
+            paperDomObserver.observe(liveContainer, { childList: true, subtree: true });
+        }
     });
-    paperDomObserver.observe(document.body, { childList: true, subtree: true });
 </script>
 @endonce

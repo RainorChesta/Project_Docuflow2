@@ -135,12 +135,14 @@
         @php
             $navUser = auth()->user();
             $sharedDocsCount = $navUser ? $navUser->sharedDocumentsCount() : 0;
-            $pendingTtdCount = $navUser ? $navUser->receivedSignatureRequests()->where('status', 'pending')->count() : 0;
-            $pendingAdminTtdCount = $pendingTtdCount;
             $pendingVersionsCount = $navUser ? $navUser->pendingVersionApprovalsCount() : 0;
             $pendingRollbacksCount = $navUser ? $navUser->pendingRollbackApprovalsCount() : 0;
             $totalApprovalCount = $pendingVersionsCount + $pendingRollbacksCount;
             $isApprovalActive = request()->routeIs('approvals.*');
+            $canSeeApproval = $navUser && ($navUser->isHead() || $navUser->isPicKlinik() || $navUser->isDirector() || $navUser->isAdmin() || $totalApprovalCount > 0);
+            $unseenActiveDirectorDocsCount = ($navUser && ($navUser->isDirector() || $navUser->isAdmin()))
+                ? \App\Models\Document::whereHas('currentVersion', fn($q) => $q->where('status', 'active'))->where('is_expired', false)->whereNull('director_read_at')->count()
+                : 0;
         @endphp
         
         <span class="px-2 text-[10px] font-extrabold text-base-content/40 uppercase tracking-[0.2em] whitespace-nowrap" :class="open ? 'block' : 'lg:hidden'">{{ __('Menu') }}</span>
@@ -156,16 +158,42 @@
             <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Dashboard') }}</span>
         </a>
 
+        @if(auth()->user()->isDirector() || auth()->user()->isAdmin())
+        <a href="{{ route('director.active-documents.index') }}"
+           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+                  {{ request()->routeIs('director.active-documents.*') ? 'nav-item-new-active' : '' }}"
+           :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
+           :title="open ? '' : '{{ __('Dokumen Aktif') }}'">
+            <div class="icon-wrapper shrink-0 relative">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+                @if($unseenActiveDirectorDocsCount > 0)
+                    <span class="absolute -top-1 -right-1 flex h-3 w-3">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-warning opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-3 w-3 border-2 border-base-100 bg-warning"></span>
+                    </span>
+                @endif
+            </div>
+            <span class="text-label min-w-0 flex-1 flex items-center justify-between gap-2" :class="open ? '' : 'lg:hidden'">
+                <span class="truncate">{{ __('Dokumen Aktif') }}</span>
+                @if($unseenActiveDirectorDocsCount > 0)
+                    <span class="badge badge-warning badge-sm font-bold px-1.5 shrink-0 shadow-sm">{{ $unseenActiveDirectorDocsCount }}</span>
+                @endif
+            </span>
+        </a>
+        @endif
+
         @if(auth()->user()->isDirector())
         <a href="{{ route('director.documents.index') }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('director.documents.*') ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
-           :title="open ? '' : '{{ __('Semua Dokumen') }}'">
+           :title="open ? '' : '{{ __('Direktori Folder') }}'">
             <div class="icon-wrapper shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
             </div>
-            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Semua Dokumen') }}</span>
+            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Direktori Folder') }}</span>
         </a>
         @endif
 
@@ -231,30 +259,39 @@
         </a>
         @endif
 
-        <a href="{{ route('signatures.requests.index') }}"
+        @endif
+
+        @php
+            $isStaffOnly = $navUser && $navUser->isStaff() && !$navUser->isHead() && !$navUser->isPicKlinik() && !$navUser->isDirector() && !$navUser->isAdmin();
+        @endphp
+
+        @if($isStaffOnly && $canSeeApproval)
+        {{-- For Staff: Single unified navigation item (no sub-menus, no rollback) --}}
+        <a href="{{ route('approvals.versions') }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
-                  {{ request()->routeIs('signatures.requests.*') ? 'nav-item-new-active' : '' }}"
+                  {{ $isApprovalActive ? 'nav-item-new-active' : '' }}"
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
-           :title="open ? '' : '{{ __('Persetujuan TTD') }}'">
+           :title="open ? '' : '{{ __('Document Approval & Signature') }}'">
             <div class="icon-wrapper shrink-0 relative">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                @if($pendingTtdCount > 0)
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+                @if($totalApprovalCount > 0)
                     <span class="absolute -top-1 -right-1 flex h-3 w-3">
                       <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
                       <span class="relative inline-flex rounded-full h-3 w-3 border-2 border-base-100 bg-error"></span>
                     </span>
                 @endif
             </div>
-            <span class="text-label min-w-0 flex-1 flex items-center justify-between gap-2" :class="open ? '' : 'lg:hidden'">
-                <span class="truncate">{{ __('Persetujuan TTD') }}</span>
-                @if($pendingTtdCount > 0)
-                    <span class="badge badge-error badge-sm font-bold text-white px-1.5 shrink-0 shadow-sm shadow-error/50">{{ $pendingTtdCount }}</span>
+            <span class="text-label min-w-0 flex-1 flex items-center justify-between gap-1.5" :class="open ? '' : 'lg:hidden'">
+                <span class="truncate">{{ __('Document Approval & Signature') }}</span>
+                @if($totalApprovalCount > 0)
+                    <span class="badge badge-error badge-sm font-bold text-white px-1.5 shadow-sm shadow-error/50">{{ $totalApprovalCount }}</span>
                 @endif
             </span>
         </a>
-        @endif
-
-        @if(auth()->user()->isHead() || auth()->user()->isDirector() || auth()->user()->isAdmin())
+        @elseif($canSeeApproval)
+        {{-- For Management / Leaders: Multi-tier Approval Dropdown with Version and Rollback approvals --}}
         <div x-data="{ approvalOpen: {{ $isApprovalActive ? 'true' : 'false' }} }" class="space-y-1">
             <button type="button"
                     @click="open ? (approvalOpen = !approvalOpen) : (toggle(), approvalOpen = true)"
@@ -299,14 +336,14 @@
                  x-transition:leave-end="opacity-0 -translate-y-1"
                  class="pl-2.5 pr-1 space-y-1 border-l-2 border-base-300/60 ml-3.5 my-1"
                  x-cloak>
-                {{-- Sub-menu 1: Document Approval (Version) --}}
+                {{-- Sub-menu 1: Document Approval & Signature --}}
                 <a href="{{ route('approvals.versions') }}"
                    class="flex items-center justify-between gap-1.5 px-2 py-2 rounded-xl text-[12.5px] font-medium transition-all duration-200
-                          {{ request()->routeIs('approvals.versions') || (request()->routeIs('approvals.index') && request('tab') !== 'rollbacks') ? 'bg-primary/10 text-primary font-bold shadow-xs' : 'text-base-content/60 hover:text-base-content hover:bg-base-200/60' }}"
-                   title="{{ __('Document Approval (Version)') }}">
+                          {{ request()->routeIs('approvals.versions') || (request()->routeIs('approvals.index') && !in_array(request('tab'), ['rollbacks', 'renames'])) ? 'bg-primary/10 text-primary font-bold shadow-xs' : 'text-base-content/60 hover:text-base-content hover:bg-base-200/60' }}"
+                   title="{{ __('Document Approval & Signature') }}">
                     <span class="flex items-center gap-2 min-w-0 flex-1">
-                        <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ request()->routeIs('approvals.versions') || (request()->routeIs('approvals.index') && request('tab') !== 'rollbacks') ? 'bg-primary' : 'bg-base-content/30' }}"></span>
-                        <span class="leading-tight break-words">{{ __('Document Approval (Version)') }}</span>
+                        <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ request()->routeIs('approvals.versions') || (request()->routeIs('approvals.index') && !in_array(request('tab'), ['rollbacks', 'renames'])) ? 'bg-primary' : 'bg-base-content/30' }}"></span>
+                        <span class="leading-tight break-words">{{ __('Document Approval & Signature') }}</span>
                     </span>
                     @if($pendingVersionsCount > 0)
                         <span class="badge badge-primary text-white font-bold badge-xs px-1.5 py-2 shrink-0 self-center ml-1">
@@ -399,27 +436,7 @@
             <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Unit Kerja') }}</span>
         </a>
 
-        <a href="{{ route('signatures.requests.index') }}"
-           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
-                  {{ request()->routeIs('signatures.requests.*') ? 'nav-item-new-active' : '' }}"
-           :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
-           :title="open ? '' : '{{ __('Tanda Tangan') }}'">
-            <div class="icon-wrapper shrink-0 relative">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                @if($pendingAdminTtdCount > 0)
-                    <span class="absolute -top-1 -right-1 flex h-3 w-3">
-                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
-                      <span class="relative inline-flex rounded-full h-3 w-3 border-2 border-base-100 bg-error"></span>
-                    </span>
-                @endif
-            </div>
-            <span class="text-label min-w-0 flex-1 flex items-center justify-between gap-2" :class="open ? '' : 'lg:hidden'">
-                <span class="truncate">{{ __('Tanda Tangan') }}</span>
-                @if($pendingAdminTtdCount > 0)
-                    <span class="badge badge-error badge-sm font-bold text-white px-1.5 shrink-0 shadow-sm shadow-error/50">{{ $pendingAdminTtdCount }}</span>
-                @endif
-            </span>
-        </a>
+
 
 
 

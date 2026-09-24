@@ -3,10 +3,10 @@
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
                 <h2 class="text-xl font-bold text-base-content leading-tight">
-                    {{ __('Document Approval (Version)') }}
+                    {{ __('Document Approval & Signature') }}
                 </h2>
                 <p class="text-xs text-base-content/60 mt-0.5">
-                    {{ __('Tinjau dan setujui pembaruan konten atau versi dokumen baru sebelum dipublikasikan.') }}
+                    {{ __('Tinjau, tanda tangani, dan setujui pembaruan konten atau versi dokumen baru sebelum dipublikasikan.') }}
                 </p>
             </div>
             @if(($counts['versions'] ?? $pendingVersions->total()) > 0)
@@ -64,7 +64,7 @@
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                        {{ __('Daftar Versi Dokumen Menunggu Persetujuan') }}
+                        {{ __('Daftar Dokumen Menunggu Persetujuan & Tanda Tangan') }}
                     </span>
                     @if($pendingVersions->total() > 0)
                         <span class="badge badge-sm badge-primary font-bold">{{ $pendingVersions->total() }}</span>
@@ -153,13 +153,13 @@
                     </div>
                     <div>
                         <h3 class="font-bold text-base text-base-content flex items-center gap-2">
-                            {{ __('Document Approval (Version)') }}
+                            {{ __('Document Approval & Signature') }}
                             @if($pendingVersions->total() > 0)
                                 <span class="badge badge-primary badge-sm font-semibold">{{ $pendingVersions->total() }}</span>
                             @endif
                         </h3>
                         <p class="text-xs text-base-content/60">
-                            {{ __('Dokumen menunggu persetujuan versi sebelum dipublikasikan kepada pengguna lain.') }}
+                            {{ __('Dokumen menunggu persetujuan dan tanda tangan versi sebelum dipublikasikan kepada pengguna lain.') }}
                         </p>
                     </div>
                 </div>
@@ -170,8 +170,8 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-base-content/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <p class="text-sm font-medium">{{ __('Semua versi dokumen telah ditinjau') }}</p>
-                    <p class="text-xs text-base-content/40">{{ __('Tidak ada versi dokumen yang sedang menunggu persetujuan.') }}</p>
+                    <p class="text-sm font-medium">{{ __('Semua dokumen telah ditinjau') }}</p>
+                    <p class="text-xs text-base-content/40">{{ __('Tidak ada dokumen yang sedang menunggu persetujuan atau tanda tangan Anda.') }}</p>
                 </div>
             @else
                 <div class="overflow-x-auto">
@@ -259,66 +259,16 @@
                                                 {{ __('Approve Version') }}
                                             </button>
 
-                                            {{-- Custom Approve Version Modal --}}
-                                            <dialog id="approve-doc-modal-{{ $version->id }}" class="modal modal-bottom sm:modal-middle text-left whitespace-normal backdrop-blur-xs">
-                                                <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-lg">
-                                                    <div class="p-6 pb-4">
-                                                        <div class="flex items-start justify-between gap-4">
-                                                            <div class="flex items-center gap-3.5">
-                                                                <div class="w-11 h-11 rounded-2xl bg-success/10 text-success flex items-center justify-center shrink-0 ring-4 ring-success/5 shadow-xs">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                                    </svg>
-                                                                </div>
-                                                                <div>
-                                                                    <h3 class="font-bold text-lg text-base-content leading-snug">{{ __('Setujui Versi Dokumen') }}</h3>
-                                                                    <p class="text-xs text-base-content/60 mt-0.5">{{ __('Setujui versi ini (v:version) agar resmi dipublikasikan.', ['version' => $version->version_number]) }}</p>
-                                                                </div>
-                                                            </div>
-                                                            <button type="button" onclick="document.getElementById('approve-doc-modal-{{ $version->id }}').close()" class="btn btn-ghost btn-sm btn-circle text-base-content/50 hover:text-base-content hover:bg-base-200">
-                                                                ✕
-                                                            </button>
-                                                        </div>
-
-                                                        <div class="mt-4 p-3.5 rounded-xl bg-base-200/60 border border-base-300/60 flex items-start gap-3">
-                                                            <div class="min-w-0 flex-1">
-                                                                <span class="font-semibold text-sm text-base-content break-words">{{ $version->document->title }}</span>
-                                                                <p class="text-xs text-base-content/60 mt-1">
-                                                                    {{ __('Penulis Versi') }}: <span class="font-medium text-base-content/80">{{ $version->author_name }}</span> &bull; <span class="badge badge-sm badge-ghost font-mono">v{{ $version->version_number }}</span>
-                                                                </p>
-                                                                @if($version->isRename() && $version->old_title)
-                                                                    <div class="mt-2 p-2.5 rounded-lg bg-info/10 border border-info/20 text-xs text-info space-y-0.5">
-                                                                        <div class="font-semibold flex items-center gap-1">
-                                                                            <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                                                            <span>{{ __('Pembaruan Nama Dokumen:') }}</span>
-                                                                        </div>
-                                                                        <p class="text-base-content/70">{{ __('Nama Semula:') }} <span class="line-through font-medium">{{ $version->old_title }}</span></p>
-                                                                        <p class="text-base-content font-semibold">{{ __('Nama Baru:') }} <span class="text-primary font-bold">{{ $version->document->title }}</span></p>
-                                                                    </div>
-                                                                @endif
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    <form method="POST" action="{{ route('approvals.approve', [$version->document, $version]) }}">
-                                                        @csrf
-                                                        <div class="bg-base-200/40 px-6 py-4 border-t border-base-200 flex items-center justify-end gap-2.5">
-                                                            <button type="button" onclick="document.getElementById('approve-doc-modal-{{ $version->id }}').close()" class="btn btn-ghost btn-sm sm:btn-md rounded-xl font-medium text-base-content/70 hover:text-base-content px-4">
-                                                                {{ __('Batal') }}
-                                                            </button>
-                                                            <button type="submit" class="btn btn-success btn-sm sm:btn-md text-white font-semibold rounded-xl px-5 shadow-xs hover:shadow-md hover:shadow-success/20 transition-all flex items-center gap-1.5">
-                                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                                                                </svg>
-                                                                {{ __('Approve Version') }}
-                                                            </button>
-                                                        </div>
-                                                    </form>
-                                                </div>
-                                                <form method="dialog" class="modal-backdrop">
-                                                    <button>{{ __('Batal') }}</button>
-                                                </form>
-                                            </dialog>
+                                            {{-- Reusable Approve Version Modal --}}
+                                            @include('approvals._approve_modal', [
+                                                'document' => $version->document,
+                                                'version' => $version,
+                                                'modalId' => 'approve-doc-modal-' . $version->id,
+                                                'hasPendingSignature' => \App\Models\SignatureRequest::where('document_id', $version->document_id)
+                                                    ->where('target_user_id', auth()->id())
+                                                    ->where('status', 'pending')
+                                                    ->exists(),
+                                            ])
 
                                             {{-- Reject Version Action Button --}}
                                             <button type="button" 
@@ -369,7 +319,7 @@
                                                         </div>
                                                     </div>
 
-                                                    <form method="POST" action="{{ route('approvals.reject', [$version->document, $version]) }}">
+                                                    <form method="POST" action="{{ route('approvals.reject', [$version->document, $version]) }}" data-prevent-double-submit="true" onsubmit="const btn = this.querySelector('button[type=submit]'); if(btn){ btn.disabled = true; btn.classList.add('opacity-75', 'cursor-not-allowed'); }">
                                                         @csrf
                                                         <div class="px-6 pb-4">
                                                             <label class="block text-xs font-semibold text-base-content/80 mb-1.5">
@@ -438,7 +388,7 @@
                     </div>
                 </div>
 
-                <form method="POST" action="{{ route('approvals.bulk-approve-versions') }}">
+                <form method="POST" action="{{ route('approvals.bulk-approve-versions') }}" data-prevent-double-submit="true" onsubmit="const btn = this.querySelector('button[type=submit]'); if(btn){ btn.disabled = true; btn.classList.add('opacity-75', 'cursor-not-allowed'); }">
                     @csrf
                     <template x-for="id in selectedVersions" :key="id">
                         <input type="hidden" name="version_ids[]" :value="id" />
@@ -489,7 +439,7 @@
                     </div>
                 </div>
 
-                <form method="POST" action="{{ route('approvals.bulk-reject-versions') }}">
+                <form method="POST" action="{{ route('approvals.bulk-reject-versions') }}" data-prevent-double-submit="true" onsubmit="const btn = this.querySelector('button[type=submit]'); if(btn){ btn.disabled = true; btn.classList.add('opacity-75', 'cursor-not-allowed'); }">
                     @csrf
                     <template x-for="id in selectedVersions" :key="id">
                         <input type="hidden" name="version_ids[]" :value="id" />

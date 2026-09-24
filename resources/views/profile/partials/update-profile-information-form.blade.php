@@ -176,8 +176,8 @@
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
                 <div class="bg-base-100 p-3.5 rounded-xl border border-base-200">
                     <span class="text-base-content/50 block mb-1">{{ __('Peran Sistem') }}</span>
-                    <span class="badge {{ $user->system_role === 'admin' ? 'badge-accent' : ($user->system_role === 'direktur' ? 'badge-info' : ($user->system_role === 'head' ? 'badge-warning' : 'badge-ghost')) }} badge-sm uppercase font-bold">
-                        {{ $user->system_role }}
+                    <span class="badge {{ $user->system_role === 'admin' ? 'badge-accent' : ($user->system_role === 'direktur' ? 'badge-info' : ($user->system_role === 'pic_klinik' ? 'badge-secondary' : ($user->system_role === 'head' ? 'badge-warning' : 'badge-ghost'))) }} badge-sm uppercase font-bold">
+                        {{ str_replace('_', ' ', $user->system_role) }}
                     </span>
                 </div>
 

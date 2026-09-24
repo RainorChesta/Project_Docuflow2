@@ -564,9 +564,11 @@ class OnlyOfficeIntegrationTest extends TestCase
         ]);
         Storage::disk('public')->put('signatures/signer.png', 'fake-png-bytes');
 
+        $this->document->update(['owner_id' => $this->headUser->id]);
+
         // 1. Create a draft signature request with notified_at = null (simulating insertion in ONLYOFFICE)
         $sigRequest = \App\Models\SignatureRequest::create([
-            'requester_id' => $this->user->id,
+            'requester_id' => $this->headUser->id,
             'target_user_id' => $signerUser->id,
             'document_id' => $this->document->id,
             'requested_signature_id' => $sig->id,
@@ -588,14 +590,14 @@ class OnlyOfficeIntegrationTest extends TestCase
         $this->postJson(route('onlyoffice.callback', $this->document), [
             'status' => 2,
             'url' => 'http://onlyoffice-server/download/final.docx',
-            'users' => [(string) $this->user->id],
+            'users' => [(string) $this->headUser->id],
             'key' => 'doc_test_key_final',
         ]);
 
-        // Notification IS sent after editing finishes and document is saved
+        // Unified Notification IS sent after editing finishes and document is saved
         \Illuminate\Support\Facades\Notification::assertSentTo(
             $signerUser,
-            \App\Notifications\SignatureRequested::class
+            \App\Notifications\DocumentApprovalRequested::class
         );
 
         $this->assertNotNull($sigRequest->fresh()->notified_at);

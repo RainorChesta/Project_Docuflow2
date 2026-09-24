@@ -259,7 +259,7 @@
                                                         </div>
                                                     </div>
 
-                                                    <form method="POST" action="{{ route('approvals.rollback-request.approve', $doc) }}">
+                                                    <form method="POST" action="{{ route('approvals.rollback-request.approve', $doc) }}" data-prevent-double-submit="true" onsubmit="const btn = this.querySelector('button[type=submit]'); if(btn){ btn.disabled = true; btn.classList.add('opacity-75', 'cursor-not-allowed'); }">
                                                         @csrf
                                                         <div class="bg-base-200/40 px-6 py-4 border-t border-base-200 flex items-center justify-end gap-2.5">
                                                             <button type="button" onclick="document.getElementById('approve-rollback-modal-{{ $doc->id }}').close()" class="btn btn-ghost btn-sm sm:btn-md rounded-xl font-medium text-base-content/70 hover:text-base-content px-4">
@@ -307,7 +307,7 @@
                                                         </div>
                                                     </div>
 
-                                                    <form method="POST" action="{{ route('approvals.rollback-request.reject', $doc) }}">
+                                                    <form method="POST" action="{{ route('approvals.rollback-request.reject', $doc) }}" data-prevent-double-submit="true" onsubmit="const btn = this.querySelector('button[type=submit]'); if(btn){ btn.disabled = true; btn.classList.add('opacity-75', 'cursor-not-allowed'); }">
                                                         @csrf
                                                         <div class="px-6 pb-5 space-y-2">
                                                             <label for="reject-rollback-notes-{{ $doc->id }}" class="text-xs font-semibold text-base-content uppercase tracking-wider">

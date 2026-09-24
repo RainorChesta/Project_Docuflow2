@@ -87,7 +87,7 @@ class SignatureRequest extends Model
         if ($user->isAdmin()) {
             return 50;
         }
-        if ($user->isHead()) {
+        if ($user->isPicKlinik() || $user->isHead()) {
             return 30;
         }
 
@@ -141,17 +141,26 @@ class SignatureRequest extends Model
 
     /**
      * Dispatch notification to target user when document editing is finished and saved.
+     * Uses unified DocumentApprovalRequested when a pending version exists, avoiding duplicate notifications.
      */
     public function sendNotification(): void
     {
-        $this->loadMissing(['document', 'requester', 'requestedSignature.company', 'targetUser']);
+        $this->loadMissing(['document.versions', 'requester', 'requestedSignature.company', 'targetUser']);
 
         $targetUser = $this->targetUser;
         $document   = $this->document;
         $requester  = $this->requester;
 
         if ($targetUser && $document && $requester && $targetUser->id !== $requester->id) {
-            $targetUser->notify(new \App\Notifications\SignatureRequested($document, $requester->name, $this));
+            $pendingVersion = $document->versions->firstWhere('status', 'pending')
+                ?? $document->versions()->where('status', 'pending')->latest('id')->first();
+
+            if ($pendingVersion) {
+                $targetUser->notify(new \App\Notifications\DocumentApprovalRequested($document, $pendingVersion, $requester->name));
+            } else {
+                $targetUser->notify(new \App\Notifications\SignatureRequested($document, $requester->name, $this));
+            }
+
             $this->update([
                 'notified_at' => now(),
                 'requested_at' => now(),

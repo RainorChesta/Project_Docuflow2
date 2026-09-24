@@ -123,13 +123,13 @@ class SignatureDrivenApprovalTest extends TestCase
         // Compile workflow
         $this->routingService->compileWorkflowFromSignatures($document, $version, $this->staffUser);
 
-        // Steps created: Step 1 (Staff - Bypassed because Agus is author), Step 2 (Kadiv - Pending)
+        // Steps created: Step 1 (Kadiv - Origin Unit Head - Pending), Step 2 (Staff - Bypassed because Agus is author)
         $steps = DocumentApprovalStep::where('version_id', $version->id)->orderBy('step_order')->get();
         $this->assertCount(2, $steps);
-        $this->assertEquals('bypassed', $steps[0]->status);
-        $this->assertEquals($this->staffUser->id, $steps[0]->assigned_user_id);
-        $this->assertEquals('pending', $steps[1]->status);
-        $this->assertEquals($this->kadivUser->id, $steps[1]->assigned_user_id);
+        $this->assertEquals('pending', $steps[0]->status);
+        $this->assertEquals($this->kadivUser->id, $steps[0]->assigned_user_id);
+        $this->assertEquals('bypassed', $steps[1]->status);
+        $this->assertEquals($this->staffUser->id, $steps[1]->assigned_user_id);
 
         // 2. Kadiv approves
         $this->actingAs($this->kadivUser);
@@ -138,11 +138,11 @@ class SignatureDrivenApprovalTest extends TestCase
         ]);
         $response->assertSessionHas('success');
 
-        $steps[1]->refresh();
+        $steps[0]->refresh();
         $version->refresh();
         $document->refresh();
 
-        $this->assertEquals('approved', $steps[1]->status);
+        $this->assertEquals('approved', $steps[0]->status);
         $this->assertEquals('active', $version->status);
         $this->assertEquals($version->id, $document->current_version_id);
 
@@ -343,4 +343,583 @@ class SignatureDrivenApprovalTest extends TestCase
         $this->assertEquals('Perlu perbaikan format', $sigKadiv->rejected_reason);
         $this->assertEquals('rejected', $version->status);
     }
+
+    public function test_scenario_6_three_tier_approval_with_unit_head_manajemen_mutu_and_pic_klinik(): void
+    {
+        $k3UnitKerja = UnitKerja::create(['nama_unit_kerja' => 'Tim K3', 'kode_unit_kerja' => '04']);
+        $mutuUnitKerja = UnitKerja::create(['nama_unit_kerja' => 'Tim Manajemen Mutu', 'kode_unit_kerja' => '01']);
+
+        $headK3 = User::factory()->create([
+            'name' => 'Fajri',
+            'email' => 'fajri@dhu.com',
+            'system_role' => 'head',
+            'unit_kerja_id' => $k3UnitKerja->id,
+            'is_active' => true,
+        ]);
+        $headK3->companies()->sync([$this->company->id]);
+        $headK3->branches()->sync([$this->pusatBranch->id]);
+        $headK3->unitKerjas()->sync([$k3UnitKerja->id]);
+
+        $headMutu = User::factory()->create([
+            'name' => 'ManajemenMutu',
+            'email' => 'mutu@dhu.com',
+            'system_role' => 'head',
+            'unit_kerja_id' => $mutuUnitKerja->id,
+            'is_active' => true,
+        ]);
+        $headMutu->companies()->sync([$this->company->id]);
+        $headMutu->branches()->sync([$this->pusatBranch->id]);
+        $headMutu->unitKerjas()->sync([$mutuUnitKerja->id]);
+
+        $picKlinik = User::factory()->create([
+            'name' => 'PJDhu',
+            'email' => 'pjdhu@dhu.com',
+            'system_role' => 'pic_klinik',
+            'is_active' => true,
+        ]);
+        $picKlinik->companies()->sync([$this->company->id]);
+        $picKlinik->branches()->sync([$this->pusatBranch->id]);
+
+        $document = Document::create([
+            'document_number' => '006/K3/SOP/2026',
+            'title' => 'SOP Keselamatan Kerja',
+            'company_id' => $this->company->id,
+            'branch_id' => $this->pusatBranch->id,
+            'unit_kerja_id' => $k3UnitKerja->id,
+            'document_type_id' => $this->sopType->id,
+            'owner_id' => $this->staffUser->id,
+            'visibility' => 'unit_kerja',
+        ]);
+
+        $version = $document->versions()->create([
+            'version_number' => 1,
+            'content' => '<p>Konten SOP [ttd:Fajri] [ttd:ManajemenMutu] [ttd:PJDhu]</p>',
+            'author_id' => $this->staffUser->id,
+            'author_name' => $this->staffUser->name,
+            'status' => 'pending',
+        ]);
+
+        // Create signature requests in arbitrary order
+        SignatureRequest::create([
+            'requester_id' => $this->staffUser->id,
+            'target_user_id' => $picKlinik->id,
+            'document_id' => $document->id,
+            'status' => 'pending',
+        ]);
+        SignatureRequest::create([
+            'requester_id' => $this->staffUser->id,
+            'target_user_id' => $headMutu->id,
+            'document_id' => $document->id,
+            'status' => 'pending',
+        ]);
+        SignatureRequest::create([
+            'requester_id' => $this->staffUser->id,
+            'target_user_id' => $headK3->id,
+            'document_id' => $document->id,
+            'status' => 'pending',
+        ]);
+
+        $res = $this->routingService->compileWorkflowFromSignatures($document, $version, $this->staffUser);
+        $steps = DocumentApprovalStep::where('version_id', $version->id)->orderBy('step_order')->get();
+
+        $this->assertCount(3, $steps);
+
+        // Step 1: Head of Tim K3 (Fajri) - Active
+        $this->assertEquals(1, $steps[0]->step_order);
+        $this->assertEquals($headK3->id, $steps[0]->assigned_user_id);
+        $this->assertStringContainsString('Tim K3', $steps[0]->step_name);
+        $this->assertStringContainsString('Fajri', $steps[0]->step_name);
+        $this->assertEquals('pending', $steps[0]->status);
+
+        // Step 2: Head of Tim Manajemen Mutu (ManajemenMutu) - Waiting
+        $this->assertEquals(2, $steps[1]->step_order);
+        $this->assertEquals($headMutu->id, $steps[1]->assigned_user_id);
+        $this->assertStringContainsString('Tim Manajemen Mutu', $steps[1]->step_name);
+        $this->assertStringContainsString('ManajemenMutu', $steps[1]->step_name);
+        $this->assertEquals('waiting', $steps[1]->status);
+
+        // Step 3: PIC Klinik / Kepala Cabang (PJDhu) - Waiting
+        $this->assertEquals(3, $steps[2]->step_order);
+        $this->assertEquals($picKlinik->id, $steps[2]->assigned_user_id);
+        $this->assertStringContainsString('PJDhu', $steps[2]->step_name);
+        $this->assertEquals('waiting', $steps[2]->status);
+
+        // Security / Gating Check: ManajemenMutu and PJDhu CANNOT approve while Step 1 is active
+        $this->assertTrue($headK3->can('approve', $document));
+        $this->assertFalse($headMutu->can('approve', $document));
+        $this->assertFalse($picKlinik->can('approve', $document));
+
+        // Step 1: Fajri approves
+        $this->actingAs($headK3);
+        $response = $this->post(route('approvals.approve', [$document, $version]));
+        $response->assertSessionHas('success');
+
+        $steps = DocumentApprovalStep::where('version_id', $version->id)->orderBy('step_order')->get();
+        $this->assertEquals('approved', $steps[0]->status);
+        $this->assertEquals('pending', $steps[1]->status); // Step 2 (ManajemenMutu) is now active!
+        $this->assertEquals('waiting', $steps[2]->status); // Step 3 (PJDhu) is still waiting
+
+        // Security / Gating Check: Fajri is done, PJDhu CANNOT approve yet, ONLY ManajemenMutu can approve
+        $this->assertFalse($headK3->can('approve', $document));
+        $this->assertTrue($headMutu->can('approve', $document));
+        $this->assertFalse($picKlinik->can('approve', $document));
+
+        // Step 2: ManajemenMutu approves
+        $this->actingAs($headMutu);
+        $response = $this->post(route('approvals.approve', [$document, $version]));
+        $response->assertSessionHas('success');
+
+        $steps = DocumentApprovalStep::where('version_id', $version->id)->orderBy('step_order')->get();
+        $this->assertEquals('approved', $steps[0]->status);
+        $this->assertEquals('approved', $steps[1]->status);
+        $this->assertEquals('pending', $steps[2]->status); // Step 3 (PJDhu) is now active!
+
+        // Security / Gating Check: ONLY PJDhu can approve Step 3
+        $this->assertFalse($headK3->can('approve', $document));
+        $this->assertFalse($headMutu->can('approve', $document));
+        $this->assertTrue($picKlinik->can('approve', $document));
+
+        // Step 3: PJDhu approves
+        $this->actingAs($picKlinik);
+        $response = $this->post(route('approvals.approve', [$document, $version]));
+        $response->assertSessionHas('success');
+
+        $steps = DocumentApprovalStep::where('version_id', $version->id)->orderBy('step_order')->get();
+        $this->assertEquals('approved', $steps[0]->status);
+        $this->assertEquals('approved', $steps[1]->status);
+        $this->assertEquals('approved', $steps[2]->status);
+
+        $version->refresh();
+        $this->assertEquals('active', $version->status);
+    }
+
+    public function test_scenario_7_origin_unit_head_is_automatically_required_even_without_signature_tag(): void
+    {
+        $k3UnitKerja = UnitKerja::create(['nama_unit_kerja' => 'Tim K3', 'kode_unit_kerja' => '04']);
+        $mutuUnitKerja = UnitKerja::create(['nama_unit_kerja' => 'Tim Manajemen Mutu', 'kode_unit_kerja' => '01']);
+
+        // Head of Tim K3 (Fajri)
+        $headK3 = User::factory()->create([
+            'name' => 'Fajri',
+            'email' => 'fajri.head@dhu.com',
+            'system_role' => 'head',
+            'unit_kerja_id' => $k3UnitKerja->id,
+            'is_active' => true,
+        ]);
+        $headK3->companies()->sync([$this->company->id]);
+        $headK3->branches()->sync([$this->pusatBranch->id]);
+        $headK3->unitKerjas()->sync([$k3UnitKerja->id]);
+
+        // Head of Manajemen Mutu
+        $headMutu = User::factory()->create([
+            'name' => 'ManajemenMutu',
+            'email' => 'mutu.head@dhu.com',
+            'system_role' => 'head',
+            'unit_kerja_id' => $mutuUnitKerja->id,
+            'is_active' => true,
+        ]);
+        $headMutu->companies()->sync([$this->company->id]);
+        $headMutu->branches()->sync([$this->pusatBranch->id]);
+        $headMutu->unitKerjas()->sync([$mutuUnitKerja->id]);
+
+        // PIC Klinik / Kepala Cabang
+        $picKlinik = User::factory()->create([
+            'name' => 'PJDhu',
+            'email' => 'pjdhu.head@dhu.com',
+            'system_role' => 'pic_klinik',
+            'is_active' => true,
+        ]);
+        $picKlinik->companies()->sync([$this->company->id]);
+        $picKlinik->branches()->sync([$this->pusatBranch->id]);
+
+        // Staff creates document for Tim K3
+        $staffRehan = User::factory()->create([
+            'name' => 'RehanDHU',
+            'email' => 'rehan@dhu.com',
+            'system_role' => 'user',
+            'unit_kerja_id' => $k3UnitKerja->id,
+            'is_active' => true,
+        ]);
+        $staffRehan->companies()->sync([$this->company->id]);
+        $staffRehan->branches()->sync([$this->pusatBranch->id]);
+        $staffRehan->unitKerjas()->sync([$k3UnitKerja->id]);
+
+        $document = Document::create([
+            'document_number' => '007/K3/SOP/2026',
+            'title' => 'SOP Kebersihan dan K3',
+            'company_id' => $this->company->id,
+            'branch_id' => $this->pusatBranch->id,
+            'unit_kerja_id' => $k3UnitKerja->id,
+            'document_type_id' => $this->sopType->id,
+            'owner_id' => $staffRehan->id,
+            'visibility' => 'unit_kerja',
+        ]);
+
+        $version = $document->versions()->create([
+            'version_number' => 1,
+            'content' => '<p>Konten SOP hanya ada TTD Mutu dan TTD PJClinic: [ttd:ManajemenMutu] [ttd:PJDhu]</p>',
+            'author_id' => $staffRehan->id,
+            'author_name' => $staffRehan->name,
+            'status' => 'pending',
+        ]);
+
+        // ONLY 2 signature requests created (NO signature tag for Fajri)
+        SignatureRequest::create([
+            'requester_id' => $staffRehan->id,
+            'target_user_id' => $picKlinik->id,
+            'document_id' => $document->id,
+            'status' => 'pending',
+        ]);
+        SignatureRequest::create([
+            'requester_id' => $staffRehan->id,
+            'target_user_id' => $headMutu->id,
+            'document_id' => $document->id,
+            'status' => 'pending',
+        ]);
+
+        // Compile workflow
+        $res = $this->routingService->compileWorkflowFromSignatures($document, $version, $staffRehan);
+        $steps = DocumentApprovalStep::where('version_id', $version->id)->orderBy('step_order')->get();
+
+        // 3 steps must be created!
+        $this->assertCount(3, $steps);
+
+        // Tahap 1: Fajri (Head of Tim K3) review step is automatically created without signature_request_id!
+        $this->assertEquals(1, $steps[0]->step_order);
+        $this->assertEquals($headK3->id, $steps[0]->assigned_user_id);
+        $this->assertNull($steps[0]->signature_request_id);
+        $this->assertStringContainsString('Tim K3', $steps[0]->step_name);
+        $this->assertStringContainsString('Fajri', $steps[0]->step_name);
+        $this->assertEquals('pending', $steps[0]->status); // Active
+
+        // Tahap 2: ManajemenMutu (Head of Manajemen Mutu)
+        $this->assertEquals(2, $steps[1]->step_order);
+        $this->assertEquals($headMutu->id, $steps[1]->assigned_user_id);
+        $this->assertNotNull($steps[1]->signature_request_id);
+        $this->assertEquals('waiting', $steps[1]->status);
+
+        // Tahap 3: PJDhu (PIC Klinik / Kepala Cabang)
+        $this->assertEquals(3, $steps[2]->step_order);
+        $this->assertEquals($picKlinik->id, $steps[2]->assigned_user_id);
+        $this->assertNotNull($steps[2]->signature_request_id);
+        $this->assertEquals('waiting', $steps[2]->status);
+
+        // Check gating: Fajri must approve first
+        $this->assertTrue($headK3->can('approve', $document));
+        $this->assertFalse($headMutu->can('approve', $document));
+        $this->assertFalse($picKlinik->can('approve', $document));
+
+        // Fajri approves
+        $this->actingAs($headK3);
+        $this->post(route('approvals.approve', [$document, $version]))->assertSessionHas('success');
+
+        // Now step 2 is active for ManajemenMutu
+        $this->assertTrue($headMutu->can('approve', $document));
+        $this->assertFalse($picKlinik->can('approve', $document));
+
+        // ManajemenMutu approves
+        $this->actingAs($headMutu);
+        $this->post(route('approvals.approve', [$document, $version]))->assertSessionHas('success');
+
+        // Now step 3 is active for PJDhu
+        $this->assertTrue($picKlinik->can('approve', $document));
+
+        // PJDhu approves
+        $this->actingAs($picKlinik);
+        $this->post(route('approvals.approve', [$document, $version]))->assertSessionHas('success');
+
+        $version->refresh();
+        $this->assertEquals('active', $version->status);
+    }
+
+    public function test_sidebar_navigation_unifies_approval_and_signature_requests(): void
+    {
+        // Give kadivUser 1 signature request and 1 pending document version
+        SignatureRequest::create([
+            'requester_id' => $this->staffUser->id,
+            'target_user_id' => $this->kadivUser->id,
+            'status' => 'pending',
+            'is_used' => false,
+            'requested_at' => now(),
+            'notified_at' => now(),
+        ]);
+
+        $doc = Document::create([
+            'document_number' => 'DOC-TEST-UNIFY-01',
+            'title' => 'Unified Approval Doc',
+            'document_type_id' => $this->sopType->id,
+            'owner_id' => $this->staffUser->id,
+            'unit_kerja_id' => $this->hrUnitKerja->id,
+            'company_id' => $this->company->id,
+            'branch_id' => $this->pusatBranch->id,
+            'visibility' => Document::VISIBILITY_UNIT_KERJA,
+            'approver_role' => 'head',
+        ]);
+        $doc->versions()->create([
+            'version_number' => 1,
+            'author_id' => $this->staffUser->id,
+            'author_name' => $this->staffUser->name,
+            'status' => 'pending',
+            'content' => '<p>Pending Doc</p>',
+        ]);
+
+        $response = $this->actingAs($this->kadivUser)->get(route('dashboard'));
+        $response->assertOk();
+
+        // 1. Sidebar contains Document Approval (Version) and Rollback Approval, but NOT Signature Approvals menu
+        $response->assertSee(route('approvals.versions'));
+        $response->assertDontSee(route('signatures.requests.index'));
+        $response->assertSee(route('approvals.rollbacks'));
+
+        // 2. Total approval count is 1 (1 pending version, signature requests are unified)
+        $response->assertSee('1');
+
+        // 3. Test approvals/signatures route alias
+        $sigResponse = $this->actingAs($this->kadivUser)->get(route('approvals.signatures'));
+        $sigResponse->assertOk();
+        $sigResponse->assertViewIs('signature_requests.index');
+
+        // 4. Test approvals?tab=signatures redirect
+        $tabResponse = $this->actingAs($this->kadivUser)->get('/approvals?tab=signatures');
+        $tabResponse->assertRedirect(route('signatures.requests.index'));
+    }
+
+    public function test_review_only_step_approves_cleanly_without_signature_request(): void
+    {
+        $k3UnitKerja = UnitKerja::create(['nama_unit_kerja' => 'Tim K3', 'kode_unit_kerja' => '04']);
+
+        $headK3 = User::factory()->create([
+            'name' => 'Fajri Reviewer',
+            'email' => 'fajri.reviewer@dhu.com',
+            'system_role' => 'head',
+            'unit_kerja_id' => $k3UnitKerja->id,
+            'is_active' => true,
+        ]);
+        $headK3->companies()->sync([$this->company->id]);
+        $headK3->branches()->sync([$this->pusatBranch->id]);
+        $headK3->unitKerjas()->sync([$k3UnitKerja->id]);
+
+        $document = Document::create([
+            'document_number' => '008/K3/SOP/2026',
+            'title' => 'SOP Review Only',
+            'company_id' => $this->company->id,
+            'branch_id' => $this->pusatBranch->id,
+            'unit_kerja_id' => $k3UnitKerja->id,
+            'document_type_id' => $this->sopType->id,
+            'owner_id' => $this->staffUser->id,
+            'visibility' => 'unit_kerja',
+        ]);
+
+        $version = $document->versions()->create([
+            'version_number' => 1,
+            'content' => '<p>Konten SOP Polos</p>',
+            'author_id' => $this->staffUser->id,
+            'author_name' => $this->staffUser->name,
+            'status' => 'pending',
+        ]);
+
+        $this->routingService->compileWorkflowFromSignatures($document, $version, $this->staffUser);
+
+        $step = DocumentApprovalStep::where('version_id', $version->id)->first();
+        $this->assertNotNull($step);
+        $this->assertEquals($headK3->id, $step->assigned_user_id);
+        $this->assertNull($step->signature_request_id); // Initially no signature request
+
+        // Fajri approves as review-only
+        $this->actingAs($headK3);
+        $response = $this->post(route('approvals.approve', [$document, $version]), [
+            'notes' => 'Review disetujui tanpa TTD',
+        ]);
+        $response->assertSessionHas('success');
+
+        $step->refresh();
+        $this->assertEquals('approved', $step->status);
+        $this->assertNull($step->signature_request_id);
+        $this->assertEmpty(SignatureRequest::where('document_id', $document->id)->get());
+    }
+
+    public function test_document_with_colleague_signature_requires_head_of_unit_review_first_before_colleague_signs(): void
+    {
+        $k3UnitKerja = UnitKerja::create(['nama_unit_kerja' => 'Tim K3', 'kode_unit_kerja' => '04']);
+
+        // Head of Tim K3 (Fajri)
+        $headK3 = User::factory()->create([
+            'name' => 'Fajri SPV K3',
+            'email' => 'fajri.spv@dhu.com',
+            'system_role' => 'head',
+            'unit_kerja_id' => $k3UnitKerja->id,
+            'is_active' => true,
+        ]);
+        $headK3->companies()->sync([$this->company->id]);
+        $headK3->branches()->sync([$this->pusatBranch->id]);
+        $headK3->unitKerjas()->sync([$k3UnitKerja->id]);
+
+        // Colleague (Staff Budi)
+        $colleagueBudi = User::factory()->create([
+            'name' => 'Budi Colleague',
+            'email' => 'budi.colleague@dhu.com',
+            'system_role' => 'staff',
+            'unit_kerja_id' => $k3UnitKerja->id,
+            'is_active' => true,
+        ]);
+        $colleagueBudi->companies()->sync([$this->company->id]);
+        $colleagueBudi->branches()->sync([$this->pusatBranch->id]);
+        $colleagueBudi->unitKerjas()->sync([$k3UnitKerja->id]);
+
+        // Drafter / Author (Staff Agus)
+        $document = Document::create([
+            'document_number' => '012/K3/SOP/2026',
+            'title' => 'SOP Kolaborasi Tim K3',
+            'company_id' => $this->company->id,
+            'branch_id' => $this->pusatBranch->id,
+            'unit_kerja_id' => $k3UnitKerja->id,
+            'document_type_id' => $this->sopType->id,
+            'owner_id' => $this->staffUser->id,
+            'visibility' => 'unit_kerja',
+        ]);
+
+        $version = $document->versions()->create([
+            'version_number' => 1,
+            'content' => '<p>Konten SOP Kolaborasi [ttd:budi]</p>',
+            'author_id' => $this->staffUser->id,
+            'author_name' => $this->staffUser->name,
+            'status' => 'pending',
+        ]);
+
+        // Signature Request for Colleague Budi
+        $sigBudi = SignatureRequest::create([
+            'requester_id' => $this->staffUser->id,
+            'target_user_id' => $colleagueBudi->id,
+            'document_id' => $document->id,
+            'status' => 'pending',
+        ]);
+
+        // Compile workflow
+        $this->routingService->compileWorkflowFromSignatures($document, $version, $this->staffUser);
+
+        // Steps must be: Step 1 (Fajri - Head SPV - Pending), Step 2 (Budi - Colleague - Waiting)
+        $steps = DocumentApprovalStep::where('version_id', $version->id)->orderBy('step_order')->get();
+        $this->assertCount(2, $steps);
+
+        $this->assertEquals($headK3->id, $steps[0]->assigned_user_id);
+        $this->assertEquals('pending', $steps[0]->status);
+        $this->assertEquals('head_approval', $steps[0]->step_type);
+
+        $this->assertEquals($colleagueBudi->id, $steps[1]->assigned_user_id);
+        $this->assertEquals('waiting', $steps[1]->status);
+        $this->assertEquals('peer_review', $steps[1]->step_type);
+
+        // 1. Fajri (Head SPV) approves Step 1
+        $this->actingAs($headK3);
+        $response1 = $this->post(route('approvals.approve', [$document, $version]), [
+            'notes' => 'Draft SOP diverifikasi dan disetujui oleh SPV K3',
+        ]);
+        $response1->assertSessionHas('success');
+
+        $steps[0]->refresh();
+        $steps[1]->refresh();
+        $this->assertEquals('approved', $steps[0]->status);
+        $this->assertEquals('pending', $steps[1]->status); // Colleague step now becomes pending!
+
+        // Colleague Budi now sees the Signature menu item (and NOT Rollback Approval)
+        $this->assertEquals(1, $colleagueBudi->pendingVersionApprovalsCount());
+        $dashboardResponse = $this->actingAs($colleagueBudi)->get(route('dashboard'));
+        $dashboardResponse->assertOk();
+        $dashboardResponse->assertSee(__('Signature'));
+        $dashboardResponse->assertDontSee(__('Rollback Approval'));
+        $dashboardResponse->assertSee(route('approvals.versions'));
+
+        $approvalsResponse = $this->actingAs($colleagueBudi)->get(route('approvals.versions'));
+        $approvalsResponse->assertOk();
+        $approvalsResponse->assertSee('SOP Kolaborasi Tim K3');
+
+        // 2. Colleague Budi approves Step 2
+        $this->actingAs($colleagueBudi);
+        $response2 = $this->post(route('approvals.approve', [$document, $version]), [
+            'notes' => 'TTD dibubuhkan oleh Budi',
+        ]);
+        $response2->assertSessionHas('success');
+
+        $steps[1]->refresh();
+        $version->refresh();
+        $document->refresh();
+
+        $this->assertEquals('approved', $steps[1]->status);
+        $this->assertEquals('active', $version->status);
+        $this->assertEquals($version->id, $document->current_version_id);
+    }
+
+    public function test_branch_document_without_signatures_only_requires_pic_unit_and_does_not_require_pic_klinik(): void
+    {
+        $cabang = Branch::create([
+            'company_id' => $this->company->id,
+            'name' => 'Klinik Pratama Citra Medika',
+            'code' => 'KPCM',
+            'is_pusat' => false,
+        ]);
+
+        $branchUnit = UnitKerja::create(['nama_unit_kerja' => 'Poli Umum', 'kode_unit_kerja' => '05']);
+
+        $headPoli = User::factory()->create([
+            'name' => 'Dr. Budi Head Poli',
+            'email' => 'budi.poli@cmh.test',
+            'system_role' => 'head',
+            'unit_kerja_id' => $branchUnit->id,
+            'is_active' => true,
+        ]);
+        $headPoli->companies()->sync([$this->company->id]);
+        $headPoli->branches()->sync([$cabang->id]);
+        $headPoli->unitKerjas()->sync([$branchUnit->id]);
+
+        $picKlinik = User::factory()->create([
+            'name' => 'Dr. PIC Klinik',
+            'email' => 'pic.klinik@cmh.test',
+            'system_role' => 'pic_klinik',
+            'is_active' => true,
+        ]);
+        $picKlinik->companies()->sync([$this->company->id]);
+        $picKlinik->branches()->sync([$cabang->id]);
+        $cabang->update(['pic_klinik_id' => $picKlinik->id]);
+
+        $author = User::factory()->create([
+            'name' => 'Perawat Siti',
+            'email' => 'siti@cmh.test',
+            'system_role' => 'staff',
+            'unit_kerja_id' => $branchUnit->id,
+            'is_active' => true,
+        ]);
+        $author->companies()->sync([$this->company->id]);
+        $author->branches()->sync([$cabang->id]);
+        $author->unitKerjas()->sync([$branchUnit->id]);
+
+        $document = Document::create([
+            'document_number' => '015/POLI/SOP/2026',
+            'title' => 'SOP Internal Poli Tanpa TTD',
+            'company_id' => $this->company->id,
+            'branch_id' => $cabang->id,
+            'unit_kerja_id' => $branchUnit->id,
+            'document_type_id' => $this->sopType->id,
+            'owner_id' => $author->id,
+            'visibility' => 'unit_kerja',
+        ]);
+
+        $version = $document->versions()->create([
+            'version_number' => 1,
+            'content' => '<p>Konten Dokumen Internal</p>',
+            'author_id' => $author->id,
+            'author_name' => $author->name,
+            'status' => 'pending',
+        ]);
+
+        $result = $this->routingService->compileWorkflowFromSignatures($document, $version, $author);
+        $steps = $result['steps'];
+
+        // Must ONLY have 1 step for Head of Unit (pic_unit_acknowledge), and NOT include PIC Klinik
+        $this->assertCount(1, $steps);
+        $this->assertEquals('pic_unit_acknowledge', $steps[0]->step_type);
+        $this->assertEquals($headPoli->id, $steps[0]->assigned_user_id);
+        $this->assertEquals('pending', $steps[0]->status);
+    }
 }
+
+

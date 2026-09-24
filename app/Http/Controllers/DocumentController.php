@@ -628,7 +628,11 @@ class DocumentController extends Controller
             }
         }
 
+<<<<<<< HEAD
         $document->load('owner', 'unitKerja', 'documentType', 'currentVersion', 'corporateSoftFile', 'versions.author', 'shares.user', 'unitKerjaShares.unitKerja');
+=======
+        $document->load('owner', 'unitKerja', 'documentType', 'currentVersion', 'versions.author', 'shares.user', 'unitKerjaShares.unitKerja', 'rollbackRequestedBy', 'pendingRollbackVersion');
+>>>>>>> adfd755b7891382091ab6be419493650cf9ee835
 
         $unitKerjas = auth()->user()->isAdmin()
             ? UnitKerja::orderBy('kode_unit_kerja')->get()
@@ -652,12 +656,15 @@ class DocumentController extends Controller
         $pendingVersion = $document->versions()->where('status', 'pending')->whereNull('discarded_at')->latest('id')->first();
         if ($pendingVersion) {
             $author = $document->owner ?? $currentUser;
-            if ($pendingVersion->approvalSteps()->count() === 0) {
+            $hasSteps = $pendingVersion->approvalSteps()->exists();
+            if (!$hasSteps) {
                 $this->approvalRoutingService->compileWorkflowFromSignatures($document, $pendingVersion, $author);
             }
         }
 
-        return view('documents.show', compact('document', 'unitKerjas', 'onlyOfficeConfig', 'version', 'approvedSignatures', 'companies'));
+        $auditTrail = $this->auditService->getDocumentAuditTrail($document);
+
+        return view('documents.show', compact('document', 'unitKerjas', 'onlyOfficeConfig', 'version', 'approvedSignatures', 'companies', 'auditTrail'));
     }
 
     public function summarize(Request $request, Document $document): JsonResponse
@@ -755,24 +762,42 @@ class DocumentController extends Controller
         ]);
     }
 
-    public function edit(Document $document): View
+    public function edit(Document $document): View|\Illuminate\Http\RedirectResponse
     {
+        if ($document->isLockedForEditing()) {
+            return redirect()->route('documents.show', $document)
+                ->with('error', __('Dokumen sedang dalam alur persetujuan dan terkunci dari pengeditan.'));
+        }
+
         $this->authorize('update', $document);
 
+<<<<<<< HEAD
         $document->load('currentVersion', 'versions', 'corporateSoftFile');
+=======
+        $currentUser = auth()->user();
+>>>>>>> adfd755b7891382091ab6be419493650cf9ee835
 
-        $version = $document->displayVersion();
+        // If the latest version was rejected and no active pending/draft version exists, prepare a new revision version with reverted placeholders
+        $latestVersion = $document->versions()->orderBy('version_number', 'desc')->first();
+        if ($latestVersion && $latestVersion->status === 'rejected') {
+            $version = $this->versionService->prepareRevisionFromRejected($document, $currentUser);
+        } else {
+            $version = $document->displayVersion();
+        }
 
         if (!$version) {
             abort(404, 'Document version not found.');
         }
 
-        $this->autoApplyApprovedSignatures($document, $version);
+        // Only auto-apply approved signatures if this version is an active approved document, not an unfinalized revision
+        if ($version->status !== 'draft' && $version->status !== 'rejected') {
+            $this->autoApplyApprovedSignatures($document, $version);
+        }
 
         $onlyOfficeConfig = $this->onlyOfficeService->generateEditorConfig(
             $document,
             $version,
-            auth()->user(),
+            $currentUser,
             'edit'
         );
 
@@ -1019,31 +1044,7 @@ class DocumentController extends Controller
             'version_number' => $version->version_number,
         ]);
 
-        $unnotifiedSigRequests = SignatureRequest::where('document_id', $document->id)
-            ->where('status', 'pending')
-            ->whereNull('notified_at')
-            ->get();
-
-        foreach ($unnotifiedSigRequests as $sigReq) {
-            $sigReq->sendNotification();
-        }
-
-        $resolution = $this->approvalRoutingService->resolveApprover($document, $user);
-        $this->approvalRoutingService->applyToDocument($document, $resolution);
-
-        foreach ($resolution['approvers'] as $approver) {
-            $approver->notify(new \App\Notifications\DocumentApprovalRequested($document, $version, $user->name));
-        }
-
-        if ($resolution['role'] !== null) {
-            $user->notify(new \App\Notifications\ApprovalRouteResolved(
-                $document,
-                $resolution['role'],
-                $resolution['approvers']->pluck('name')->join(', '),
-                $resolution['message'],
-                $resolution['isFallback'],
-            ));
-        }
+        $this->approvalRoutingService->compileWorkflowFromSignatures($document, $version, $user);
 
         $message = $version->wasRecentlyCreated
             ? __('Perubahan disimpan. Menunggu persetujuan.')
@@ -1126,14 +1127,7 @@ class DocumentController extends Controller
         $user = auth()->user();
         $version = $document->displayVersion();
 
-        $unnotifiedSigRequests = SignatureRequest::where('document_id', $document->id)
-            ->where('status', 'pending')
-            ->whereNull('notified_at')
-            ->get();
-
-        foreach ($unnotifiedSigRequests as $sigReq) {
-            $sigReq->sendNotification();
-        }
+        $this->onlyOfficeService->rotateDocumentKey($document, $version);
 
         $routingMessage = null;
         if ($version) {
@@ -1142,47 +1136,31 @@ class DocumentController extends Controller
             }
 
             if ($version->status === 'pending') {
-                $notifKey = 'approval_notified_' . $document->id . '_v' . $version->id;
-
                 Cache::forget('onlyoffice_pending_notif_' . $document->id);
-
-                if (!Cache::has($notifKey)) {
-                    Cache::put($notifKey, true, now()->addMinutes(10));
-
-                    $resolution = $this->approvalRoutingService->resolveApprover($document, $user);
-                    $this->approvalRoutingService->applyToDocument($document, $resolution);
-
-                    foreach ($resolution['approvers'] as $approver) {
-                        $approver->notify(new \App\Notifications\DocumentApprovalRequested($document, $version, $user->name));
-                    }
-
-                    if ($resolution['role'] !== null) {
-                        $user->notify(new \App\Notifications\ApprovalRouteResolved(
-                            $document,
-                            $resolution['role'],
-                            $resolution['approvers']->pluck('name')->join(', '),
-                            $resolution['message'],
-                            $resolution['isFallback'],
-                        ));
-                        $routingMessage = $resolution['message'];
-                    }
-                }
+                $result = $this->approvalRoutingService->compileWorkflowFromSignatures($document, $version, $user);
+                $routingMessage = $result['message'] ?? null;
             }
+
+            $version->touch();
         }
+
+        $document->touch();
 
         $successMessage = $routingMessage ?? __('Perubahan disimpan. Menunggu persetujuan.');
 
         session()->flash('success', $successMessage);
 
+        $redirectUrl = route('documents.show', ['document' => $document, 'saving' => 1]);
+
         if ($request->expectsJson() || $request->wantsJson()) {
             return response()->json([
                 'success' => true,
                 'message' => $successMessage,
-                'redirect_url' => route('documents.show', $document),
+                'redirect_url' => $redirectUrl,
             ]);
         }
 
-        return redirect()->route('documents.show', $document)->with('success', $successMessage);
+        return redirect()->to($redirectUrl)->with('success', $successMessage);
     }
 
     public function saveDraft(Request $request, Document $document): RedirectResponse
@@ -1218,6 +1196,11 @@ class DocumentController extends Controller
 
     public function uploadVersion(Request $request, Document $document): RedirectResponse
     {
+        if ($document->isLockedForEditing()) {
+            return redirect()->route('documents.show', $document)
+                ->with('error', __('Dokumen sedang dalam alur persetujuan dan terkunci dari pengeditan.'));
+        }
+
         $this->authorize('update', $document);
 
         $validated = $request->validate([
@@ -1232,22 +1215,7 @@ class DocumentController extends Controller
             'version_number' => $version->version_number,
         ]);
 
-        $resolution = $this->approvalRoutingService->resolveApprover($document, $user);
-        $this->approvalRoutingService->applyToDocument($document, $resolution);
-
-        foreach ($resolution['approvers'] as $approver) {
-            $approver->notify(new \App\Notifications\DocumentApprovalRequested($document, $version, $user->name));
-        }
-
-        if ($resolution['role'] !== null) {
-            $user->notify(new \App\Notifications\ApprovalRouteResolved(
-                $document,
-                $resolution['role'],
-                $resolution['approvers']->pluck('name')->join(', '),
-                $resolution['message'],
-                $resolution['isFallback'],
-            ));
-        }
+        $this->approvalRoutingService->compileWorkflowFromSignatures($document, $version, $user);
 
         return redirect()->route('documents.show', $document)->with('success', __('Versi baru diunggah. Menunggu persetujuan.'));
     }
@@ -1304,7 +1272,19 @@ class DocumentController extends Controller
             abort(404);
         }
 
-        $document = Document::with(['owner', 'unitKerja', 'documentType', 'currentVersion'])->findOrFail($id);
+        $document = Document::with([
+            'owner.unitKerja',
+            'unitKerja',
+            'documentType',
+            'currentVersion.author.unitKerja',
+            'currentVersion.reviewer.unitKerja',
+            'currentVersion.approvalSteps' => fn($q) => $q->orderBy('step_order'),
+            'currentVersion.approvalSteps.assignedUser.unitKerja',
+            'currentVersion.approvalSteps.actionBy.unitKerja',
+            'currentVersion.approvalSteps.signatureRequest.targetUser.unitKerja',
+            'signatureRequests.targetUser.unitKerja',
+            'signatureRequests.requestedSignature',
+        ])->findOrFail($id);
 
         return view('documents.verified', compact('document', 'token'));
     }
@@ -1440,6 +1420,10 @@ class DocumentController extends Controller
 
     public function rename(Request $request, Document $document): RedirectResponse
     {
+        if ($document->hasPendingRename() || $document->isLockedForEditing()) {
+            return back()->with('error', __('Nama dokumen terkunci karena sedang dalam proses persetujuan.'));
+        }
+
         $this->authorize('rename', $document);
 
         $validated = $request->validate([
@@ -1464,22 +1448,7 @@ class DocumentController extends Controller
 
         if ($version && $version->status === 'pending') {
             if ($version->wasRecentlyCreated) {
-                $resolution = $this->approvalRoutingService->resolveApprover($document, $user);
-                $this->approvalRoutingService->applyToDocument($document, $resolution);
-
-                foreach ($resolution['approvers'] as $approver) {
-                    $approver->notify(new \App\Notifications\DocumentApprovalRequested($document, $version, $user->name));
-                }
-
-                if ($resolution['role'] !== null) {
-                    $user->notify(new \App\Notifications\ApprovalRouteResolved(
-                        $document,
-                        $resolution['role'],
-                        $resolution['approvers']->pluck('name')->join(', '),
-                        $resolution['message'],
-                        $resolution['isFallback'],
-                    ));
-                }
+                $this->approvalRoutingService->compileWorkflowFromSignatures($document, $version, $user);
 
                 return back()->with('success', __('Nama dokumen diperbarui dan versi v:version diajukan untuk persetujuan.', [
                     'version' => $version->version_number,
@@ -1533,6 +1502,10 @@ class DocumentController extends Controller
 
     public function requestRename(Request $request, Document $document): RedirectResponse
     {
+        if ($document->hasPendingRename() || $document->isLockedForEditing()) {
+            return back()->with('error', __('Nama dokumen terkunci karena sedang dalam proses persetujuan.'));
+        }
+
         $this->authorize('requestRename', $document);
 
         $validated = $request->validate([

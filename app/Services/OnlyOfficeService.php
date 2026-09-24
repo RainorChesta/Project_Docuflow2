@@ -112,6 +112,120 @@ class OnlyOfficeService
     }
 
     /**
+     * Generate the raw PNG binary of a pending signature / stamp placeholder badge.
+     */
+    public function generatePlaceholderPngBytes(?string $text = null, ?int $requestId = null, bool $isStamp = false): string
+    {
+        $width = 400;
+        $height = 400;
+
+        if (!extension_loaded('gd')) {
+            return '';
+        }
+
+        $image = imagecreatetruecolor($width, $height);
+        
+        imagealphablending($image, false);
+        imagesavealpha($image, true);
+        $transparent = imagecolorallocatealpha($image, 255, 255, 255, 127);
+        imagefilledrectangle($image, 0, 0, $width, $height, $transparent);
+        imagealphablending($image, true);
+
+        // Amber background card
+        $bgColor = imagecolorallocate($image, 254, 243, 199);       // #FEF3C7
+        $borderColor = imagecolorallocate($image, 245, 158, 11);     // #F59E0B
+        $titleColor = imagecolorallocate($image, 180, 83, 9);        // #B45309
+        $subtitleColor = imagecolorallocate($image, 146, 64, 14);    // #92400E
+        $pillBg = imagecolorallocate($image, 253, 230, 138);         // #FDE68A
+        $pillBorder = imagecolorallocate($image, 217, 119, 6);       // #D97706
+        $dividerColor = imagecolorallocate($image, 252, 211, 77);    // #FCD34D
+        $mutedColor = imagecolorallocate($image, 161, 98, 7);        // #A16207
+
+        // Outer box with border
+        imagefilledrectangle($image, 6, 6, $width - 7, $height - 7, $bgColor);
+        imagerectangle($image, 6, 6, $width - 7, $height - 7, $borderColor);
+        imagerectangle($image, 7, 7, $width - 8, $height - 8, $borderColor);
+
+        $header = $isStamp ? "[ STEMPEL PERUSAHAAN ]" : "[ TANDA TANGAN DIGITAL ]";
+        $subHeader = "MENUNGGU PERSETUJUAN:";
+        $mainText = $text ? strtoupper($text) : ($isStamp ? "STEMPEL PERUSAHAAN" : "TANDA TANGAN RESMI");
+        $pillText = "PENDING APPROVAL";
+        $footnote = "OTOMATIS BERUBAH SETELAH DISETUJUI";
+
+        // Section 1: Header
+        $fontHeader = 4;
+        $fwH = imagefontwidth($fontHeader);
+        $xH = ($width - ($fwH * strlen($header))) / 2;
+        imagestring($image, $fontHeader, max(12, (int) $xH), 40, $header, $titleColor);
+
+        // Divider 1
+        imageline($image, 30, 75, $width - 31, 75, $dividerColor);
+
+        // Section 2: Subheader ("MENUNGGU PERSETUJUAN:")
+        $fontSub = 3;
+        $fwSub = imagefontwidth($fontSub);
+        $xSub = ($width - ($fwSub * strlen($subHeader))) / 2;
+        imagestring($image, $fontSub, max(12, (int) $xSub), 115, $subHeader, $subtitleColor);
+
+        // Section 3: Main Name (Font 5)
+        $fontLarge = 5;
+        $fwL = imagefontwidth($fontLarge);
+        $truncatedMain = strlen($mainText) > 26 ? (substr($mainText, 0, 24) . '..') : $mainText;
+        $xL = ($width - ($fwL * strlen($truncatedMain))) / 2;
+        imagestring($image, $fontLarge, max(12, (int) $xL), 165, $truncatedMain, $subtitleColor);
+
+        // Divider 2
+        imageline($image, 30, 225, $width - 31, 225, $dividerColor);
+
+        // Section 4: Pill Badge
+        $pillLeft = 50;
+        $pillRight = $width - 51;
+        $pillTop = 250;
+        $pillBottom = 295;
+        imagefilledrectangle($image, $pillLeft, $pillTop, $pillRight, $pillBottom, $pillBg);
+        imagerectangle($image, $pillLeft, $pillTop, $pillRight, $pillBottom, $pillBorder);
+
+        $fontPill = 4;
+        $fwP = imagefontwidth($fontPill);
+        $xP = ($width - ($fwP * strlen($pillText))) / 2;
+        imagestring($image, $fontPill, max(12, (int) $xP), 265, $pillText, $titleColor);
+
+        // Section 5: Footnote
+        $fontFoot = 2;
+        $fwF = imagefontwidth($fontFoot);
+        $xF = ($width - ($fwF * strlen($footnote))) / 2;
+        imagestring($image, $fontFoot, max(12, (int) $xF), 335, $footnote, $mutedColor);
+
+        if ($requestId && $requestId > 0) {
+            // Embed invisible identifier text using background color with safe delimiters
+            imagestring($image, 1, 10, 380, "DocuFlowSigReq:#" . $requestId . "# [DF-REQ:#" . $requestId . "#]", $bgColor);
+        }
+
+        ob_start();
+        imagepng($image);
+        $imageData = ob_get_clean();
+        imagedestroy($image);
+
+        if ($requestId && $requestId > 0 && $imageData) {
+            $keyword = "DocuFlowSigReq";
+            $text = "#" . $requestId . "#";
+            $chunkData = $keyword . "\0" . $text;
+            $chunkLen = pack('N', strlen($chunkData));
+            $chunkType = 'tEXt';
+            $crc = pack('N', crc32($chunkType . $chunkData));
+            $tExtChunk = $chunkLen . $chunkType . $chunkData . $crc;
+
+            $iendPos = strrpos($imageData, "IEND");
+            if ($iendPos !== false && $iendPos >= 4) {
+                $insertPos = $iendPos - 4;
+                $imageData = substr($imageData, 0, $insertPos) . $tExtChunk . substr($imageData, $insertPos);
+            }
+        }
+
+        return $imageData ?: '';
+    }
+
+    /**
      * Get the URL ONLYOFFICE uses to fetch the document's QR code PNG image.
      */
     public function getQrCodeFileUrl(Document $document): string
@@ -152,7 +266,7 @@ class OnlyOfficeService
      * transparent canvas with balanced margins, ensuring a consistent square aspect ratio
      * and crisp rendering across ONLYOFFICE and PDF viewers.
      */
-    public function formatSquareSignature(string $rawPngBytes, int $targetSize = 400, int $padding = 24): string
+    public function formatSquareSignature(string $rawPngBytes, int $targetSize = 400, int $padding = 24, ?int $requestId = null, bool $isStamp = false): string
     {
         if (!extension_loaded('gd') || empty($rawPngBytes)) {
             return $rawPngBytes;
@@ -233,11 +347,8 @@ class OnlyOfficeService
         $cropW = max(1, $maxX - $minX + 1);
         $cropH = max(1, $maxY - $minY + 1);
 
-        $targetSize = max(100, $targetSize);
-        $padding = max(4, min((int)($targetSize * 0.2), $padding));
-        $innerSize = max(20, $targetSize - ($padding * 2));
-
-        // Scale proportionally to fit within innerSize of the square canvas
+        // Calculate uniform scaling to fit inside the inner bounding box (targetSize - 2 * padding)
+        $innerSize = max(1, $targetSize - (2 * $padding));
         $scale = min($innerSize / $cropW, $innerSize / $cropH);
         $drawW = (int) round($cropW * $scale);
         $drawH = (int) round($cropH * $scale);
@@ -297,6 +408,11 @@ class OnlyOfficeService
         // Resample cropped signature neatly into the center of the square canvas
         imagecopyresampled($dest, $cropped, $destX, $destY, 0, 0, $drawW, $drawH, $cropW, $cropH);
 
+        if ($requestId && $requestId > 0) {
+            // Embed invisible identifier text using transparent color
+            imagestring($dest, 1, 10, $targetSize - 20, "DocuFlowSigReq:" . $requestId . " [DF-REQ:" . $requestId . "]", imagecolorallocatealpha($dest, 255, 255, 255, 127));
+        }
+
         ob_start();
         imagepng($dest);
         $result = ob_get_clean();
@@ -304,6 +420,22 @@ class OnlyOfficeService
         imagedestroy($src);
         imagedestroy($cropped);
         imagedestroy($dest);
+
+        if ($requestId && $requestId > 0 && $result) {
+            $keyword = "DocuFlowSigReq";
+            $text = "#" . $requestId . "#";
+            $chunkData = $keyword . "\0" . $text;
+            $chunkLen = pack('N', strlen($chunkData));
+            $chunkType = 'tEXt';
+            $crc = pack('N', crc32($chunkType . $chunkData));
+            $tExtChunk = $chunkLen . $chunkType . $chunkData . $crc;
+
+            $iendPos = strrpos($result, "IEND");
+            if ($iendPos !== false && $iendPos >= 4) {
+                $insertPos = $iendPos - 4;
+                $result = substr($result, 0, $insertPos) . $tExtChunk . substr($result, $insertPos);
+            }
+        }
 
         return $result ?: $rawPngBytes;
     }
@@ -514,6 +646,9 @@ class OnlyOfficeService
                     'comments' => false,
                     'toolbarNoTabs' => false,
                     'feedback' => false,
+                    'logo' => [
+                        'url' => 'https://cmhgroup.id/',
+                    ],
                     'goback' => [
                         'url' => route('documents.show', $document),
                         'text' => __('Kembali ke Detail Dokumen'),
@@ -595,6 +730,9 @@ class OnlyOfficeService
                     'comments' => false,
                     'toolbarNoTabs' => false,
                     'feedback' => false,
+                    'logo' => [
+                        'url' => 'https://cmhgroup.id/',
+                    ],
                     'goback' => [
                         'url' => route('admin.templates.index'),
                         'text' => __('Kembali ke Daftar Template'),

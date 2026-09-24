@@ -33,6 +33,17 @@
     />
 
     <x-confirm-modal
+        name="confirm-discard-version-{{ $document->id }}"
+        :title="__('Discard Pending Changes?')"
+        :message="__('Are you sure you want to discard recent unsaved changes? The document and its base version will remain intact.')"
+        :action="route('documents.discard', $document)"
+        method="POST"
+        :confirmLabel="__('Discard Changes')"
+        :cancelLabel="__('Batal')"
+        confirmClass="btn-error"
+    />
+
+    <x-confirm-modal
         name="confirm-discard-{{ $document->id }}"
         :title="__('Delete Document?')"
         :message="__('Are you sure you want to delete this document and all its changes?')"
@@ -52,7 +63,7 @@
             method="POST"
             :confirmLabel="__('Approve Rollback')"
             :cancelLabel="__('Batal')"
-            confirmClass="btn-success"
+            confirmClass="btn-secondary"
         />
     @endif
 
@@ -106,14 +117,14 @@
                         </div>
                         @can('approve', $document)
                             <div class="flex flex-wrap gap-2 shrink-0">
-                                <form method="POST" action="{{ route('approvals.rollback-request.approve', $document) }}" class="inline">
+                                <form method="POST" action="{{ route('approvals.rollback-request.approve', $document) }}" data-prevent-double-submit="true" onsubmit="const btn = this.querySelector('button[type=submit]'); if(btn){ btn.disabled = true; btn.classList.add('opacity-75', 'cursor-not-allowed'); }" class="inline">
                                     @csrf
-                                    <button class="btn btn-success btn-sm rounded-xl">
+                                    <button type="submit" class="btn btn-secondary btn-sm rounded-xl text-white font-semibold gap-1">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
                                         {{ __('Approve Rollback') }}
                                     </button>
                                 </form>
-                                <button type="button" onclick="document.getElementById('reject-rollback-modal-{{ $document->id }}').showModal()" class="btn btn-outline btn-error btn-sm rounded-xl">
+                                <button type="button" onclick="openModal('reject-rollback-modal-{{ $document->id }}')" class="btn btn-outline btn-error btn-sm rounded-xl">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                                     {{ __('Reject') }}
                                 </button>
@@ -156,7 +167,7 @@
                                         <div class="flex items-center gap-2 flex-wrap">
                                             <span class="font-semibold text-sm text-base-content break-words">{{ $document->title }}</span>
                                             @if($document->pendingRollbackVersion)
-                                                <span class="badge badge-warning badge-sm font-semibold">Ke v{{ $document->pendingRollbackVersion->version_number }}</span>
+                                                <span class="badge badge-primary badge-sm font-semibold">Ke v{{ $document->pendingRollbackVersion->version_number }}</span>
                                             @endif
                                         </div>
                                         @if($document->rollbackRequestedBy)
@@ -169,7 +180,7 @@
                             </div>
 
                             {{-- Form --}}
-                            <form method="POST" action="{{ route('approvals.rollback-request.reject', $document) }}">
+                            <form method="POST" action="{{ route('approvals.rollback-request.reject', $document) }}" data-prevent-double-submit="true" onsubmit="const btn = this.querySelector('button[type=submit]'); if(btn){ btn.disabled = true; btn.classList.add('opacity-75', 'cursor-not-allowed'); }">
                                 @csrf
                                 <div class="px-6 pb-5 space-y-2">
                                     <div class="flex items-center justify-between">
@@ -226,7 +237,7 @@
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
                         <div class="flex items-start sm:items-center gap-3 min-w-0">
                             @if($pendingVersion->isRename())
-                                <div class="w-9 h-9 rounded-xl bg-info/20 text-info flex items-center justify-center shrink-0">
+                                <div class="w-9 h-9 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
                                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                     </svg>
@@ -234,22 +245,22 @@
                                 <div>
                                     <div class="flex items-center gap-2 flex-wrap">
                                         <p class="font-semibold text-sm">{{ __('Persetujuan Perubahan Nama Dokumen') }}</p>
-                                        <span class="badge badge-info badge-sm font-semibold">v{{ $pendingVersion->version_number }}</span>
+                                        <span class="badge badge-primary/15 text-primary border border-primary/20 badge-sm font-semibold">v{{ $pendingVersion->version_number }}</span>
                                     </div>
                                     <p class="text-xs text-base-content/70 mt-0.5">
                                         {{ __('Perubahan nama dari') }} <span class="line-through text-base-content/60 font-medium">"{{ $pendingVersion->old_title }}"</span> {{ __('menjadi') }} <strong class="text-base-content font-semibold">"{{ $document->title }}"</strong>
                                     </p>
                                 </div>
                             @else
-                                <div class="w-9 h-9 rounded-xl bg-warning/20 text-warning-content flex items-center justify-center shrink-0">
-                                    <svg class="w-5 h-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <div class="w-9 h-9 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                     </svg>
                                 </div>
                                 <div>
                                     <div class="flex items-center gap-2 flex-wrap">
                                         <p class="font-bold text-sm text-base-content">{{ __('Menunggu Persetujuan') }}</p>
-                                        <span class="badge badge-warning badge-sm font-semibold">v{{ $pendingVersion->version_number }}</span>
+                                        <span class="badge badge-primary badge-sm text-white font-semibold">v{{ $pendingVersion->version_number }}</span>
                                     </div>
                                     <p class="text-xs text-base-content/70 mt-0.5">
                                         @if($currentStep)
@@ -265,30 +276,55 @@
                             @endif
                         </div>
                         <div class="flex flex-wrap items-center gap-2 shrink-0">
-                            @if($isPendingV1 && (auth()->id() === $document->owner_id || auth()->user()->can('update', $document) || auth()->user()->can('delete', $document)))
-                                <button type="button" 
-                                        onclick="window.dispatchEvent(new CustomEvent('open-modal', { detail: 'confirm-discard-v1-{{ $document->id }}' }))" 
-                                        class="btn btn-outline btn-error btn-sm rounded-xl gap-1 font-medium"
-                                        title="{{ __('Buang Dokumen') }}">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                    {{ __('Buang Dokumen') }}
-                                </button>
+                            @if($pendingVersion && (auth()->id() === $document->owner_id || auth()->user()->can('update', $document) || auth()->user()->can('delete', $document)))
+                                @if($isPendingV1)
+                                    <button type="button" 
+                                            onclick="window.dispatchEvent(new CustomEvent('open-modal', { detail: 'confirm-discard-v1-{{ $document->id }}' }))" 
+                                            class="btn btn-outline btn-error btn-sm rounded-xl gap-1 font-medium"
+                                            title="{{ __('Buang Dokumen') }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                        {{ __('Buang Dokumen') }}
+                                    </button>
+                                @else
+                                    <button type="button" 
+                                            onclick="window.dispatchEvent(new CustomEvent('open-modal', { detail: 'confirm-discard-version-{{ $document->id }}' }))" 
+                                            class="btn btn-outline btn-error btn-sm rounded-xl gap-1 font-medium"
+                                            title="{{ __('Tarik / Batalkan Pengajuan') }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                        {{ __('Batalkan Pengajuan') }}
+                                    </button>
+                                @endif
                             @endif
 
                             @can('approve', $document)
-                                <form method="POST" action="{{ route('approvals.approve', [$document, $pendingVersion]) }}" class="inline">
-                                    @csrf
-                                    <button class="btn btn-success btn-sm rounded-xl text-white font-semibold gap-1 px-3.5 shadow-xs hover:shadow-md transition-all">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
-                                        {{ __('Approve') }}
-                                    </button>
-                                </form>
-                                <button type="button" onclick="document.getElementById('reject-version-modal-{{ $pendingVersion->id }}').showModal()" class="btn btn-error btn-sm rounded-xl text-white font-semibold gap-1 px-3 shadow-xs hover:shadow-md transition-all">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
-                                    {{ __('Reject') }}
+                                @php
+                                    $currentUser = auth()->user();
+                                    $hasPendingSignature = \App\Models\SignatureRequest::where('document_id', $document->id)
+                                        ->where('target_user_id', $currentUser->id)
+                                        ->where('status', 'pending')
+                                        ->exists();
+                                @endphp
+
+                                <button type="button" onclick="openModal('approve-version-modal-{{ $pendingVersion->id }}')" class="btn btn-secondary btn-sm rounded-xl text-white font-semibold gap-1.5 px-4 shadow-xs hover:shadow-md transition-all">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                                    {{ $hasPendingSignature ? __('Setujui & Tandatangani') : __('Setujui Dokumen') }}
                                 </button>
+                                <button type="button" onclick="openModal('reject-version-modal-{{ $pendingVersion->id }}')" class="btn btn-error btn-sm rounded-xl text-white font-semibold gap-1 px-3 shadow-xs hover:shadow-md transition-all">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                                    {{ __('Tolak') }}
+                                </button>
+
+                                {{-- Reusable Approve Version Modal --}}
+                                @include('approvals._approve_modal', [
+                                    'document' => $document,
+                                    'version' => $pendingVersion,
+                                    'modalId' => 'approve-version-modal-' . $pendingVersion->id,
+                                    'hasPendingSignature' => $hasPendingSignature,
+                                ])
                             @endcan
                         </div>
                     </div>
@@ -296,7 +332,13 @@
 
                 {{-- Dedicated Multi-Tier Approval Workflow Timeline Card --}}
                 @if(isset($approvalSteps) && $approvalSteps->isNotEmpty())
+                    @php
+                        $approvedCount = $approvalSteps->whereIn('status', ['approved', 'bypassed'])->count();
+                        $totalSteps = $approvalSteps->count();
+                        $isAllApproved = $approvedCount === $totalSteps;
+                    @endphp
                     <div class="card bg-base-100 border border-base-300 shadow-xs rounded-2xl mb-4 overflow-hidden print:hidden">
+                        {{-- Header matching inspiration mockup --}}
                         <div class="px-5 py-3.5 bg-base-200/40 border-b border-base-200 flex items-center justify-between gap-3 flex-wrap">
                             <div class="flex items-center gap-2.5">
                                 <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
@@ -305,104 +347,225 @@
                                     </svg>
                                 </div>
                                 <div>
-                                    <h3 class="font-bold text-sm text-base-content leading-tight">{{ __('Alur Persetujuan & Tanda Tangan') }}</h3>
-                                    <p class="text-xs text-base-content/60">{{ __('Progres pengesahan berjenjang berdasarkan tanda tangan yang disisipkan.') }}</p>
+                                    <h3 class="font-extrabold text-xs tracking-wider uppercase text-base-content/80 leading-tight">{{ __('APPROVAL PROGRESS') }}</h3>
+                                    <p class="text-xs text-base-content/60">{{ __('Progres alur persetujuan dan tanda tangan berjenjang.') }}</p>
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">
-                                <span class="badge badge-sm badge-neutral font-medium">
-                                    {{ $approvalSteps->whereIn('status', ['approved', 'bypassed'])->count() }} / {{ $approvalSteps->count() }} {{ __('Selesai') }}
+                                @if($document->isLockedForEditing())
+                                    <span class="badge badge-sm badge-ghost border border-base-300 text-base-content/70 font-semibold gap-1 text-[11px]" title="{{ __('Dokumen terkunci dari pengeditan selama proses persetujuan berlangsung.') }}">
+                                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                                        {{ __('Terkunci') }}
+                                    </span>
+                                @endif
+                                <span class="badge badge-sm {{ $isAllApproved ? 'badge-secondary text-white' : 'badge-ghost border border-base-300 text-base-content/70' }} font-medium">
+                                    {{ $approvedCount }} / {{ $totalSteps }} {{ __('Selesai') }}
                                 </span>
                             </div>
                         </div>
 
-                        <div class="p-4 sm:p-5">
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
-                                @foreach($approvalSteps as $step)
+                        {{-- Vertical Timeline Content --}}
+                        <div class="p-5 sm:p-6">
+                            <div class="flex flex-col">
+                                {{-- Node 0: Initial Creation / Draft Submission --}}
+                                @php
+                                    $draftAuthor = $pendingVersion->author_name ?? $document->owner?->name ?? __('Pembuat Dokumen');
+                                    $draftUnit = $document->unitKerja?->nama_unit_kerja ?? $document->owner?->unitKerja?->nama_unit_kerja ?? __('Unit Kerja');
+                                    $draftTime = ($pendingVersion->created_at ?? $document->created_at)?->format('d M Y, H:i') ?? '-';
+                                @endphp
+                                <div class="flex gap-3.5 sm:gap-4">
+                                    {{-- Node Circle & Vertical Track --}}
+                                    <div class="w-7 flex flex-col items-center shrink-0">
+                                        <div class="w-7 h-7 rounded-full bg-secondary text-white flex items-center justify-center shrink-0 shadow-xs ring-4 ring-secondary/15">
+                                            <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        </div>
+                                        <div class="w-0.5 bg-base-300 flex-1 my-1.5 min-h-[26px]"></div>
+                                    </div>
+
+                                    {{-- Step Content --}}
+                                    <div class="flex-1 pb-5 pt-0.5 min-w-0">
+                                        <div class="flex items-center justify-between gap-2 flex-wrap">
+                                            <h4 class="font-bold text-sm text-base-content leading-tight">
+                                                {{ __('Draft Dokumen Disusun') }}
+                                            </h4>
+                                            <span class="badge badge-secondary badge-sm text-white font-semibold gap-1 text-[10px] py-0 px-2 h-5">
+                                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                                                {{ __('Selesai') }}
+                                            </span>
+                                        </div>
+                                        <div class="text-xs text-base-content/70 mt-1 flex items-center gap-1.5 flex-wrap">
+                                            <span class="font-semibold text-base-content/90">{{ $draftAuthor }}</span>
+                                            <span class="text-base-content/40">•</span>
+                                            <span>{{ $draftUnit }}</span>
+                                            <span class="text-base-content/40">•</span>
+                                            <span class="text-base-content/50">{{ $draftTime }} WIB</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {{-- Nodes 1..N: Approval Steps --}}
+                                @foreach($approvalSteps as $index => $step)
                                     @php
+                                        $isStepLast = $loop->last;
                                         $isStepApproved = $step->status === 'approved';
                                         $isStepBypassed = $step->status === 'bypassed';
                                         $isStepPending = $step->status === 'pending';
                                         $isStepRejected = $step->status === 'rejected';
-                                    @endphp
-                                    <div class="relative flex flex-col justify-between p-4 rounded-xl border transition-all duration-200 {{ $isStepPending ? 'bg-amber-500/5 dark:bg-amber-500/10 border-amber-500/40 ring-2 ring-amber-500/20 shadow-sm' : ($isStepApproved ? 'bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/30' : ($isStepBypassed ? 'bg-base-200/40 border-base-300 opacity-75' : 'bg-base-200/20 border-base-300/80')) }}">
-                                        
-                                        {{-- Top Row: Step Order & Status Badge --}}
-                                        <div class="flex items-center justify-between gap-2 mb-2.5">
-                                            <div class="flex items-center gap-2">
-                                                <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold shadow-xs {{ $isStepPending ? 'bg-amber-500 text-white animate-pulse' : ($isStepApproved ? 'bg-emerald-500 text-white' : ($isStepBypassed ? 'bg-base-300 text-base-content/70' : 'bg-base-200 text-base-content/50 border border-base-300')) }}">
-                                                    @if($isStepApproved)
-                                                        ✓
-                                                    @elseif($isStepBypassed)
-                                                        ⚡
-                                                    @elseif($isStepRejected)
-                                                        ✕
-                                                    @else
-                                                        {{ $step->step_order }}
-                                                    @endif
-                                                </div>
-                                                <span class="text-xs font-bold uppercase tracking-wider text-base-content/60">
-                                                    {{ __('Tahap :order', ['order' => $step->step_order]) }}
-                                                </span>
-                                            </div>
+                                        $isStepWaiting = !in_array($step->status, ['approved', 'bypassed', 'pending', 'rejected']);
 
+                                        // Clean step title
+                                        $cleanStepName = preg_replace('/\s*\([^)]*\)$/', '', $step->step_name);
+                                        if (str_starts_with($cleanStepName, 'Review & Persetujuan Kepala Unit')) {
+                                            $cleanStepTitle = str_replace('Review & Persetujuan Kepala Unit', __('Review Kepala Unit'), $cleanStepName);
+                                        } elseif (str_starts_with($cleanStepName, 'Persetujuan Kepala Unit')) {
+                                            $cleanStepTitle = str_replace('Persetujuan Kepala Unit', __('Review Kepala Unit'), $cleanStepName);
+                                        } elseif (str_starts_with($cleanStepName, 'Pengesahan Kepala Cabang')) {
+                                            $cleanStepTitle = str_replace('Pengesahan Kepala Cabang', __('Pengesahan PJ Klinik'), $cleanStepName);
+                                        } elseif (str_starts_with($cleanStepName, 'Verifikasi / TTD')) {
+                                            $cleanStepTitle = __('Verifikasi & Tanda Tangan');
+                                        } else {
+                                            $cleanStepTitle = $cleanStepName;
+                                        }
+
+                                        $targetUser = $step->actionBy ?? $step->assignedUser;
+                                        $targetName = $targetUser?->name ?? ('Role: ' . ucfirst(str_replace('_', ' ', $step->assigned_role)));
+                                        $targetUnit = $targetUser?->unitKerja?->nama_unit_kerja 
+                                            ?? $targetUser?->unitKerjas?->first()?->nama_unit_kerja 
+                                            ?? ($step->assigned_role ? ucfirst(str_replace('_', ' ', $step->assigned_role)) : null);
+                                        $actionTimeFormatted = $step->action_at?->format('d M Y, H:i');
+                                    @endphp
+
+                                    <div class="flex gap-3.5 sm:gap-4">
+                                        {{-- Node Circle & Track --}}
+                                        <div class="w-7 flex flex-col items-center shrink-0">
                                             @if($isStepApproved)
-                                                <span class="badge badge-success badge-sm text-white font-semibold gap-1">
-                                                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
-                                                    {{ __('Disetujui') }}
-                                                </span>
+                                                <div class="w-7 h-7 rounded-full bg-secondary text-white flex items-center justify-center shrink-0 shadow-xs ring-4 ring-secondary/15">
+                                                    <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                </div>
                                             @elseif($isStepBypassed)
-                                                <span class="badge badge-ghost badge-sm text-base-content/60 font-medium" title="{{ __('Dilewati otomatis karena author adalah penandatangan') }}">
-                                                    {{ __('Bypass') }}
-                                                </span>
+                                                <div class="w-7 h-7 rounded-full bg-secondary/80 text-white flex items-center justify-center shrink-0 shadow-xs ring-4 ring-secondary/10">
+                                                    <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                </div>
                                             @elseif($isStepPending)
-                                                <span class="badge badge-warning badge-sm font-bold gap-1 animate-pulse">
-                                                    <span class="w-1.5 h-1.5 rounded-full bg-warning-content"></span>
-                                                    {{ __('Menunggu') }}
-                                                </span>
+                                                <div class="w-7 h-7 rounded-full bg-primary text-white flex items-center justify-center shrink-0 shadow-sm ring-4 ring-primary/20 animate-pulse">
+                                                    <span class="w-2.5 h-2.5 rounded-full bg-white"></span>
+                                                </div>
                                             @elseif($isStepRejected)
-                                                <span class="badge badge-error badge-sm text-white font-bold gap-1">
-                                                    ✕ {{ __('Ditolak') }}
-                                                </span>
+                                                <div class="w-7 h-7 rounded-full bg-error text-white flex items-center justify-center shrink-0 ring-4 ring-error/20 shadow-xs">
+                                                    <svg class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                </div>
                                             @else
-                                                <span class="badge badge-ghost badge-sm text-base-content/40 font-normal">
-                                                    {{ __('Menunggu Giliran') }}
-                                                </span>
+                                                <div class="w-7 h-7 rounded-full bg-base-200 text-base-content/50 border border-base-300 flex items-center justify-center shrink-0 text-xs font-bold">
+                                                    {{ $step->step_order }}
+                                                </div>
+                                            @endif
+
+                                            @if(!$isStepLast)
+                                                <div class="w-0.5 bg-base-300 flex-1 my-1.5 min-h-[26px]"></div>
                                             @endif
                                         </div>
 
-                                        {{-- Middle: Step Title & Target User --}}
-                                        <div class="space-y-1 my-1">
-                                            <h4 class="font-bold text-sm text-base-content leading-snug break-words">
-                                                {{ $step->step_name }}
-                                            </h4>
-                                            
-                                            <div class="flex items-center gap-1.5 text-xs text-base-content/70 pt-0.5">
-                                                <svg class="w-3.5 h-3.5 text-base-content/40 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                                </svg>
-                                                <span class="font-medium text-base-content truncate" title="{{ $step->assignedUser?->name ?? ucfirst($step->assigned_role) }}">
-                                                    {{ $step->assignedUser?->name ?? ('Role: ' . ucfirst(str_replace('_', ' ', $step->assigned_role))) }}
-                                                </span>
-                                            </div>
-                                        </div>
+                                        {{-- Step Content --}}
+                                        <div class="flex-1 {{ !$isStepLast ? 'pb-5' : 'pb-1' }} pt-0.5 min-w-0">
+                                            <div class="flex items-center justify-between gap-2 flex-wrap">
+                                                <h4 class="font-bold text-sm {{ $isStepPending ? 'text-primary' : ($isStepWaiting ? 'text-base-content/75' : 'text-base-content') }} leading-tight">
+                                                    {{ $cleanStepTitle }}
+                                                </h4>
 
-                                        {{-- Footer Info: Notes or Completed Timestamp --}}
-                                        @if($isStepApproved && $step->action_at)
-                                            <div class="mt-2.5 pt-2 border-t border-emerald-500/20 text-[11px] text-emerald-700 dark:text-emerald-400 flex items-center justify-between">
-                                                <span>{{ __('Disetujui oleh :name', ['name' => $step->actionBy?->name ?? 'Approver']) }}</span>
-                                                <span class="font-medium">{{ $step->action_at->format('d/m/Y H:i') }}</span>
+                                                @if($isStepApproved)
+                                                    <span class="badge badge-secondary badge-sm text-white font-semibold gap-1 text-[10px] py-0 px-2 h-5">
+                                                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                                                        {{ __('Disetujui') }}
+                                                    </span>
+                                                @elseif($isStepBypassed)
+                                                    <span class="badge badge-ghost badge-sm text-base-content/60 font-medium text-[10px] py-0 px-2 h-5" title="{{ __('Dilewati otomatis karena author adalah penandatangan') }}">
+                                                        ⚡ {{ __('Bypass') }}
+                                                    </span>
+                                                @elseif($isStepPending)
+                                                    <span class="badge badge-primary badge-sm text-white font-bold gap-1 animate-pulse text-[10px] py-0 px-2 h-5">
+                                                        <span class="w-1.5 h-1.5 rounded-full bg-white"></span>
+                                                        {{ __('Menunggu') }}
+                                                    </span>
+                                                @elseif($isStepRejected)
+                                                    <span class="badge badge-error badge-sm text-white font-bold gap-1 text-[10px] py-0 px-2 h-5">
+                                                        ✕ {{ __('Ditolak') }}
+                                                    </span>
+                                                @else
+                                                    <span class="badge badge-ghost badge-sm text-base-content/40 font-normal text-[10px] py-0 px-2 h-5">
+                                                        {{ __('Tahap :order', ['order' => $step->step_order]) }}
+                                                    </span>
+                                                @endif
                                             </div>
-                                        @elseif($isStepBypassed)
-                                            <div class="mt-2.5 pt-2 border-t border-base-300 text-[11px] text-base-content/50 italic">
-                                                {{ __('Pembuat dokumen (Otomatis)') }}
+
+                                            {{-- Subtitle Row (Author/Assignee • Unit • Timestamp) --}}
+                                            <div class="text-xs text-base-content/70 mt-1 flex items-center gap-1.5 flex-wrap">
+                                                <span class="font-semibold text-base-content/90">{{ $targetName }}</span>
+                                                @if($targetUnit)
+                                                    <span class="text-base-content/40">•</span>
+                                                    <span>{{ $targetUnit }}</span>
+                                                @endif
+                                                @if($isStepApproved && $actionTimeFormatted)
+                                                    <span class="text-base-content/40">•</span>
+                                                    <span class="text-secondary font-medium">{{ $actionTimeFormatted }} WIB</span>
+                                                @elseif($isStepBypassed)
+                                                    <span class="text-base-content/40">•</span>
+                                                    <span class="text-base-content/50 italic">{{ __('Otomatis') }}</span>
+                                                @endif
                                             </div>
-                                        @elseif($isStepPending)
-                                            <div class="mt-2.5 pt-2 border-t border-amber-500/20 text-[11px] text-amber-700 dark:text-amber-400 font-medium flex items-center gap-1">
-                                                <svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                                <span>{{ __('Sedang ditinjau oleh pejabat terkait') }}</span>
+
+                                            {{-- Additional Badges & Status Information --}}
+                                            <div class="mt-1.5 flex items-center gap-2 flex-wrap">
+                                                @if($step->signature_request_id || ($step->signatureRequest ?? false))
+                                                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20">
+                                                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                                        <span>{{ __('Tanda Tangan Digital') }}</span>
+                                                    </span>
+                                                @endif
+
+                                                @if($isStepPending)
+                                                    <span class="text-[11px] text-primary font-medium flex items-center gap-1">
+                                                        <svg class="w-3 h-3 animate-spin shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                        <span>{{ __('Sedang ditinjau oleh pejabat terkait') }}</span>
+                                                    </span>
+                                                @endif
                                             </div>
-                                        @endif
+
+                                        {{-- Footer Info: Notes or Completed Timestamp (Anchored to Bottom) --}}
+                                        <div class="mt-3 pt-2.5 border-t border-base-200/80 text-[11px]">
+                                            @if($isStepApproved && $step->action_at)
+                                                <div class="text-secondary flex items-center justify-between gap-1">
+                                                    <span class="truncate">{{ __('Disetujui oleh :name', ['name' => $step->actionBy?->name ?? 'Approver']) }}</span>
+                                                    <span class="font-medium shrink-0">{{ $step->action_at->format('d/m/Y H:i') }} WIB</span>
+                                                </div>
+                                            @elseif($isStepBypassed)
+                                                <div class="text-base-content/50 italic truncate">
+                                                    {{ __('Pembuat dokumen (Otomatis)') }}
+                                                </div>
+                                            @elseif($isStepPending)
+                                                <div class="text-primary font-medium flex items-center gap-1 truncate">
+                                                    <svg class="w-3 h-3 animate-spin shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                    <span class="truncate">{{ __('Sedang ditinjau oleh pejabat terkait') }}</span>
+                                                </div>
+                                            @else
+                                                <div class="text-base-content/40 truncate">
+                                                    {{ __('Menunggu giliran tahap sebelumnya') }}
+                                                </div>
+                                            @endif
+
+                                            @if($step->notes)
+                                                <div class="mt-2 p-2.5 rounded-xl bg-base-200/60 border border-base-300 text-xs text-base-content/80">
+                                                    <span class="font-semibold text-base-content/90">{{ __('Catatan:') }}</span> {{ $step->notes }}
+                                                </div>
+                                            @endif
+                                        </div>
                                     </div>
                                 @endforeach
                             </div>
@@ -443,9 +606,9 @@
                                     <div class="min-w-0 flex-1">
                                         <div class="flex items-center gap-2 flex-wrap">
                                             <span class="font-semibold text-sm text-base-content break-words">{{ $document->title }}</span>
-                                            <span class="badge badge-warning badge-sm font-semibold">v{{ $pendingVersion->version_number }}</span>
+                                            <span class="badge badge-primary badge-sm font-semibold">v{{ $pendingVersion->version_number }}</span>
                                             @if($pendingVersion->isRename())
-                                                <span class="badge badge-info badge-sm font-medium gap-1">
+                                                <span class="badge badge-primary badge-outline badge-sm font-medium gap-1">
                                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                                     </svg>
@@ -454,9 +617,9 @@
                                             @endif
                                         </div>
                                         @if($pendingVersion->isRename() && $pendingVersion->old_title)
-                                            <div class="text-xs bg-info/10 text-info border border-info/20 rounded-lg p-2 mt-2">
+                                            <div class="text-xs bg-primary/10 text-primary border border-primary/20 rounded-lg p-2 mt-2">
                                                 <div class="text-base-content/70"><span class="font-semibold text-base-content/80">{{ __('Nama Semula') }}:</span> {{ $pendingVersion->old_title }}</div>
-                                                <div class="text-base-content/70 mt-0.5"><span class="font-semibold text-info">{{ __('Nama Baru yang Ditolak') }}:</span> {{ $document->title }}</div>
+                                                <div class="text-base-content/70 mt-0.5"><span class="font-semibold text-primary">{{ __('Nama Baru yang Ditolak') }}:</span> {{ $document->title }}</div>
                                                 <p class="text-[11px] text-base-content/60 mt-1 italic">{{ __('Jika ditolak, nama dokumen akan dikembalikan ke nama semula.') }}</p>
                                             </div>
                                         @endif
@@ -470,7 +633,7 @@
                             </div>
 
                             {{-- Form --}}
-                            <form method="POST" action="{{ route('approvals.reject', [$document, $pendingVersion]) }}">
+                            <form method="POST" action="{{ route('approvals.reject', [$document, $pendingVersion]) }}" data-prevent-double-submit="true" onsubmit="const btn = this.querySelector('button[type=submit]'); if(btn){ btn.disabled = true; btn.classList.add('opacity-75', 'cursor-not-allowed'); }">
                                 @csrf
                                 <div class="px-6 pb-5 space-y-2">
                                     <div class="flex items-center justify-between">
@@ -518,9 +681,10 @@
 
             {{-- Rejection Notice Banner --}}
             @php
-                $latestRejectedVersion = $document->versions->where('status', 'rejected')->sortByDesc('updated_at')->first();
+                $latestVersion = $document->versions->sortByDesc('version_number')->first();
+                $latestRejectedVersion = ($latestVersion && $latestVersion->status === 'rejected') ? $latestVersion : null;
             @endphp
-            @if($latestRejectedVersion && (!$document->currentVersion || $latestRejectedVersion->version_number >= $document->currentVersion->version_number))
+            @if($latestRejectedVersion && !$document->isLockedForEditing() && (!$document->currentVersion || $latestRejectedVersion->version_number >= $document->currentVersion->version_number))
                 <div id="rejection-notice-banner" class="mb-3 sm:mb-4 rounded-2xl border border-error/30 bg-error/10 p-4 sm:p-5 shadow-xs print:hidden">
                     <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
                         <div class="flex items-start gap-3 min-w-0 flex-1">
@@ -562,7 +726,7 @@
             @endif
 
             <!-- Pending Rename Approval Banner (Executive Blue Palette) -->
-            @if($document->hasPendingRename())
+            @if(!empty(trim($document->pending_title ?? '')))
                 <div class="mb-3 sm:mb-4 rounded-2xl border border-primary/30 dark:border-primary/40 bg-primary/10 dark:bg-primary/15 p-4 sm:p-4.5 shadow-sm print:hidden transition-all">
                     <div class="flex flex-col md:flex-row md:items-center justify-between gap-3.5">
                         {{-- Left: Icon, Proposed Title & Metadata --}}
@@ -596,14 +760,14 @@
                         {{-- Right: Actions --}}
                         <div class="flex items-center gap-2 shrink-0 self-start md:self-center">
                             @can('approveRename', $document)
-                                <form method="POST" action="{{ route('approvals.rename-request.approve', $document) }}" class="inline">
+                                <form method="POST" action="{{ route('approvals.rename-request.approve', $document) }}" data-prevent-double-submit="true" onsubmit="const btn = this.querySelector('button[type=submit]'); if(btn){ btn.disabled = true; btn.classList.add('opacity-75', 'cursor-not-allowed'); }" class="inline">
                                     @csrf
-                                    <button type="submit" class="btn btn-success btn-sm rounded-xl text-white font-semibold gap-1.5 shadow-sm px-3.5 hover:shadow-md transition-all">
+                                    <button type="submit" class="btn btn-secondary btn-sm rounded-xl text-white font-semibold gap-1.5 shadow-sm px-3.5 hover:shadow-md transition-all">
                                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
                                         {{ __('Setujui') }}
                                     </button>
                                 </form>
-                                <button type="button" onclick="document.getElementById('reject-rename-modal-{{ $document->id }}').showModal()" class="btn btn-outline btn-error btn-sm rounded-xl font-semibold gap-1 px-3 bg-white dark:bg-transparent hover:text-white transition-all">
+                                <button type="button" onclick="openModal('reject-rename-modal-{{ $document->id }}')" class="btn btn-outline btn-error btn-sm rounded-xl font-semibold gap-1 px-3 bg-white dark:bg-transparent hover:text-white transition-all">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                                     {{ __('Tolak') }}
                                 </button>
@@ -641,7 +805,7 @@
                                             </div>
                                         </div>
 
-                                        <form method="POST" action="{{ route('approvals.rename-request.reject', $document) }}">
+                                        <form method="POST" action="{{ route('approvals.rename-request.reject', $document) }}" data-prevent-double-submit="true" onsubmit="const btn = this.querySelector('button[type=submit]'); if(btn){ btn.disabled = true; btn.classList.add('opacity-75', 'cursor-not-allowed'); }">
                                             @csrf
                                             <div class="px-5 pb-4 space-y-1.5">
                                                 <label for="reject-rename-notes-{{ $document->id }}" class="text-xs font-semibold text-base-content uppercase tracking-wider">
@@ -673,7 +837,7 @@
                             @if($document->rename_requested_by_id === auth()->id() || $document->owner_id === auth()->id() || auth()->user()->isAdmin())
                                 <form method="POST" action="{{ route('documents.cancel-rename', $document) }}" class="inline" onsubmit="return confirm('{{ __('Batalkan permintaan perubahan nama dokumen ini?') }}')">
                                     @csrf
-                                    <button type="submit" class="btn btn-ghost btn-sm text-slate-500 hover:text-error hover:bg-error/10 rounded-xl font-normal transition-colors">
+                                    <button type="submit" class="btn btn-ghost btn-sm text-base-content/60 hover:text-error hover:bg-error/10 rounded-xl font-normal transition-colors">
                                         {{ __('Batal') }}
                                     </button>
                                 </form>
@@ -700,13 +864,26 @@
                     <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4 border-b border-base-200 pb-2.5 sm:pb-3">
                         <div class="flex items-center flex-wrap gap-2 min-w-0 flex-1">
                             <h1 class="text-lg sm:text-xl font-bold text-base-content break-words">{{ $document->title }}</h1>
-                            @can('rename', $document)
-                                <button type="button" onclick="document.getElementById('rename-document-modal-{{ $document->id }}').showModal()" class="btn btn-ghost btn-xs btn-circle text-base-content/50 hover:text-primary hover:bg-base-200 shrink-0" title="{{ __('Ubah Nama Dokumen') }}">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            @php
+                                $isRenamePending = $document->hasPendingRename() || ($pendingVersion && $pendingVersion->isRename());
+                                $isDocLocked = $document->isLockedForEditing();
+                            @endphp
+                            @if($isRenamePending || $isDocLocked)
+                                <span class="inline-flex items-center justify-center p-1 text-base-content/50 cursor-not-allowed shrink-0" 
+                                      title="{{ $isRenamePending ? __('Nama dokumen terkunci karena pengajuan perubahan nama sedang dalam proses persetujuan.') : __('Nama dokumen terkunci karena dokumen sedang dalam proses persetujuan.') }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-base-content/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                     </svg>
-                                </button>
-                            @endcan
+                                </span>
+                            @else
+                                @can('rename', $document)
+                                    <button type="button" onclick="openModal('rename-document-modal-{{ $document->id }}')" class="btn btn-ghost btn-xs btn-circle text-base-content/50 hover:text-primary hover:bg-base-200 shrink-0" title="{{ __('Ubah Nama Dokumen') }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                    </button>
+                                @endcan
+                            @endif
                             @php
                                 $contextService = app(\App\Services\CompanyContextService::class);
                                 $activeBranchId = $contextService->getActiveBranchId(auth()->user());
@@ -719,8 +896,8 @@
                                 @php
                                     $roleColors = [
                                         'head' => 'badge-primary badge-outline',
-                                        'admin' => 'badge-warning badge-outline',
-                                        'direktur' => 'badge-error badge-outline'
+                                        'admin' => 'badge-ghost border border-base-300 text-base-content/70',
+                                        'direktur' => 'badge-secondary badge-outline'
                                     ];
                                     $roleLabels = [
                                         'head' => 'Head',
@@ -737,6 +914,7 @@
                                     {{ __('Route: :role', ['role' => $badgeLabel]) }}
                                 </span>
                             @endif
+<<<<<<< HEAD
                             @if($document->corporateSoftFile)
                                 <span class="badge badge-accent badge-sm shrink-0 gap-1.5 font-bold shadow-xs py-2 px-2.5" title="{{ __('Kop Surat Korporat yang digunakan: ') . $document->corporateSoftFile->title }}">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-accent-content" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -744,6 +922,19 @@
                                     </svg>
                                     <span>{{ __('Kop:') }} {{ \Illuminate\Support\Str::limit($document->corporateSoftFile->title, 20) }}</span>
                                     <span class="badge badge-xs bg-white text-accent font-extrabold px-1 py-0">{{ __('✓ Terpilih') }}</span>
+=======
+
+                            {{-- Director Seen Status Badge --}}
+                            @if($document->isDirectorRead())
+                                <span class="badge badge-secondary badge-sm text-white font-semibold gap-1 shrink-0 shadow-2xs" title="{{ __('Ditinjau oleh Direktur pada :time', ['time' => $document->director_read_at?->format('d/m/Y H:i') . ' WIB']) }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                                    {{ __('Ditinjau oleh Direktur') }}
+                                </span>
+                            @elseif(auth()->user()->isDirector() || auth()->user()->isAdmin())
+                                <span class="badge badge-ghost border border-base-300 text-base-content/70 badge-sm font-medium gap-1 shrink-0" title="{{ __('Belum ditinjau oleh Direktur') }}">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-primary/70 animate-pulse"></span>
+                                    {{ __('Belum Ditinjau Direktur') }}
+>>>>>>> adfd755b7891382091ab6be419493650cf9ee835
                                 </span>
                             @endif
                         </div>
@@ -777,30 +968,41 @@
                         </div>
                         <div>
                             <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Status') }}</span>
-                            <p class="font-medium mt-0.5">
-                                @if($document->is_expired)
-                                    <span class="badge badge-error badge-sm mb-1">{{ __('Kedaluwarsa') }}</span><br>
+                            <div class="font-medium mt-0.5 space-y-1">
+                                <div>
+                                    @if($document->is_expired)
+                                        <span class="badge badge-error badge-sm mb-1">{{ __('Kedaluwarsa') }}</span><br>
+                                    @endif
+                                    @if($document->currentVersion)
+                                        <div>{{ __('Aktif') }} (v{{ $document->currentVersion->version_number }})</div>
+                                        <div class="text-[11px] text-base-content/60 font-normal" title="{{ __('Waktu Aktif:') }} {{ $document->activated_at->format('d/m/Y H:i') }} WIB">
+                                            {{ $document->activated_at->translatedFormat('d M Y, H:i') }} WIB
+                                        </div>
+                                    @elseif($pendingVersion)
+                                        <span class="text-primary font-semibold">{{ __('Menunggu Persetujuan') }} (v{{ $pendingVersion->version_number }})</span>
+                                    @elseif($hasDraft)
+                                        <span class="text-base-content/70 font-medium">{{ __('Draf') }}</span>
+                                    @else
+                                        <span class="text-primary font-semibold">{{ __('Menunggu Persetujuan Pertama') }}</span>
+                                    @endif
+                                </div>
+                                @if($document->isDirectorRead())
+                                    <div class="text-[11px] text-secondary font-semibold flex items-center gap-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-secondary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                                        <span>{{ __('Ditinjau Direktur') }}</span>
+                                    </div>
                                 @endif
-                                @if($document->currentVersion)
-                                    {{ __('Aktif') }} (v{{ $document->currentVersion->version_number }})
-                                @elseif($pendingVersion)
-                                    <span class="text-warning">{{ __('Menunggu Persetujuan') }} (v{{ $pendingVersion->version_number }})</span>
-                                @elseif($hasDraft)
-                                    <span class="text-warning">{{ __('Draf') }}</span>
-                                @else
-                                    <span class="text-warning">{{ __('Menunggu Persetujuan Pertama') }}</span>
-                                @endif
-                            </p>
+                            </div>
                         </div>
                         <div>
                             <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Visibilitas') }}</span>
                             <p class="font-medium mt-0.5">
                                 @if($document->isGeneral())
-                                    <span class="badge badge-success badge-sm">{{ __('Umum') }}</span>
+                                    <span class="badge badge-primary text-white badge-sm">{{ __('Umum') }}</span>
                                 @elseif($document->isPersonal())
-                                    <span class="badge badge-info badge-sm">{{ __('Personal') }}</span>
+                                    <span class="badge badge-secondary text-white badge-sm">{{ __('Personal') }}</span>
                                 @else
-                                    <span class="badge badge-neutral badge-sm">{{ $document->unitKerja?->nama_unit_kerja ?? __('Unit Kerja') }} {{ __('saja') }}</span>
+                                    <span class="badge badge-ghost border border-base-300 badge-sm">{{ $document->unitKerja?->nama_unit_kerja ?? __('Unit Kerja') }} {{ __('saja') }}</span>
                                 @endif
                             </p>
                         </div>
@@ -822,25 +1024,34 @@
                     @php $isFileBased = $document->displayVersion()?->file_path; @endphp
                     <div class="mt-3 pt-2.5 border-t border-base-200 w-full overflow-x-auto scrollbar-hide touch-pan-x">
                         <div class="flex items-center justify-center sm:justify-start gap-2 flex-nowrap min-w-max py-0.5 px-0.5">
-                            @can('update', $document)
-                                @if(request('saving') == 1)
-                                    <a href="{{ route('documents.edit', $document) }}" id="btn-edit-document" class="btn btn-primary btn-sm pointer-events-none opacity-50 gap-1.5 shrink-0" title="{{ __('Edit Dokumen') }}">
-                                        <span id="spinner-edit-document" class="loading loading-spinner loading-xs"></span>
-                                        <svg id="icon-edit-document" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 hidden shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                        </svg>
-                                        <span id="text-edit-document" class="hidden sm:inline">{{ __('Menyimpan...') }}</span>
-                                    </a>
-                                @else
-                                    <a href="{{ route('documents.edit', $document) }}" id="btn-edit-document" class="btn btn-primary btn-sm gap-1.5 shrink-0" title="{{ __('Edit Dokumen') }}">
-                                        <span id="spinner-edit-document" class="loading loading-spinner loading-xs hidden"></span>
-                                        <svg id="icon-edit-document" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                        </svg>
-                                        <span id="text-edit-document" class="hidden sm:inline">{{ __('Edit Dokumen') }}</span>
-                                    </a>
-                                @endif
-                            @endcan
+                            @if($document->isLockedForEditing())
+                                <button type="button" class="btn btn-neutral btn-sm gap-1.5 shrink-0 opacity-75 cursor-not-allowed" title="{{ __('Dokumen terkunci karena sedang dalam alur persetujuan') }}" disabled>
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0 text-base-content/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    </svg>
+                                    <span class="hidden sm:inline">{{ __('Terkunci (Sedang Ditinjau)') }}</span>
+                                </button>
+                            @else
+                                @can('update', $document)
+                                    @if(request('saving') == 1)
+                                        <a href="{{ route('documents.edit', $document) }}" id="btn-edit-document" class="btn btn-primary btn-sm pointer-events-none opacity-50 gap-1.5 shrink-0" title="{{ __('Edit Dokumen') }}">
+                                            <span id="spinner-edit-document" class="loading loading-spinner loading-xs"></span>
+                                            <svg id="icon-edit-document" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 hidden shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                            </svg>
+                                            <span id="text-edit-document" class="hidden sm:inline">{{ __('Menyimpan...') }}</span>
+                                        </a>
+                                    @else
+                                        <a href="{{ route('documents.edit', $document) }}" id="btn-edit-document" class="btn btn-primary btn-sm gap-1.5 shrink-0" title="{{ __('Edit Dokumen') }}">
+                                            <span id="spinner-edit-document" class="loading loading-spinner loading-xs hidden"></span>
+                                            <svg id="icon-edit-document" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                            </svg>
+                                            <span id="text-edit-document" class="hidden sm:inline">{{ __('Edit Dokumen') }}</span>
+                                        </a>
+                                    @endif
+                                @endcan
+                            @endif
                             <a href="{{ route('documents.download', $document) }}" class="btn btn-outline btn-primary btn-sm gap-1.5 shrink-0" title="{{ __('Download DOCX') }}">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -867,6 +1078,18 @@
                                 <span class="badge badge-ghost badge-xs">{{ $document->versions->count() }}</span>
                             </button>
 
+                            <button
+                                type="button"
+                                class="btn btn-ghost btn-sm border border-base-300 gap-1.5 shrink-0"
+                                onclick="openModal('audit-trail-modal')"
+                                title="{{ __('Audit Trail & Pengesahan') }}"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                </svg>
+                                <span class="hidden sm:inline">{{ __('Audit Trail') }}</span>
+                            </button>
+
                             @can('manageScope', $document)
                                 <button type="button" class="btn btn-ghost btn-sm border border-base-300 gap-1.5 shrink-0" onclick="openModal('scope-modal')" title="{{ __('Ubah Cakupan') }}">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -875,14 +1098,14 @@
                             @endcan
 
                             @can('rename', $document)
-                                <button type="button" class="btn btn-ghost btn-sm border border-base-300 gap-1.5 shrink-0" onclick="document.getElementById('rename-document-modal-{{ $document->id }}').showModal()" title="{{ __('Ubah Nama') }}">
+                                <button type="button" class="btn btn-ghost btn-sm border border-base-300 gap-1.5 shrink-0" onclick="openModal('rename-document-modal-{{ $document->id }}')" title="{{ __('Ubah Nama') }}">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                     <span class="hidden sm:inline">{{ __('Ubah Nama') }}</span>
                                 </button>
                             @endcan
 
                             @if(!$isFileBased)
-                                <button type="button" onclick="document.getElementById('export-pdf-modal').showModal()" class="btn btn-ghost btn-sm border border-base-300 gap-1.5 shrink-0" title="{{ __('Export PDF') }}">
+                                <button type="button" onclick="openModal('export-pdf-modal')" class="btn btn-ghost btn-sm border border-base-300 gap-1.5 shrink-0" title="{{ __('Export PDF') }}">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                                     <span class="hidden sm:inline">{{ __('Export PDF') }}</span>
                                 </button>
@@ -894,6 +1117,25 @@
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                                 <span class="hidden sm:inline">{{ __('Summarize Document') }}</span>
                             </button>
+
+                            {{-- Director Seen Quick Action Button --}}
+                            @if(auth()->user()->isDirector() || auth()->user()->isAdmin())
+                                <form method="POST" action="{{ route('director.documents.acknowledge', $document) }}" class="inline">
+                                    @csrf
+                                    <input type="hidden" name="action" value="{{ $document->isDirectorRead() ? 'unseen' : 'seen' }}">
+                                    <button type="submit" 
+                                            class="btn btn-sm gap-1.5 shrink-0 {{ $document->isDirectorRead() ? 'btn-ghost text-base-content/60 hover:text-error hover:bg-error/10 border border-base-300' : 'btn-secondary text-white shadow-xs' }}" 
+                                            title="{{ $document->isDirectorRead() ? __('Batalkan status tinjauan Direktur') : __('Tandai telah ditinjau oleh Direktur') }}">
+                                        @if($document->isDirectorRead())
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                            <span class="hidden sm:inline">{{ __('Batal Ditinjau') }}</span>
+                                        @else
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                                            <span class="hidden sm:inline">{{ __('Tandai Ditinjau') }}</span>
+                                        @endif
+                                    </button>
+                                </form>
+                            @endif
                         </div>
                     </div>
 
@@ -1207,7 +1449,7 @@
                             </div>
 
                             <p class="text-xs text-base-content/60 bg-base-200/40 p-2.5 rounded-lg border border-base-200 mb-4">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 inline mr-1 text-info" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 inline mr-1 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                 {{ __('Pilihan ukuran kertas di atas hanya berlaku untuk sesi cetak/ekspor ini dan TIDAK akan mengubah format asli dokumen Anda.') }}
                             </p>
                             <div class="flex flex-wrap justify-end gap-2">
@@ -1415,21 +1657,37 @@
         function openModal(modalId) {
             const modal = document.getElementById(modalId);
             if (!modal) return;
-            // Teleport dialog to body only if not inside an Alpine x-data component scope
-            if (modal.parentElement !== document.body && !modal.closest('[x-data]')) {
-                document.body.appendChild(modal);
-            }
-            modal.showModal();
-        }
+            const mainEl = document.querySelector('main') || document.documentElement;
+            const mainScroll = mainEl ? mainEl.scrollTop : 0;
+            const winScrollY = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+            const winScrollX = window.scrollX || document.documentElement.scrollLeft || document.body.scrollLeft || 0;
 
-        document.addEventListener('DOMContentLoaded', function() {
-            document.querySelectorAll('dialog.modal').forEach(function(modal) {
-                // DO NOT detach dialogs that belong to Alpine.js x-data components (e.g. switcher, search)
-                if (modal.parentElement !== document.body && !modal.closest('[x-data]')) {
-                    document.body.appendChild(modal);
+            if (typeof modal.showModal === 'function') {
+                try {
+                    modal.showModal();
+                } catch (e) {
+                    // Ignore if already open
                 }
-            });
-        });
+            } else {
+                modal.setAttribute('open', '');
+            }
+
+            const restore = () => {
+                if (mainEl && mainEl.scrollTop !== mainScroll) {
+                    mainEl.scrollTop = mainScroll;
+                }
+                if ((window.scrollY || document.documentElement.scrollTop || document.body.scrollTop) !== winScrollY) {
+                    window.scrollTo({ top: winScrollY, left: winScrollX, behavior: 'instant' });
+                }
+            };
+            restore();
+            requestAnimationFrame(restore);
+            setTimeout(restore, 0);
+            setTimeout(restore, 20);
+            setTimeout(restore, 60);
+            setTimeout(restore, 150);
+            setTimeout(restore, 300);
+        }
 
         // ---- Bagikan modal (Google Docs model) ----
         const shareDataUrl = @json(route('shares.data', $document));
@@ -1678,13 +1936,13 @@
                 // Ubah state tombol
                 const originalHtml = btn.innerHTML;
                 btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg> ' + @json(__('Copied'));
-                btn.classList.add('btn-success', 'text-success-content');
+                btn.classList.add('btn-secondary', 'text-white');
                 btn.classList.remove('btn-outline', 'btn-primary');
 
                 setTimeout(() => {
                     feedbackDiv.classList.add('hidden');
                     btn.innerHTML = originalHtml;
-                    btn.classList.remove('btn-success', 'text-success-content');
+                    btn.classList.remove('btn-secondary', 'text-white');
                     btn.classList.add('btn-outline', 'btn-primary');
                 }, 3000);
             };
@@ -1781,13 +2039,21 @@
                         <p class="text-xs text-base-content/60 mt-0.5">{{ __('Daftar seluruh versi dokumen, status persetujuan, dan catatan perubahannya.') }}</p>
                     </div>
                 </div>
-                <button type="button" class="btn btn-ghost btn-sm btn-circle text-base-content/50 hover:text-base-content hover:bg-base-200" onclick="document.getElementById('version-modal').close()">
-                    ✕
-                </button>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="document.getElementById('version-modal').close(); openModal('audit-trail-modal')" class="btn btn-ghost btn-xs text-primary gap-1 font-medium hover:bg-primary/10">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                        <span class="hidden sm:inline">{{ __('Lihat Audit Trail') }}</span>
+                    </button>
+                    <button type="button" class="btn btn-ghost btn-sm btn-circle text-base-content/50 hover:text-base-content hover:bg-base-200" onclick="document.getElementById('version-modal').close()">
+                        ✕
+                    </button>
+                </div>
             </div>
 
             @if($document->hasPendingRollback())
-                <div class="alert alert-warning alert-sm mb-4 rounded-xl text-xs flex items-center gap-2">
+                <div class="p-3.5 rounded-xl bg-primary/10 border border-primary/20 text-primary text-xs flex items-center gap-2 mb-4">
                     <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
@@ -1797,82 +2063,84 @@
 
             <div class="space-y-3">
                 @forelse($document->versions->sortByDesc('version_number') as $version)
-                    <div class="p-4 rounded-2xl bg-base-200/50 hover:bg-base-200/80 border border-base-300/60 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div class="min-w-0 flex-1">
-                            <div class="flex items-center gap-2 flex-wrap">
-                                <span class="font-bold text-sm text-base-content">v{{ $version->version_number }}</span>
-                                @if($version->version_title)
-                                    <span class="text-sm font-semibold text-base-content/90 truncate max-w-xs sm:max-w-md" title="{{ $version->version_title }}">{{ $version->version_title }}</span>
-                                @endif
-                                @if($version->file_path)
-                                    <span class="badge badge-ghost badge-xs">Berkas</span>
-                                @endif
-                                @if($version->isRename())
-                                    <span class="badge badge-info badge-xs font-medium gap-0.5">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                        </svg>
-                                        {{ __('Perubahan Nama') }}
-                                    </span>
-                                @endif
-                                @if($version->id === $document->current_version_id)
-                                    <span class="badge badge-success badge-sm font-semibold">Active</span>
-                                @elseif($version->status === 'inactive')
-                                    <span class="badge badge-neutral badge-sm">Inactive</span>
-                                @elseif($version->status === 'pending')
-                                    <span class="badge badge-warning badge-sm font-medium">Pending</span>
-                                @elseif($version->status === 'discarded' || $version->discarded_at)
-                                    <span class="badge badge-neutral badge-sm">Discarded</span>
-                                @elseif($version->status === 'rejected')
-                                    <span class="badge badge-error badge-sm font-semibold">Rejected</span>
-                                @endif
-                                @if($document->hasPendingRollback() && $document->pending_rollback_version_id === $version->id)
-                                    <span class="badge badge-warning badge-sm font-semibold">Target Rollback</span>
-                                @endif
-                            </div>
-                            <div class="text-xs text-base-content/60 mt-1 flex items-center gap-2 flex-wrap">
-                                <div class="flex items-center gap-1.5">
-                                    <span>{{ __('Diajukan oleh') }}:</span>
-                                    <x-user-avatar :user="$version->author" :name="$version->author_name" size="w-4 h-4" text-size="text-[9px]" />
-                                    <strong class="font-medium text-base-content/80">{{ $version->author_name }}</strong>
+                    <div class="p-4 rounded-2xl bg-base-200/50 hover:bg-base-200/80 border border-base-300/60 transition-all flex flex-col gap-3">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="font-bold text-sm text-base-content">v{{ $version->version_number }}</span>
+                                    @if($version->version_title)
+                                        <span class="text-sm font-semibold text-base-content/90 truncate max-w-xs sm:max-w-md" title="{{ $version->version_title }}">{{ $version->version_title }}</span>
+                                    @endif
+                                    @if($version->file_path)
+                                        <span class="badge badge-ghost badge-xs">Berkas</span>
+                                    @endif
+                                    @if($version->isRename())
+                                        <span class="badge badge-primary badge-outline badge-xs font-medium gap-0.5">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                            </svg>
+                                            {{ __('Perubahan Nama') }}
+                                        </span>
+                                    @endif
+                                    @if($version->id === $document->current_version_id)
+                                        <span class="badge badge-secondary text-white badge-sm font-semibold">Active</span>
+                                    @elseif($version->status === 'inactive')
+                                        <span class="badge badge-ghost border border-base-300 badge-sm">Inactive</span>
+                                    @elseif($version->status === 'pending')
+                                        <span class="badge badge-primary text-white badge-sm font-medium">Pending</span>
+                                    @elseif($version->status === 'discarded' || $version->discarded_at)
+                                        <span class="badge badge-ghost border border-base-300 badge-sm">Discarded</span>
+                                    @elseif($version->status === 'rejected')
+                                        <span class="badge badge-error badge-sm font-semibold">Rejected</span>
+                                    @endif
+                                    @if($document->hasPendingRollback() && $document->pending_rollback_version_id === $version->id)
+                                        <span class="badge badge-primary badge-outline badge-sm font-semibold">Target Rollback</span>
+                                    @endif
                                 </div>
-                                <span>•</span>
-                                <span>{{ $version->created_at->format('d M Y, H:i') }}</span>
-                                @if($version->isRename() && $version->old_title)
-                                    <span>•</span>
-                                    <span class="text-info font-medium">{{ __('Semula:') }} <span class="line-through text-base-content/50">{{ $version->old_title }}</span></span>
-                                @endif
-                            </div>
-                            @if($version->status === 'rejected' && $version->notes)
-                                <div class="w-full mt-2 p-2.5 rounded-xl bg-error/10 border border-error/20 text-xs text-error font-medium flex items-start gap-2 min-w-0 max-w-full overflow-hidden">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
-                                    <div class="min-w-0 flex-1 break-words [overflow-wrap:anywhere]">
-                                        <span class="font-bold">{{ __('Catatan Penolakan:') }}</span>
-                                        <span class="whitespace-pre-wrap text-base-content/85 dark:text-base-content/90 font-normal ml-1">{{ $version->notes }}</span>
+                                <div class="text-xs text-base-content/60 mt-1 flex items-center gap-2 flex-wrap">
+                                    <div class="flex items-center gap-1.5">
+                                        <span>{{ __('Diajukan oleh') }}:</span>
+                                        <x-user-avatar :user="$version->author" :name="$version->author_name" size="w-4 h-4" text-size="text-[9px]" />
+                                        <strong class="font-medium text-base-content/80">{{ $version->author_name }}</strong>
                                     </div>
+                                    <span>•</span>
+                                    <span>{{ $version->created_at->format('d M Y, H:i') }} WIB</span>
+                                    @if($version->isRename() && $version->old_title)
+                                        <span>•</span>
+                                        <span class="text-primary font-medium">{{ __('Semula:') }} <span class="line-through text-base-content/50">{{ $version->old_title }}</span></span>
+                                    @endif
                                 </div>
-                            @endif
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0 self-start sm:self-center pt-2 sm:pt-0 border-t sm:border-t-0 border-base-200 sm:border-none w-full sm:w-auto justify-end">
+                                <a href="{{ route('documents.preview-version', [$document, $version]) }}"
+                                   class="btn btn-ghost btn-sm rounded-xl gap-1.5 font-medium hover:bg-base-300/50">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                    {{ __('Preview') }}
+                                </a>
+                                @can('update', $document)
+                                    @if($version->id !== $document->current_version_id
+                                        && $version->status !== 'pending'
+                                        && !($version->status === 'discarded' || $version->discarded_at)
+                                        && !$document->hasPendingRollback())
+                                        <button type="button"
+                                                class="btn btn-outline btn-primary btn-sm rounded-xl gap-1.5 font-medium"
+                                                onclick="document.getElementById('version-modal').close(); window.dispatchEvent(new CustomEvent('open-modal', { detail: 'confirm-rollback-{{ $version->id }}' }))">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                            {{ __('Rollback') }}
+                                        </button>
+                                    @endif
+                                @endcan
+                            </div>
                         </div>
-                        <div class="flex items-center gap-2 shrink-0 self-start sm:self-center pt-2 sm:pt-0 border-t sm:border-t-0 border-base-200 sm:border-none w-full sm:w-auto justify-end">
-                            <a href="{{ route('documents.preview-version', [$document, $version]) }}"
-                               class="btn btn-ghost btn-sm rounded-xl gap-1.5 font-medium hover:bg-base-300/50">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                                {{ __('Preview') }}
-                            </a>
-                            @can('update', $document)
-                                @if($version->id !== $document->current_version_id
-                                    && $version->status !== 'pending'
-                                    && !($version->status === 'discarded' || $version->discarded_at)
-                                    && !$document->hasPendingRollback())
-                                    <button type="button"
-                                            class="btn btn-warning btn-outline btn-sm rounded-xl gap-1.5 font-medium"
-                                            onclick="document.getElementById('version-modal').close(); window.dispatchEvent(new CustomEvent('open-modal', { detail: 'confirm-rollback-{{ $version->id }}' }))">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                        {{ __('Rollback') }}
-                                    </button>
-                                @endif
-                            @endcan
-                        </div>
+                        @if($version->status === 'rejected' && $version->notes)
+                            <div class="w-full p-2.5 rounded-xl bg-error/10 border border-error/20 text-xs text-error font-medium flex items-start gap-2 min-w-0 max-w-full overflow-hidden">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
+                                <div class="min-w-0 flex-1 break-words [overflow-wrap:anywhere]">
+                                    <span class="font-bold">{{ __('Catatan Penolakan:') }}</span>
+                                    <span class="whitespace-pre-wrap text-base-content/85 dark:text-base-content/90 font-normal ml-1">{{ $version->notes }}</span>
+                                </div>
+                            </div>
+                        @endif
                     </div>
                 @empty
                     <div class="text-center py-8 text-base-content/50">
@@ -2174,7 +2442,7 @@
                         $isActiveDoc = $document->currentVersion && $document->currentVersion->status === 'active';
                     @endphp
                     @if($isActiveDoc)
-                        <div class="mt-4 p-3.5 rounded-xl bg-info/10 border border-info/20 text-xs text-info flex items-start gap-2.5">
+                        <div class="mt-4 p-3.5 rounded-xl bg-primary/10 border border-primary/20 text-xs text-primary flex items-start gap-2.5">
                             <svg class="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
@@ -2221,6 +2489,9 @@
             </form>
         </dialog>
     @endcan
+
+    {{-- Include Audit Trail Modal --}}
+    @include('documents._audit_trail_modal')
 
     <script>
         @if(request('saving') == 1)

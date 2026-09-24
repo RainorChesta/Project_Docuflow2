@@ -271,7 +271,7 @@
     </div>
 
     @push('scripts')
-        <script src="{{ rtrim(config('onlyoffice.url'), '/') }}/web-apps/apps/api/documents/api.js?v=9.4.0-f4-v2"
+        <script src="{{ rtrim(config('onlyoffice.url'), '/') }}/web-apps/apps/api/documents/api.js?v=9.4.0-cmh-v2"
                 onerror="document.getElementById('onlyoffice-fallback').classList.remove('hidden');"></script>
         <script>
             const mainScrollContainer = document.querySelector('main') || document.documentElement;
@@ -780,7 +780,10 @@
                 })
                 .then(res => res.json())
                 .then(data => {
-                    window.location.href = data.redirect_url || targetUrl;
+                    const redirectUrl = data.redirect_url || targetUrl;
+                    setTimeout(() => {
+                        window.location.href = redirectUrl;
+                    }, 500);
                 })
                 .catch(err => {
                     console.warn('finish-editing template request error:', err);

@@ -585,7 +585,7 @@
                 }
             </script>
         @endif
-        <script src="{{ rtrim(config('onlyoffice.url'), '/') }}/web-apps/apps/api/documents/api.js?v=9.4.0-f4-v2"
+        <script src="{{ rtrim(config('onlyoffice.url'), '/') }}/web-apps/apps/api/documents/api.js?v=9.4.0-cmh-v2"
                 onerror="document.getElementById('onlyoffice-fallback').classList.remove('hidden');"></script>
         <script>
             const qrCodeUrl = @json($qrCodeUrl ?? null);
@@ -614,25 +614,25 @@
 
             function preserveParentScroll(fn) {
                 const currentScrollTop = mainScrollContainer ? mainScrollContainer.scrollTop : 0;
+                const currentWinScrollY = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
                 let result = null;
                 if (typeof fn === 'function') {
                     result = fn();
                 }
-                requestAnimationFrame(() => {
+                const restore = () => {
                     if (mainScrollContainer && mainScrollContainer.scrollTop !== currentScrollTop) {
                         mainScrollContainer.scrollTop = currentScrollTop;
                     }
-                });
-                setTimeout(() => {
-                    if (mainScrollContainer && mainScrollContainer.scrollTop !== currentScrollTop) {
-                        mainScrollContainer.scrollTop = currentScrollTop;
+                    if ((window.scrollY || document.documentElement.scrollTop || document.body.scrollTop) !== currentWinScrollY) {
+                        window.scrollTo({ top: currentWinScrollY, behavior: 'instant' });
                     }
-                }, 50);
-                setTimeout(() => {
-                    if (mainScrollContainer && mainScrollContainer.scrollTop !== currentScrollTop) {
-                        mainScrollContainer.scrollTop = currentScrollTop;
-                    }
-                }, 150);
+                };
+                restore();
+                requestAnimationFrame(restore);
+                setTimeout(restore, 20);
+                setTimeout(restore, 60);
+                setTimeout(restore, 150);
+                setTimeout(restore, 300);
                 return result;
             }
 
@@ -1935,24 +1935,26 @@
             let allSignatureUsersData = [];
 
             function openSignatureSelectorModal() {
-                const modal = document.getElementById('signature-users-modal');
-                const list = document.getElementById('signature-users-list');
-                const searchInput = document.getElementById('signature-search-input');
-                if (searchInput) searchInput.value = '';
-                const clearBtn = document.getElementById('signature-search-clear');
-                if (clearBtn) clearBtn.classList.add('hidden');
+                preserveParentScroll(() => {
+                    const modal = document.getElementById('signature-users-modal');
+                    const list = document.getElementById('signature-users-list');
+                    const searchInput = document.getElementById('signature-search-input');
+                    if (searchInput) searchInput.value = '';
+                    const clearBtn = document.getElementById('signature-search-clear');
+                    if (clearBtn) clearBtn.classList.add('hidden');
 
-                modal.showModal();
+                    if (modal) modal.showModal();
 
-                fetch('{{ route("signatures.users") }}?document_id={{ $document->id }}')
-                    .then(res => res.json())
-                    .then(data => {
-                        allSignatureUsersData = data.users || [];
-                        filterSignatureUsers('');
-                    })
-                    .catch(err => {
-                        list.innerHTML = '<p class="text-sm text-error text-center py-4 uppercase">{{ __("GAGAL MEMUAT PENGGUNA.") }}</p>';
-                    });
+                    fetch('{{ route("signatures.users") }}?document_id={{ $document->id }}')
+                        .then(res => res.json())
+                        .then(data => {
+                            allSignatureUsersData = data.users || [];
+                            filterSignatureUsers('');
+                        })
+                        .catch(err => {
+                            list.innerHTML = '<p class="text-sm text-error text-center py-4 uppercase">{{ __("GAGAL MEMUAT PENGGUNA.") }}</p>';
+                        });
+                });
             }
 
             function filterSignatureUsers(query) {
@@ -2013,10 +2015,18 @@
                                 if (u.is_me) {
                                     sigActionHtml = `<button type="button" onclick="insertMySignature(${sig.id}, '${sig.type}', '${safeComp}')" class="btn btn-xs ${isStamp ? 'btn-secondary' : 'btn-primary'} gap-1 uppercase font-bold shrink-0">{{ __("SISIPKAN") }}</button>`;
                                 } else if (sig.request_status === 'pending') {
+                                    const reqAction = isPdfDocument 
+                                        ? `openPdfVisualPlacementModal(${u.id}, '${safeName}', 'signature', ${sig.id}, '${sig.type}', '${safeComp}')`
+                                        : `fetchUserSignatureAndInsert(${u.id}, &quot;${(u.name || '').replace(/"/g, '&quot;')}&quot;, ${sig.id})`;
                                     sigActionHtml = `
-                                        <span class="badge badge-warning badge-xs gap-1 py-1.5 px-2 font-bold uppercase shrink-0">
-                                            ⏳ {{ __('MENUNGGU') }}
-                                        </span>
+                                        <div class="flex items-center gap-1.5 shrink-0">
+                                            <span class="badge badge-warning badge-xs gap-1 py-1 px-2 font-bold uppercase">
+                                                ⏳ {{ __('MENUNGGU') }}
+                                            </span>
+                                            <button type="button" onclick="${reqAction}" class="btn btn-xs btn-outline ${isStamp ? 'btn-secondary' : 'btn-primary'} gap-1 uppercase font-bold" title="{{ __('Sisipkan kembali penanda tanda tangan ke dokumen') }}">
+                                                {{ __('SISIPKAN') }}
+                                            </button>
+                                        </div>
                                     `;
                                 } else if (sig.request_status === 'approved') {
                                     const reqAction = isPdfDocument 
@@ -2288,9 +2298,11 @@
                 if (typeof window.showLoadingBlur === 'function') {
                     window.showLoadingBlur(
                         @json(__('Menyimpan Dokumen...')),
-                        @json(__('Menyelesaikan pengeditan dan meneruskan ke approver...'))
+                        @json(__('Menyelesaikan pengeditan dan menyinkronkan isi dokumen...'))
                     );
                 }
+
+                const initialUpdatedAt = "{{ $document->displayVersion()?->updated_at?->timestamp }}";
 
                 if (window.docEditor) {
                     try {
@@ -2310,11 +2322,37 @@
                 })
                 .then(res => res.json())
                 .then(data => {
-                    window.location.href = data.redirect_url || "{{ route('documents.show', $document) }}";
+                    const targetUrl = data.redirect_url || "{{ route('documents.show', ['document' => $document, 'saving' => 1]) }}";
+                    
+                    let attempts = 0;
+                    const maxAttempts = 12; // 6 seconds max
+                    
+                    function checkSavedAndRedirect() {
+                        attempts++;
+                        fetch("{{ route('documents.onlyoffice-status', $document) }}")
+                            .then(r => r.json())
+                            .then(statusData => {
+                                const isSaved = (!statusData.active) || (statusData.updated_at && statusData.updated_at != initialUpdatedAt);
+                                if (isSaved || attempts >= maxAttempts) {
+                                    window.location.href = targetUrl;
+                                } else {
+                                    setTimeout(checkSavedAndRedirect, 500);
+                                }
+                            })
+                            .catch(() => {
+                                if (attempts >= maxAttempts) {
+                                    window.location.href = targetUrl;
+                                } else {
+                                    setTimeout(checkSavedAndRedirect, 500);
+                                }
+                            });
+                    }
+
+                    setTimeout(checkSavedAndRedirect, 500);
                 })
                 .catch(err => {
                     console.warn('finish-editing request error:', err);
-                    window.location.href = "{{ route('documents.show', $document) }}";
+                    window.location.href = "{{ route('documents.show', ['document' => $document, 'saving' => 1]) }}";
                 });
             }
         </script>

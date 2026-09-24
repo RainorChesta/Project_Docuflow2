@@ -11,6 +11,12 @@
             @if($doc->hasPendingRename())
                 <span class="badge badge-warning badge-outline badge-xs shrink-0" title="{{ __('Menunggu Persetujuan Ubah Nama') }}">{{ __('Ubah Nama') }}</span>
             @endif
+            @if($doc->isLockedForEditing())
+                <span class="badge badge-warning badge-outline badge-xs gap-1 shrink-0" title="{{ __('Dokumen sedang dalam alur peninjauan/tanda tangan dan terkunci dari pengeditan') }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                    {{ __('Terkunci') }}
+                </span>
+            @endif
             @if(isset($type) && $type === 'shared')
                 @php $shareRole = $doc->shares->first()?->role; @endphp
                 @if($shareRole)
@@ -44,7 +50,7 @@
         @php
             $isEditorShare = isset($type) && $type === 'shared' && $doc->shares->first()?->role === 'editor';
         @endphp
-        @if($doc->owner_id === auth()->id() || $isEditorShare)
+        @if(($doc->owner_id === auth()->id() || $isEditorShare) && !$doc->isLockedForEditing())
             <a href="{{ route('documents.edit', ['document' => $doc, 'type' => request('type')]) }}" class="btn btn-ghost btn-xs">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                 {{ __('Edit') }}
@@ -73,6 +79,12 @@
                 <span class="badge badge-warning badge-sm w-16 justify-center">{{ __('Draf') }}</span>
             @else
                 <span class="badge badge-ghost badge-sm w-16 justify-center">{{ __('Tanpa versi') }}</span>
+            @endif
+            @if($doc->isDirectorRead())
+                <span class="badge badge-success badge-sm gap-1 text-white font-semibold shrink-0" title="{{ __('Ditinjau oleh Direktur') }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                    {{ __('Ditinjau Direktur') }}
+                </span>
             @endif
         </div>
     </div>

@@ -129,8 +129,27 @@
                     const currentToastIds = this.toasts.map(t => t.id);
                     const unshownNotifs = newNotifs.filter(n => !currentToastIds.includes(n.id));
 
+                    // Deduplicate incoming items so multiple concurrent alerts for the same document outcome never appear
+                    const getOutcomeGroup = (notif) => {
+                        const isApp = notif.status === 'approved' || (notif.type || '').includes('approved');
+                        const isRej = notif.icon === 'rejected' || (notif.type || '').includes('reject') || (notif.type || '').includes('revoked');
+                        if (isApp) return 'approved';
+                        if (isRej) return 'rejected';
+                        return notif.type || 'general';
+                    };
+
+                    const seenToastKeys = new Set(this.toasts.map(t => `${t.document_id || ''}_${t.actor_name || ''}_${getOutcomeGroup(t)}`));
+                    const uniqueIncoming = [];
+                    for (const notif of unshownNotifs) {
+                        const key = `${notif.document_id || ''}_${notif.actor_name || ''}_${getOutcomeGroup(notif)}`;
+                        if (!seenToastKeys.has(key)) {
+                            seenToastKeys.add(key);
+                            uniqueIncoming.push(notif);
+                        }
+                    }
+
                     // Only toast up to 2 items at a time to prevent screen flooding
-                    const incomingToasts = unshownNotifs.slice(0, 2).map(notif => {
+                    const incomingToasts = uniqueIncoming.slice(0, 2).map(notif => {
                         return {
                             id: notif.id,
                             title: notif.title,
@@ -145,7 +164,7 @@
                             url: this.formatUrl(notif.url),
                             time: notif.time,
                             isRejected: notif.icon === 'rejected' || (notif.type || '').includes('reject') || (notif.type || '').includes('revoked'),
-                            isApproved: (notif.type || '').includes('approved') || notif.icon === 'approval' || notif.status === 'approved',
+                            isApproved: (notif.status === 'approved' || (notif.type || '').includes('approved')) && !(notif.type || '').includes('request') && notif.icon !== 'approval',
                             expanded: false
                         };
                     });
@@ -291,11 +310,14 @@
                             <template x-if="toast.isApproved">
                                 <span class="badge badge-success badge-xs font-bold text-white uppercase shrink-0">{{ __('Disetujui') }}</span>
                             </template>
-                            <template x-if="(toast.type || '').includes('stamp_request')">
+                            <template x-if="(toast.type || '').includes('stamp_request') || toast.request_type === 'stamp' || toast.icon === 'stamp' || toast.is_stamp">
                                 <span class="badge badge-secondary badge-xs font-bold uppercase shrink-0">{{ __('Stempel') }}</span>
                             </template>
-                            <template x-if="(toast.type || '').includes('signature_request') && !(toast.type || '').includes('stamp') && !toast.isApproved && !toast.isRejected">
+                            <template x-if="((toast.type || '').includes('signature_request') || toast.has_signature || toast.request_type === 'signature' || toast.icon === 'signature') && !(toast.type || '').includes('stamp') && toast.request_type !== 'stamp' && toast.icon !== 'stamp' && !toast.is_stamp && !toast.isApproved && !toast.isRejected">
                                 <span class="badge badge-primary badge-xs font-bold uppercase shrink-0">{{ __('TTD') }}</span>
+                            </template>
+                            <template x-if="(toast.type || '').includes('rollback') && !toast.isApproved && !toast.isRejected">
+                                <span class="badge badge-warning badge-xs font-bold uppercase shrink-0">{{ __('Rollback') }}</span>
                             </template>
                         </div>
                         <span x-show="toast.time" class="text-[10px] text-base-content/40 font-normal whitespace-nowrap shrink-0" x-text="toast.time"></span>

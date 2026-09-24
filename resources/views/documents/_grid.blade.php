@@ -13,7 +13,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
             </svg>
         </span>
-        @if($doc->owner_id === auth()->id() || $isEditorShare)
+        @if(($doc->owner_id === auth()->id() || $isEditorShare) && !$doc->isLockedForEditing())
             <span onclick="event.preventDefault(); event.stopPropagation(); window.location='{{ route('documents.edit', ['document' => $doc, 'type' => request('type')]) }}'" class="btn btn-ghost btn-xs btn-square" title="{{ __('Edit') }}">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
             </span>
@@ -76,6 +76,9 @@
         </svg>
         {{-- Version badge --}}
         <div class="absolute -bottom-1 -right-2 flex flex-col items-end gap-0.5">
+            @if($doc->isLockedForEditing())
+                <span class="badge badge-warning badge-xs text-[9px] px-1" title="{{ __('Dokumen Terkunci (Sedang Ditinjau)') }}">🔒</span>
+            @endif
             @if($doc->hasPendingRename())
                 <span class="badge badge-warning badge-xs text-[9px] px-1" title="{{ __('Menunggu Persetujuan Ubah Nama') }}">✎</span>
             @endif
@@ -99,7 +102,7 @@
         <div class="text-[10px] text-base-content/60 mt-1 line-clamp-2 leading-tight" title="{{ $doc->document_number }} · {{ $doc->branch?->name }} · {{ $doc->owner->name }}">
             {{ $doc->document_number }}
             @if($doc->branch)
-                <span class="font-medium text-base-content/80">· {{ $doc->branch->name }}</span>
+                <span class="font-medium text-base-content/80">· {{ $doc->branch->effective_code ?? $doc->branch->code ?? $doc->branch->name }}</span>
             @endif
             @if($doc->isGeneral()) <span class="text-success">· {{ __('Umum') }}</span>
             @elseif($doc->isPersonal()) <span class="text-info">· {{ __('Personal') }}</span>
@@ -118,6 +121,12 @@
         @if($doc->documentType)
             <span class="badge badge-ghost badge-xs max-w-[110px] inline-flex items-center text-base-content/70 border border-base-300/40 shrink-0" title="{{ $doc->documentType->name ?? $doc->documentType->code }}">
                 <span class="truncate">{{ $doc->documentType->code }}</span>
+            </span>
+        @endif
+        @if($doc->isDirectorRead())
+            <span class="badge badge-success badge-xs text-[9px] text-white font-semibold inline-flex items-center gap-0.5 border border-success/40 shrink-0" title="{{ __('Ditinjau oleh Direktur') }}">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                <span>{{ __('Ditinjau Direktur') }}</span>
             </span>
         @endif
     </div>

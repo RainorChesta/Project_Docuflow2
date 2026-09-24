@@ -217,19 +217,8 @@ class OnlyOfficeController extends Controller
 
         $requestId = (int) $request->query('request_id', 0);
         if ($requestId > 0) {
-            imagestring($image, 1, 10, 380, "DocuFlowSigReq:" . $requestId, $bgColor);
-
-            // Steganographic metadata in top-inner border pixels (x=8..10, y=8)
-            // Pixel 0: Magic marker DF (222, 173, 190)
-            // Pixel 1: Request ID low/mid/high bytes
-            // Pixel 2: isStamp flag
-            $magicColor = imagecolorallocate($image, 222, 173, 190);
-            $reqColor   = imagecolorallocate($image, ($requestId & 0xFF), (($requestId >> 8) & 0xFF), (($requestId >> 16) & 0xFF));
-            $stampColor = imagecolorallocate($image, $isStamp ? 1 : 0, 88, 99);
-
-            imagesetpixel($image, 8, 8, $magicColor);
-            imagesetpixel($image, 9, 8, $reqColor);
-            imagesetpixel($image, 10, 8, $stampColor);
+            // Embed invisible identifier text using background color
+            imagestring($image, 1, 10, 380, "DocuFlowSigReq:#" . $requestId . "# [DF-REQ:#" . $requestId . "#]", $bgColor);
         }
 
         ob_start();
@@ -239,7 +228,7 @@ class OnlyOfficeController extends Controller
 
         if ($requestId > 0) {
             $keyword = "DocuFlowSigReq";
-            $text = (string) $requestId;
+            $text = "#" . $requestId . "#";
             $chunkData = $keyword . "\0" . $text;
             $chunkLen = pack('N', strlen($chunkData));
             $chunkType = 'tEXt';
@@ -387,18 +376,6 @@ class OnlyOfficeController extends Controller
                     }
                 }
 
-                // Automatically remove any rejected signature placeholders from the document
-                $rejectedRequests = \App\Models\SignatureRequest::where('document_id', $document->id)
-                    ->where('status', 'rejected')
-                    ->get();
-
-                if ($rejectedRequests->isNotEmpty()) {
-                    $processor = app(\App\Services\DocumentProcessorService::class);
-                    foreach ($rejectedRequests as $req) {
-                        $processor->removeSignaturePlaceholder($document, $version, $req->id);
-                    }
-                }
-
                 $this->auditService->log($author, 'document.saved_onlyoffice', 'document', $document->id, [
                     'version_number' => $version->version_number,
                     'status' => $status,
@@ -407,24 +384,9 @@ class OnlyOfficeController extends Controller
                 // Trigger approval routing and notifications if the version is pending
                 // ONLY when status is 2 (final save on close / finish editing) - NOT on status 6 (intermediate save / forcesave while editing)
                 if ($status === 2) {
-                    // Send signature and stamp request notifications for requests created/inserted during this editing session
-                    $unnotifiedSigRequests = \App\Models\SignatureRequest::where('document_id', $document->id)
-                        ->where('status', 'pending')
-                        ->whereNull('notified_at')
-                        ->get();
-
-                    foreach ($unnotifiedSigRequests as $sigReq) {
-                        $sigReq->sendNotification();
-                    }
-
                     if ($version->status === 'pending') {
                         \Illuminate\Support\Facades\Cache::forget('onlyoffice_pending_notif_' . $document->id);
-
-                        $notifKey = 'approval_notified_' . $document->id . '_v' . $version->id;
-                        if (!\Illuminate\Support\Facades\Cache::has($notifKey)) {
-                            \Illuminate\Support\Facades\Cache::put($notifKey, true, now()->addMinutes(10));
-                            $this->approvalRoutingService->compileWorkflowFromSignatures($document, $version, $author);
-                        }
+                        $this->approvalRoutingService->compileWorkflowFromSignatures($document, $version, $author);
                     }
                 } elseif ($status === 6 && $version->status === 'pending') {
                     // Mark that pending version was saved/modified in this session and will need notification when edit finishes
@@ -443,27 +405,13 @@ class OnlyOfficeController extends Controller
             }
         } elseif ($status === 4) {
             // Document closed without changes (or closed after previous forcesave status 6).
-            // Send any unnotified signature/stamp request notifications now that editing session has ended
-            $unnotifiedSigRequests = \App\Models\SignatureRequest::where('document_id', $document->id)
-                ->where('status', 'pending')
-                ->whereNull('notified_at')
-                ->get();
-
-            foreach ($unnotifiedSigRequests as $sigReq) {
-                $sigReq->sendNotification();
-            }
-
             // Check if there is a pending notification from status 6 that needs to be fired upon closing
             $pendingNotif = \Illuminate\Support\Facades\Cache::pull('onlyoffice_pending_notif_' . $document->id);
             if ($pendingNotif) {
                 $version = \App\Models\DocumentVersion::find($pendingNotif['version_id']);
                 $author = \App\Models\User::find($pendingNotif['author_id']) ?? $document->owner;
                 if ($version && $version->status === 'pending') {
-                    $notifKey = 'approval_notified_' . $document->id . '_v' . $version->id;
-                    if (!\Illuminate\Support\Facades\Cache::has($notifKey)) {
-                        \Illuminate\Support\Facades\Cache::put($notifKey, true, now()->addMinutes(10));
-                        $this->approvalRoutingService->compileWorkflowFromSignatures($document, $version, $author);
-                    }
+                    $this->approvalRoutingService->compileWorkflowFromSignatures($document, $version, $author);
                 }
             }
 
