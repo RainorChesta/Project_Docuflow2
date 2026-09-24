@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\Document;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
 /**
@@ -11,7 +12,7 @@ use Illuminate\Notifications\Notification;
  * approved or rejected the document, so they know no further action
  * is needed on their part.
  */
-class ApprovalAlreadyHandled extends Notification
+class ApprovalAlreadyHandled extends Notification implements ShouldQueue
 {
     use Queueable;
 

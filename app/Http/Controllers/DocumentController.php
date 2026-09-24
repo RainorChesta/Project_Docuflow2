@@ -54,8 +54,8 @@ class DocumentController extends Controller
                     return null;
                 }
                 $sig = $req->requestedSignature 
-                    ?? $targetUser->signatures()->where('type', 'original')->first() 
-                    ?? $targetUser->signatures()->first();
+                    ?? $targetUser->signatures->firstWhere('type', 'original') 
+                    ?? $targetUser->signatures->first();
                 if (!$sig) {
                     return null;
                 }
@@ -103,8 +103,8 @@ class DocumentController extends Controller
             } elseif ($req->requestedSignature) {
                 $sig = $req->requestedSignature;
             } else {
-                $sig = $req->targetUser?->signatures()->where('type', 'original')->first() 
-                    ?? $req->targetUser?->signatures()->first();
+                $sig = $req->targetUser?->signatures->firstWhere('type', 'original') 
+                    ?? $req->targetUser?->signatures->first();
             }
 
             $signaturePath = null;

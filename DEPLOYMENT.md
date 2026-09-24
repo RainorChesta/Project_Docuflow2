@@ -126,7 +126,22 @@ APP_DEBUG=false
 APP_URL=http://dokuflow.cmhgroup.id
 
 # Database
-DB_CONNECTION=sqlite # or mysql / pgsql
+DB_CONNECTION=mysql # or sqlite / pgsql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=dokuflow_prod
+DB_USERNAME=dokuflow_user
+DB_PASSWORD=your_secure_password
+
+# Redis & In-Memory Drivers (Queue, Cache, Session for High-Concurrency Multi-User)
+REDIS_CLIENT=predis
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+
+QUEUE_CONNECTION=redis
+CACHE_STORE=redis
+SESSION_DRIVER=redis
 
 # Groq AI Key (for AI PDF Summarization)
 GROQ_API_KEY=your_production_groq_api_key
@@ -370,24 +385,31 @@ php artisan config:cache
 
 ---
 
-## 🔄 Step 5: Supervisor Setup (Queue Worker & Reverb WebSocket)
+## 🔄 Step 5: Redis Server & Supervisor Setup (Queue Worker & Reverb WebSocket)
 
-Install Supervisor (if not already installed):
+### 5.1 Install & Enable Redis Server on Production Host
+Install Redis to handle in-memory queues, caching, and sessions:
 ```bash
-apt-get update && apt-get install -y supervisor
+apt-get update && apt-get install -y redis-server supervisor
+systemctl enable redis-server && systemctl start redis-server
+
+# Verify Redis is active:
+redis-cli ping
+# Output should return: PONG
 ```
 
+### 5.2 Configure Supervisor for Redis Queue Worker & Reverb WebSocket
 Create `/etc/supervisor/conf.d/dokuflow.conf`:
 ```ini
 [program:dokuflow-worker]
 process_name=%(program_name)s_%(process_num)02d
-command=php /var/www/dokuflow.cmhgroup.id/artisan queue:work --sleep=3 --tries=3 --max-time=3600
+command=php /var/www/dokuflow.cmhgroup.id/artisan queue:work redis --sleep=3 --tries=3 --max-time=3600
 autostart=true
 autorestart=true
 stopasgroup=true
 killasgroup=true
 user=www-data
-numprocs=2
+numprocs=4
 redirect_stderr=true
 stdout_logfile=/var/www/dokuflow.cmhgroup.id/storage/logs/worker.log
 
@@ -487,7 +509,7 @@ chmod +x deploy.sh
   ```
 
 ### Gotcha 2: Broken `/storage` Symlink & 403 Forbidden Images
-* **Symptom:** Assets in `/storage/` (e.g., `https://dokuflow.cmhgroup.id/storage/logo.png`) return `403 Forbidden` or `404 Not Found`.
+* **Symptom:** Assets in `/storage/` (e.g., `https://dokuflow.cmhgroup.id/storage/logo.webp`) return `403 Forbidden` or `404 Not Found`.
 * **Root Cause:** Running `rsync` from local machine uploads the local machine symlink (`/home/austin/Web Dev/.../storage/app/public`) to the server, pointing to a non-existent local directory path on the server.
 * **Fix:** Re-link storage directly on the production server and reset directory permissions:
   ```bash

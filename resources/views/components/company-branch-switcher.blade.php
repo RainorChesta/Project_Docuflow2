@@ -542,11 +542,11 @@
                     </div>
 
                     {{-- Active Context Pill --}}
-                    <div class="bg-base-200/50 rounded-2xl p-3.5 flex items-center justify-between text-xs border border-base-300/40">
-                        <div class="flex items-center gap-2">
-                            <span class="text-base-content/50 uppercase tracking-wider font-bold text-[10px]">{{ __('Aktif:') }}</span>
-                            <span class="badge badge-primary badge-sm font-bold">{{ $activeCompany?->code ?? '-' }}</span>
-                            <span class="font-semibold text-base-content truncate">{{ $activeBranch?->name ?? '-' }}</span>
+                    <div class="bg-base-200/50 rounded-2xl p-3.5 flex items-center justify-between text-xs border border-base-300/40 overflow-hidden">
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <span class="text-base-content/50 uppercase tracking-wider font-bold text-[10px] shrink-0">{{ __('Aktif:') }}</span>
+                            <span class="badge badge-primary badge-sm font-bold shrink-0">{{ $activeCompany?->code ?? '-' }}</span>
+                            <span class="font-semibold text-base-content truncate min-w-0 flex-1" title="{{ $activeBranch?->name ?? '-' }}">{{ $activeBranch?->name ?? '-' }}</span>
                         </div>
                     </div>
 
@@ -555,11 +555,11 @@
                         <div class="space-y-1.5">
                             <label class="text-xs font-semibold text-base-content/80 flex items-center justify-between">
                                 <span>{{ __('Perusahaan') }}</span>
-                                <span class="text-[10px] text-base-content/40 font-normal">{{ count($companies) }} {{ __('tersedia') }}</span>
+                                <span class="text-[10px] text-base-content/40 font-normal shrink-0">{{ count($companies) }} {{ __('tersedia') }}</span>
                             </label>
                             <select x-model="selectedCompanyId" 
                                     @change="onMobileCompanyChange($event.target.value)"
-                                    class="select select-bordered select-sm w-full bg-base-100 text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary rounded-xl">
+                                    class="select select-bordered select-sm w-full max-w-full bg-base-100 text-xs sm:text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary rounded-xl truncate pr-8">
                                 @foreach($companies as $comp)
                                     @php $pCount = (int) ($pendingApprovalsPerCompany[$comp->id] ?? 0); @endphp
                                     <option value="{{ $comp->id }}">
@@ -572,11 +572,11 @@
                         <div class="space-y-1.5" x-show="availableSelectedBranches.length > 0">
                             <label class="text-xs font-semibold text-base-content/80 flex items-center justify-between">
                                 <span>{{ __('Cabang') }}</span>
-                                <span class="text-[10px] text-base-content/40 font-normal" x-text="availableSelectedBranches.length + ' {{ __('tersedia') }}'"></span>
+                                <span class="text-[10px] text-base-content/40 font-normal shrink-0" x-text="availableSelectedBranches.length + ' {{ __('tersedia') }}'"></span>
                             </label>
                             <select x-model="selectedBranchId"
                                     @change="onMobileBranchChange($event.target.value)"
-                                    class="select select-bordered select-sm w-full bg-base-100 text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary rounded-xl">
+                                    class="select select-bordered select-sm w-full max-w-full bg-base-100 text-xs sm:text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary rounded-xl truncate pr-8">
                                 <template x-for="br in availableSelectedBranches" :key="br.id">
                                     <option :value="br.id" x-text="br.name"></option>
                                 </template>
@@ -586,10 +586,10 @@
                         <div class="space-y-1.5" x-show="selectedBranchUnitKerjas.length > 1">
                             <label class="text-xs font-semibold text-base-content/80 flex items-center justify-between">
                                 <span>{{ __('Unit Kerja') }}</span>
-                                <span class="text-[10px] text-base-content/40 font-normal" x-text="selectedBranchUnitKerjas.length + ' {{ __('tersedia') }}'"></span>
+                                <span class="text-[10px] text-base-content/40 font-normal shrink-0" x-text="selectedBranchUnitKerjas.length + ' {{ __('tersedia') }}'"></span>
                             </label>
                             <select x-model="selectedUnitKerjaId"
-                                    class="select select-bordered select-sm w-full bg-base-100 text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary rounded-xl">
+                                    class="select select-bordered select-sm w-full max-w-full bg-base-100 text-xs sm:text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary rounded-xl truncate pr-8">
                                 <template x-for="uk in selectedBranchUnitKerjas" :key="uk.id">
                                     <option :value="uk.id" x-text="uk.code + ' - ' + uk.name"></option>
                                 </template>
@@ -644,22 +644,22 @@
                     {{-- Visual Flow Cards (From -> To) --}}
                     <div class="space-y-2">
                         {{-- Current Entity Box --}}
-                        <div class="p-3.5 rounded-2xl bg-base-200/50 border border-base-300/60 transition-all">
+                        <div class="p-3.5 rounded-2xl bg-base-200/50 border border-base-300/60 transition-all overflow-hidden">
                             <div class="flex items-center justify-between mb-2">
-                                <span class="text-[10px] uppercase font-bold tracking-wider text-base-content/45 flex items-center gap-1.5">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-base-content/30 inline-block"></span>
+                                <span class="text-[10px] uppercase font-bold tracking-wider text-base-content/45 flex items-center gap-1.5 shrink-0">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-base-content/30 inline-block shrink-0"></span>
                                     {{ __('Entitas Saat Ini:') }}
                                 </span>
-                                <span class="badge badge-ghost badge-sm text-[11px] font-semibold" x-text="currentCompany?.code || '-'"></span>
+                                <span class="badge badge-ghost badge-sm text-[11px] font-semibold shrink-0" x-text="currentCompany?.code || '-'"></span>
                             </div>
-                            <div class="flex items-center justify-between gap-2 text-xs sm:text-sm">
-                                <div class="font-semibold text-base-content truncate flex items-center gap-1.5">
+                            <div class="flex items-center justify-between gap-2 text-xs sm:text-sm min-w-0">
+                                <div class="font-semibold text-base-content truncate flex items-center gap-1.5 min-w-0 flex-1">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-base-content/40 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                                     </svg>
-                                    <span x-text="currentCompany?.name || '-'"></span>
+                                    <span class="truncate min-w-0" x-text="currentCompany?.name || '-'"></span>
                                 </div>
-                                <span class="badge badge-sm badge-neutral/10 text-base-content/70 font-medium shrink-0" x-text="currentBranch?.raw_name || currentBranch?.name || '-'"></span>
+                                <span class="badge badge-sm badge-neutral/10 text-base-content/70 font-medium shrink-0 max-w-[45%] truncate" x-text="currentBranch?.raw_name || currentBranch?.name || '-'"></span>
                             </div>
                         </div>
 
@@ -673,25 +673,25 @@
                         </div>
 
                         {{-- Target Entity Box --}}
-                        <div class="p-3.5 rounded-2xl bg-primary/[0.07] border-2 border-primary/40 shadow-sm transition-all">
+                        <div class="p-3.5 rounded-2xl bg-primary/[0.07] border-2 border-primary/40 shadow-sm transition-all overflow-hidden">
                             <div class="flex items-center justify-between mb-2">
-                                <span class="text-[10px] uppercase font-bold tracking-wider text-primary flex items-center gap-1.5">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-primary inline-block animate-ping"></span>
+                                <span class="text-[10px] uppercase font-bold tracking-wider text-primary flex items-center gap-1.5 shrink-0">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-primary inline-block animate-ping shrink-0"></span>
                                     {{ __('Entitas Tujuan:') }}
                                 </span>
-                                <span class="badge badge-primary badge-sm text-[11px] font-bold" x-text="targetCompany?.code || '-'"></span>
+                                <span class="badge badge-primary badge-sm text-[11px] font-bold shrink-0" x-text="targetCompany?.code || '-'"></span>
                             </div>
-                            <div class="flex items-center justify-between gap-2 text-xs sm:text-sm">
-                                <div class="font-bold text-primary truncate flex items-center gap-1.5">
+                            <div class="flex items-center justify-between gap-2 text-xs sm:text-sm min-w-0">
+                                <div class="font-bold text-primary truncate flex items-center gap-1.5 min-w-0 flex-1">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                                     </svg>
-                                    <span x-text="targetCompany?.name || '-'"></span>
+                                    <span class="truncate min-w-0" x-text="targetCompany?.name || '-'"></span>
                                 </div>
-                                <div class="flex items-center gap-1 shrink-0">
-                                    <span class="badge badge-sm badge-primary font-semibold" x-text="targetBranch?.raw_name || targetBranch?.name || '-'"></span>
+                                <div class="flex items-center gap-1 shrink-0 max-w-[50%]">
+                                    <span class="badge badge-sm badge-primary font-semibold truncate max-w-full" x-text="targetBranch?.raw_name || targetBranch?.name || '-'"></span>
                                     <template x-if="targetUnitKerjas.length > 1">
-                                        <span class="badge badge-sm badge-outline text-primary font-semibold" x-text="'UK: ' + (targetUnitKerja?.code || targetUnitKerja?.name || '-')"></span>
+                                        <span class="badge badge-sm badge-outline text-primary font-semibold truncate" x-text="'UK: ' + (targetUnitKerja?.code || targetUnitKerja?.name || '-')"></span>
                                     </template>
                                 </div>
                             </div>

@@ -4,9 +4,10 @@ namespace App\Notifications;
 
 use App\Models\Document;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
-class DocumentAddedToUnitKerja extends Notification
+class DocumentAddedToUnitKerja extends Notification implements ShouldQueue
 {
     use Queueable;
 

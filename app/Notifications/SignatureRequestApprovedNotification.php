@@ -5,12 +5,13 @@ namespace App\Notifications;
 use App\Models\Document;
 use App\Models\SignatureRequest;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
 /**
  * Sent when a target user approves a signature request so the requester knows to replace it in the editor.
  */
-class SignatureRequestApprovedNotification extends Notification
+class SignatureRequestApprovedNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 

@@ -8,8 +8,8 @@
         <title>{{ config('app.name', 'DokuFlow') }} — {{ __('Menunggu Verifikasi Administrator') }}</title>
 
         <!-- Favicon -->
-        <link rel="icon" type="image/png" href="{{ asset('logo.png') }}">
-        <link rel="shortcut icon" type="image/png" href="{{ asset('logo.png') }}">
+        <link rel="icon" type="image/webp" href="{{ asset('logo.webp') }}">
+        <link rel="shortcut icon" type="image/webp" href="{{ asset('logo.webp') }}">
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">

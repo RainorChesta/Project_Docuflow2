@@ -342,7 +342,7 @@ class DirectorActiveDocumentsTest extends TestCase
         $enResponse->assertSee('Confirmed');
     }
 
-    public function test_first_page_only_contains_documents_active_today(): void
+    public function test_all_active_documents_are_listed_chronologically_on_first_page(): void
     {
         // Document A: active today via reviewed_at
         $docA = $this->createActiveDocument([
@@ -372,93 +372,18 @@ class DirectorActiveDocumentsTest extends TestCase
             'reviewed_at' => now()->subDays(5),
         ]);
 
-        // Page 1 should only have Document A and Document B
+        // Page 1 should contain all active documents in chronological order
         $response = $this->actingAs($this->director)->get(route('director.active-documents.index', ['page' => 1]));
 
         $response->assertOk();
         $response->assertSee('Dokumen Aktif Hari Ini A');
         $response->assertSee('Dokumen Aktif Hari Ini B');
-        $response->assertDontSee('Dokumen Aktif Kemarin');
-        $response->assertDontSee('Dokumen Aktif Minggu Lalu');
-        $response->assertSee('Dokumen Aktif Hari Ini');
-        $response->assertSee('Prioritas Utama');
-    }
-
-    public function test_subsequent_pages_only_contain_previously_active_documents(): void
-    {
-        // Document A: active today
-        $docA = $this->createActiveDocument([
-            'title' => 'Dokumen Aktif Hari Ini A',
-            'document_number' => 'SOP/TODAY/001',
-            'reviewed_at' => now(),
-        ]);
-
-        // Document C: activated yesterday
-        $docC = $this->createActiveDocument([
-            'title' => 'Dokumen Aktif Kemarin',
-            'document_number' => 'SOP/YESTERDAY/001',
-            'reviewed_at' => now()->subDay(),
-        ]);
-
-        // Document D: activated 5 days ago
-        $docD = $this->createActiveDocument([
-            'title' => 'Dokumen Aktif Minggu Lalu',
-            'document_number' => 'SOP/PAST/001',
-            'reviewed_at' => now()->subDays(5),
-        ]);
-
-        // Page 2 should contain Document C and Document D, but NOT Document A
-        $response = $this->actingAs($this->director)->get(route('director.active-documents.index', ['page' => 2]));
-
-        $response->assertOk();
         $response->assertSee('Dokumen Aktif Kemarin');
         $response->assertSee('Dokumen Aktif Minggu Lalu');
-        $response->assertDontSee('Dokumen Aktif Hari Ini A');
-        $response->assertSee('Dokumen Aktif Sebelumnya');
-        $response->assertSee('Kembali ke Dokumen Hari Ini');
+        $response->assertSee('Daftar Dokumen Aktif');
     }
 
-    public function test_future_active_documents_do_not_appear_in_today_page(): void
-    {
-        // Document with future active date (e.g., tomorrow)
-        $futureDoc = $this->createActiveDocument([
-            'title' => 'Dokumen Aktif Masa Depan',
-            'document_number' => 'SOP/FUTURE/001',
-            'reviewed_at' => now()->addDay(),
-        ]);
-
-        // Document active today
-        $todayDoc = $this->createActiveDocument([
-            'title' => 'Dokumen Aktif Valid Hari Ini',
-            'document_number' => 'SOP/VALID/001',
-            'reviewed_at' => now(),
-        ]);
-
-        $response = $this->actingAs($this->director)->get(route('director.active-documents.index', ['page' => 1]));
-
-        $response->assertOk();
-        $response->assertSee('Dokumen Aktif Valid Hari Ini');
-        $response->assertDontSee('Dokumen Aktif Masa Depan');
-    }
-
-    public function test_page_1_empty_state_when_no_documents_active_today_with_link_to_previous(): void
-    {
-        // Only past active document
-        $this->createActiveDocument([
-            'title' => 'Dokumen Arsip Kemarin',
-            'document_number' => 'SOP/ARCHIVE/001',
-            'reviewed_at' => now()->subDays(2),
-        ]);
-
-        $response = $this->actingAs($this->director)->get(route('director.active-documents.index', ['page' => 1]));
-
-        $response->assertOk();
-        $response->assertSee('Tidak Ada Dokumen Aktif Hari Ini');
-        $response->assertSee('Buka Dokumen Aktif Sebelumnya');
-        $response->assertDontSee('Dokumen Arsip Kemarin');
-    }
-
-    public function test_historical_documents_are_grouped_by_activation_date(): void
+    public function test_active_documents_are_grouped_by_activation_date(): void
     {
         // Document 1 & 2: Activated yesterday (e.g. 21 Sep)
         $doc1 = $this->createActiveDocument([
@@ -479,8 +404,7 @@ class DirectorActiveDocumentsTest extends TestCase
             'reviewed_at' => now()->subDays(2)->setTime(9, 15, 0),
         ]);
 
-        // Page 2 should render both date headers
-        $response = $this->actingAs($this->director)->get(route('director.active-documents.index', ['page' => 2]));
+        $response = $this->actingAs($this->director)->get(route('director.active-documents.index', ['page' => 1]));
 
         $response->assertOk();
         $response->assertSee($doc1->activated_at->translatedFormat('d F Y'));
@@ -491,7 +415,7 @@ class DirectorActiveDocumentsTest extends TestCase
         $response->assertSee('Kemarin');
 
         // Test with List view
-        $listResponse = $this->actingAs($this->director)->get(route('director.active-documents.index', ['page' => 2, 'view_mode' => 'list']));
+        $listResponse = $this->actingAs($this->director)->get(route('director.active-documents.index', ['page' => 1, 'view_mode' => 'list']));
         $listResponse->assertOk();
         $listResponse->assertSee($doc1->activated_at->translatedFormat('d F Y'));
         $listResponse->assertSee($doc3->activated_at->translatedFormat('d F Y'));
@@ -525,6 +449,44 @@ class DirectorActiveDocumentsTest extends TestCase
         $response->assertDontSee('Dokumen Tanggal Lain');
         $response->assertSee('Filter Tanggal');
         $response->assertSee(now()->subDays(3)->translatedFormat('d F Y'));
+    }
+
+    public function test_director_can_filter_by_date_range_start_and_end_date(): void
+    {
+        $startDate = now()->subDays(5)->format('Y-m-d');
+        $endDate = now()->subDays(2)->format('Y-m-d');
+
+        // Document within range (4 days ago)
+        $docInRange = $this->createActiveDocument([
+            'title' => 'Dokumen Dalam Rentang',
+            'document_number' => 'SOP/INRANGE/001',
+            'reviewed_at' => now()->subDays(4)->setTime(10, 0, 0),
+        ]);
+
+        // Document before range (8 days ago)
+        $docBefore = $this->createActiveDocument([
+            'title' => 'Dokumen Sebelum Rentang',
+            'document_number' => 'SOP/BEFORE/001',
+            'reviewed_at' => now()->subDays(8)->setTime(10, 0, 0),
+        ]);
+
+        // Document after range (today)
+        $docAfter = $this->createActiveDocument([
+            'title' => 'Dokumen Setelah Rentang',
+            'document_number' => 'SOP/AFTER/001',
+            'reviewed_at' => now()->setTime(10, 0, 0),
+        ]);
+
+        $response = $this->actingAs($this->director)->get(route('director.active-documents.index', [
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('Dokumen Dalam Rentang');
+        $response->assertDontSee('Dokumen Sebelum Rentang');
+        $response->assertDontSee('Dokumen Setelah Rentang');
+        $response->assertSee('Filter Tanggal');
     }
 
     public function test_empty_state_when_filtering_by_date_with_no_active_documents(): void

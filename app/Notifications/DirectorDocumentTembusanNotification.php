@@ -5,12 +5,13 @@ namespace App\Notifications;
 use App\Models\Document;
 use App\Models\DocumentVersion;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
 /**
  * Sent to Director when a document is finalized and released without Director's signature box (Only To Know / Tembusan).
  */
-class DirectorDocumentTembusanNotification extends Notification
+class DirectorDocumentTembusanNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 

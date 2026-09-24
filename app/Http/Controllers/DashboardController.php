@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Document;
 use App\Models\DocumentType;
+use App\Models\Setting;
 use App\Models\UnitKerja;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -122,18 +123,25 @@ class DashboardController extends Controller
 
         $recent = (clone $baseDocQuery)->with('unitKerja', 'currentVersion')->latest()->take(5)->get();
 
-        $expiringQuery = (clone $baseDocQuery)
+        $retentionYears = (int) Setting::get('document_retention_years', config('app.document_retention_years', 2));
+        $now = now();
+        $in30Days = $now->copy()->addDays(30);
+
+        $expiringDocuments = (clone $baseDocQuery)
             ->with('unitKerja')
             ->where('is_expired', false)
-            ->whereHas('currentVersion', fn($q) => $q->where('status', 'active'));
-
-        $expiringDocuments = $expiringQuery
-            ->get()
-            ->filter(function ($doc) {
-                if (!$doc->expires_at) return false;
-                $days = now()->startOfDay()->diffInDays($doc->expires_at->startOfDay(), false);
-                return $days >= 0 && $days <= 30;
+            ->whereHas('currentVersion', fn($q) => $q->where('status', 'active'))
+            ->where(function ($q) use ($now, $in30Days, $retentionYears) {
+                $q->whereBetween('expiration_date', [$now->toDateString(), $in30Days->toDateString()])
+                  ->orWhere(function ($fallback) use ($now, $in30Days, $retentionYears) {
+                      $fallback->whereNull('expiration_date')
+                               ->whereBetween('created_at', [
+                                   $now->copy()->subYears($retentionYears)->toDateTimeString(),
+                                   $in30Days->copy()->subYears($retentionYears)->toDateTimeString()
+                               ]);
+                  });
             })
+            ->get()
             ->sortBy(fn($doc) => $doc->expires_at);
 
         $documentTypes = DocumentType::orderBy('name')->get();

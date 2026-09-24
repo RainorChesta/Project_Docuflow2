@@ -44,7 +44,7 @@
 
         {{-- Floating Brand Logo --}}
         <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <img src="{{ asset('logo.png') }}"
+            <img src="{{ asset('logo.webp') }}"
                  alt="{{ config('app.name', 'DokuFlow') }}"
                  class="w-10 h-10 sm:w-12 sm:h-12 object-contain animate-loading-float drop-shadow-md" />
         </div>

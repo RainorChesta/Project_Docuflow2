@@ -474,7 +474,7 @@ class SignatureController extends Controller
                         'company_id' => $sig->company_id,
                         'company_name' => $sig->company ? $sig->company->name : null,
                         'preview_url' => asset('storage/' . $sig->file_path),
-                        'data_uri' => $sig->base64,
+                        'data_uri' => null,
                         'request_id' => $requestId,
                         'request_status' => $status,
                         'rejected_reason' => ($latestSigReq && $latestSigReq->isRejected()) ? $latestSigReq->rejected_reason : null,

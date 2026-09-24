@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\Document;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
 /**
@@ -11,7 +12,7 @@ use Illuminate\Notifications\Notification;
  * review their document, including fallback context if the primary
  * Head approver is unavailable.
  */
-class ApprovalRouteResolved extends Notification
+class ApprovalRouteResolved extends Notification implements ShouldQueue
 {
     use Queueable;
 

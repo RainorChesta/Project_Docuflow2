@@ -4,12 +4,13 @@ namespace App\Notifications;
 
 use App\Models\Document;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
 /**
  * Sent to the document owner when another user opens their document via a shared link.
  */
-class DocumentOpenedViaLink extends Notification
+class DocumentOpenedViaLink extends Notification implements ShouldQueue
 {
     use Queueable;
 

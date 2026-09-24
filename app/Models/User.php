@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Cache;
 
 #[Fillable(['name', 'email', 'password', 'unit_kerja_id', 'system_role', 'is_active', 'profile_picture', 'nip', 'phone_number'])]
 #[Hidden(['password', 'remember_token'])]
@@ -300,11 +301,22 @@ class User extends Authenticatable
         }
     }
 
+    protected array $badgeCountsCache = [];
+
     /**
      * Hitung total persetujuan versi dokumen yang menunggu tindakan pengguna.
      */
     public function pendingVersionApprovalsCount(?int $companyId = null, ?int $branchId = null, bool $scopedToContext = true): int
     {
+        $contextService = app(\App\Services\CompanyContextService::class);
+        $effectiveCompId = $companyId ?? ($scopedToContext ? $contextService->getActiveCompanyId($this) : null);
+        $effectiveBranchId = $branchId ?? ($scopedToContext ? $contextService->getActiveBranchId($this) : null);
+        $cacheKey = "ver_{$effectiveCompId}_{$effectiveBranchId}_" . ($scopedToContext ? '1' : '0');
+
+        if (isset($this->badgeCountsCache[$cacheKey])) {
+            return $this->badgeCountsCache[$cacheKey];
+        }
+
         $query = DocumentVersion::where('status', 'pending')
             ->whereNull('discarded_at')
             ->where(function ($vq) use ($companyId, $branchId, $scopedToContext) {
@@ -380,7 +392,7 @@ class User extends Authenticatable
                 }
             });
 
-        return $query->count();
+        return $this->badgeCountsCache[$cacheKey] = $query->count();
     }
 
     /**
@@ -390,6 +402,15 @@ class User extends Authenticatable
     {
         if (!$this->isHead() && !$this->isPicKlinik() && !$this->isDirector() && !$this->isAdmin()) {
             return 0;
+        }
+
+        $contextService = app(\App\Services\CompanyContextService::class);
+        $effectiveCompId = $companyId ?? ($scopedToContext ? $contextService->getActiveCompanyId($this) : null);
+        $effectiveBranchId = $branchId ?? ($scopedToContext ? $contextService->getActiveBranchId($this) : null);
+        $cacheKey = "ren_{$effectiveCompId}_{$effectiveBranchId}_" . ($scopedToContext ? '1' : '0');
+
+        if (isset($this->badgeCountsCache[$cacheKey])) {
+            return $this->badgeCountsCache[$cacheKey];
         }
 
         if ($this->isAdmin() || $this->isDirector()) {
@@ -421,13 +442,13 @@ class User extends Authenticatable
                 $renamesQuery->where($companyFilter);
             }
 
-            return $renamesQuery->count();
+            return $this->badgeCountsCache[$cacheKey] = $renamesQuery->count();
         }
 
         if ($this->isPicKlinik()) {
             $branchIds = $this->branches()->pluck('branches.id')->all();
             if (empty($branchIds)) {
-                return 0;
+                return $this->badgeCountsCache[$cacheKey] = 0;
             }
 
             $roleFilter = function ($q) {
@@ -449,12 +470,12 @@ class User extends Authenticatable
 
             $this->applyContextFilterToDocumentQuery($renamesQuery, $companyId, $branchId, $scopedToContext);
 
-            return $renamesQuery->count();
+            return $this->badgeCountsCache[$cacheKey] = $renamesQuery->count();
         }
 
         $unitKerjaIds = $this->allUnitKerjaIds($branchId);
         if (empty($unitKerjaIds)) {
-            return 0;
+            return $this->badgeCountsCache[$cacheKey] = 0;
         }
 
         $roleFilter = function ($q) {
@@ -470,7 +491,7 @@ class User extends Authenticatable
 
         $this->applyContextFilterToDocumentQuery($renamesQuery, $companyId, $branchId, $scopedToContext);
 
-        return $renamesQuery->count();
+        return $this->badgeCountsCache[$cacheKey] = $renamesQuery->count();
     }
 
     /**
@@ -480,6 +501,15 @@ class User extends Authenticatable
     {
         if (!$this->isHead() && !$this->isPicKlinik() && !$this->isDirector() && !$this->isAdmin()) {
             return 0;
+        }
+
+        $contextService = app(\App\Services\CompanyContextService::class);
+        $effectiveCompId = $companyId ?? ($scopedToContext ? $contextService->getActiveCompanyId($this) : null);
+        $effectiveBranchId = $branchId ?? ($scopedToContext ? $contextService->getActiveBranchId($this) : null);
+        $cacheKey = "rol_{$effectiveCompId}_{$effectiveBranchId}_" . ($scopedToContext ? '1' : '0');
+
+        if (isset($this->badgeCountsCache[$cacheKey])) {
+            return $this->badgeCountsCache[$cacheKey];
         }
 
         if ($this->isAdmin() || $this->isDirector()) {
@@ -510,13 +540,13 @@ class User extends Authenticatable
                 $rollbacksQuery->where($companyFilter);
             }
 
-            return $rollbacksQuery->count();
+            return $this->badgeCountsCache[$cacheKey] = $rollbacksQuery->count();
         }
 
         if ($this->isPicKlinik()) {
             $branchIds = $this->branches()->pluck('branches.id')->all();
             if (empty($branchIds)) {
-                return 0;
+                return $this->badgeCountsCache[$cacheKey] = 0;
             }
 
             $roleFilter = function ($q) {
@@ -537,12 +567,12 @@ class User extends Authenticatable
 
             $this->applyContextFilterToDocumentQuery($rollbacksQuery, $companyId, $branchId, $scopedToContext);
 
-            return $rollbacksQuery->count();
+            return $this->badgeCountsCache[$cacheKey] = $rollbacksQuery->count();
         }
 
         $unitKerjaIds = $this->allUnitKerjaIds($branchId);
         if (empty($unitKerjaIds)) {
-            return 0;
+            return $this->badgeCountsCache[$cacheKey] = 0;
         }
 
         $roleFilter = function ($q) {
@@ -557,7 +587,7 @@ class User extends Authenticatable
 
         $this->applyContextFilterToDocumentQuery($rollbacksQuery, $companyId, $branchId, $scopedToContext);
 
-        return $rollbacksQuery->count();
+        return $this->badgeCountsCache[$cacheKey] = $rollbacksQuery->count();
     }
 
     /**
@@ -580,9 +610,14 @@ class User extends Authenticatable
             return [];
         }
 
+        $cacheKey = "appr_by_comp";
+        if (isset($this->badgeCountsCache[$cacheKey])) {
+            return $this->badgeCountsCache[$cacheKey];
+        }
+
         $accessibleCompanies = app(\App\Services\CompanyContextService::class)->getAvailableCompanies($this);
         if ($accessibleCompanies->isEmpty()) {
-            return [];
+            return $this->badgeCountsCache[$cacheKey] = [];
         }
 
         $result = [];
@@ -593,7 +628,7 @@ class User extends Authenticatable
             }
         }
 
-        return $result;
+        return $this->badgeCountsCache[$cacheKey] = $result;
     }
 
     /**

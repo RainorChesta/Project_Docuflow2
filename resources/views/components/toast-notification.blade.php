@@ -75,10 +75,12 @@
         pollInterval: null,
         init() {
             this.checkNotifications();
-            // Poll every 5 seconds for real-time notifications fallback (instant if Echo active)
-            this.pollInterval = setInterval(() => this.checkNotifications(), 5000);
+            // Relaxed backup poll every 60s only if Echo is not active
+            if (typeof window.Echo === 'undefined') {
+                this.pollInterval = setInterval(() => this.checkNotifications(), 60000);
+            }
 
-            // Immediately check when user switches to or focuses this window/tab
+            // Check on focus or when tab becomes visible
             window.addEventListener('focus', () => this.checkNotifications());
             document.addEventListener('visibilitychange', () => {
                 if (!document.hidden) this.checkNotifications();
@@ -94,10 +96,15 @@
                     .listen('.notification.new', () => {
                         this.checkNotifications();
                     });
-            }
-
-            window.addEventListener('notification-received', () => this.checkNotifications());
-            window.addEventListener('notifications-read', () => this.checkNotifications());
+            }            window.addEventListener('notification-received', () => this.checkNotifications());
+            window.addEventListener('notifications-read', (event) => {
+                if (event.detail && typeof event.detail.unread_count !== 'undefined' && event.detail.unread_count === 0) {
+                    this.toasts = [];
+                    this.stopDismissTimer();
+                } else if (event.detail && event.detail.id) {
+                    this.dismiss(event.detail.id);
+                }
+            });
         },
         checkNotifications() {
             if (this.isFetching) return;
@@ -194,8 +201,9 @@
         },
         startDismissTimer() {
             this.stopDismissTimer();
+            if (this.toasts.length === 0) return;
             this.remainingTime = this.totalDuration;
-            const stepMs = 50;
+            const stepMs = 100;
             this.timerInterval = setInterval(() => {
                 if (!this.isPaused && !this.toasts.some(t => t.expanded)) {
                     this.remainingTime -= stepMs;
@@ -237,13 +245,13 @@
                     'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
                 }
             }).then(r => r.json()).then(data => {
-                window.dispatchEvent(new CustomEvent('notifications-read', { detail: data }));
+                window.dispatchEvent(new CustomEvent('notifications-read', { detail: { ...data, id } }));
             }).catch(() => {});
         }
      }"
      @mouseenter="pauseTimer()"
      @mouseleave="resumeTimer()"
-     class="fixed top-16 right-3 sm:right-5 z-[100] flex flex-col gap-2.5 pointer-events-none max-w-full">
+     class="fixed top-16 right-3 sm:right-5 z-[100] flex flex-col gap-2.5 pointer-events-none max-w-full transform-gpu">
     
     {{-- Dismiss All Pill when multiple toasts are visible --}}
     <div x-show="toasts.length > 1" 

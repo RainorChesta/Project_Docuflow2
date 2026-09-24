@@ -83,9 +83,6 @@ class SearchController extends Controller
                     })
                     ->orWhereHas('owner', function ($uQuery) use ($q) {
                         $uQuery->where('name', 'like', "%{$q}%");
-                    })
-                    ->orWhereHas('currentVersion', function ($vQuery) use ($q) {
-                        $vQuery->where('content', 'like', "%{$q}%");
                     });
             });
         }

@@ -4,12 +4,13 @@ namespace App\Notifications;
 
 use App\Models\Document;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
 /**
  * Sent to members of a branch when a document is shared with their branch.
  */
-class DocumentSharedWithBranch extends Notification
+class DocumentSharedWithBranch extends Notification implements ShouldQueue
 {
     use Queueable;
 

@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ __('Document Not Found') }} - {{ config('app.name', 'DokuFlow') }}</title>
     <!-- Favicon -->
-    <link rel="icon" type="image/png" href="{{ asset('logo.png') }}">
-    <link rel="shortcut icon" type="image/png" href="{{ asset('logo.png') }}">
+    <link rel="icon" type="image/webp" href="{{ asset('logo.webp') }}">
+    <link rel="shortcut icon" type="image/webp" href="{{ asset('logo.webp') }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen bg-base-200 flex items-center justify-center p-4">

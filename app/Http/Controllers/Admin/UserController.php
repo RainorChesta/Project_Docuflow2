@@ -221,7 +221,7 @@ class UserController extends Controller
             'unit_kerja_ids' => 'nullable|array',
             'unit_kerja_ids.*' => 'exists:unit_kerjas,id',
             'branch_unit_kerjas' => 'nullable|array',
-            'system_role' => 'required|in:admin,direktur,head,user',
+            'system_role' => 'required|in:admin,direktur,pic_klinik,head,user',
             'is_active' => 'boolean',
             'company_ids' => 'nullable|array',
             'company_ids.*' => 'exists:companies,id',

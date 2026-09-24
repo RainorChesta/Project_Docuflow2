@@ -4,12 +4,13 @@ namespace App\Notifications;
 
 use App\Models\Document;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
 /**
  * Sent to the document owner when a user who was granted access opens that document.
  */
-class DocumentOpenedByGrantedUser extends Notification
+class DocumentOpenedByGrantedUser extends Notification implements ShouldQueue
 {
     use Queueable;
 

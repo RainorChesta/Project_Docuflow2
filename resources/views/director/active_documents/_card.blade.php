@@ -2,7 +2,7 @@
     $isSeen = $doc->isDirectorRead();
 @endphp
 <div id="doc-card-{{ $doc->id }}" 
-     class="bg-base-100 border {{ $isSeen ? 'border-base-300 hover:border-secondary/50' : 'border-base-300 hover:border-primary/50' }} rounded-2xl p-4.5 transition-all duration-200 shadow-xs hover:shadow-md flex flex-col justify-between h-full relative group">
+     class="bg-base-100 border {{ $isSeen ? 'border-base-300 hover:border-secondary/50' : 'border-base-300 hover:border-primary/50' }} rounded-2xl p-3.5 sm:p-4.5 transition-all duration-200 shadow-xs hover:shadow-md flex flex-col justify-between h-full relative group">
     
     {{-- Card Top: Header, Title, Number, Metadata --}}
     <div class="space-y-3">

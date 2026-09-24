@@ -99,14 +99,10 @@
         <span class="text-xs text-base-content/90 group-hover:text-primary transition-colors line-clamp-2 leading-tight font-medium" title="{{ $doc->title }}">
             {{ $doc->title }}
         </span>
-        <div class="text-[10px] text-base-content/60 mt-1 line-clamp-2 leading-tight" title="{{ $doc->document_number }} · {{ $doc->branch?->name }} · {{ $doc->owner->name }}">
+        <div class="text-[10px] text-base-content/60 mt-1 line-clamp-2 leading-tight" title="{{ $doc->document_number }} - {{ $doc->branch?->name }} - {{ $doc->owner->name }}">
             {{ $doc->document_number }}
             @if($doc->branch)
-                <span class="font-medium text-base-content/80">· {{ $doc->branch->effective_code ?? $doc->branch->code ?? $doc->branch->name }}</span>
-            @endif
-            @if($doc->isGeneral()) <span class="text-success">· {{ __('Umum') }}</span>
-            @elseif($doc->isPersonal()) <span class="text-info">· {{ __('Personal') }}</span>
-            @else <span>· {{ $doc->unitKerja?->kode_unit_kerja ?? '—' }}</span>
+                <span class="font-medium text-base-content/80">{{ $doc->branch->effective_code ?? $doc->branch->code ?? $doc->branch->name }}</span>
             @endif
         </div>
         <div class="inline-flex items-center justify-center gap-1 mt-1 text-[10px] text-base-content/70 font-medium max-w-full">
@@ -115,9 +111,8 @@
         </div>
     </div>
 
-    {{-- Format and Document type badges --}}
+    {{-- Document type badges & director read status --}}
     <div class="flex items-center justify-center gap-1.5 flex-wrap max-w-[95%]">
-        <x-document-format-badge :format="$doc->format_choice" />
         @if($doc->documentType)
             <span class="badge badge-ghost badge-xs max-w-[110px] inline-flex items-center text-base-content/70 border border-base-300/40 shrink-0" title="{{ $doc->documentType->name ?? $doc->documentType->code }}">
                 <span class="truncate">{{ $doc->documentType->code }}</span>

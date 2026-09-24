@@ -5,12 +5,13 @@ namespace App\Notifications;
 use App\Models\Document;
 use App\Models\DocumentVersion;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
 /**
  * Sent to the rollback requester when their rollback request is approved or rejected.
  */
-class DocumentRollbackResult extends Notification
+class DocumentRollbackResult extends Notification implements ShouldQueue
 {
     use Queueable;
 

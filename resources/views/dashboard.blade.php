@@ -88,7 +88,7 @@
                                                 @elseif($doc->isPersonal()) <span class="text-info">{{ __('Personal') }}</span>
                                                 @else {{ $doc->unitKerja?->nama_unit_kerja }} @endif
                                                 · {{ $doc->created_at->diffForHumans() }}
-                                            </div>/div>
+                                            </div>
                                         </div>
                                     </div>
                                 @empty

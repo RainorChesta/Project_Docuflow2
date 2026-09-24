@@ -6,8 +6,8 @@
     <title>{{ config('app.name', 'DokuFlow') }} — Document Management System</title>
     
     <!-- Favicon -->
-    <link rel="icon" type="image/png" href="{{ asset('logo.png') }}">
-    <link rel="shortcut icon" type="image/png" href="{{ asset('logo.png') }}">
+    <link rel="icon" type="image/webp" href="{{ asset('logo.webp') }}">
+    <link rel="shortcut icon" type="image/webp" href="{{ asset('logo.webp') }}">
 
     <!-- New Font: Plus Jakarta Sans -->
     <link rel="preconnect" href="https://fonts.googleapis.com">

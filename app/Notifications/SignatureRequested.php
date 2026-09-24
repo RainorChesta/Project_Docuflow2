@@ -5,12 +5,13 @@ namespace App\Notifications;
 use App\Models\Document;
 use App\Models\SignatureRequest;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
 /**
  * Sent when a user requests someone's signature or stamp on a document.
  */
-class SignatureRequested extends Notification
+class SignatureRequested extends Notification implements ShouldQueue
 {
     use Queueable;
 

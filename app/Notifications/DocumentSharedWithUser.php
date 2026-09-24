@@ -4,12 +4,13 @@ namespace App\Notifications;
 
 use App\Models\Document;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
 /**
  * Sent to a user when a document is shared with them.
  */
-class DocumentSharedWithUser extends Notification
+class DocumentSharedWithUser extends Notification implements ShouldQueue
 {
     use Queueable;
 

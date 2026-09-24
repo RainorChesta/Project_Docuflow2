@@ -79,7 +79,7 @@ class OnlyOfficeController extends Controller
         return response($squaredBytes, 200, [
             'Content-Type' => 'image/png',
             'Content-Disposition' => 'inline; filename="signature_' . $user->id . '_' . $signature->id . '.png"',
-            'Cache-Control' => 'no-cache, private',
+            'Cache-Control' => 'public, max-age=86400',
         ]);
     }
 
@@ -103,7 +103,7 @@ class OnlyOfficeController extends Controller
         return response($squaredBytes, 200, [
             'Content-Type' => 'image/png',
             'Content-Disposition' => 'inline; filename="signature_' . $signature->user_id . '_' . $signature->id . '.png"',
-            'Cache-Control' => 'no-cache, private',
+            'Cache-Control' => 'public, max-age=86400',
         ]);
     }
 
@@ -224,7 +224,7 @@ class OnlyOfficeController extends Controller
         
         return response($imageData, 200, [
             'Content-Type' => 'image/png',
-            'Cache-Control' => 'no-cache, private',
+            'Cache-Control' => 'public, max-age=86400',
         ]);
     }
 

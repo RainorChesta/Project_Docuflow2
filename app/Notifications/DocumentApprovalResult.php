@@ -5,12 +5,13 @@ namespace App\Notifications;
 use App\Models\Document;
 use App\Models\DocumentVersion;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
 /**
  * Sent to the document author when their version is approved or rejected.
  */
-class DocumentApprovalResult extends Notification
+class DocumentApprovalResult extends Notification implements ShouldQueue
 {
     use Queueable;
 

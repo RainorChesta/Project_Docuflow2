@@ -9,8 +9,10 @@
         isFetching: false,
         init() {
             this.fetchUnreadCount();
-            // Fallback poll every 15s (toast component also broadcasts updates)
-            setInterval(() => this.fetchUnreadCount(), 15000);
+            // Relaxed backup poll every 60s only if Echo is not active
+            if (typeof window.Echo === 'undefined') {
+                setInterval(() => this.fetchUnreadCount(), 60000);
+            }
 
             // Sync immediately with toast component polling
             window.addEventListener('notifications-updated', (event) => {
@@ -176,38 +178,63 @@
         </span>
     </button>
 
+    {{-- Mobile backdrop overlay (dismiss on tap anywhere on screen) --}}
+    <div x-show="open"
+         x-transition:enter="transition ease-out duration-150"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-100"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="fixed inset-0 z-40 bg-black/25 sm:hidden transform-gpu will-change-[opacity]"
+         @click="open = false"
+         x-cloak>
+    </div>
+
     {{-- Dropdown panel --}}
     <div x-show="open"
-         x-transition:enter="transition ease-out duration-200"
-         x-transition:enter-start="opacity-0 scale-95 -translate-y-1"
+         @keydown.escape.window="open = false"
+         x-transition:enter="transition ease-out duration-150"
+         x-transition:enter-start="opacity-0 scale-98 -translate-y-1"
          x-transition:enter-end="opacity-100 scale-100 translate-y-0"
-         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave="transition ease-in duration-100"
          x-transition:leave-start="opacity-100 scale-100 translate-y-0"
-         x-transition:leave-end="opacity-0 scale-95 -translate-y-1"
-         class="absolute right-0 top-full mt-2 w-[calc(100vw-1.5rem)] sm:w-[440px] md:w-[480px] bg-base-100 border border-base-300/90 rounded-3xl shadow-2xl overflow-hidden z-50"
+         x-transition:leave-end="opacity-0 scale-98 -translate-y-1"
+         class="fixed inset-x-2.5 top-[68px] sm:inset-x-auto sm:absolute sm:right-0 sm:top-full sm:mt-2 w-auto sm:w-[440px] md:w-[480px] bg-base-100 border border-base-300/90 rounded-2xl sm:rounded-3xl shadow-xl overflow-hidden z-50 flex flex-col max-h-[50vh] sm:max-h-[460px] transform-gpu will-change-[transform,opacity]"
          x-cloak>
 
         {{-- Header --}}
-        <div class="flex items-center justify-between px-4 sm:px-5 py-3.5 border-b border-base-200 bg-base-200/40">
+        <div class="flex items-center justify-between px-3.5 sm:px-4 py-2.5 sm:py-3 border-b border-base-200 bg-base-200/40 shrink-0">
             <div class="flex items-center gap-2">
                 <h3 class="text-sm font-bold text-base-content">{{ __('Notifikasi') }}</h3>
                 <template x-if="unreadCount > 0">
                     <span class="badge badge-primary badge-xs font-bold px-2 py-0.5" x-text="`${unreadCount} baru`"></span>
                 </template>
             </div>
-            <button type="button"
-                    class="text-xs text-primary hover:text-primary/80 font-semibold transition-colors"
-                    @click="markAllAsRead()"
-                    x-show="unreadCount > 0">
-                {{ __('Tandai semua dibaca') }}
-            </button>
+            <div class="flex items-center gap-2">
+                <button type="button"
+                        class="text-xs text-primary hover:text-primary/80 font-semibold transition-colors"
+                        @click="markAllAsRead()"
+                        x-show="unreadCount > 0">
+                    {{ __('Tandai semua dibaca') }}
+                </button>
+                <button type="button"
+                        class="btn btn-ghost btn-circle btn-xs text-base-content/50 hover:text-base-content hover:bg-base-300/60"
+                        @click="open = false"
+                        title="{{ __('Tutup') }}"
+                        aria-label="{{ __('Tutup') }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
         </div>
 
         {{-- Notification list --}}
-        <div class="max-h-[460px] overflow-y-auto">
+        <div class="max-h-[calc(50vh-3.25rem)] sm:max-h-[380px] overflow-y-auto flex-1 overscroll-contain">
             {{-- Loading state --}}
             <template x-if="loading">
-                <div class="flex items-center justify-center py-10">
+                <div class="flex items-center justify-center py-8">
                     <span class="loading loading-spinner loading-md text-primary"></span>
                 </div>
             </template>
@@ -218,7 +245,7 @@
                     <template x-for="notif in notifications" :key="notif.id">
                         <li>
                             <a :href="formatUrl(notif.url)"
-                               class="flex items-start gap-3.5 px-4 sm:px-5 py-4 transition-colors border-l-4 group"
+                               class="flex items-start gap-3 sm:gap-3.5 px-3 sm:px-4 py-3 sm:py-3.5 transition-colors border-l-4 group"
                                :class="((notif.status === 'rejected' || notif.icon === 'rejected' || (notif.type || '').includes('reject') || (notif.type || '').includes('revoked'))
                                    ? (notif.read ? 'border-l-error/30 hover:bg-base-200/60 bg-base-100' : 'border-l-error bg-error/5 hover:bg-error/10')
                                    : ((notif.status === 'approved' || (notif.type || '').includes('approved'))

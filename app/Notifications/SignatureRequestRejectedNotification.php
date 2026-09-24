@@ -5,12 +5,13 @@ namespace App\Notifications;
 use App\Models\Document;
 use App\Models\SignatureRequest;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
 /**
  * Sent when a target user rejects a signature request so the requester knows.
  */
-class SignatureRequestRejectedNotification extends Notification
+class SignatureRequestRejectedNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 

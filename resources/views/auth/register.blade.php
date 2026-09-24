@@ -6,8 +6,8 @@
     <title>{{ config('app.name', 'DokuFlow') }} — {{ __('Daftar') }}</title>
     
     <!-- Favicon -->
-    <link rel="icon" type="image/png" href="{{ asset('logo.png') }}">
-    <link rel="shortcut icon" type="image/png" href="{{ asset('logo.png') }}">
+    <link rel="icon" type="image/webp" href="{{ asset('logo.webp') }}">
+    <link rel="shortcut icon" type="image/webp" href="{{ asset('logo.webp') }}">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

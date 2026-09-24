@@ -441,14 +441,92 @@ class DirectorDocumentController extends Controller
 
         // Date-based filtering & grouping
         $selectedActiveDate = $request->get('active_date');
+        $startDate = $request->get('start_date');
+        $endDate = $request->get('end_date');
         $isSpecificDateFilter = false;
         $selectedActiveDateFormatted = null;
 
-        if (!empty($selectedActiveDate)) {
+        if (!empty($startDate) || !empty($endDate)) {
+            try {
+                $start = !empty($startDate) ? \Carbon\Carbon::parse($startDate)->startOfDay() : null;
+                $end = !empty($endDate) ? \Carbon\Carbon::parse($endDate)->endOfDay() : null;
+
+                if ($start && $end && $start->gt($end)) {
+                    [$start, $end] = [$end->copy()->startOfDay(), $start->copy()->endOfDay()];
+                    [$startDate, $endDate] = [$endDate, $startDate];
+                }
+
+                $docQuery->where(function ($q) use ($start, $end) {
+                    $q->whereHas('currentVersion', function ($vq) use ($start, $end) {
+                        $vq->where('status', 'active')
+                           ->where(function ($sub) use ($start, $end) {
+                               if ($start && $end) {
+                                   $sub->whereBetween('reviewed_at', [$start, $end])
+                                       ->orWhere(function ($s2) use ($start, $end) {
+                                           $s2->whereNull('reviewed_at')
+                                              ->whereBetween('created_at', [$start, $end]);
+                                       });
+                               } elseif ($start) {
+                                   $sub->where('reviewed_at', '>=', $start)
+                                       ->orWhere(function ($s2) use ($start) {
+                                           $s2->whereNull('reviewed_at')
+                                              ->where('created_at', '>=', $start);
+                                       });
+                               } elseif ($end) {
+                                   $sub->where('reviewed_at', '<=', $end)
+                                       ->orWhere(function ($s2) use ($end) {
+                                           $s2->whereNull('reviewed_at')
+                                              ->where('created_at', '<=', $end);
+                                       });
+                               }
+                           });
+                    })->orWhere(function ($dq) use ($start, $end) {
+                        $dq->whereDoesntHave('currentVersion', fn($vq) => $vq->whereNotNull('reviewed_at'));
+                        if ($start && $end) {
+                            $dq->whereBetween('created_at', [$start, $end]);
+                        } elseif ($start) {
+                            $dq->where('created_at', '>=', $start);
+                        } elseif ($end) {
+                            $dq->where('created_at', '<=', $end);
+                        }
+                    });
+                });
+
+                $isSpecificDateFilter = true;
+                if ($start && $end) {
+                    $selectedActiveDateFormatted = $start->isSameDay($end)
+                        ? $start->translatedFormat('d F Y')
+                        : $start->translatedFormat('d M Y') . ' — ' . $end->translatedFormat('d M Y');
+                } elseif ($start) {
+                    $selectedActiveDateFormatted = '≥ ' . $start->translatedFormat('d F Y');
+                } else {
+                    $selectedActiveDateFormatted = '≤ ' . $end->translatedFormat('d F Y');
+                }
+            } catch (\Exception $e) {
+                // Ignore invalid date formats
+            }
+        } elseif (!empty($selectedActiveDate)) {
             try {
                 $parsedDate = \Carbon\Carbon::parse($selectedActiveDate);
                 $targetStart = $parsedDate->copy()->startOfDay();
                 $targetEnd = $parsedDate->copy()->endOfDay();
+
+                $docQuery->where(function ($q) use ($targetStart, $targetEnd) {
+                    $q->whereHas('currentVersion', function ($vq) use ($targetStart, $targetEnd) {
+                        $vq->where('status', 'active')
+                           ->where(function ($sub) use ($targetStart, $targetEnd) {
+                               $sub->whereBetween('reviewed_at', [$targetStart, $targetEnd])
+                                   ->orWhere(function ($s2) use ($targetStart, $targetEnd) {
+                                       $s2->whereNull('reviewed_at')
+                                          ->whereBetween('created_at', [$targetStart, $targetEnd]);
+                                   });
+                           });
+                    })->orWhere(function ($dq) use ($targetStart, $targetEnd) {
+                        $dq->whereDoesntHave('currentVersion', fn($vq) => $vq->whereNotNull('reviewed_at'))
+                           ->whereBetween('created_at', [$targetStart, $targetEnd]);
+                    });
+                });
+
                 $isSpecificDateFilter = true;
                 $selectedActiveDateFormatted = $parsedDate->translatedFormat('d F Y');
                 $selectedActiveDate = $parsedDate->format('Y-m-d');
@@ -457,119 +535,29 @@ class DirectorDocumentController extends Controller
             }
         }
 
-        $todayStart = now()->startOfDay();
-        $todayEnd = now()->endOfDay();
-
-        // 1. Query for Documents becoming active Today
-        $todayDocQuery = (clone $docQuery)->where(function ($q) use ($todayStart, $todayEnd) {
-            $q->whereHas('currentVersion', function ($vq) use ($todayStart, $todayEnd) {
-                $vq->where('status', 'active')
-                   ->where(function ($sub) use ($todayStart, $todayEnd) {
-                       $sub->whereBetween('reviewed_at', [$todayStart, $todayEnd])
-                           ->orWhere(function ($s2) use ($todayStart, $todayEnd) {
-                               $s2->whereNull('reviewed_at')
-                                  ->whereBetween('created_at', [$todayStart, $todayEnd]);
-                           });
-                   });
-            })->orWhere(function ($dq) use ($todayStart, $todayEnd) {
-                $dq->whereDoesntHave('currentVersion', fn($vq) => $vq->whereNotNull('reviewed_at'))
-                   ->whereBetween('created_at', [$todayStart, $todayEnd]);
-            });
-        });
-
-        // 2. Query for Documents activated Before Today
-        $previousDocQuery = (clone $docQuery)->where(function ($q) use ($todayStart) {
-            $q->whereHas('currentVersion', function ($vq) use ($todayStart) {
-                $vq->where('status', 'active')
-                   ->where(function ($sub) use ($todayStart) {
-                       $sub->where('reviewed_at', '<', $todayStart)
-                           ->orWhere(function ($s2) use ($todayStart) {
-                               $s2->whereNull('reviewed_at')
-                                  ->where('created_at', '<', $todayStart);
-                           });
-                   });
-            })->orWhere(function ($dq) use ($todayStart) {
-                $dq->whereDoesntHave('currentVersion', fn($vq) => $vq->whereNotNull('reviewed_at'))
-                   ->where('created_at', '<', $todayStart);
-            });
-        });
-
-        $todayCount = (clone $todayDocQuery)->count();
-        $previousCount = (clone $previousDocQuery)->count();
         $perPage = 16;
         $page = max(1, (int) $request->get('page', 1));
+        $totalCount = (clone $docQuery)->count();
 
-        if ($isSpecificDateFilter) {
-            // Specific Date Filter is active
-            $filteredDateQuery = (clone $docQuery)->where(function ($q) use ($targetStart, $targetEnd) {
-                $q->whereHas('currentVersion', function ($vq) use ($targetStart, $targetEnd) {
-                    $vq->where('status', 'active')
-                       ->where(function ($sub) use ($targetStart, $targetEnd) {
-                           $sub->whereBetween('reviewed_at', [$targetStart, $targetEnd])
-                               ->orWhere(function ($s2) use ($targetStart, $targetEnd) {
-                                   $s2->whereNull('reviewed_at')
-                                      ->whereBetween('created_at', [$targetStart, $targetEnd]);
-                               });
-                       });
-                })->orWhere(function ($dq) use ($targetStart, $targetEnd) {
-                    $dq->whereDoesntHave('currentVersion', fn($vq) => $vq->whereNotNull('reviewed_at'))
-                       ->whereBetween('created_at', [$targetStart, $targetEnd]);
-                });
-            });
+        // Paginate all active documents chronologically
+        $items = (clone $docQuery)->latest('updated_at')->forPage($page, $perPage)->get()
+            ->sortByDesc(fn($doc) => $doc->activated_at?->getTimestamp() ?? $doc->created_at->getTimestamp());
 
-            $totalCount = (clone $filteredDateQuery)->count();
-            $items = $filteredDateQuery->latest('updated_at')->forPage($page, $perPage)->get()
-                ->sortByDesc(fn($doc) => $doc->activated_at->getTimestamp());
+        $documents = new LengthAwarePaginator(
+            $items,
+            $totalCount,
+            $perPage,
+            $page,
+            [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ]
+        );
 
-            $documents = new LengthAwarePaginator(
-                $items,
-                $totalCount,
-                $perPage,
-                $page,
-                [
-                    'path' => $request->url(),
-                    'query' => $request->query(),
-                ]
-            );
-
-            $groupedDocuments = $items->groupBy(fn($doc) => $doc->activated_at->format('Y-m-d'));
-            $isTodayPage = ($selectedActiveDate === now()->format('Y-m-d'));
-        } else {
-            // Default pagination: Page 1 = Today's documents, Page 2+ = Previous documents
-            $previousPages = (int) ceil($previousCount / $perPage);
-            $totalPages = max(1, 1 + $previousPages);
-
-            if ($page > $totalPages && $totalPages > 0) {
-                $page = $totalPages;
-            }
-
-            $isTodayPage = ($page === 1);
-
-            if ($isTodayPage) {
-                $items = $todayDocQuery->latest('updated_at')->get()
-                    ->sortByDesc(fn($doc) => $doc->activated_at->getTimestamp());
-            } else {
-                $offset = ($page - 2) * $perPage;
-                $items = $previousDocQuery->latest('updated_at')->skip($offset)->take($perPage)->get()
-                    ->sortByDesc(fn($doc) => $doc->activated_at->getTimestamp());
-            }
-
-            $virtualTotal = $todayCount + $previousCount;
-            $paginatorTotal = max($virtualTotal, $totalPages * $perPage);
-
-            $documents = new LengthAwarePaginator(
-                $items,
-                $paginatorTotal,
-                $perPage,
-                $page,
-                [
-                    'path' => $request->url(),
-                    'query' => $request->query(),
-                ]
-            );
-
-            $groupedDocuments = $items->groupBy(fn($doc) => $doc->activated_at->format('Y-m-d'));
-        }
+        $groupedDocuments = $items->groupBy(fn($doc) => $doc->activated_at ? $doc->activated_at->format('Y-m-d') : $doc->created_at->format('Y-m-d'));
+        $isTodayPage = false;
+        $todayCount = 0;
+        $previousCount = 0;
 
         // Fetch filter dropdown options across system
         $availableCompanies = Company::orderBy('name')->get(['id', 'name', 'code']);
@@ -580,18 +568,6 @@ class DirectorDocumentController extends Controller
             $q->whereHas('currentVersion', fn($qv) => $qv->where('status', 'active'));
         })->orderBy('name')->get(['id', 'name']);
 
-        // Fetch distinct available active dates for quick dropdown filter
-        $availableActiveDates = Document::whereHas('currentVersion', fn($q) => $q->where('status', 'active'))
-            ->where('is_expired', false)
-            ->with('currentVersion')
-            ->get(['id', 'current_version_id', 'created_at'])
-            ->map(function ($doc) {
-                return $doc->activated_at->format('Y-m-d');
-            })
-            ->unique()
-            ->sortDesc()
-            ->values();
-
         return view('director.active_documents.index', compact(
             'documents',
             'groupedDocuments',
@@ -599,6 +575,8 @@ class DirectorDocumentController extends Controller
             'isSpecificDateFilter',
             'selectedActiveDate',
             'selectedActiveDateFormatted',
+            'startDate',
+            'endDate',
             'todayCount',
             'previousCount',
             'tab',
@@ -617,8 +595,7 @@ class DirectorDocumentController extends Controller
             'availableBranches',
             'availableUnitKerjas',
             'availableDocumentTypes',
-            'availableCreators',
-            'availableActiveDates'
+            'availableCreators'
         ));
     }
 

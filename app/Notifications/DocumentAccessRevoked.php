@@ -4,12 +4,13 @@ namespace App\Notifications;
 
 use App\Models\Document;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
 /**
  * Sent to a user (or unit kerja members) when their access to a document is revoked.
  */
-class DocumentAccessRevoked extends Notification
+class DocumentAccessRevoked extends Notification implements ShouldQueue
 {
     use Queueable;
 

@@ -4,12 +4,13 @@ namespace App\Notifications;
 
 use App\Models\Document;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
 /**
  * Sent to the rename requester when their document rename request is approved or rejected.
  */
-class DocumentRenameResult extends Notification
+class DocumentRenameResult extends Notification implements ShouldQueue
 {
     use Queueable;
 

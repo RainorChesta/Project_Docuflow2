@@ -117,20 +117,22 @@ class OnlyOfficeService
      */
     public function generatePlaceholderPngBytes(?string $text = null, ?int $requestId = null, bool $isStamp = false): string
     {
-        $width = 400;
-        $height = 400;
-
         if (!extension_loaded('gd')) {
             return '';
         }
 
-        $image = imagecreatetruecolor($width, $height);
-        
-        imagealphablending($image, false);
-        imagesavealpha($image, true);
-        $transparent = imagecolorallocatealpha($image, 255, 255, 255, 127);
-        imagefilledrectangle($image, 0, 0, $width, $height, $transparent);
-        imagealphablending($image, true);
+        $cacheKey = 'oo_placeholder_png_' . md5(($text ?? '') . '_' . ($requestId ?? 0) . '_' . ($isStamp ? '1' : '0'));
+        return \Illuminate\Support\Facades\Cache::rememberForever($cacheKey, function () use ($text, $requestId, $isStamp) {
+            $width = 400;
+            $height = 400;
+
+            $image = imagecreatetruecolor($width, $height);
+            
+            imagealphablending($image, false);
+            imagesavealpha($image, true);
+            $transparent = imagecolorallocatealpha($image, 255, 255, 255, 127);
+            imagefilledrectangle($image, 0, 0, $width, $height, $transparent);
+            imagealphablending($image, true);
 
         // Amber background card
         $bgColor = imagecolorallocate($image, 254, 243, 199);       // #FEF3C7
@@ -224,7 +226,8 @@ class OnlyOfficeService
         }
 
         return $imageData ?: '';
-    }
+    });
+}
 
     /**
      * Get the URL ONLYOFFICE uses to fetch the document's QR code PNG image.
@@ -273,10 +276,12 @@ class OnlyOfficeService
             return $rawPngBytes;
         }
 
-        $src = @imagecreatefromstring($rawPngBytes);
-        if (!$src) {
-            return $rawPngBytes;
-        }
+        $cacheKey = 'oo_sq_sig_' . md5($rawPngBytes) . '_' . $targetSize . '_' . $padding . '_' . ($requestId ?? 0) . '_' . ($isStamp ? '1' : '0');
+        return \Illuminate\Support\Facades\Cache::rememberForever($cacheKey, function () use ($rawPngBytes, $targetSize, $padding, $requestId, $isStamp) {
+            $src = @imagecreatefromstring($rawPngBytes);
+            if (!$src) {
+                return $rawPngBytes;
+            }
 
         // Convert palette/indexed images (PNG-8, etc.) to truecolor immediately.
         // On indexed images, imagecolorat() returns palette indices instead of ARGB values,
@@ -439,6 +444,7 @@ class OnlyOfficeService
         }
 
         return $result ?: $rawPngBytes;
+        });
     }
 
     /**

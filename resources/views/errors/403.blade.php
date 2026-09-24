@@ -65,8 +65,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ __('Dokumen Tidak Bisa Diakses') }} - {{ config('app.name', 'DokuFlow') }}</title>
     <!-- Favicon -->
-    <link rel="icon" type="image/png" href="{{ asset('logo.png') }}">
-    <link rel="shortcut icon" type="image/png" href="{{ asset('logo.png') }}">
+    <link rel="icon" type="image/webp" href="{{ asset('logo.webp') }}">
+    <link rel="shortcut icon" type="image/webp" href="{{ asset('logo.webp') }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen bg-gradient-to-br from-primary/10 via-base-200 to-secondary/10 font-sans antialiased flex items-center justify-center p-4">

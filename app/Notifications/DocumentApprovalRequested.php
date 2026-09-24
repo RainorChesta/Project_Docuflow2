@@ -5,12 +5,13 @@ namespace App\Notifications;
 use App\Models\Document;
 use App\Models\DocumentVersion;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
 /**
  * Sent to Division Head when a document version is submitted for approval.
  */
-class DocumentApprovalRequested extends Notification
+class DocumentApprovalRequested extends Notification implements ShouldQueue
 {
     use Queueable;
 
