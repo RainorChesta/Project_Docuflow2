@@ -211,8 +211,7 @@ class User extends Authenticatable
 
     public function isStaff(): bool
     {
-<<<<<<< HEAD
-        return $this->system_role === 'staff' || $this->system_role === 'user';
+        return $this->system_role === 'staff' || $this->system_role === 'user' || (!$this->isAdmin() && !$this->isDirector() && !$this->isPicKlinik() && !$this->isHead());
     }
 
     /**
@@ -229,9 +228,6 @@ class User extends Authenticatable
         }
 
         return true;
-=======
-        return $this->system_role === 'staff' || (!$this->isAdmin() && !$this->isDirector() && !$this->isPicKlinik() && !$this->isHead());
->>>>>>> adfd755b7891382091ab6be419493650cf9ee835
     }
 
     /**

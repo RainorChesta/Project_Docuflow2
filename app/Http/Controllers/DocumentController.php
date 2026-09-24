@@ -628,11 +628,7 @@ class DocumentController extends Controller
             }
         }
 
-<<<<<<< HEAD
-        $document->load('owner', 'unitKerja', 'documentType', 'currentVersion', 'corporateSoftFile', 'versions.author', 'shares.user', 'unitKerjaShares.unitKerja');
-=======
-        $document->load('owner', 'unitKerja', 'documentType', 'currentVersion', 'versions.author', 'shares.user', 'unitKerjaShares.unitKerja', 'rollbackRequestedBy', 'pendingRollbackVersion');
->>>>>>> adfd755b7891382091ab6be419493650cf9ee835
+        $document->load('owner', 'unitKerja', 'documentType', 'currentVersion', 'corporateSoftFile', 'versions.author', 'shares.user', 'unitKerjaShares.unitKerja', 'rollbackRequestedBy', 'pendingRollbackVersion');
 
         $unitKerjas = auth()->user()->isAdmin()
             ? UnitKerja::orderBy('kode_unit_kerja')->get()
@@ -771,11 +767,8 @@ class DocumentController extends Controller
 
         $this->authorize('update', $document);
 
-<<<<<<< HEAD
         $document->load('currentVersion', 'versions', 'corporateSoftFile');
-=======
         $currentUser = auth()->user();
->>>>>>> adfd755b7891382091ab6be419493650cf9ee835
 
         // If the latest version was rejected and no active pending/draft version exists, prepare a new revision version with reverted placeholders
         $latestVersion = $document->versions()->orderBy('version_number', 'desc')->first();

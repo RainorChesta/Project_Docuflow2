@@ -914,7 +914,6 @@
                                     {{ __('Route: :role', ['role' => $badgeLabel]) }}
                                 </span>
                             @endif
-<<<<<<< HEAD
                             @if($document->corporateSoftFile)
                                 <span class="badge badge-accent badge-sm shrink-0 gap-1.5 font-bold shadow-xs py-2 px-2.5" title="{{ __('Kop Surat Korporat yang digunakan: ') . $document->corporateSoftFile->title }}">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-accent-content" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -922,7 +921,8 @@
                                     </svg>
                                     <span>{{ __('Kop:') }} {{ \Illuminate\Support\Str::limit($document->corporateSoftFile->title, 20) }}</span>
                                     <span class="badge badge-xs bg-white text-accent font-extrabold px-1 py-0">{{ __('✓ Terpilih') }}</span>
-=======
+                                </span>
+                            @endif
 
                             {{-- Director Seen Status Badge --}}
                             @if($document->isDirectorRead())
@@ -934,7 +934,6 @@
                                 <span class="badge badge-ghost border border-base-300 text-base-content/70 badge-sm font-medium gap-1 shrink-0" title="{{ __('Belum ditinjau oleh Direktur') }}">
                                     <span class="w-1.5 h-1.5 rounded-full bg-primary/70 animate-pulse"></span>
                                     {{ __('Belum Ditinjau Direktur') }}
->>>>>>> adfd755b7891382091ab6be419493650cf9ee835
                                 </span>
                             @endif
                         </div>
