@@ -11,12 +11,17 @@ class DocumentTemplate extends Model
 {
     protected $fillable = [
         'title', 'description', 'file_path', 'file_original_name',
-        'file_mime', 'document_type_id', 'status', 'created_by',
+        'file_mime', 'document_type_id', 'corporate_soft_file_id', 'status', 'created_by',
     ];
 
     /* ------------------------------------------------------------------ */
     /*  Relationships                                                      */
     /* ------------------------------------------------------------------ */
+
+    public function corporateSoftFile(): BelongsTo
+    {
+        return $this->belongsTo(CorporateSoftFile::class, 'corporate_soft_file_id');
+    }
 
     public function documentType(): BelongsTo
     {

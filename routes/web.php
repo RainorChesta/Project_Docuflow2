@@ -89,6 +89,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/documents/{document}/rename', [DocumentController::class, 'rename'])->name('documents.rename');
     Route::post('/documents/{document}/request-rename', [DocumentController::class, 'requestRename'])->name('documents.request-rename');
     Route::post('/documents/{document}/cancel-rename', [DocumentController::class, 'cancelRenameRequest'])->name('documents.cancel-rename');
+    Route::get('/documents/{document}/corporate-soft-files', [DocumentController::class, 'corporateSoftFiles'])->name('documents.corporate-soft-files');
+    Route::post('/documents/{document}/corporate-soft-files/{corporateSoftFile}/apply', [DocumentController::class, 'applyCorporateSoftFile'])->name('documents.corporate-soft-files.apply');
+    Route::post('/documents/{document}/corporate-soft-files/remove', [DocumentController::class, 'removeCorporateSoftFile'])->name('documents.corporate-soft-files.remove');
 
     // Approvals
     Route::get('/approvals', [ApprovalController::class, 'index'])->name('approvals.index');
@@ -158,6 +161,14 @@ Route::middleware('auth')->group(function () {
         Route::resource('templates', DocumentTemplateController::class)->except(['show']);
         Route::patch('/templates/{template}/toggle-status', [DocumentTemplateController::class, 'toggleStatus'])->name('templates.toggle-status');
         Route::get('/templates/{template}/download', [DocumentTemplateController::class, 'download'])->name('templates.download');
+        Route::post('/templates/{template}/corporate-soft-files/{corporateSoftFile}/apply', [DocumentTemplateController::class, 'applyCorporateSoftFile'])->name('templates.corporate-soft-files.apply');
+        Route::post('/templates/{template}/corporate-soft-files/remove', [DocumentTemplateController::class, 'removeCorporateSoftFile'])->name('templates.corporate-soft-files.remove');
+        Route::resource('corporate-soft-files', \App\Http\Controllers\Admin\CorporateSoftFileController::class)->except(['show']);
+        Route::get('/corporate-soft-files/{corporateSoftFile}/preview', [\App\Http\Controllers\Admin\CorporateSoftFileController::class, 'preview'])->name('corporate-soft-files.preview');
+        Route::get('/corporate-soft-files/{corporateSoftFile}/preview-content', [\App\Http\Controllers\Admin\CorporateSoftFileController::class, 'previewContent'])->name('corporate-soft-files.preview-content');
+        Route::get('/corporate-soft-files/{corporateSoftFile}/preview-config', [\App\Http\Controllers\Admin\CorporateSoftFileController::class, 'previewConfig'])->name('corporate-soft-files.preview-config');
+        Route::patch('/corporate-soft-files/{corporateSoftFile}/toggle-status', [\App\Http\Controllers\Admin\CorporateSoftFileController::class, 'toggleStatus'])->name('corporate-soft-files.toggle-status');
+        Route::get('/corporate-soft-files/{corporateSoftFile}/download', [\App\Http\Controllers\Admin\CorporateSoftFileController::class, 'download'])->name('corporate-soft-files.download');
         Route::get('/documents', [AdminDocumentController::class, 'index'])->name('documents.index');
         Route::delete('/documents/{document}', [AdminDocumentController::class, 'destroy'])->name('documents.destroy');
 
@@ -188,6 +199,8 @@ Route::match(['get', 'post'], '/onlyoffice/documents/{document}/callback', [\App
 
 Route::get('/onlyoffice/templates/{template}/file', [\App\Http\Controllers\OnlyOfficeController::class, 'templateFile'])->name('onlyoffice.templates.file');
 Route::match(['get', 'post'], '/onlyoffice/templates/{template}/callback', [\App\Http\Controllers\OnlyOfficeController::class, 'templateCallback'])->name('onlyoffice.templates.callback')->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class]);
+
+Route::get('/onlyoffice/corporate-soft-files/{corporateSoftFile}/file', [\App\Http\Controllers\OnlyOfficeController::class, 'corporateSoftFile'])->name('onlyoffice.corporate-soft-files.file');
 
 // Share-token link access (Google Docs model)
 Route::get('/shared/{token}', [DocumentShareController::class, 'accessByToken'])->name('documents.shared')->middleware(['auth', 'account.verified', 'signature.required']);

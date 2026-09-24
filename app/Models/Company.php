@@ -55,4 +55,9 @@ class Company extends Model
     {
         return $this->hasMany(Document::class);
     }
+
+    public function corporateSoftFiles(): BelongsToMany
+    {
+        return $this->belongsToMany(CorporateSoftFile::class, 'company_corporate_soft_file')->withTimestamps();
+    }
 }

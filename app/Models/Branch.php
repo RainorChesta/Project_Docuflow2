@@ -81,4 +81,9 @@ class Branch extends Model
 
         return $this->code;
     }
+
+    public function corporateSoftFiles(): BelongsToMany
+    {
+        return $this->belongsToMany(CorporateSoftFile::class, 'branch_corporate_soft_file')->withTimestamps();
+    }
 }

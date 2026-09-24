@@ -15,7 +15,7 @@ class Document extends Model
     protected $fillable = [
         'document_number', 'format_choice', 'numbering_scheme', 'title', 'summary', 'summary_status', 'summary_error',
         'summary_started_at', 'summary_completed_at', 'visibility', 'unit_kerja_id', 'company_id', 'branch_id', 'owner_id',
-        'document_type_id', 'template_id', 'is_public', 'current_version_id',
+        'document_type_id', 'template_id', 'corporate_soft_file_id', 'is_public', 'current_version_id',
         'pending_rollback_version_id', 'rollback_requested_by_id', 'rollback_requested_at',
         'pending_title', 'rename_requested_by_id', 'rename_requested_at', 'rename_request_notes',
         'paper_size', 'paper_margin',
@@ -142,6 +142,11 @@ class Document extends Model
     public function template(): BelongsTo
     {
         return $this->belongsTo(DocumentTemplate::class, 'template_id');
+    }
+
+    public function corporateSoftFile(): BelongsTo
+    {
+        return $this->belongsTo(CorporateSoftFile::class, 'corporate_soft_file_id');
     }
 
     public function owner(): BelongsTo

@@ -118,6 +118,19 @@ if os.path.exists(code_js):
     print('[+] code.js patched')
 
 # 4. Patch Toolbar.js & PageSizeDialog.js
+tb_js = f'{web_apps}/app/view/Toolbar.js'
+if os.path.exists(tb_js):
+    with open(tb_js, 'r', encoding='utf-8') as f:
+        content = f.read()
+    if 'caption: \'F4\'' not in content:
+        content = content.replace(
+            'caption: \'A4\',\n                                    subtitle: \'21cm x 29,7cm\',\n                                    template: pageSizeTemplate,\n                                    checkable: true,\n                                    toggleGroup: \'menuPageSize\',\n                                    value: [210, 297],\n                                    checked: true\n                                },',
+            'caption: \'A4\',\n                                    subtitle: \'21cm x 29,7cm\',\n                                    template: pageSizeTemplate,\n                                    checkable: true,\n                                    toggleGroup: \'menuPageSize\',\n                                    value: [210, 297],\n                                    checked: true\n                                },\n                                {\n                                    caption: \'F4\',\n                                    subtitle: \'21cm x 33cm\',\n                                    template: pageSizeTemplate,\n                                    checkable: true,\n                                    toggleGroup: \'menuPageSize\',\n                                    value: [210, 330]\n                                },'
+        )
+        with open(tb_js, 'w', encoding='utf-8') as f:
+            f.write(content)
+        print('[+] Toolbar.js patched')
+
 ps_js = f'{web_apps}/app/view/PageSizeDialog.js'
 if os.path.exists(ps_js):
     with open(ps_js, 'r', encoding='utf-8') as f:

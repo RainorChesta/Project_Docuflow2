@@ -484,6 +484,17 @@
             <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Template Dokumen') }}</span>
         </a>
 
+        <a href="{{ route('admin.corporate-soft-files.index') }}"
+           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+                  {{ request()->routeIs('admin.corporate-soft-files.*') ? 'nav-item-new-active' : '' }}"
+           :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
+           :title="open ? '' : '{{ __('Soft File Korporat') }}'">
+            <div class="icon-wrapper shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            </div>
+            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Soft File Korporat') }}</span>
+        </a>
+
         <a href="{{ route('admin.users.index') }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('admin.users.*') ? 'nav-item-new-active' : '' }}"

@@ -93,7 +93,7 @@
                 config.editorConfig.mode = 'view';
                 config.editorConfig.customization = config.editorConfig.customization || {};
                 config.editorConfig.customization.compactHeader = true;
-                config.editorConfig.customization.toolbarNoTabs = true;
+                config.editorConfig.customization.toolbarNoTabs = false;
                 config.editorConfig.customization.mobile = { force: false };
 
                 config.events = config.events || {};

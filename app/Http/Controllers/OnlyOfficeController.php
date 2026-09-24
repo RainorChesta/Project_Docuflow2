@@ -51,6 +51,26 @@ class OnlyOfficeController extends Controller
     }
 
     /**
+     * Serve a corporate soft file (DOCX, PDF, image) to ONLYOFFICE Docs Document Server.
+     */
+    public function corporateSoftFile(\App\Models\CorporateSoftFile $corporateSoftFile): BinaryFileResponse|StreamedResponse|\Illuminate\Http\Response
+    {
+        $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
+
+        if (!$corporateSoftFile->file_path || !$disk->exists($corporateSoftFile->file_path)) {
+            abort(404, 'Corporate soft file not found in storage.');
+        }
+
+        $mime = $corporateSoftFile->file_mime ?? 'application/octet-stream';
+        $fileName = $corporateSoftFile->file_original_name ?? basename($corporateSoftFile->file_path);
+
+        return $disk->response($corporateSoftFile->file_path, $fileName, [
+            'Content-Type' => $mime,
+            'Content-Disposition' => 'inline; filename="' . addslashes($fileName) . '"',
+        ]);
+    }
+
+    /**
      * Serve user's signature image to ONLYOFFICE Docs Document Server.
      */
     public function signature(Request $request, User $user): \Illuminate\Http\Response
@@ -523,3 +543,4 @@ class OnlyOfficeController extends Controller
         return response()->json(['error' => 0]);
     }
 }
+
