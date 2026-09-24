@@ -284,7 +284,7 @@ define([
                         window.open('https://cmhgroup.id/', '_blank');
                     });
                     $(function() {
-                        $('#header-logo, #header-logo i, .logo').css('cursor', 'pointer').attr('title', 'CMHGROUP');
+                        $('#header-logo, #header-logo i, .logo').css('cursor', 'pointer').attr('title', 'Grup CMH');
                     });
 
                     /** coauthoring begin **/

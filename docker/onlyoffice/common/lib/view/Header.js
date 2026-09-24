@@ -143,7 +143,7 @@ define([
             '</section>';
 
         var templateLeftBox = '<section class="logo">' +
-            '<div id="header-logo" style="cursor: pointer;" title="CMHGROUP - Cahaya Diagnostic Centre"><i></i></div>' +
+            '<div id="header-logo" style="cursor: pointer;" title="Grup CMH"><i></i></div>' +
             '</section>';
 
         var templateTitleBox = '<section id="box-document-title">' +
