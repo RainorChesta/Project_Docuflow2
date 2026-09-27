@@ -26,11 +26,15 @@ class OnlyOfficeService
             $fileHash = md5($document->id . '_' . $version->id . '_' . ($version->updated_at ? $version->updated_at->timestamp : time()));
         }
 
+        $sessionNonce = \Illuminate\Support\Facades\Cache::get('onlyoffice_doc_session_key_' . $document->id . '_v' . $version->id, '');
+        $nonceSuffix = $sessionNonce ? ('_' . $sessionNonce) : '';
+
         $raw = sprintf(
-            'doc_%d_v%d_%s',
+            'doc_%d_v%d_%s%s',
             $document->id,
             $version->id,
-            substr($fileHash, 0, 24)
+            substr($fileHash, 0, 20),
+            $nonceSuffix
         );
 
         return substr(preg_replace('/[^0-9a-zA-Z_\-]/', '_', $raw), 0, 128);
@@ -41,11 +45,12 @@ class OnlyOfficeService
      */
     public function rotateDocumentKey(Document $document, ?DocumentVersion $version = null): void
     {
+        $newNonce = substr(md5(uniqid((string)mt_rand(), true)), 0, 8);
         if ($version) {
-            \Illuminate\Support\Facades\Cache::forget('onlyoffice_doc_session_key_' . $document->id . '_v' . $version->id);
+            \Illuminate\Support\Facades\Cache::put('onlyoffice_doc_session_key_' . $document->id . '_v' . $version->id, $newNonce, 86400);
         }
         foreach ($document->versions as $v) {
-            \Illuminate\Support\Facades\Cache::forget('onlyoffice_doc_session_key_' . $document->id . '_v' . $v->id);
+            \Illuminate\Support\Facades\Cache::put('onlyoffice_doc_session_key_' . $document->id . '_v' . $v->id, $newNonce, 86400);
         }
     }
 
@@ -930,11 +935,12 @@ class OnlyOfficeService
      * Uses ONLYOFFICE's native x2t engine (via Docker container if available),
      * falling back to ConvertService.ashx HTTP API, and then PhpWord/PdfParser.
      */
-    public function convertPdfToDocx($fileOrPath, ?string $fileUrl = null): ?string
+    public function convertPdfToDocx($fileOrPath, ?string $fileUrl = null, string $targetPaperSize = 'f4'): ?string
     {
         // 1. Resolve local absolute file path
         $localPath = null;
         if ($fileOrPath instanceof \App\Models\CorporateSoftFile) {
+            $targetPaperSize = $fileOrPath->paper_size ?? 'f4';
             $disk = \Illuminate\Support\Facades\Storage::disk(config('onlyoffice.storage_disk', 'local'));
             if ($disk->exists($fileOrPath->file_path)) {
                 $localPath = $disk->path($fileOrPath->file_path);
@@ -948,9 +954,9 @@ class OnlyOfficeService
 
         // 2. Try native x2t conversion via ONLYOFFICE Docker container (instant & offline)
         if ($localPath && file_exists($localPath)) {
-            $convertedDocx = $this->convertPdfUsingDockerX2t($localPath);
+            $convertedDocx = $this->convertPdfUsingDockerX2t($localPath, $targetPaperSize);
             if ($convertedDocx && substr($convertedDocx, 0, 2) === "PK") {
-                return $this->enforceF4PageSize($convertedDocx);
+                return $targetPaperSize === 'a4' ? $this->enforceA4PageSize($convertedDocx) : $this->enforceF4PageSize($convertedDocx);
             }
         }
 
@@ -958,7 +964,7 @@ class OnlyOfficeService
         if ($fileUrl) {
             $convertedDocx = $this->convertDocument($fileUrl, 'pdf', 'docx');
             if ($convertedDocx && substr($convertedDocx, 0, 2) === "PK") {
-                return $this->enforceF4PageSize($convertedDocx);
+                return $targetPaperSize === 'a4' ? $this->enforceA4PageSize($convertedDocx) : $this->enforceF4PageSize($convertedDocx);
             }
         }
 
@@ -966,7 +972,7 @@ class OnlyOfficeService
         if ($localPath && file_exists($localPath)) {
             $convertedDocx = $this->convertPdfUsingPhpWordFallback($localPath);
             if ($convertedDocx && substr($convertedDocx, 0, 2) === "PK") {
-                return $this->enforceF4PageSize($convertedDocx);
+                return $targetPaperSize === 'a4' ? $this->enforceA4PageSize($convertedDocx) : $this->enforceF4PageSize($convertedDocx);
             }
         }
 
@@ -976,9 +982,9 @@ class OnlyOfficeService
     /**
      * Convert a PDF file to DOCX using ONLYOFFICE's native x2t binary inside Docker container.
      * Extracts the corporate letterhead directly into the Word Header (word/header1.xml)
-     * and Footer (word/footer1.xml), with clean typing body in F4 dimensions.
+     * and Footer (word/footer1.xml), with clean typing body in target dimensions.
      */
-    protected function convertPdfUsingDockerX2t(string $localPdfPath): ?string
+    protected function convertPdfUsingDockerX2t(string $localPdfPath, string $targetPaperSize = 'f4'): ?string
     {
         try {
             $container = env('ONLYOFFICE_DOCKER_CONTAINER', 'dokuflow-onlyoffice');
@@ -1014,7 +1020,7 @@ class OnlyOfficeService
                     @unlink($tempLocalPng);
                     @exec(sprintf('docker exec %s rm -f %s %s 2>&1', escapeshellarg($container), escapeshellarg($containerIn), escapeshellarg($containerPngOut)));
 
-                    return $this->createDocxFromImageBytes($pngBytes, 'png');
+                    return $this->createDocxFromImageBytes($pngBytes, 'png', $targetPaperSize);
                 }
             }
             if (file_exists($tempLocalPng)) {
@@ -1039,7 +1045,7 @@ class OnlyOfficeService
             if ($codeCpDocx === 0 && file_exists($tempLocalDocx) && filesize($tempLocalDocx) > 1000) {
                 $content = file_get_contents($tempLocalDocx);
                 @unlink($tempLocalDocx);
-                return $this->enforceF4PageSize($content);
+                return $targetPaperSize === 'a4' ? $this->enforceA4PageSize($content) : $this->enforceF4PageSize($content);
             }
             if (file_exists($tempLocalDocx)) {
                 @unlink($tempLocalDocx);
@@ -1049,6 +1055,112 @@ class OnlyOfficeService
         }
 
         return null;
+    }
+
+    /**
+     * Convert a DOCX corporate soft file with body-level design to smart header/footer DOCX
+     * using ONLYOFFICE's native x2t binary inside Docker container.
+     */
+    public function convertDocxUsingDockerX2t(string $localDocxPath, string $targetPaperSize = 'f4'): ?string
+    {
+        try {
+            $container = env('ONLYOFFICE_DOCKER_CONTAINER', 'dokuflow-onlyoffice');
+            $uid = uniqid('conv_docx_', true);
+            $containerIn = "/var/www/onlyoffice/Data/in_{$uid}.docx";
+            $containerPngOut = "/var/www/onlyoffice/Data/out_{$uid}.png";
+            $tempLocalPng = storage_path("app/temp_png_{$uid}.png");
+
+            // 1. Copy DOCX into container
+            $cpInCmd = sprintf('docker cp %s %s:%s 2>&1', escapeshellarg($localDocxPath), escapeshellarg($container), escapeshellarg($containerIn));
+            @exec($cpInCmd, $outIn, $codeIn);
+            if ($codeIn !== 0) {
+                return null;
+            }
+
+            // 2. Render to high-res PNG for header & footer extraction
+            $x2tPngCmd = sprintf(
+                'docker exec %s /var/www/onlyoffice/documentserver/server/FileConverter/bin/x2t %s %s 2>&1',
+                escapeshellarg($container),
+                escapeshellarg($containerIn),
+                escapeshellarg($containerPngOut)
+            );
+            @exec($x2tPngCmd, $outPng, $codePng);
+
+            if ($codePng === 0) {
+                $cpPngCmd = sprintf('docker cp %s:%s %s 2>&1', escapeshellarg($container), escapeshellarg($containerPngOut), escapeshellarg($tempLocalPng));
+                @exec($cpPngCmd, $outCpPng, $codeCpPng);
+
+                if ($codeCpPng === 0 && file_exists($tempLocalPng) && filesize($tempLocalPng) > 0) {
+                    $pngBytes = file_get_contents($tempLocalPng);
+                    @unlink($tempLocalPng);
+                    @exec(sprintf('docker exec %s rm -f %s %s 2>&1', escapeshellarg($container), escapeshellarg($containerIn), escapeshellarg($containerPngOut)));
+
+                    return $this->createDocxFromImageBytes($pngBytes, 'png', $targetPaperSize);
+                }
+            }
+            if (file_exists($tempLocalPng)) {
+                @unlink($tempLocalPng);
+            }
+            @exec(sprintf('docker exec %s rm -f %s %s 2>&1', escapeshellarg($container), escapeshellarg($containerIn), escapeshellarg($containerPngOut)));
+        } catch (\Throwable $e) {
+            Log::warning('convertDocxUsingDockerX2t failed: ' . $e->getMessage());
+        }
+
+        return null;
+    }
+
+    /**
+     * Check if a DOCX binary has both native explicit header and footer XML files.
+     */
+    public function docxHasExplicitHeaderAndFooter(string $docxBinary): bool
+    {
+        if (empty($docxBinary) || substr($docxBinary, 0, 2) !== 'PK') {
+            return false;
+        }
+
+        $tmp = tempnam(sys_get_temp_dir(), 'chk_docx_');
+        file_put_contents($tmp, $docxBinary);
+        $zip = new \ZipArchive();
+        if ($zip->open($tmp) !== true) {
+            @unlink($tmp);
+            return false;
+        }
+
+        $hasHeader = false;
+        $hasFooter = false;
+
+        $isMeaningful = function (?string $xml): bool {
+            if (!$xml) return false;
+            if (preg_match('/<w:drawing\b|<w:pict\b|<v:shape\b|<v:imagedata\b|<a:blip\b|<pic:pic\b|<w:tbl\b/i', $xml)) {
+                return true;
+            }
+            if (preg_match_all('/<w:t\b[^>]*>(.*?)<\/w:t>/is', $xml, $matches)) {
+                foreach ($matches[1] as $text) {
+                    if (trim(html_entity_decode(strip_tags($text))) !== '') {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        };
+
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $name = $zip->getNameIndex($i);
+            if (preg_match('#^word/header\d*\.xml$#i', $name)) {
+                if ($isMeaningful($zip->getFromIndex($i))) {
+                    $hasHeader = true;
+                }
+            } elseif (preg_match('#^word/footer\d*\.xml$#i', $name)) {
+                if ($isMeaningful($zip->getFromIndex($i))) {
+                    $hasFooter = true;
+                }
+            }
+        }
+
+        $zip->close();
+        @unlink($tmp);
+
+        return $hasHeader || $hasFooter;
     }
 
     /**
@@ -1196,6 +1308,188 @@ class OnlyOfficeService
     }
 
     /**
+     * Convert any PDF to F4 dimensions (210 x 330 mm = 595.28 x 935.43 pt).
+     * Automatically scales and aligns letterhead to top.
+     */
+    public function convertPdfToF4(string $pdfBinary): string
+    {
+        if (empty($pdfBinary) || !str_starts_with($pdfBinary, '%PDF-')) {
+            return $pdfBinary;
+        }
+
+        $tempIn = tempnam(sys_get_temp_dir(), 'pdf_in_');
+        file_put_contents($tempIn, $pdfBinary);
+
+        try {
+            $pdf = new Fpdi();
+            $pageCount = $pdf->setSourceFile($tempIn);
+
+            for ($pageNo = 1; $pageNo <= $pageCount; $pageNo++) {
+                $templateId = $pdf->importPage($pageNo);
+                $size = $pdf->getTemplateSize($templateId);
+
+                $isLandscape = $size['width'] > $size['height'];
+                $pageFormat = $isLandscape ? [330, 210] : [210, 330];
+                $orientation = $isLandscape ? 'L' : 'P';
+
+                $pdf->AddPage($orientation, $pageFormat);
+
+                $targetW = $isLandscape ? 330 : 210;
+                $targetH = $isLandscape ? 210 : 330;
+
+                if ($isLandscape) {
+                    $scale = min(330 / max(1, $size['width']), 210 / max(1, $size['height']), 1.0);
+                    $w = $size['width'] * $scale;
+                    $h = $size['height'] * $scale;
+                    $x = ($targetW - $w) / 2;
+                    $y = ($targetH - $h) / 2;
+                } else {
+                    // Portrait: Scale width to fit 210mm (F4 width) and top align
+                    $w = 210;
+                    $h = ($size['height'] / max(1, $size['width'])) * 210;
+                    if ($h > 330) {
+                        $h = 330;
+                        $w = ($size['width'] / max(1, $size['height'])) * 330;
+                        $x = (210 - $w) / 2;
+                        $y = 0;
+                    } else {
+                        $x = 0;
+                        $y = 0;
+                    }
+                }
+
+                $pdf->useTemplate($templateId, $x, $y, $w, $h);
+            }
+
+            $tempOut = tempnam(sys_get_temp_dir(), 'pdf_out_');
+            $pdf->Output($tempOut, 'F');
+            $result = file_get_contents($tempOut);
+            @unlink($tempOut);
+
+            return $result ?: $pdfBinary;
+        } catch (\Throwable $e) {
+            Log::warning('convertPdfToF4 failed: ' . $e->getMessage(), ['exception' => $e]);
+            return $pdfBinary;
+        } finally {
+            @unlink($tempIn);
+        }
+    }
+
+    /**
+     * Convert any uploaded document (DOCX, DOC, or PDF) to standard F4 paper size.
+     */
+    public function convertFileToF4(string $binaryContent, string $extension): string
+    {
+        $ext = strtolower($extension);
+        if (in_array($ext, ['docx', 'doc']) || substr($binaryContent, 0, 2) === 'PK') {
+            return $this->enforceF4PageSize($binaryContent);
+        }
+
+        if ($ext === 'pdf' || str_starts_with($binaryContent, '%PDF-')) {
+            return $this->convertPdfToF4($binaryContent);
+        }
+
+        return $binaryContent;
+    }
+
+    /**
+     * Convert any PDF to A4 dimensions (210 x 297 mm = 595.28 x 841.89 pt).
+     * Automatically scales and aligns letterhead to top.
+     */
+    public function convertPdfToA4(string $pdfBinary): string
+    {
+        if (empty($pdfBinary) || !str_starts_with($pdfBinary, '%PDF-')) {
+            return $pdfBinary;
+        }
+
+        $tempIn = tempnam(sys_get_temp_dir(), 'pdf_in_');
+        file_put_contents($tempIn, $pdfBinary);
+
+        try {
+            $pdf = new Fpdi();
+            $pageCount = $pdf->setSourceFile($tempIn);
+
+            for ($pageNo = 1; $pageNo <= $pageCount; $pageNo++) {
+                $templateId = $pdf->importPage($pageNo);
+                $size = $pdf->getTemplateSize($templateId);
+
+                $isLandscape = $size['width'] > $size['height'];
+                $pageFormat = $isLandscape ? [297, 210] : [210, 297];
+                $orientation = $isLandscape ? 'L' : 'P';
+
+                $pdf->AddPage($orientation, $pageFormat);
+
+                $targetW = $isLandscape ? 297 : 210;
+                $targetH = $isLandscape ? 210 : 297;
+
+                if ($isLandscape) {
+                    $scale = min(297 / max(1, $size['width']), 210 / max(1, $size['height']), 1.0);
+                    $w = $size['width'] * $scale;
+                    $h = $size['height'] * $scale;
+                    $x = ($targetW - $w) / 2;
+                    $y = ($targetH - $h) / 2;
+                } else {
+                    // Portrait: Scale width to fit 210mm (A4 width) and top align
+                    $w = 210;
+                    $h = ($size['height'] / max(1, $size['width'])) * 210;
+                    if ($h > 297) {
+                        $h = 297;
+                        $w = ($size['width'] / max(1, $size['height'])) * 297;
+                        $x = (210 - $w) / 2;
+                        $y = 0;
+                    } else {
+                        $x = 0;
+                        $y = 0;
+                    }
+                }
+
+                $pdf->useTemplate($templateId, $x, $y, $w, $h);
+            }
+
+            $tempOut = tempnam(sys_get_temp_dir(), 'pdf_out_');
+            $pdf->Output($tempOut, 'F');
+            $result = file_get_contents($tempOut);
+            @unlink($tempOut);
+
+            return $result ?: $pdfBinary;
+        } catch (\Throwable $e) {
+            Log::warning('convertPdfToA4 failed: ' . $e->getMessage(), ['exception' => $e]);
+            return $pdfBinary;
+        } finally {
+            @unlink($tempIn);
+        }
+    }
+
+    /**
+     * Convert any uploaded document (DOCX, DOC, or PDF) to standard A4 paper size.
+     */
+    public function convertFileToA4(string $binaryContent, string $extension): string
+    {
+        $ext = strtolower($extension);
+        if (in_array($ext, ['docx', 'doc']) || substr($binaryContent, 0, 2) === 'PK') {
+            return $this->enforceA4PageSize($binaryContent);
+        }
+
+        if ($ext === 'pdf' || str_starts_with($binaryContent, '%PDF-')) {
+            return $this->convertPdfToA4($binaryContent);
+        }
+
+        return $binaryContent;
+    }
+
+    /**
+     * Convert any uploaded document (DOCX, DOC, or PDF) to specified target paper size (A4 or F4).
+     */
+    public function convertFileToPaperSize(string $binaryContent, string $extension, string $paperSize = 'f4'): string
+    {
+        if (strtolower($paperSize) === 'a4') {
+            return $this->convertFileToA4($binaryContent, $extension);
+        }
+
+        return $this->convertFileToF4($binaryContent, $extension);
+    }
+
+    /**
      * Enforce A4 paper size (210 x 297 mm = 11906 x 16838 twips) in a DOCX binary.
      */
     public function enforceA4PageSize(string $docxBinary): string
@@ -1270,17 +1564,10 @@ class OnlyOfficeService
             // 2. Clean word/document.xml
             $docXml = $zip->getFromName('word/document.xml');
             if ($docXml !== false) {
-                // Remove headerReference and footerReference
+                // Remove headerReference and footerReference while preserving original margins (<w:pgMar>)
                 $docXml = preg_replace('/<w:headerReference\b[^>]*\/?>/', '', $docXml);
                 $docXml = preg_replace('/<w:footerReference\b[^>]*\/?>/', '', $docXml);
 
-                // Reset top and bottom margins to standard (top 1440 twips = 2.5cm, bottom 1134 twips = 2.0cm, left 1440, right 1134)
-                if (preg_match('/<w:pgMar\b[^>]*\/>/', $docXml)) {
-                    $docXml = preg_replace('/w:top="\d+"/', 'w:top="1440"', $docXml);
-                    $docXml = preg_replace('/w:bottom="\d+"/', 'w:bottom="1134"', $docXml);
-                    $docXml = preg_replace('/w:left="\d+"/', 'w:left="1440"', $docXml);
-                    $docXml = preg_replace('/w:right="\d+"/', 'w:right="1134"', $docXml);
-                }
                 $zip->addFromString('word/document.xml', $docXml);
             }
 
@@ -1308,155 +1595,491 @@ class OnlyOfficeService
 
     /**
      * Apply corporate soft file (Kop Surat & Footer) to an existing DOCX binary,
-     * preserving all existing paragraphs, tables, and text written by the user.
+     * strictly preserving all existing paragraphs, tables, drawings, and text written by the user.
      */
     public function applyCorporateSoftFileToDocx(string $targetDocxBinary, \App\Models\CorporateSoftFile $corporateSoftFile): string
     {
+        if (empty($targetDocxBinary) || substr($targetDocxBinary, 0, 2) !== 'PK') {
+            return $targetDocxBinary;
+        }
+
         $disk = \Illuminate\Support\Facades\Storage::disk(config('onlyoffice.storage_disk', 'local'));
-
-        // Generate or get the kop DOCX binary
-        if ($corporateSoftFile->isPdf()) {
-            $kopDocx = $this->convertPdfToDocx($corporateSoftFile);
-        } elseif ($corporateSoftFile->isImage()) {
-            $kopDocx = $this->createDocxFromCorporateSoftFileImage($corporateSoftFile);
-        } else {
-            $kopDocx = $disk->exists($corporateSoftFile->file_path) ? $disk->get($corporateSoftFile->file_path) : null;
-            if ($kopDocx) {
-                $kopDocx = $this->enforceF4PageSize($kopDocx);
-            }
-        }
-
-        if (!$kopDocx) {
+        if (!$disk->exists($corporateSoftFile->file_path)) {
             return $targetDocxBinary;
         }
 
-        if (substr($kopDocx, 0, 2) !== 'PK' || substr($targetDocxBinary, 0, 2) !== 'PK') {
-            return $kopDocx;
-        }
+        $originalTargetBackup = $targetDocxBinary;
 
-        // 1. Clean any old headers/footers from target docx
-        $cleanTargetDoc = $this->removeHeaderAndFooterFromDocx($targetDocxBinary);
+        try {
+            // 1. Obtain the Letterhead DOCX components
+            $isA4 = $corporateSoftFile->isA4();
+            $targetPaperSize = $isA4 ? 'a4' : 'f4';
+            $kopDocx = null;
 
-        // 2. Read all header, footer, media files and sectPr from kopDocx
-        $tmpKop = tempnam(sys_get_temp_dir(), 'kop_');
-        file_put_contents($tmpKop, $kopDocx);
-        $zipKop = new \ZipArchive();
-        if ($zipKop->open($tmpKop) !== true) {
+            if ($corporateSoftFile->isPdf()) {
+                $kopDocx = $this->convertPdfToDocx($corporateSoftFile, null, $targetPaperSize);
+            } elseif ($corporateSoftFile->isImage()) {
+                $kopDocx = $this->createDocxFromCorporateSoftFileImage($corporateSoftFile);
+            } else {
+                // DOCX corporate soft file
+                $rawDocxBytes = $disk->get($corporateSoftFile->file_path);
+                $localPath = $disk->path($corporateSoftFile->file_path);
+
+                // If the DOCX does not have both native explicit header AND footer, or is designed on the body canvas,
+                // render via Docker x2t to generate perfectly aligned and proportioned header/footer components
+                if (!$this->docxHasExplicitHeaderAndFooter($rawDocxBytes) && file_exists($localPath)) {
+                    $convertedDocx = $this->convertDocxUsingDockerX2t($localPath, $targetPaperSize);
+                    if ($convertedDocx && substr($convertedDocx, 0, 2) === 'PK') {
+                        $kopDocx = $convertedDocx;
+                    }
+                }
+
+                if (!$kopDocx) {
+                    $kopDocx = $rawDocxBytes;
+                }
+            }
+
+            if (!$kopDocx || substr($kopDocx, 0, 2) !== 'PK') {
+                return $targetDocxBinary;
+            }
+
+            // 2. Clean old letterhead headers/footers from target while preserving all body content and user media
+            $cleanTargetDoc = $this->removeHeaderAndFooterFromDocx($targetDocxBinary);
+
+            // 3. Extract header/footer files, media, relationships, and sectPr from kopDocx
+            $tmpKop = tempnam(sys_get_temp_dir(), 'kop_');
+            file_put_contents($tmpKop, $kopDocx);
+            $zipKop = new \ZipArchive();
+            if ($zipKop->open($tmpKop) !== true) {
+                @unlink($tmpKop);
+                return $targetDocxBinary;
+            }
+
+            $kopFiles = [];
+            for ($i = 0; $i < $zipKop->numFiles; $i++) {
+                $name = $zipKop->getNameIndex($i);
+                if (
+                    preg_match('#^word/(header|footer)\d*\.xml#i', $name) ||
+                    preg_match('#^word/_rels/(header|footer)\d*\.xml\.rels#i', $name) ||
+                    preg_match('#^word/media/#i', $name)
+                ) {
+                    $kopFiles[$name] = $zipKop->getFromIndex($i);
+                }
+            }
+
+            $kopDocXml = $zipKop->getFromName('word/document.xml');
+            $kopRelsXml = $zipKop->getFromName('word/_rels/document.xml.rels');
+            $kopCtXml = $zipKop->getFromName('[Content_Types].xml');
+            $zipKop->close();
             @unlink($tmpKop);
-            return $targetDocxBinary;
-        }
 
-        $kopFiles = [];
-        for ($i = 0; $i < $zipKop->numFiles; $i++) {
-            $name = $zipKop->getNameIndex($i);
-            if (
-                preg_match('#^word/(header|footer)\d*\.xml#i', $name) ||
-                preg_match('#^word/_rels/(header|footer)\d*\.xml\.rels#i', $name) ||
-                preg_match('#^word/media/#i', $name)
-            ) {
-                $kopFiles[$name] = $zipKop->getFromIndex($i);
+            // Helper to determine if an XML part has visible text or graphics
+            $isMeaningfulXml = function (?string $xml): bool {
+                if (!$xml) {
+                    return false;
+                }
+                if (preg_match('/<w:drawing\b|<w:pict\b|<v:shape\b|<v:imagedata\b|<a:blip\b|<pic:pic\b|<w:tbl\b/i', $xml)) {
+                    return true;
+                }
+                if (preg_match_all('/<w:t\b[^>]*>(.*?)<\/w:t>/is', $xml, $matches)) {
+                    foreach ($matches[1] as $text) {
+                        if (trim(html_entity_decode(strip_tags($text))) !== '') {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            };
+
+            // Inspect explicit headers and footers in kop
+            $hasExplicitHeader = false;
+            $meaningfulHeaderPath = null;
+            foreach ($kopFiles as $path => $content) {
+                if (preg_match('#^word/header\d*\.xml$#i', $path)) {
+                    if ($isMeaningfulXml($content)) {
+                        $hasExplicitHeader = true;
+                        if (!$meaningfulHeaderPath) {
+                            $meaningfulHeaderPath = $path;
+                        }
+                    }
+                }
             }
-        }
 
-        $kopDocXml = $zipKop->getFromName('word/document.xml');
-        $kopRelsXml = $zipKop->getFromName('word/_rels/document.xml.rels');
-        $kopCtXml = $zipKop->getFromName('[Content_Types].xml');
-        $zipKop->close();
-        @unlink($tmpKop);
+            $hasExplicitFooter = false;
+            $meaningfulFooterPath = null;
+            foreach ($kopFiles as $path => $content) {
+                if (preg_match('#^word/footer\d*\.xml$#i', $path)) {
+                    if ($isMeaningfulXml($content)) {
+                        $hasExplicitFooter = true;
+                        if (!$meaningfulFooterPath) {
+                            $meaningfulFooterPath = $path;
+                        }
+                    }
+                }
+            }
 
-        // 3. Inject kop components into target DOCX without touching existing body elements
-        $tmpTarget = tempnam(sys_get_temp_dir(), 'tgt_');
-        file_put_contents($tmpTarget, $cleanTargetDoc);
-        $zipTarget = new \ZipArchive();
-        if ($zipTarget->open($tmpTarget) !== true) {
-            @unlink($tmpTarget);
-            return $targetDocxBinary;
-        }
+            // Ensure header1.xml and footer1.xml exist if meaningful headers/footers were defined under other filenames (e.g. header2.xml, footer2.xml)
+            if ($hasExplicitHeader && $meaningfulHeaderPath && (!isset($kopFiles['word/header1.xml']) || !$isMeaningfulXml($kopFiles['word/header1.xml']))) {
+                $kopFiles['word/header1.xml'] = $kopFiles[$meaningfulHeaderPath];
+                $srcRelsPath = preg_replace('#^word/(header\d*\.xml)$#i', 'word/_rels/$1.rels', $meaningfulHeaderPath);
+                if (isset($kopFiles[$srcRelsPath])) {
+                    $kopFiles['word/_rels/header1.xml.rels'] = $kopFiles[$srcRelsPath];
+                }
+            }
 
-        // Add headers, footers, media
-        foreach ($kopFiles as $name => $content) {
-            $zipTarget->addFromString($name, $content);
-        }
+            if ($hasExplicitFooter && $meaningfulFooterPath && (!isset($kopFiles['word/footer1.xml']) || !$isMeaningfulXml($kopFiles['word/footer1.xml']))) {
+                $kopFiles['word/footer1.xml'] = $kopFiles[$meaningfulFooterPath];
+                $srcRelsPath = preg_replace('#^word/(footer\d*\.xml)$#i', 'word/_rels/$1.rels', $meaningfulFooterPath);
+                if (isset($kopFiles[$srcRelsPath])) {
+                    $kopFiles['word/_rels/footer1.xml.rels'] = $kopFiles[$srcRelsPath];
+                }
+            }
 
-        // Merge [Content_Types].xml
-        if ($kopCtXml) {
+            $createRelsForXml = function(string $xmlContent, ?string $sourceRelsXml): string {
+                $matchedRels = [];
+                if ($sourceRelsXml && preg_match_all('/\b(?:r:embed|r:id|r:href|id)="([^"]+)"/i', $xmlContent, $refMatches)) {
+                    $referencedIds = array_unique($refMatches[1]);
+                    foreach ($referencedIds as $rId) {
+                        if (preg_match('/<Relationship\b[^>]*\bId="' . preg_quote($rId, '/') . '"[^>]*\/?>/i', $sourceRelsXml, $relMatch)) {
+                            $matchedRels[$rId] = $relMatch[0];
+                        }
+                    }
+                }
+                return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' . "\n" .
+                    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' . "\n" .
+                    implode("\n", $matchedRels) . "\n" .
+                    '</Relationships>';
+            };
+
+            // If header or footer is missing, extract from document.xml body paragraphs / drawings
+            if ((!$hasExplicitHeader || !$hasExplicitFooter) && $kopDocXml && preg_match('/<w:body\b[^>]*>(.*?)<\/w:body>/s', $kopDocXml, $bm)) {
+                $body = $bm[1];
+                $bodyWithoutSect = preg_replace('/<w:sectPr\b[^>]*>.*?<\/w:sectPr>/s', '', $body);
+                preg_match_all('/<(w:p|w:tbl)\b[^>]*>.*?<\/\1>/s', $bodyWithoutSect, $pMatches);
+                $elements = $pMatches[0];
+
+                if (!empty($elements)) {
+                    $isElemEmpty = function($elem) {
+                        if (preg_match('/<w:drawing\b|<w:pict\b|<v:shape\b|<v:imagedata\b|<a:blip\b|<pic:pic\b|<w:tbl\b/i', $elem)) {
+                            return false;
+                        }
+                        return (trim(html_entity_decode(strip_tags($elem))) === '');
+                    };
+
+                    $isBottomElem = function($elem) {
+                        if (preg_match('/<wp:positionV[^>]*>.*?<wp:align>bottom<\/wp:align>.*?<\/wp:positionV>/s', $elem)) {
+                            return true;
+                        }
+                        if (preg_match('/<wp:positionV[^>]*>.*?<wp:posOffset>(\d+)<\/wp:posOffset>.*?<\/wp:positionV>/s', $elem, $m)) {
+                            if ((int)$m[1] > 4000000) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    };
+
+                    $headerElems = [];
+                    $footerElems = [];
+                    $hasBottomAnchored = false;
+                    foreach ($elements as $el) {
+                        if ($isBottomElem($el)) {
+                            $hasBottomAnchored = true;
+                            break;
+                        }
+                    }
+
+                    if ($hasBottomAnchored) {
+                        foreach ($elements as $el) {
+                            if ($isElemEmpty($el)) continue;
+                            if ($isBottomElem($el)) {
+                                $footerElems[] = $el;
+                            } else {
+                                $headerElems[] = $el;
+                            }
+                        }
+                    } else {
+                        $clusters = [];
+                        $currentCluster = [];
+                        foreach ($elements as $el) {
+                            if ($isElemEmpty($el)) {
+                                if (!empty($currentCluster)) {
+                                    $clusters[] = $currentCluster;
+                                    $currentCluster = [];
+                                }
+                            } else {
+                                $currentCluster[] = $el;
+                            }
+                        }
+                        if (!empty($currentCluster)) {
+                            $clusters[] = $currentCluster;
+                        }
+
+                        if (count($clusters) === 1) {
+                            $headerElems = $clusters[0];
+                        } elseif (count($clusters) >= 2) {
+                            $headerElems = $clusters[0];
+                            for ($c = 1; $c < count($clusters); $c++) {
+                                $footerElems = array_merge($footerElems, $clusters[$c]);
+                            }
+                        }
+                    }
+
+                    $nsAttributes = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" xmlns:v="urn:schemas-microsoft-com:vml"';
+                    if (preg_match('/<w:document\b([^>]*)>/', $kopDocXml, $docTagMatch)) {
+                        $nsAttributes = $docTagMatch[1];
+                    }
+
+                    if (!$hasExplicitHeader && !empty($headerElems)) {
+                        $hXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' . "\n" .
+                            '<w:hdr ' . $nsAttributes . '>' . implode('', $headerElems) . '</w:hdr>';
+                        $kopFiles['word/header1.xml'] = $hXml;
+                        $kopFiles['word/_rels/header1.xml.rels'] = $createRelsForXml($hXml, $kopRelsXml);
+                        $hasExplicitHeader = true;
+                    }
+
+                    if (!$hasExplicitFooter && !empty($footerElems)) {
+                        $fXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' . "\n" .
+                            '<w:ftr ' . $nsAttributes . '>' . implode('', $footerElems) . '</w:ftr>';
+                        $kopFiles['word/footer1.xml'] = $fXml;
+                        $kopFiles['word/_rels/footer1.xml.rels'] = $createRelsForXml($fXml, $kopRelsXml);
+                        $hasExplicitFooter = true;
+                    }
+                }
+            }
+
+            if (!$hasExplicitHeader && empty($kopFiles)) {
+                return $targetDocxBinary;
+            }
+
+            // Namespace kop media filenames to avoid collision with target document media
+            $mediaRenameMap = [];
+            $updatedKopFiles = [];
+            foreach ($kopFiles as $path => $content) {
+                if (preg_match('#^word/media/([^/]+)$#i', $path, $m)) {
+                    $oldName = $m[1];
+                    $newName = 'kop_' . $oldName;
+                    $mediaRenameMap[$oldName] = $newName;
+                    $updatedKopFiles['word/media/' . $newName] = $content;
+                } else {
+                    $updatedKopFiles[$path] = $content;
+                }
+            }
+            $kopFiles = $updatedKopFiles;
+
+            // Update media references in header/footer XML and relationship files
+            if (!empty($mediaRenameMap)) {
+                foreach ($kopFiles as $path => $content) {
+                    if (preg_match('#^word/(_rels/)?(header|footer)\d*\.xml(\.rels)?$#i', $path)) {
+                        foreach ($mediaRenameMap as $oldName => $newName) {
+                            $content = str_replace('Target="media/' . $oldName . '"', 'Target="media/' . $newName . '"', $content);
+                            $content = str_replace('Target="../media/' . $oldName . '"', 'Target="../media/' . $newName . '"', $content);
+                            $content = str_replace('Target="' . $oldName . '"', 'Target="' . $newName . '"', $content);
+                            $content = str_replace('name="' . $oldName . '"', 'name="' . $newName . '"', $content);
+                        }
+                        $kopFiles[$path] = $content;
+                    }
+                }
+            }
+
+            // 4. Inject kop components into target DOCX
+            $tmpTarget = tempnam(sys_get_temp_dir(), 'tgt_');
+            file_put_contents($tmpTarget, $cleanTargetDoc);
+            $zipTarget = new \ZipArchive();
+            if ($zipTarget->open($tmpTarget) !== true) {
+                @unlink($tmpTarget);
+                return $targetDocxBinary;
+            }
+
+            // Add all header, footer, and media files to target ZIP
+            foreach ($kopFiles as $name => $content) {
+                $zipTarget->addFromString($name, $content);
+            }
+
+            // Update [Content_Types].xml
             $targetCtXml = $zipTarget->getFromName('[Content_Types].xml');
             if ($targetCtXml !== false) {
-                preg_match_all('/<Override\b[^>]*PartName="\/word\/(header|footer)\d*\.xml"[^>]*\/?>/i', $kopCtXml, $ctMatches);
-                if (!empty($ctMatches[0])) {
-                    foreach ($ctMatches[0] as $override) {
-                        if (strpos($targetCtXml, $override) === false) {
-                            $targetCtXml = str_replace('</Types>', $override . '</Types>', $targetCtXml);
+                foreach (array_keys($kopFiles) as $path) {
+                    if (preg_match('#^word/(header\d*\.xml)$#i', $path, $hm)) {
+                        $part = '/word/' . $hm[1];
+                        if (!str_contains($targetCtXml, 'PartName="' . $part . '"')) {
+                            $headerOverride = '<Override PartName="' . $part . '" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>';
+                            $targetCtXml = str_replace('</Types>', $headerOverride . '</Types>', $targetCtXml);
+                        }
+                    } elseif (preg_match('#^word/(footer\d*\.xml)$#i', $path, $fm)) {
+                        $part = '/word/' . $fm[1];
+                        if (!str_contains($targetCtXml, 'PartName="' . $part . '"')) {
+                            $footerOverride = '<Override PartName="' . $part . '" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>';
+                            $targetCtXml = str_replace('</Types>', $footerOverride . '</Types>', $targetCtXml);
                         }
                     }
-                    $zipTarget->addFromString('[Content_Types].xml', $targetCtXml);
                 }
-            }
-        }
 
-        // Merge word/_rels/document.xml.rels
-        if ($kopRelsXml) {
+                $extTypes = [
+                    'png'  => 'image/png',
+                    'jpeg' => 'image/jpeg',
+                    'jpg'  => 'image/jpeg',
+                    'emf'  => 'image/x-emf',
+                    'wmf'  => 'image/x-wmf',
+                    'gif'  => 'image/gif',
+                    'svg'  => 'image/svg+xml',
+                    'tif'  => 'image/tiff',
+                    'tiff' => 'image/tiff',
+                    'webp' => 'image/webp',
+                    'xml'  => 'application/xml',
+                    'rels' => 'application/vnd.openxmlformats-package.relationships+xml',
+                ];
+                foreach ($extTypes as $ext => $mime) {
+                    if (!str_contains($targetCtXml, 'Extension="' . $ext . '"')) {
+                        $targetCtXml = str_replace('</Types>', '<Default Extension="' . $ext . '" ContentType="' . $mime . '"/></Types>', $targetCtXml);
+                    }
+                }
+
+                $zipTarget->addFromString('[Content_Types].xml', $targetCtXml);
+            }
+
+            // Update word/_rels/document.xml.rels
             $targetRelsXml = $zipTarget->getFromName('word/_rels/document.xml.rels');
             if ($targetRelsXml !== false) {
-                preg_match_all('/<Relationship\b[^>]*Type="http:\/\/schemas\.openxmlformats\.org\/officeDocument\/2006\/relationships\/(header|footer)"[^>]*\/?>/i', $kopRelsXml, $relMatches);
-                if (!empty($relMatches[0])) {
-                    foreach ($relMatches[0] as $rel) {
-                        if (strpos($targetRelsXml, $rel) === false) {
-                            $targetRelsXml = str_replace('</Relationships>', $rel . '</Relationships>', $targetRelsXml);
+                // Remove any old header/footer relationships
+                $targetRelsXml = preg_replace('/<Relationship\b[^>]*Type="http:\/\/schemas\.openxmlformats\.org\/officeDocument\/2006\/relationships\/(header|footer)"[^>]*\/?>/i', '', $targetRelsXml);
+
+                foreach (array_keys($kopFiles) as $path) {
+                    if (preg_match('#^word/(header\d*\.xml)$#i', $path, $hm)) {
+                        $hdrFile = $hm[1];
+                        $hdrRelId = 'rId_letterhead_' . str_replace('.xml', '', $hdrFile);
+                        $hdrRel = '<Relationship Id="' . $hdrRelId . '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="' . $hdrFile . '"/>';
+                        if (!str_contains($targetRelsXml, 'Id="' . $hdrRelId . '"')) {
+                            $targetRelsXml = str_replace('</Relationships>', $hdrRel . '</Relationships>', $targetRelsXml);
+                        }
+                    } elseif (preg_match('#^word/(footer\d*\.xml)$#i', $path, $fm)) {
+                        $ftrFile = $fm[1];
+                        $ftrRelId = 'rId_letterhead_' . str_replace('.xml', '', $ftrFile);
+                        $ftrRel = '<Relationship Id="' . $ftrRelId . '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="' . $ftrFile . '"/>';
+                        if (!str_contains($targetRelsXml, 'Id="' . $ftrRelId . '"')) {
+                            $targetRelsXml = str_replace('</Relationships>', $ftrRel . '</Relationships>', $targetRelsXml);
                         }
                     }
-                    $zipTarget->addFromString('word/_rels/document.xml.rels', $targetRelsXml);
                 }
-            }
-        }
 
-        // Merge word/document.xml sectPr (headerReferences, footerReferences, pgSz, pgMar)
-        $targetDocXml = $zipTarget->getFromName('word/document.xml');
-        if ($targetDocXml !== false && $kopDocXml) {
-            // Extract headerReferences & footerReferences from kopDocXml
-            preg_match_all('/<w:(headerReference|footerReference)\b[^>]*\/?>/', $kopDocXml, $refMatches);
-            $headerFooterRefs = implode('', $refMatches[0] ?? []);
-
-            // Extract pgMar from kopDocXml
-            $pgMar = '';
-            if (preg_match('/<w:pgMar\b[^>]*\/?>/', $kopDocXml, $pgMarMatch)) {
-                $pgMar = $pgMarMatch[0];
+                $zipTarget->addFromString('word/_rels/document.xml.rels', $targetRelsXml);
             }
 
-            if (preg_match('/<w:sectPr\b[^>]*>(.*?)<\/w:sectPr>/s', $targetDocXml, $sectMatch)) {
-                $sectContent = $sectMatch[1];
-                $sectContent = preg_replace('/<w:(headerReference|footerReference)\b[^>]*\/?>/', '', $sectContent);
-                $sectContent = $headerFooterRefs . $sectContent;
-                if ($pgMar) {
-                    if (preg_match('/<w:pgMar\b[^>]*\/?>/', $sectContent)) {
-                        $sectContent = preg_replace('/<w:pgMar\b[^>]*\/?>/', $pgMar, $sectContent);
-                    } else {
-                        $sectContent .= $pgMar;
+            // Update word/document.xml sectPr with 100% exact margins and header/footer references
+            $targetDocXml = $zipTarget->getFromName('word/document.xml');
+            if ($targetDocXml !== false) {
+                if (!str_contains($targetDocXml, 'xmlns:r=')) {
+                    $targetDocXml = preg_replace('/<w:document\b/', '<w:document xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"', $targetDocXml, 1);
+                }
+
+                // Build header/footer references for both default and first pages
+                $headerFooterRefs = '';
+                if (isset($kopFiles['word/header1.xml'])) {
+                    $headerFooterRefs .= '<w:headerReference w:type="default" r:id="rId_letterhead_header1"/>';
+                    $headerFooterRefs .= '<w:headerReference w:type="first" r:id="rId_letterhead_header1"/>';
+                }
+                if (isset($kopFiles['word/footer1.xml'])) {
+                    $headerFooterRefs .= '<w:footerReference w:type="default" r:id="rId_letterhead_footer1"/>';
+                    $headerFooterRefs .= '<w:footerReference w:type="first" r:id="rId_letterhead_footer1"/>';
+                }
+
+                // Extract exact original margins directly from uploaded Kop Soft File ($kopDocXml)
+                $extractMarAttr = function (string $attrName, string $str, ?int $default = null): ?int {
+                    if (preg_match('/(?:\bw:)?' . preg_quote($attrName, '/') . '="(\d+)"/i', $str, $m)) {
+                        return (int) $m[1];
                     }
+                    return $default;
+                };
+
+                $topMargin = null;
+                $bottomMargin = null;
+                $leftMargin = null;
+                $rightMargin = null;
+                $headerMargin = null;
+                $footerMargin = null;
+                $gutterMargin = null;
+
+                // Priority 1: Exact margins directly from uploaded Kop Soft File
+                if (!empty($kopDocXml) && preg_match_all('/<w:pgMar\b([^>]*)/i', $kopDocXml, $allKm)) {
+                    $lastKopAttr = end($allKm[1]);
+                    $topMargin = $extractMarAttr('top', $lastKopAttr);
+                    $bottomMargin = $extractMarAttr('bottom', $lastKopAttr);
+                    $leftMargin = $extractMarAttr('left', $lastKopAttr);
+                    $rightMargin = $extractMarAttr('right', $lastKopAttr);
+                    $headerMargin = $extractMarAttr('header', $lastKopAttr);
+                    $footerMargin = $extractMarAttr('footer', $lastKopAttr);
+                    $gutterMargin = $extractMarAttr('gutter', $lastKopAttr);
                 }
-                if (preg_match('/<w:pgSz\b[^>]*\/?>/', $sectContent)) {
-                    $sectContent = preg_replace('/<w:pgSz\b[^>]*\/?>/', '<w:pgSz w:w="11906" w:h="18709"/>', $sectContent);
+
+                // Priority 2: Target document existing margins fallback if softfile has no pgMar
+                if (preg_match('/<w:pgMar\b([^>]*)/i', $targetDocXml, $tm)) {
+                    $tgtAttr = $tm[1];
+                    if ($topMargin === null) $topMargin = $extractMarAttr('top', $tgtAttr);
+                    if ($bottomMargin === null) $bottomMargin = $extractMarAttr('bottom', $tgtAttr);
+                    if ($leftMargin === null) $leftMargin = $extractMarAttr('left', $tgtAttr);
+                    if ($rightMargin === null) $rightMargin = $extractMarAttr('right', $tgtAttr);
+                    if ($headerMargin === null) $headerMargin = $extractMarAttr('header', $tgtAttr);
+                    if ($footerMargin === null) $footerMargin = $extractMarAttr('footer', $tgtAttr);
+                    if ($gutterMargin === null) $gutterMargin = $extractMarAttr('gutter', $tgtAttr);
+                }
+
+                $topMargin = $topMargin ?? 1440;
+                $bottomMargin = $bottomMargin ?? 1440;
+                $leftMargin = $leftMargin ?? 1440;
+                $rightMargin = $rightMargin ?? 1440;
+                $headerMargin = $headerMargin ?? 720;
+                $footerMargin = $footerMargin ?? 720;
+
+                // Target paper size: A4 (11906 x 16838 twips) or F4 (11906 x 18709 twips)
+                $pageW = 11906;
+                $pageH = $isA4 ? 16838 : 18709;
+
+                $gutterAttr = ($gutterMargin !== null) ? ' w:gutter="' . $gutterMargin . '"' : '';
+                $pgMarTag = '<w:pgMar w:top="' . $topMargin . '" w:bottom="' . $bottomMargin . '" w:left="' . $leftMargin . '" w:right="' . $rightMargin . '" w:header="' . $headerMargin . '" w:footer="' . $footerMargin . '"' . $gutterAttr . '/>';
+                $pgSzTag = '<w:pgSz w:w="' . $pageW . '" w:h="' . $pageH . '"/>';
+
+                if (preg_match('/<w:sectPr\b[^>]*>(.*?)<\/w:sectPr>/s', $targetDocXml, $sectMatch)) {
+                    $sectContent = $sectMatch[1];
+                    // Strip old header/footer references
+                    $sectContent = preg_replace('/<w:(headerReference|footerReference)\b[^>]*\/?>/', '', $sectContent);
+                    $sectContent = $headerFooterRefs . $sectContent;
+
+                    // Apply pgMar
+                    if (preg_match('/<w:pgMar\b[^>]*\/?>/', $sectContent)) {
+                        $sectContent = preg_replace('/<w:pgMar\b[^>]*\/?>/', $pgMarTag, $sectContent);
+                    } else {
+                        $sectContent .= $pgMarTag;
+                    }
+
+                    // Apply target pgSz
+                    if (preg_match('/<w:pgSz\b[^>]*\/?>/', $sectContent)) {
+                        $sectContent = preg_replace('/<w:pgSz\b[^>]*\/?>/', $pgSzTag, $sectContent);
+                    } else {
+                        $sectContent .= $pgSzTag;
+                    }
+
+                    $targetDocXml = preg_replace('/<w:sectPr\b[^>]*>.*?<\/w:sectPr>/s', '<w:sectPr>' . $sectContent . '</w:sectPr>', $targetDocXml);
                 } else {
-                    $sectContent .= '<w:pgSz w:w="11906" w:h="18709"/>';
+                    $sectPr = '<w:sectPr>' . $headerFooterRefs . $pgMarTag . $pgSzTag . '</w:sectPr>';
+                    $targetDocXml = str_replace('</w:body>', $sectPr . '</w:body>', $targetDocXml);
                 }
-                $targetDocXml = preg_replace('/<w:sectPr\b[^>]*>.*?<\/w:sectPr>/s', '<w:sectPr>' . $sectContent . '</w:sectPr>', $targetDocXml);
-            } else {
-                $sectPr = '<w:sectPr>' . $headerFooterRefs . ($pgMar ?: '<w:pgMar w:top="2200" w:bottom="1440" w:left="1440" w:right="1134"/>') . '<w:pgSz w:w="11906" w:h="18709"/></w:sectPr>';
-                $targetDocXml = str_replace('</w:body>', $sectPr . '</w:body>', $targetDocXml);
+
+                $zipTarget->addFromString('word/document.xml', $targetDocXml);
             }
 
-            $zipTarget->addFromString('word/document.xml', $targetDocXml);
+            $zipTarget->close();
+            $resultBinary = file_get_contents($tmpTarget);
+            @unlink($tmpTarget);
+
+            if (empty($resultBinary) || substr($resultBinary, 0, 2) !== 'PK') {
+                return $originalTargetBackup;
+            }
+
+            return $isA4 ? $this->enforceA4PageSize($resultBinary) : $this->enforceF4PageSize($resultBinary);
+        } catch (\Throwable $e) {
+            \Log::error('applyCorporateSoftFileToDocx failed: ' . $e->getMessage(), ['exception' => $e]);
+            return $originalTargetBackup;
         }
-
-        $zipTarget->close();
-        $resultBinary = file_get_contents($tmpTarget);
-        @unlink($tmpTarget);
-
-        return $this->enforceF4PageSize($resultBinary);
     }
-
-
-
 
     /**
      * Generate an editable DOCX document from an image corporate soft file (JPEG/PNG kop surat).
@@ -1471,14 +2094,20 @@ class OnlyOfficeService
         $imageBytes = $disk->get($corporateSoftFile->file_path);
         $ext = pathinfo($corporateSoftFile->file_path, PATHINFO_EXTENSION) ?: 'png';
 
-        return $this->createDocxFromImageBytes($imageBytes, $ext);
+        return $this->createDocxFromImageBytes($imageBytes, $ext, $corporateSoftFile->paper_size ?? 'f4');
     }
 
     /**
      * Generate an editable DOCX from raw image bytes with smart letterhead layout.
      */
-    public function createDocxFromImageBytes(string $imageBytes, string $ext = 'png'): string
+    public function createDocxFromImageBytes(string $imageBytes, string $ext = 'png', string $paperSize = 'f4'): string
     {
+        $isA4 = strtolower($paperSize) === 'a4';
+        $pageW_Twips = 11906;
+        $pageH_Twips = $isA4 ? 16838 : 18709;
+        $pageW_Emu = 7560000;
+        $pageH_Emu = $isA4 ? 10692000 : 11880000;
+
         $tempImagePath = storage_path('app/temp_gen_in_' . uniqid() . '.' . $ext);
         file_put_contents($tempImagePath, $imageBytes);
 
@@ -1486,8 +2115,8 @@ class OnlyOfficeService
         if (!$im) {
             $phpWord = new \PhpOffice\PhpWord\PhpWord();
             $section = $phpWord->addSection([
-                'pageSizeW' => 11906,
-                'pageSizeH' => 18709,
+                'pageSizeW' => $pageW_Twips,
+                'pageSizeH' => $pageH_Twips,
                 'marginTop' => 850,
                 'marginBottom' => 1134,
                 'marginLeft' => 1417,
@@ -1507,7 +2136,7 @@ class OnlyOfficeService
             @unlink($tempImagePath);
             @unlink($tempDocx);
 
-            return $this->enforceF4PageSize($res);
+            return $isA4 ? $this->enforceA4PageSize($res) : $this->enforceF4PageSize($res);
         }
 
         $w = imagesx($im);
@@ -1519,20 +2148,17 @@ class OnlyOfficeService
         $headerHeightPx = $h;
         $footerHeightPx = 0;
 
-        // Printable width in points for F4 (210mm wide with 25mm left, 20mm right margins = 165mm = ~468 pt)
-        $maxWidthPt = 460;
-
         if ($ratio >= 1.5) {
             // Landscape / Banner Kop only
             $headerTempFile = $tempImagePath;
             $headerHeightPx = $h;
         } else {
-            // Portrait / Full Page scan: detect Top Kop and Bottom Footer
+            // Portrait / Full Page scan: detect Top Kop and Bottom Footer (fully dynamic without limits)
             $topEnd = 0;
             $emptyStreak = 0;
             $foundAnyTop = false;
 
-            $scanLimitY = (int)($h * 0.45);
+            $scanLimitY = (int)($h * 0.75);
             for ($y = 0; $y < $scanLimitY; $y++) {
                 $rowDark = 0;
                 for ($x = 0; $x < $w; $x += 4) {
@@ -1559,11 +2185,11 @@ class OnlyOfficeService
             }
             $topEnd = min($h, $topEnd + 15);
 
-            // Detect Footer if any
+            // Detect Footer if any (fully dynamic without artificial height limits)
             $bottomStart = $h;
             $emptyStreak = 0;
             $foundAnyBottom = false;
-            $scanBottomLimitY = (int)($h * 0.65);
+            $scanBottomLimitY = max(0, $topEnd + 20);
 
             for ($y = $h - 1; $y > $scanBottomLimitY; $y--) {
                 $rowDark = 0;
@@ -1591,7 +2217,7 @@ class OnlyOfficeService
             }
             $bottomStart = max(0, $bottomStart - 15);
 
-            if ($foundAnyTop && $topEnd > 20 && $topEnd < (int)($h * 0.5)) {
+            if ($foundAnyTop && $topEnd > 20 && $topEnd < $bottomStart) {
                 // Crop Header Kop
                 $headerIm = imagecreatetruecolor($w, $topEnd);
                 imagecopy($headerIm, $im, 0, 0, 0, 0, $w, $topEnd);
@@ -1600,8 +2226,8 @@ class OnlyOfficeService
                 imagedestroy($headerIm);
                 $headerHeightPx = $topEnd;
 
-                // Crop Footer if present
-                if ($foundAnyBottom && ($h - $bottomStart) > 20 && $bottomStart > (int)($h * 0.6)) {
+                // Crop Footer if present (any size)
+                if ($foundAnyBottom && ($h - $bottomStart) > 10 && $bottomStart > ($topEnd + 10)) {
                     $footerH = $h - $bottomStart;
                     $footerIm = imagecreatetruecolor($w, $footerH);
                     imagecopy($footerIm, $im, 0, 0, 0, $bottomStart, $w, $footerH);
@@ -1637,69 +2263,164 @@ class OnlyOfficeService
             $maxX = $w;
         }
 
-        $leftRatio = $minX / $w;
-        $rightRatio = ($w - $maxX) / $w;
-
-        // Map original file margin proportions to F4 page dimensions (11906 twips)
-        $marginLeft = max(720, min(2500, (int)round(11906 * $leftRatio)));
-        $marginRight = max(720, min(2500, (int)round(11906 * $rightRatio)));
+        $isBanner = ($ratio >= 1.5);
+        if ($isBanner) {
+            $marginLeft = 1440; // 1 inch (2.54 cm)
+            $marginRight = 1134; // ~2.0 cm
+            $headerMarginTwips = 450; // ~0.8 cm from top of paper
+            $footerMarginTwips = 450;
+        } else {
+            $leftRatio = $minX / $w;
+            $rightRatio = ($w - $maxX) / $w;
+            $marginLeft = max(720, min(2500, (int)round(11906 * $leftRatio)));
+            $marginRight = max(720, min(2500, (int)round(11906 * $rightRatio)));
+            $headerMarginTwips = 450;
+            $footerMarginTwips = 450;
+        }
 
         imagedestroy($im);
 
-        // Build Word document with F4 dimensions (210 x 330 mm = 11906 x 18709 twips)
-        $printableWidthPt = (11906 - ($marginLeft + $marginRight)) / 20.0;
-        $maxWidthPt = max(400, $printableWidthPt);
-        $scale = min(1.0, $maxWidthPt / ($w * 0.75));
-        $headerWidthPt = ($w * 0.75) * $scale;
-        $headerHeightPt = ($headerHeightPx * 0.75) * $scale;
+        $headerH_Emu = (int)round(($headerHeightPx / $h) * $pageH_Emu);
+        $headerHTwips = (int)round($headerH_Emu / 635);
+        $marginTopTwips = max(1440, $headerHTwips + 300);
 
-        $headerHeightTwips = (int)(($headerHeightPt / 72.0) * 1440);
-        $footerHeightTwips = 0;
+        $footerH_Emu = 0;
+        $footerHTwips = 0;
+        $footerTopOffset_Emu = $pageH_Emu;
+        $marginBottomTwips = 1440;
+
         if ($footerTempFile && $footerHeightPx > 0) {
-            $footerHeightPt = ($footerHeightPx * 0.75) * $scale;
-            $footerHeightTwips = (int)(($footerHeightPt / 72.0) * 1440);
+            $footerH_Emu = (int)round(($footerHeightPx / $h) * $pageH_Emu);
+            $footerHTwips = (int)round($footerH_Emu / 635);
+            $footerTopOffset_Emu = $pageH_Emu - $footerH_Emu;
+            $marginBottomTwips = max(1440, $footerHTwips + 300);
         }
 
-        $marginTop = max(1440, $headerHeightTwips + 280);
-        $marginBottom = max(1134, $footerHeightTwips + 280);
+        $marginLeftTwips = 1440; // 2.54 cm standard
+        $marginRightTwips = 1134; // 2.0 cm standard
 
-        $phpWord = new \PhpOffice\PhpWord\PhpWord();
-        $section = $phpWord->addSection([
-            'pageSizeW' => 11906,
-            'pageSizeH' => 18709,
-            'marginTop' => $marginTop,
-            'marginBottom' => $marginBottom,
-            'marginLeft' => $marginLeft,
-            'marginRight' => $marginRight,
-            'headerHeight' => 720,
-            'footerHeight' => 720,
-        ]);
+        // Build header1.xml using exact edge-to-edge page-relative anchor
+        $headerXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' . "\n" .
+            '<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ' .
+            'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ' .
+            'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" ' .
+            'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" ' .
+            'xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">' .
+            '<w:p><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr><w:r><w:drawing>' .
+            '<wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="251658240" behindDoc="1" locked="1" layoutInCell="1" allowOverlap="1">' .
+            '<wp:simplePos x="0" y="0"/>' .
+            '<wp:positionH relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionH>' .
+            '<wp:positionV relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionV>' .
+            '<wp:extent cx="' . $pageW_Emu . '" cy="' . $headerH_Emu . '"/>' .
+            '<wp:effectExtent l="0" t="0" r="0" b="0"/>' .
+            '<wp:wrapNone/>' .
+            '<wp:docPr id="1" name="Header Image"/>' .
+            '<wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr>' .
+            '<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">' .
+            '<pic:pic><pic:nvPicPr><pic:cNvPr id="1" name="Header Picture"/><pic:cNvPicPr/></pic:nvPicPr>' .
+            '<pic:blipFill><a:blip r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>' .
+            '<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' . $pageW_Emu . '" cy="' . $headerH_Emu . '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>' .
+            '</pic:pic></a:graphicData></a:graphic>' .
+            '</wp:anchor></w:drawing></w:r></w:p></w:hdr>';
 
-        // Place Kop Surat inside the Word Header (word/header1.xml)
-        $header = $section->addHeader();
-        $header->addImage($headerTempFile, [
-            'width' => $headerWidthPt,
-            'height' => $headerHeightPt,
-            'alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER,
-        ]);
+        $headerRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' . "\n" .
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' .
+            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/header1_image1.png"/>' .
+            '</Relationships>';
 
-        // Place Footer inside the Word Footer (word/footer1.xml) if present
-        if ($footerTempFile && $footerHeightPx > 0) {
-            $footer = $section->addFooter();
-            $footer->addImage($footerTempFile, [
-                'width' => $headerWidthPt,
-                'height' => $footerHeightPt,
-                'alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER,
-            ]);
+        $footerXml = null;
+        $footerRelsXml = null;
+        if ($footerTempFile && $footerH_Emu > 0) {
+            $footerXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' . "\n" .
+                '<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ' .
+                'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ' .
+                'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" ' .
+                'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" ' .
+                'xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">' .
+                '<w:p><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr><w:r><w:drawing>' .
+                '<wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="251658240" behindDoc="1" locked="1" layoutInCell="1" allowOverlap="1">' .
+                '<wp:simplePos x="0" y="0"/>' .
+                '<wp:positionH relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionH>' .
+                '<wp:positionV relativeFrom="page"><wp:posOffset>' . $footerTopOffset_Emu . '</wp:posOffset></wp:positionV>' .
+                '<wp:extent cx="' . $pageW_Emu . '" cy="' . $footerH_Emu . '"/>' .
+                '<wp:effectExtent l="0" t="0" r="0" b="0"/>' .
+                '<wp:wrapNone/>' .
+                '<wp:docPr id="2" name="Footer Image"/>' .
+                '<wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr>' .
+                '<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">' .
+                '<pic:pic><pic:nvPicPr><pic:cNvPr id="2" name="Footer Picture"/><pic:cNvPicPr/></pic:nvPicPr>' .
+                '<pic:blipFill><a:blip r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>' .
+                '<pic:spPr><a:xfrm><a:off x="0" y="' . $footerTopOffset_Emu . '"/><a:ext cx="' . $pageW_Emu . '" cy="' . $footerH_Emu . '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>' .
+                '</pic:pic></a:graphicData></a:graphic>' .
+                '</wp:anchor></w:drawing></w:r></w:p></w:ftr>';
+
+            $footerRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' . "\n" .
+                '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' .
+                '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/footer1_image1.png"/>' .
+                '</Relationships>';
         }
 
-        // Clean default editable paragraph in the document body
-        $section->addText('', ['name' => 'Calibri', 'size' => 11]);
+        $pw = new \PhpOffice\PhpWord\PhpWord();
+        $sec = $pw->addSection([
+            'pageSizeW' => $pageW_Twips,
+            'pageSizeH' => $pageH_Twips,
+            'marginTop' => $marginTopTwips,
+            'marginBottom' => $marginBottomTwips,
+            'marginLeft' => $marginLeftTwips,
+            'marginRight' => $marginRightTwips,
+            'headerHeight' => 0,
+            'footerHeight' => 0,
+        ]);
+        $sec->addText('', ['name' => 'Calibri', 'size' => 11]);
 
         $tempDocx = storage_path('app/temp_gen_out_' . uniqid() . '.docx');
-        $writer = \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007');
+        $writer = \PhpOffice\PhpWord\IOFactory::createWriter($pw, 'Word2007');
         $writer->save($tempDocx);
 
+        $zip = new \ZipArchive();
+        $zip->open($tempDocx);
+        $zip->addFromString('word/header1.xml', $headerXml);
+        $zip->addFromString('word/_rels/header1.xml.rels', $headerRelsXml);
+        $zip->addFromString('word/media/header1_image1.png', file_get_contents($headerTempFile));
+
+        if ($footerXml && $footerTempFile) {
+            $zip->addFromString('word/footer1.xml', $footerXml);
+            $zip->addFromString('word/_rels/footer1.xml.rels', $footerRelsXml);
+            $zip->addFromString('word/media/footer1_image1.png', file_get_contents($footerTempFile));
+        }
+
+        $ct = $zip->getFromName('[Content_Types].xml');
+        if (!str_contains($ct, 'header1.xml')) {
+            $ct = str_replace('</Types>', '<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/></Types>', $ct);
+        }
+        if ($footerXml && !str_contains($ct, 'footer1.xml')) {
+            $ct = str_replace('</Types>', '<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/></Types>', $ct);
+        }
+        if (!str_contains($ct, 'Extension="png"')) {
+            $ct = str_replace('</Types>', '<Default Extension="png" ContentType="image/png"/></Types>', $ct);
+        }
+        $zip->addFromString('[Content_Types].xml', $ct);
+
+        $rels = $zip->getFromName('word/_rels/document.xml.rels');
+        $rels = preg_replace('/<Relationship\b[^>]*Type="http:\/\/schemas\.openxmlformats\.org\/officeDocument\/2006\/relationships\/(header|footer)"[^>]*\/?>/i', '', $rels);
+        $hdrRel = '<Relationship Id="rIdHeader1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>';
+        $rels = str_replace('</Relationships>', $hdrRel . '</Relationships>', $rels);
+        if ($footerXml) {
+            $ftrRel = '<Relationship Id="rIdFooter1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>';
+            $rels = str_replace('</Relationships>', $ftrRel . '</Relationships>', $rels);
+        }
+        $zip->addFromString('word/_rels/document.xml.rels', $rels);
+
+        $docXml = $zip->getFromName('word/document.xml');
+        $hRefs = '<w:headerReference w:type="default" r:id="rIdHeader1"/><w:headerReference w:type="first" r:id="rIdHeader1"/>';
+        if ($footerXml) {
+            $hRefs .= '<w:footerReference w:type="default" r:id="rIdFooter1"/><w:footerReference w:type="first" r:id="rIdFooter1"/>';
+        }
+        $docXml = preg_replace('/<w:(headerReference|footerReference)\b[^>]*\/?>/', '', $docXml);
+        $docXml = preg_replace('/<w:sectPr\b[^>]*>/', '<w:sectPr>' . $hRefs, $docXml);
+        $zip->addFromString('word/document.xml', $docXml);
+
+        $zip->close();
         $resultBytes = file_get_contents($tempDocx);
 
         @unlink($tempImagePath);
@@ -1707,7 +2428,8 @@ class OnlyOfficeService
         if ($footerTempFile) @unlink($footerTempFile);
         @unlink($tempDocx);
 
-        return $this->enforceF4PageSize($resultBytes);
+        return $isA4 ? $this->enforceA4PageSize($resultBytes) : $this->enforceF4PageSize($resultBytes);
     }
 }
+
 

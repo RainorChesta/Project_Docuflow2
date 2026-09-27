@@ -20,6 +20,7 @@ class CorporateSoftFile extends Model
         'file_mime',
         'file_size',
         'status',
+        'paper_size',
         'allowed_roles',
         'is_all_companies',
         'is_all_branches',
@@ -167,5 +168,20 @@ class CorporateSoftFile extends Model
             return 'PDF';
         }
         return 'DOCX';
+    }
+
+    public function isA4(): bool
+    {
+        return strtolower($this->paper_size ?? 'f4') === 'a4';
+    }
+
+    public function isF4(): bool
+    {
+        return ! $this->isA4();
+    }
+
+    public function getPaperSizeLabelAttribute(): string
+    {
+        return $this->isA4() ? 'A4 (210 × 297 mm)' : 'F4 / Folio (210 × 330 mm)';
     }
 }

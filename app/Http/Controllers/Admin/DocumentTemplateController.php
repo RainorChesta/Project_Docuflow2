@@ -151,23 +151,48 @@ class DocumentTemplateController extends Controller
 
         $onlyOfficeService = app(\App\Services\OnlyOfficeService::class);
         $onlyOfficeService->forceSaveTemplate($template);
-        usleep(300000);
+        
+        // Wait briefly for ONLYOFFICE forcesave callback to flush content to disk
+        $initialMtime = ($template->file_path && $disk->exists($template->file_path)) ? $disk->lastModified($template->file_path) : 0;
+        $maxWaitMs = 1200;
+        $waited = 0;
+        while ($waited < $maxWaitMs) {
+            usleep(150000);
+            $waited += 150;
+            $currentMtime = ($template->file_path && $disk->exists($template->file_path)) ? $disk->lastModified($template->file_path) : 0;
+            if ($currentMtime > $initialMtime) {
+                break;
+            }
+        }
         $template->refresh();
 
         $existingDocx = ($template->file_path && $disk->exists($template->file_path))
             ? $disk->get($template->file_path)
             : '';
 
-        if (!empty($existingDocx)) {
-            $mergedDocx = $onlyOfficeService->applyCorporateSoftFileToDocx($existingDocx, $corporateSoftFile);
-            $disk->put($template->file_path, $mergedDocx);
+        $originalBackup = $existingDocx;
+
+        try {
+            if (!empty($existingDocx) && substr($existingDocx, 0, 2) === 'PK') {
+                $mergedDocx = $onlyOfficeService->applyCorporateSoftFileToDocx($existingDocx, $corporateSoftFile);
+                if (empty($mergedDocx) || substr($mergedDocx, 0, 2) !== 'PK') {
+                    throw new \RuntimeException('Gagal memproses penggabungan kop surat ke template.');
+                }
+                $disk->put($template->file_path, $mergedDocx);
+            }
+            $template->touch();
+
+            // Update template reference to indicate which corporate soft file was applied
+            $template->update(['corporate_soft_file_id' => $corporateSoftFile->id]);
+
+            $onlyOfficeService->rotateTemplateKey($template);
+        } catch (\Throwable $e) {
+            if (!empty($originalBackup) && $template->file_path) {
+                $disk->put($template->file_path, $originalBackup);
+            }
+            \Log::error('applyCorporateSoftFile template error: ' . $e->getMessage(), ['exception' => $e]);
+            return response()->json(['error' => __('Gagal menerapkan kop surat: :msg', ['msg' => $e->getMessage()])], 500);
         }
-        $template->touch();
-
-        // Update template reference to indicate which corporate soft file was applied
-        $template->update(['corporate_soft_file_id' => $corporateSoftFile->id]);
-
-        $onlyOfficeService->rotateTemplateKey($template);
 
         return response()->json([
             'success' => true,

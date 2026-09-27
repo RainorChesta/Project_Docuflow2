@@ -133,6 +133,7 @@
                                                               data-preview-url="{{ route('admin.corporate-soft-files.preview', $softFile) }}"
                                                               data-download-url="{{ route('admin.corporate-soft-files.download', $softFile) }}">{{ $softFile->title }}</span>
                                                         <span class="badge {{ $softFile->isPdf() ? 'badge-error' : ($softFile->isImage() ? 'badge-secondary' : 'badge-primary') }} badge-xs font-mono font-bold">{{ $softFile->file_type }}</span>
+                                                        <span class="badge {{ $softFile->isA4() ? 'badge-secondary badge-outline' : 'badge-neutral badge-outline' }} badge-xs font-mono font-bold">{{ $softFile->isA4() ? 'A4' : 'F4' }}</span>
                                                     </div>
                                                     <div class="text-xs text-base-content/50 mt-0.5 flex items-center gap-2 flex-wrap">
                                                         <span>{{ $softFile->file_original_name }}</span>

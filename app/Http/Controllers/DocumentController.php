@@ -27,6 +27,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
@@ -892,32 +893,59 @@ class DocumentController extends Controller
 
         // Flush any active in-memory edits from ONLYOFFICE to server storage first
         $this->onlyOfficeService->forceSaveDocument($document, $version);
-        usleep(300000);
+        
+        // Wait briefly for ONLYOFFICE forcesave callback to flush content to disk
+        $initialMtime = ($version->file_path && $disk->exists($version->file_path)) ? $disk->lastModified($version->file_path) : 0;
+        $maxWaitMs = 1200;
+        $waited = 0;
+        while ($waited < $maxWaitMs) {
+            usleep(150000);
+            $waited += 150;
+            $currentMtime = ($version->file_path && $disk->exists($version->file_path)) ? $disk->lastModified($version->file_path) : 0;
+            if ($currentMtime > $initialMtime) {
+                break;
+            }
+        }
         $version->refresh();
 
-        // Apply corporate soft file (Header & Footer) to current version's DOCX while preserving existing content
+        // Apply corporate soft file (Header & Footer) to current version's DOCX while strictly preserving existing content
         $existingDocx = ($version->file_path && $disk->exists($version->file_path))
             ? $disk->get($version->file_path)
             : '';
 
-        if (empty($existingDocx)) {
-            $existingDocx = app(\App\Services\DocumentService::class)->createBlankDocx($document->id, $version->version_number);
+        if (empty($existingDocx) || substr($existingDocx, 0, 2) !== 'PK') {
+            app(\App\Services\DocumentService::class)->createBlankDocx($document->id, $version->version_number);
             $existingDocx = $disk->get($version->file_path);
         }
 
-        $mergedDocx = $this->onlyOfficeService->applyCorporateSoftFileToDocx($existingDocx, $corporateSoftFile);
-        $disk->put($version->file_path, $mergedDocx);
-        $version->touch();
+        $originalBackup = $existingDocx;
 
-        // Update document reference to indicate which corporate soft file was applied
-        $document->update([
-            'corporate_soft_file_id' => $corporateSoftFile->id,
-            'format_choice' => 'F4',
-            'paper_size' => 'F4',
-        ]);
+        try {
+            $mergedDocx = $this->onlyOfficeService->applyCorporateSoftFileToDocx($existingDocx, $corporateSoftFile);
 
-        // Invalidate ONLYOFFICE cached keys so editor reloads new content
-        $this->onlyOfficeService->rotateDocumentKey($document, $version);
+            if (empty($mergedDocx) || substr($mergedDocx, 0, 2) !== 'PK') {
+                throw new \RuntimeException('Gagal memproses penggabungan kop surat ke dokumen.');
+            }
+
+            $disk->put($version->file_path, $mergedDocx);
+            $version->touch();
+
+            // Update document reference to indicate which corporate soft file was applied
+            $document->update([
+                'corporate_soft_file_id' => $corporateSoftFile->id,
+                'format_choice' => 'F4',
+                'paper_size' => 'F4',
+            ]);
+
+            // Invalidate ONLYOFFICE cached keys so editor reloads new content
+            $this->onlyOfficeService->rotateDocumentKey($document, $version);
+        } catch (\Throwable $e) {
+            if (!empty($originalBackup) && $version->file_path) {
+                $disk->put($version->file_path, $originalBackup);
+            }
+            Log::error('applyCorporateSoftFile error: ' . $e->getMessage(), ['exception' => $e]);
+            return response()->json(['error' => __('Gagal menerapkan kop surat: :msg', ['msg' => $e->getMessage()])], 500);
+        }
 
         return response()->json([
             'success' => true,

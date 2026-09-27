@@ -45,105 +45,86 @@
                             <textarea name="description" rows="2" placeholder="{{ __('Keterangan singkat peruntukan soft file ini...') }}" class="textarea textarea-bordered w-full rounded-xl">{{ old('description', $corporateSoftFile->description) }}</textarea>
                         </div>
 
-                        {{-- Current File & Upload Replacement --}}
-                        <div class="p-4 bg-base-200/40 rounded-2xl border border-base-300 space-y-3">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <span class="text-xs font-bold text-base-content uppercase block">{{ __('Berkas Saat Ini:') }}</span>
-                                    <span class="text-sm font-semibold text-primary">{{ $corporateSoftFile->file_original_name }}</span>
-                                    @if($corporateSoftFile->file_size)
-                                        <span class="text-xs text-base-content/50">({{ number_format($corporateSoftFile->file_size / 1024, 1) }} KB)</span>
-                                    @endif
+                        {{-- Locked File Information Card --}}
+                        <div class="p-5 bg-base-200/50 rounded-2xl border border-base-300/80 space-y-3 shadow-2xs">
+                            <div class="flex items-center justify-between gap-3 flex-wrap">
+                                <div class="flex items-center gap-3 min-w-0">
+                                    <div class="w-10 h-10 rounded-xl bg-primary/15 text-primary flex items-center justify-center font-extrabold text-xs shrink-0 shadow-xs">
+                                        @if($corporateSoftFile->isPdf())
+                                            <span class="text-error font-extrabold">PDF</span>
+                                        @elseif($corporateSoftFile->isImage())
+                                            <span class="text-warning font-extrabold">IMG</span>
+                                        @else
+                                            <span class="text-primary font-extrabold">DOCX</span>
+                                        @endif
+                                    </div>
+                                    <div class="min-w-0">
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <span class="text-xs font-bold text-base-content uppercase tracking-wider block">{{ __('Berkas Soft File Terkunci') }}</span>
+                                            <span class="badge badge-neutral badge-xs font-bold gap-1 px-1.5 py-0.5">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                                </svg>
+                                                {{ __('Terkunci') }}
+                                            </span>
+                                            <span class="badge {{ $corporateSoftFile->isA4() ? 'badge-secondary' : 'badge-primary' }} badge-xs font-mono font-bold">
+                                                {{ $corporateSoftFile->paper_size_label }}
+                                            </span>
+                                        </div>
+                                        <span class="text-sm font-semibold text-base-content truncate block mt-0.5">{{ $corporateSoftFile->file_original_name }}</span>
+                                        @if($corporateSoftFile->file_size)
+                                            <span class="text-[11px] text-base-content/50 block">({{ number_format($corporateSoftFile->file_size / 1024, 1) }} KB)</span>
+                                        @endif
+                                    </div>
                                 </div>
-                                <a href="{{ route('admin.corporate-soft-files.download', $corporateSoftFile) }}" class="btn btn-outline btn-xs gap-1 rounded-lg">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                                    {{ __('Unduh') }}
-                                </a>
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <a href="{{ route('admin.corporate-soft-files.preview', $corporateSoftFile) }}" target="_blank" class="btn btn-ghost btn-xs gap-1 rounded-lg border border-base-300 hover:bg-base-200" title="{{ __('Lihat Pratinjau Soft File') }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                        {{ __('Pratinjau') }}
+                                    </a>
+                                    <a href="{{ route('admin.corporate-soft-files.download', $corporateSoftFile) }}" class="btn btn-outline btn-primary btn-xs gap-1 rounded-lg" title="{{ __('Unduh Berkas Asli') }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                        {{ __('Unduh') }}
+                                    </a>
+                                </div>
                             </div>
+                            <div class="p-3 bg-base-100 rounded-xl border border-base-300/60 text-xs text-base-content/70 flex items-start gap-2.5">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-info shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span>{{ __('Berkas soft file kop surat ini terkunci untuk menjaga konsistensi dokumen yang sudah menggunakannya. Anda dapat memperbarui nama judul, deskripsi, format kertas dokumen, dan hak akses perusahaan/cabang di bawah ini.') }}</span>
+                            </div>
+                        </div>
 
-                            <div class="form-control pt-2 border-t border-base-200" x-data="{
-                                fileName: '',
-                                fileSize: '',
-                                fileExt: '',
-                                isDragging: false,
-                                handleFiles(files) {
-                                    if (files && files.length > 0) {
-                                        const f = files[0];
-                                        this.fileName = f.name;
-                                        this.fileSize = (f.size / (1024 * 1024) >= 1) 
-                                            ? (f.size / (1024 * 1024)).toFixed(2) + ' MB' 
-                                            : (f.size / 1024).toFixed(1) + ' KB';
-                                        this.fileExt = f.name.split('.').pop().toUpperCase();
-                                        $refs.fileInput.files = files;
-                                    }
-                                },
-                                clearFile() {
-                                    this.fileName = '';
-                                    this.fileSize = '';
-                                    this.fileExt = '';
-                                    $refs.fileInput.value = '';
-                                }
-                            }">
-                                <label class="label font-medium text-xs">
-                                    <span class="label-text font-semibold">{{ __('Ganti Berkas (.docx, .pdf) - Opsional') }}</span>
+                        {{-- Target Ukuran Kertas (Paper Size) --}}
+                        <div class="form-control" x-data="{ paperSize: '{{ old('paper_size', $corporateSoftFile->paper_size ?? 'f4') }}' }">
+                            <label class="label font-medium text-xs sm:text-sm">
+                                <span class="label-text font-bold">{{ __('Target Ukuran Kertas Dokumen') }}</span>
+                            </label>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <label class="flex items-center gap-3 p-3.5 rounded-2xl border transition-all cursor-pointer select-none"
+                                       :class="paperSize === 'f4' ? 'bg-primary/10 border-primary shadow-xs ring-1 ring-primary/30' : 'bg-base-100 border-base-300 hover:bg-base-200/50'">
+                                    <input type="radio" name="paper_size" value="f4" x-model="paperSize" class="radio radio-primary radio-sm">
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex items-center justify-between gap-1">
+                                            <span class="text-xs sm:text-sm font-bold text-base-content">{{ __('F4 / Folio (Standar)') }}</span>
+                                            <span class="badge badge-neutral badge-xs font-mono font-semibold">210 × 330 mm</span>
+                                        </div>
+                                        <p class="text-[11px] text-base-content/60 mt-0.5">{{ __('Ukuran kertas standar default korporat.') }}</p>
+                                    </div>
                                 </label>
 
-                                <div class="relative border-2 border-dashed rounded-2xl p-4 transition-all text-center cursor-pointer"
-                                     :class="isDragging ? 'border-primary bg-primary/10 shadow-md ring-2 ring-primary/30' : (fileName ? 'border-success/60 bg-success/5' : 'border-base-300 hover:border-primary/60 hover:bg-base-200/40 bg-base-100')"
-                                     @dragover.prevent="isDragging = true"
-                                     @dragleave.prevent="isDragging = false"
-                                     @drop.prevent="isDragging = false; handleFiles($event.dataTransfer.files)"
-                                     @click="$refs.fileInput.click()">
-                                    
-                                    <input type="file" 
-                                           name="file" 
-                                           x-ref="fileInput" 
-                                           accept=".docx,.doc,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword"
-                                           @change="handleFiles($event.target.files)"
-                                           class="hidden @error('file') is-invalid @enderror">
-
-                                    <template x-if="!fileName">
-                                        <div class="flex flex-col items-center justify-center space-y-1.5 py-1">
-                                            <div class="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shadow-xs">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                                </svg>
-                                            </div>
-                                            <div>
-                                                <p class="text-xs font-bold text-base-content">
-                                                    <span class="text-primary hover:underline">{{ __('Klik untuk mengganti file') }}</span> {{ __('atau seret (drag & drop) ke sini') }}
-                                                </p>
-                                                <p class="text-[11px] text-base-content/50 mt-0.5">
-                                                    {{ __('Biarkan kosong jika tidak ingin mengubah berkas. Format: .docx, .doc, .pdf (Maks 15 MB)') }}
-                                                </p>
-                                            </div>
+                                <label class="flex items-center gap-3 p-3.5 rounded-2xl border transition-all cursor-pointer select-none"
+                                       :class="paperSize === 'a4' ? 'bg-secondary/10 border-secondary shadow-xs ring-1 ring-secondary/30' : 'bg-base-100 border-base-300 hover:bg-base-200/50'">
+                                    <input type="radio" name="paper_size" value="a4" x-model="paperSize" class="radio radio-secondary radio-sm">
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex items-center justify-between gap-1">
+                                            <span class="text-xs sm:text-sm font-bold text-base-content">{{ __('A4 (Khusus Cabang / Internasional)') }}</span>
+                                            <span class="badge badge-secondary badge-xs font-mono font-semibold">210 × 297 mm</span>
                                         </div>
-                                    </template>
-
-                                    <template x-if="fileName">
-                                        <div class="flex items-center justify-between p-2.5 bg-base-100 rounded-xl border border-base-300 shadow-xs text-left" @click.stop>
-                                            <div class="flex items-center gap-3 min-w-0">
-                                                <div class="w-9 h-9 rounded-xl bg-primary/15 text-primary flex items-center justify-center font-bold text-xs shrink-0" x-text="fileExt"></div>
-                                                <div class="min-w-0">
-                                                    <p class="text-xs font-bold text-base-content truncate" x-text="fileName"></p>
-                                                    <p class="text-[11px] text-base-content/50" x-text="fileSize"></p>
-                                                </div>
-                                            </div>
-                                            <div class="flex items-center gap-2 shrink-0">
-                                                <button type="button" @click.stop="$refs.fileInput.click()" class="btn btn-xs btn-outline btn-primary rounded-lg">
-                                                    {{ __('Ganti') }}
-                                                </button>
-                                                <button type="button" @click.stop="clearFile()" class="btn btn-xs btn-ghost btn-circle text-error" title="{{ __('Batal Ganti') }}">
-                                                    ✕
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </template>
-                                </div>
-
-                                @error('file')
-                                    <span class="text-xs text-error mt-1.5 font-medium block">{{ $message }}</span>
-                                @enderror
+                                        <p class="text-[11px] text-base-content/60 mt-0.5">{{ __('Format ukuran A4 untuk dokumen cabang.') }}</p>
+                                    </div>
+                                </label>
                             </div>
                         </div>
 
@@ -180,24 +161,81 @@
                         {{-- Company Access --}}
                         @php
                             $selectedCompanyIds = old('company_ids', $corporateSoftFile->companies->pluck('id')->all());
-                            $isAllCompanies = old('is_all_companies', $corporateSoftFile->is_all_companies ? '1' : '0') == '1';
+                            $isAllCompanies = old('is_all_companies', $corporateSoftFile->is_all_companies ? '1' : '0');
                         @endphp
-                        <div x-data="{ allCompanies: {{ $isAllCompanies ? 'true' : 'false' }} }" class="space-y-3">
-                            <div class="flex items-center justify-between">
-                                <label class="font-bold text-xs sm:text-sm text-base-content">{{ __('Akses Perusahaan (Company)') }}</label>
-                                <label class="label cursor-pointer gap-2 p-0">
-                                    <span class="label-text text-xs font-semibold">{{ __('Berlaku untuk Semua Perusahaan') }}</span>
-                                    <input type="checkbox" name="is_all_companies" value="1" x-model="allCompanies" {{ $isAllCompanies ? 'checked' : '' }} class="toggle toggle-primary toggle-sm">
+                        <div x-data="{
+                            allCompanies: '{{ $isAllCompanies }}',
+                            searchCompany: '',
+                            selectedCompanies: {{ json_encode(array_map('strval', $selectedCompanyIds)) }},
+                            toggleCompany(id) {
+                                id = String(id);
+                                if (this.selectedCompanies.includes(id)) {
+                                    this.selectedCompanies = this.selectedCompanies.filter(item => item !== id);
+                                } else {
+                                    this.selectedCompanies.push(id);
+                                }
+                            },
+                            selectAllCompanies(ids) {
+                                ids.forEach(id => {
+                                    id = String(id);
+                                    if (!this.selectedCompanies.includes(id)) {
+                                        this.selectedCompanies.push(id);
+                                    }
+                                });
+                            },
+                            clearAllCompanies() {
+                                this.selectedCompanies = [];
+                            }
+                        }" class="space-y-3">
+                            <div class="form-control w-full">
+                                <label class="label pb-1.5 flex items-center justify-between">
+                                    <span class="label-text font-bold text-xs sm:text-sm text-base-content flex items-center gap-1.5">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                                        {{ __('Akses Perusahaan (Company)') }}
+                                    </span>
+                                    <span class="text-[11px] font-semibold text-primary" x-show="allCompanies === '0'" x-text="selectedCompanies.length + ' Perusahaan Dipilih'"></span>
                                 </label>
+                                <select name="is_all_companies" x-model="allCompanies" class="select select-bordered select-sm w-full font-medium rounded-xl text-xs sm:text-sm bg-base-100 focus:border-primary">
+                                    <option value="1">🌐 {{ __('Berlaku untuk Semua Perusahaan (Global)') }}</option>
+                                    <option value="0">🏢 {{ __('Pilih Perusahaan Tertentu (Dropdown Spesifik)') }}</option>
+                                </select>
                             </div>
 
-                            <div x-show="!allCompanies" x-cloak x-transition class="p-4 bg-base-200/50 rounded-2xl border border-base-300 space-y-2" style="{{ $isAllCompanies ? 'display: none;' : '' }}">
-                                <span class="text-xs text-base-content/60 font-medium block mb-2">{{ __('Pilih Perusahaan yang dapat mengakses:') }}</span>
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                            <div x-show="allCompanies === '0'" x-cloak x-transition class="p-4 bg-base-200/50 rounded-2xl border border-base-300 space-y-3" style="{{ $isAllCompanies == '1' ? 'display: none;' : '' }}">
+                                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                    <span class="text-xs text-base-content/70 font-semibold">{{ __('Daftar Perusahaan yang Diizinkan:') }}</span>
+                                    <div class="flex items-center gap-1.5">
+                                        <button type="button" @click="selectAllCompanies({{ json_encode($companies->pluck('id')->map(fn($id) => (string)$id)->all()) }})" class="btn btn-2xs btn-ghost text-primary font-bold">
+                                            {{ __('Pilih Semua') }}
+                                        </button>
+                                        <span class="text-base-content/30">•</span>
+                                        <button type="button" @click="clearAllCompanies()" class="btn btn-2xs btn-ghost text-error font-medium">
+                                            {{ __('Hapus Semua') }}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {{-- Search box --}}
+                                <div class="relative">
+                                    <input type="text" x-model="searchCompany" placeholder="{{ __('Cari nama perusahaan...') }}" class="input input-xs input-bordered w-full rounded-lg bg-base-100 pl-8 text-xs">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                                </div>
+
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1">
                                     @foreach($companies as $company)
-                                        <label class="label cursor-pointer justify-start gap-2.5 p-1 hover:bg-base-300/40 rounded-lg">
-                                            <input type="checkbox" name="company_ids[]" value="{{ $company->id }}" class="checkbox checkbox-primary checkbox-sm rounded-md" {{ in_array($company->id, $selectedCompanyIds) ? 'checked' : '' }}>
-                                            <span class="label-text text-xs font-medium">{{ $company->name }}</span>
+                                        <label x-show="!searchCompany || '{{ strtolower(addslashes($company->name)) }}'.includes(searchCompany.toLowerCase())" 
+                                               class="flex items-center justify-between gap-2.5 p-2 rounded-xl border transition-all cursor-pointer select-none"
+                                               :class="selectedCompanies.includes('{{ $company->id }}') ? 'bg-primary/10 border-primary/40 shadow-xs' : 'bg-base-100 border-base-200/80 hover:bg-base-200/60'">
+                                            <div class="flex items-center gap-2.5 min-w-0">
+                                                <input type="checkbox" name="company_ids[]" value="{{ $company->id }}" 
+                                                       :checked="selectedCompanies.includes('{{ $company->id }}')"
+                                                       @change="toggleCompany('{{ $company->id }}')"
+                                                       class="checkbox checkbox-primary checkbox-sm rounded-md">
+                                                <span class="text-xs font-semibold text-base-content truncate">{{ $company->name }}</span>
+                                            </div>
+                                            @if($company->code)
+                                                <span class="badge badge-ghost badge-xs shrink-0 font-mono text-[10px]">{{ $company->code }}</span>
+                                            @endif
                                         </label>
                                     @endforeach
                                 </div>
@@ -207,24 +245,84 @@
                         {{-- Branch Access --}}
                         @php
                             $selectedBranchIds = old('branch_ids', $corporateSoftFile->branches->pluck('id')->all());
-                            $isAllBranches = old('is_all_branches', $corporateSoftFile->is_all_branches ? '1' : '0') == '1';
+                            $isAllBranches = old('is_all_branches', $corporateSoftFile->is_all_branches ? '1' : '0');
                         @endphp
-                        <div x-data="{ allBranches: {{ $isAllBranches ? 'true' : 'false' }} }" class="space-y-3">
-                            <div class="flex items-center justify-between">
-                                <label class="font-bold text-xs sm:text-sm text-base-content">{{ __('Akses Cabang (Branch)') }}</label>
-                                <label class="label cursor-pointer gap-2 p-0">
-                                    <span class="label-text text-xs font-semibold">{{ __('Berlaku untuk Semua Cabang') }}</span>
-                                    <input type="checkbox" name="is_all_branches" value="1" x-model="allBranches" {{ $isAllBranches ? 'checked' : '' }} class="toggle toggle-secondary toggle-sm">
+                        <div x-data="{
+                            allBranches: '{{ $isAllBranches }}',
+                            searchBranch: '',
+                            selectedBranches: {{ json_encode(array_map('strval', $selectedBranchIds)) }},
+                            toggleBranch(id) {
+                                id = String(id);
+                                if (this.selectedBranches.includes(id)) {
+                                    this.selectedBranches = this.selectedBranches.filter(item => item !== id);
+                                } else {
+                                    this.selectedBranches.push(id);
+                                }
+                            },
+                            selectAllBranches(ids) {
+                                ids.forEach(id => {
+                                    id = String(id);
+                                    if (!this.selectedBranches.includes(id)) {
+                                        this.selectedBranches.push(id);
+                                    }
+                                });
+                            },
+                            clearAllBranches() {
+                                this.selectedBranches = [];
+                            }
+                        }" class="space-y-3">
+                            <div class="form-control w-full">
+                                <label class="label pb-1.5 flex items-center justify-between">
+                                    <span class="label-text font-bold text-xs sm:text-sm text-base-content flex items-center gap-1.5">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" /></svg>
+                                        {{ __('Akses Cabang (Branch)') }}
+                                    </span>
+                                    <span class="text-[11px] font-semibold text-secondary" x-show="allBranches === '0'" x-text="selectedBranches.length + ' Cabang Dipilih'"></span>
                                 </label>
+                                <select name="is_all_branches" x-model="allBranches" class="select select-bordered select-sm w-full font-medium rounded-xl text-xs sm:text-sm bg-base-100 focus:border-secondary">
+                                    <option value="1">🌐 {{ __('Berlaku untuk Semua Cabang (Global)') }}</option>
+                                    <option value="0">🏛️ {{ __('Pilih Cabang Tertentu (Dropdown Spesifik)') }}</option>
+                                </select>
                             </div>
 
-                            <div x-show="!allBranches" x-cloak x-transition class="p-4 bg-base-200/50 rounded-2xl border border-base-300 space-y-2" style="{{ $isAllBranches ? 'display: none;' : '' }}">
-                                <span class="text-xs text-base-content/60 font-medium block mb-2">{{ __('Pilih Cabang yang dapat mengakses:') }}</span>
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                            <div x-show="allBranches === '0'" x-cloak x-transition class="p-4 bg-base-200/50 rounded-2xl border border-base-300 space-y-3" style="{{ $isAllBranches == '1' ? 'display: none;' : '' }}">
+                                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                    <span class="text-xs text-base-content/70 font-semibold">{{ __('Daftar Cabang yang Diizinkan:') }}</span>
+                                    <div class="flex items-center gap-1.5">
+                                        <button type="button" @click="selectAllBranches({{ json_encode($branches->pluck('id')->map(fn($id) => (string)$id)->all()) }})" class="btn btn-2xs btn-ghost text-secondary font-bold">
+                                            {{ __('Pilih Semua') }}
+                                        </button>
+                                        <span class="text-base-content/30">•</span>
+                                        <button type="button" @click="clearAllBranches()" class="btn btn-2xs btn-ghost text-error font-medium">
+                                            {{ __('Hapus Semua') }}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {{-- Search box --}}
+                                <div class="relative">
+                                    <input type="text" x-model="searchBranch" placeholder="{{ __('Cari nama cabang atau perusahaan...') }}" class="input input-xs input-bordered w-full rounded-lg bg-base-100 pl-8 text-xs">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                                </div>
+
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1">
                                     @foreach($branches as $branch)
-                                        <label class="label cursor-pointer justify-start gap-2.5 p-1 hover:bg-base-300/40 rounded-lg">
-                                            <input type="checkbox" name="branch_ids[]" value="{{ $branch->id }}" class="checkbox checkbox-secondary checkbox-sm rounded-md" {{ in_array($branch->id, $selectedBranchIds) ? 'checked' : '' }}>
-                                            <span class="label-text text-xs font-medium">{{ $branch->company?->name }} - {{ $branch->name }}</span>
+                                        <label x-show="!searchBranch || '{{ strtolower(addslashes(($branch->company?->name ?? '') . ' ' . $branch->name)) }}'.includes(searchBranch.toLowerCase())" 
+                                               class="flex items-center justify-between gap-2.5 p-2 rounded-xl border transition-all cursor-pointer select-none"
+                                               :class="selectedBranches.includes('{{ $branch->id }}') ? 'bg-secondary/10 border-secondary/40 shadow-xs' : 'bg-base-100 border-base-200/80 hover:bg-base-200/60'">
+                                            <div class="flex items-center gap-2.5 min-w-0">
+                                                <input type="checkbox" name="branch_ids[]" value="{{ $branch->id }}" 
+                                                       :checked="selectedBranches.includes('{{ $branch->id }}')"
+                                                       @change="toggleBranch('{{ $branch->id }}')"
+                                                       class="checkbox checkbox-secondary checkbox-sm rounded-md">
+                                                <div class="min-w-0 flex flex-col">
+                                                    <span class="text-xs font-semibold text-base-content truncate">{{ $branch->name }}</span>
+                                                    <span class="text-[10px] text-base-content/50 truncate">{{ $branch->company?->name }}</span>
+                                                </div>
+                                            </div>
+                                            @if($branch->code)
+                                                <span class="badge badge-ghost badge-xs shrink-0 font-mono text-[10px]">{{ $branch->code }}</span>
+                                            @endif
                                         </label>
                                     @endforeach
                                 </div>

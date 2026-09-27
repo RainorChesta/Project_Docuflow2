@@ -28,8 +28,8 @@
 
                             <div class="flex items-center gap-1.5 shrink-0 ml-auto sm:ml-0">
                                 {{-- Corporate Soft File Dropdown Selector for Admin --}}
-                                <div class="dropdown dropdown-end dropdown-bottom z-30" id="admin-template-sf-dropdown">
-                                    <label tabindex="0" class="btn btn-xs {{ $template->corporateSoftFile ? 'btn-accent text-accent-content font-bold shadow-xs' : 'btn-outline btn-accent font-medium' }} gap-1.5 shrink-0 cursor-pointer" title="{{ __('Pilih Soft File Korporat') }}" id="template-softfile-btn">
+                                <div class="relative inline-block z-30" x-data="{ open: false }" @click.outside="open = false" id="admin-template-sf-dropdown">
+                                    <button type="button" @click="open = !open" class="btn btn-xs {{ $template->corporateSoftFile ? 'btn-accent text-accent-content font-bold shadow-xs' : 'btn-outline btn-accent font-medium' }} gap-1.5 shrink-0 cursor-pointer" title="{{ __('Pilih Soft File Korporat') }}" id="template-softfile-btn">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                                         </svg>
@@ -40,17 +40,23 @@
                                         @else
                                             <span class="badge badge-xs bg-white text-accent font-extrabold px-1.5 py-0 shadow-2xs hidden" id="template-softfile-btn-badge">✓ Terpilih</span>
                                         @endif
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 opacity-70 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                                         </svg>
-                                    </label>
-                                    <div tabindex="0" class="dropdown-content z-40 p-3 shadow-2xl bg-base-100/98 backdrop-blur-md border border-base-300 rounded-2xl w-80 sm:w-[420px] max-h-[480px] flex flex-col gap-2 mt-2">
+                                    </button>
+                                    <div x-show="open" x-cloak x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" class="absolute right-0 top-full z-40 p-3 shadow-2xl bg-base-100/98 backdrop-blur-md border border-base-300 rounded-2xl w-80 sm:w-[420px] max-h-[480px] flex flex-col gap-2 mt-2">
                                             <div class="px-1 py-1 border-b border-base-200/80 flex items-center justify-between shrink-0">
                                                 <div>
                                                     <span class="text-xs font-bold text-base-content uppercase tracking-wider block">{{ __('Soft File Korporat') }}</span>
                                                     <span class="text-[11px] text-base-content/50 block">{{ __('Pilih kop surat resmi untuk template ini') }}</span>
                                                 </div>
-                                                <span class="badge badge-accent badge-xs font-bold">{{ isset($corporateSoftFiles) ? $corporateSoftFiles->count() : 0 }}</span>
+                                                <div class="flex items-center gap-1.5 shrink-0">
+                                                    <span class="badge badge-accent badge-xs font-bold">{{ isset($corporateSoftFiles) ? $corporateSoftFiles->count() : 0 }}</span>
+                                                    <a href="{{ route('admin.corporate-soft-files.create') }}" target="_blank" class="btn btn-xs btn-outline btn-accent font-semibold text-[11px] h-6 min-h-0 px-2 py-0 rounded-lg gap-1 shadow-2xs hover:bg-accent hover:text-accent-content transition-all" title="{{ __('Buat Soft File Kop Baru') }}">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" /></svg>
+                                                        <span>{{ __('Buat Kop') }}</span>
+                                                    </a>
+                                                </div>
                                             </div>
 
                                             {{-- Banner Active Soft File Indicator --}}
@@ -150,10 +156,18 @@
                                                         </li>
                                                     @endforeach
                                                 </ul>
+
+                                                <div class="pt-1.5 mt-0.5 border-t border-base-200/80 shrink-0 flex items-center justify-between px-1 text-[11px]">
+                                                    <span class="text-base-content/50">{{ __('Butuh kop surat baru?') }}</span>
+                                                    <a href="{{ route('admin.corporate-soft-files.create') }}" target="_blank" class="text-accent hover:text-accent-focus font-bold inline-flex items-center gap-1 hover:underline transition-all">
+                                                        <span>{{ __('+ Upload di sini') }}</span>
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                                    </a>
+                                                </div>
                                             @else
                                                 <div class="py-4 text-center text-xs text-base-content/60 space-y-2">
                                                     <p>{{ __('Belum ada soft file korporat aktif.') }}</p>
-                                                    <a href="{{ route('admin.corporate-soft-files.create') }}" class="btn btn-accent btn-xs rounded-lg gap-1">
+                                                    <a href="{{ route('admin.corporate-soft-files.create') }}" target="_blank" class="btn btn-accent btn-xs rounded-lg gap-1">
                                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                                                         {{ __('Tambah Soft File') }}
                                                     </a>
@@ -578,6 +592,13 @@
 
                 const modal = document.getElementById('template-softfile-modal');
                 if (modal && typeof modal.close === 'function') modal.close();
+
+                // Request ONLYOFFICE in-memory flush before applying letterhead
+                if (window.docEditor && typeof window.docEditor.serviceCommand === 'function') {
+                    try {
+                        window.docEditor.serviceCommand('forcesave');
+                    } catch(e) {}
+                }
 
                 const applyUrl = "{{ url('/admin/templates/' . $template->id . '/corporate-soft-files') }}/" + selectedId + "/apply";
                 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';

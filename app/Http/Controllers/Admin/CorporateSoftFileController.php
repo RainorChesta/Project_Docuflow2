@@ -62,13 +62,14 @@ class CorporateSoftFileController extends Controller
         return view('admin.corporate_soft_files.create', compact('companies', 'branches'));
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, OnlyOfficeService $onlyOfficeService): RedirectResponse
     {
         $this->authorize('admin');
 
         $validated = $request->validate([
             'title'            => 'required|string|max:255',
             'description'      => 'nullable|string|max:1000',
+            'paper_size'       => 'nullable|string|in:f4,a4',
             'file'             => ['required', 'file', 'max:15360', 'mimes:docx,doc,pdf', 'extensions:docx,doc,pdf'],
             'allowed_roles'    => 'nullable|array',
             'allowed_roles.*'  => 'in:direktur,head,staff,user',
@@ -78,7 +79,26 @@ class CorporateSoftFileController extends Controller
             'is_all_branches'  => 'nullable|boolean',
             'branch_ids'       => 'nullable|array',
             'branch_ids.*'     => 'exists:branches,id',
+        ], [
+            'file.required'   => __('Berkas soft file wajib diunggah.'),
+            'file.mimes'      => __('Format gambar (JPEG/PNG) tidak diizinkan. Mohon gunakan berkas dokumen Microsoft Word (.docx) atau PDF (.pdf).'),
+            'file.extensions' => __('Format gambar (JPEG/PNG) tidak diizinkan. Mohon gunakan berkas dokumen Microsoft Word (.docx) atau PDF (.pdf).'),
+            'file.max'        => __('Ukuran berkas maksimal 15 MB.'),
+            'paper_size.in'   => __('Pilihan ukuran kertas tidak valid.'),
         ]);
+
+        $targetPaperSize = $validated['paper_size'] ?? 'f4';
+        $file = $request->file('file');
+        $ext = strtolower($file->getClientOriginalExtension());
+        $rawBinary = file_get_contents($file->getRealPath());
+
+        // Automatically convert uploaded file to target paper size (A4 or F4)
+        $convertedBinary = $onlyOfficeService->convertFileToPaperSize($rawBinary, $ext, $targetPaperSize);
+
+        $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
+        $storedFileName = uniqid('csf_') . '.' . $ext;
+        $storedPath = 'corporate_soft_files/' . $storedFileName;
+        $disk->put($storedPath, $convertedBinary);
 
         $isAllCompanies = $request->boolean('is_all_companies', false);
         $isAllBranches = $request->boolean('is_all_branches', false);
@@ -93,16 +113,14 @@ class CorporateSoftFileController extends Controller
             $isAllBranches = true;
         }
 
-        $file = $request->file('file');
-        $storedPath = $file->store('corporate_soft_files', config('onlyoffice.storage_disk', 'local'));
-
         $softFile = CorporateSoftFile::create([
             'title'              => $validated['title'],
             'description'        => $validated['description'] ?? null,
+            'paper_size'         => $targetPaperSize,
             'file_path'          => $storedPath,
             'file_original_name' => $file->getClientOriginalName(),
             'file_mime'          => $file->getClientMimeType() ?: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'file_size'          => $file->getSize(),
+            'file_size'          => strlen($convertedBinary),
             'status'             => 'active',
             'allowed_roles'      => $validated['allowed_roles'] ?? null,
             'is_all_companies'   => $isAllCompanies,
@@ -118,8 +136,9 @@ class CorporateSoftFileController extends Controller
             $softFile->branches()->sync($validated['branch_ids']);
         }
 
+        $paperLabel = $softFile->paper_size_label;
         return redirect()->route('admin.corporate-soft-files.index')
-            ->with('success', __('Soft File Korporat berhasil ditambahkan.'));
+            ->with('success', __('Soft File Korporat berhasil ditambahkan dan otomatis dikonversi ke format :paper.', ['paper' => $paperLabel]));
     }
 
     public function edit(CorporateSoftFile $corporateSoftFile): View
@@ -140,7 +159,7 @@ class CorporateSoftFileController extends Controller
         $validated = $request->validate([
             'title'            => 'required|string|max:255',
             'description'      => 'nullable|string|max:1000',
-            'file'             => ['nullable', 'file', 'max:15360', 'mimes:docx,doc,pdf', 'extensions:docx,doc,pdf'],
+            'paper_size'       => 'nullable|string|in:f4,a4',
             'allowed_roles'    => 'nullable|array',
             'allowed_roles.*'  => 'in:direktur,head,staff,user',
             'is_all_companies' => 'nullable|boolean',
@@ -164,24 +183,12 @@ class CorporateSoftFileController extends Controller
 
         $corporateSoftFile->title            = $validated['title'];
         $corporateSoftFile->description      = $validated['description'] ?? null;
+        if (!empty($validated['paper_size'])) {
+            $corporateSoftFile->paper_size   = $validated['paper_size'];
+        }
         $corporateSoftFile->allowed_roles    = $validated['allowed_roles'] ?? null;
         $corporateSoftFile->is_all_companies = $isAllCompanies;
         $corporateSoftFile->is_all_branches  = $isAllBranches;
-
-        // Replace file if new uploaded
-        if ($request->hasFile('file')) {
-            $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
-
-            if ($corporateSoftFile->file_path && $disk->exists($corporateSoftFile->file_path)) {
-                $disk->delete($corporateSoftFile->file_path);
-            }
-
-            $file = $request->file('file');
-            $corporateSoftFile->file_path          = $file->store('corporate_soft_files', config('onlyoffice.storage_disk', 'local'));
-            $corporateSoftFile->file_original_name = $file->getClientOriginalName();
-            $corporateSoftFile->file_mime          = $file->getClientMimeType() ?: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-            $corporateSoftFile->file_size          = $file->getSize();
-        }
 
         $corporateSoftFile->save();
 
@@ -199,6 +206,109 @@ class CorporateSoftFileController extends Controller
 
         return redirect()->route('admin.corporate-soft-files.index')
             ->with('success', __('Soft File Korporat berhasil diperbarui.'));
+    }
+
+    /**
+     * Inspect and strictly validate physical paper dimensions of uploaded file when target paper size is A4.
+     * Rejects non-A4 files (F4, Letter, Legal, etc.) with a clear message showing actual dimensions.
+     */
+    protected function validatePaperSizeDimension(\Illuminate\Http\UploadedFile $file, string $targetPaperSize): ?string
+    {
+        $ext = strtolower($file->getClientOriginalExtension());
+        $realPath = $file->getRealPath();
+
+        if ($targetPaperSize === 'a4') {
+            // Validate DOCX physical dimensions
+            if (in_array($ext, ['docx', 'doc'])) {
+                $zip = new \ZipArchive();
+                if ($zip->open($realPath) === true) {
+                    $docXml = $zip->getFromName('word/document.xml');
+                    $zip->close();
+
+                    if ($docXml !== false && preg_match('/<w:pgSz\b([^>]*)/i', $docXml, $matches)) {
+                        $attrs = $matches[1];
+                        $wTwips = null;
+                        $hTwips = null;
+                        if (preg_match('/\bw:w="(\d+)"/i', $attrs, $wm)) $wTwips = (int)$wm[1];
+                        if (preg_match('/\bw:h="(\d+)"/i', $attrs, $hm)) $hTwips = (int)$hm[1];
+
+                        if ($wTwips && $hTwips) {
+                            if ($wTwips > $hTwips) {
+                                $tmp = $wTwips; $wTwips = $hTwips; $hTwips = $tmp;
+                            }
+
+                            $wMm = (int)round($wTwips / 56.6929);
+                            $hMm = (int)round($hTwips / 56.6929);
+
+                            // A4 standard: 11906 x 16838 twips (210 x 297 mm)
+                            // Reject if height is > 17500 (F4 is 18709 twips, Legal is 20160 twips)
+                            // or height < 16100 (Letter is 15840 twips / 279mm)
+                            if ($hTwips > 17500 || $hTwips < 16100) {
+                                $detectedName = match (true) {
+                                    $hTwips >= 18000 && $hTwips <= 19200 => 'F4 / Folio',
+                                    $hTwips >= 15300 && $hTwips <= 16100 => 'Letter',
+                                    $hTwips >= 19500 && $hTwips <= 20800 => 'Legal',
+                                    $hTwips >= 23000 => 'A3',
+                                    $hTwips <= 12500 => 'A5',
+                                    default => 'Kustom / Non-A4',
+                                };
+
+                                return __("Gagal mengunggah: Berkas yang diunggah berukuran :detected (:w × :h mm), sedangkan softfile ini dikhususkan untuk format A4 (210 × 297 mm).", [
+                                    'detected' => $detectedName,
+                                    'w' => $wMm,
+                                    'h' => $hMm,
+                                ]);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Validate PDF physical dimensions
+            if ($ext === 'pdf') {
+                try {
+                    $pdf = new \setasign\Fpdi\Fpdi();
+                    $pageCount = $pdf->setSourceFile($realPath);
+                    if ($pageCount > 0) {
+                        $tpl = $pdf->importPage(1);
+                        $size = $pdf->getTemplateSize($tpl);
+                        $wPt = $size['width'];
+                        $hPt = $size['height'];
+
+                        if ($wPt > $hPt) {
+                            $tmp = $wPt; $wPt = $hPt; $hPt = $tmp;
+                        }
+
+                        $wMm = (int)round($wPt * 0.352778);
+                        $hMm = (int)round($hPt * 0.352778);
+
+                        // A4 is 595.28 x 841.89 pt (210 x 297 mm)
+                        // F4 is 595.28 x 935.43 pt (210 x 330 mm)
+                        // Letter is 612 x 792 pt (215.9 x 279.4 mm)
+                        if ($hPt > 875 || $hPt < 810) {
+                            $detectedName = match (true) {
+                                $hPt >= 900 && $hPt <= 970 => 'F4 / Folio',
+                                $hPt >= 760 && $hPt <= 810 => 'Letter',
+                                $hPt >= 980 && $hPt <= 1040 => 'Legal',
+                                $hPt >= 1100 => 'A3',
+                                $hPt <= 620 => 'A5',
+                                default => 'Kustom / Non-A4',
+                            };
+
+                            return __("Gagal mengunggah: Berkas PDF yang diunggah berukuran :detected (:w × :h mm), sedangkan softfile ini dikhususkan untuk format A4 (210 × 297 mm).", [
+                                'detected' => $detectedName,
+                                'w' => $wMm,
+                                'h' => $hMm,
+                            ]);
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    \Log::warning('validatePaperSizeDimension PDF inspection warning: ' . $e->getMessage());
+                }
+            }
+        }
+
+        return null;
     }
 
     public function toggleStatus(CorporateSoftFile $corporateSoftFile): RedirectResponse

@@ -98,6 +98,61 @@ class CorporateSoftFileTest extends TestCase
         $this->assertTrue($softFile->branches->contains($this->branchA->id));
     }
 
+    public function test_uploading_image_format_is_rejected(): void
+    {
+        $jpegFile = UploadedFile::fake()->image('kop_surat.jpg', 800, 600);
+
+        $response = $this->actingAs($this->admin)->post(route('admin.corporate-soft-files.store'), [
+            'title' => 'Kop Surat Gambar',
+            'file' => $jpegFile,
+            'is_all_companies' => '1',
+            'is_all_branches' => '1',
+        ]);
+
+        $response->assertSessionHasErrors('file');
+        $this->assertDatabaseMissing('corporate_soft_files', [
+            'title' => 'Kop Surat Gambar',
+        ]);
+    }
+
+    public function test_admin_can_update_soft_file_metadata_with_locked_file(): void
+    {
+        $softFile = CorporateSoftFile::create([
+            'title' => 'Kop Surat Lama',
+            'description' => 'Deskripsi lama',
+            'file_path' => 'corporate_soft_files/original_file.docx',
+            'file_original_name' => 'original_file.docx',
+            'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'file_size' => 10240,
+            'status' => 'active',
+            'is_all_companies' => true,
+            'is_all_branches' => true,
+            'allowed_roles' => ['staff'],
+            'created_by' => $this->admin->id,
+        ]);
+
+        $response = $this->actingAs($this->admin)->put(route('admin.corporate-soft-files.update', $softFile), [
+            'title' => 'Kop Surat Diperbarui',
+            'description' => 'Deskripsi baru',
+            'is_all_companies' => '0',
+            'company_ids' => [$this->companyA->id],
+            'is_all_branches' => '0',
+            'branch_ids' => [$this->branchA->id],
+            'allowed_roles' => ['staff', 'direktur'],
+        ]);
+
+        $response->assertRedirect(route('admin.corporate-soft-files.index'));
+        $response->assertSessionHas('success');
+
+        $softFile->refresh();
+        $this->assertEquals('Kop Surat Diperbarui', $softFile->title);
+        $this->assertEquals('Deskripsi baru', $softFile->description);
+        // Original file must remain unchanged / locked
+        $this->assertEquals('corporate_soft_files/original_file.docx', $softFile->file_path);
+        $this->assertEquals('original_file.docx', $softFile->file_original_name);
+        $this->assertEquals(['staff', 'direktur'], $softFile->allowed_roles);
+    }
+
     public function test_non_admin_cannot_access_admin_corporate_soft_file_management(): void
     {
         $response = $this->actingAs($this->staffA)->get(route('admin.corporate-soft-files.index'));
@@ -174,8 +229,21 @@ class CorporateSoftFileTest extends TestCase
     public function test_apply_corporate_soft_file_to_document_version(): void
     {
         $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
+
+        // 1. Create a master kop DOCX with header
+        $phpWordKop = new \PhpOffice\PhpWord\PhpWord();
+        $sectionKop = $phpWordKop->addSection();
+        $header = $sectionKop->addHeader();
+        $header->addText("PT JBM MASTER KOP HEADER");
+
+        $tmpKop = tempnam(sys_get_temp_dir(), 'test_mkop_') . '.docx';
+        $writerKop = \PhpOffice\PhpWord\IOFactory::createWriter($phpWordKop, 'Word2007');
+        $writerKop->save($tmpKop);
+        $kopDocx = file_get_contents($tmpKop);
+        @unlink($tmpKop);
+
         $softFilePath = 'corporate_soft_files/master_template.docx';
-        $disk->put($softFilePath, 'MASTER_CONTENT_XYZ');
+        $disk->put($softFilePath, $kopDocx);
 
         $softFile = CorporateSoftFile::create([
             'title' => 'Master Template Alpha',
@@ -199,7 +267,18 @@ class CorporateSoftFileTest extends TestCase
             'status' => 'draft',
         ]);
         $docPath = 'documents/' . $doc->id . '/v1.docx';
-        $disk->put($docPath, 'OLD_CONTENT');
+
+        $phpWordDoc = new \PhpOffice\PhpWord\PhpWord();
+        $sectionDoc = $phpWordDoc->addSection();
+        $sectionDoc->addText("Isi Dokumen Asli Alpha");
+
+        $tmpDoc = tempnam(sys_get_temp_dir(), 'test_mdoc_') . '.docx';
+        $writerDoc = \PhpOffice\PhpWord\IOFactory::createWriter($phpWordDoc, 'Word2007');
+        $writerDoc->save($tmpDoc);
+        $userDocx = file_get_contents($tmpDoc);
+        @unlink($tmpDoc);
+
+        $disk->put($docPath, $userDocx);
 
         $version = $doc->versions()->create([
             'version_number' => 1,
@@ -219,8 +298,23 @@ class CorporateSoftFileTest extends TestCase
         $response->assertOk();
         $response->assertJson(['success' => true]);
 
-        // Verify file content in storage is updated with master soft file
-        $this->assertEquals('MASTER_CONTENT_XYZ', $disk->get($docPath));
+        // Verify file content in storage has the header and preserved user body
+        $appliedDocx = $disk->get($docPath);
+        $this->assertNotEmpty($appliedDocx);
+        $this->assertStringStartsWith('PK', $appliedDocx);
+
+        $tmpCheck = tempnam(sys_get_temp_dir(), 'chk_app_');
+        file_put_contents($tmpCheck, $appliedDocx);
+        $zip = new \ZipArchive();
+        $zip->open($tmpCheck);
+        $docXml = $zip->getFromName('word/document.xml');
+        $hdrXml = $zip->getFromName('word/header1.xml');
+        $zip->close();
+        @unlink($tmpCheck);
+
+        $this->assertNotEmpty($hdrXml, 'Header XML should exist');
+        $this->assertStringContainsString('PT JBM MASTER KOP HEADER', $hdrXml);
+        $this->assertStringContainsString('Isi Dokumen Asli Alpha', $docXml);
 
         // Verify document tracks which corporate soft file was applied
         $this->assertEquals($softFile->id, $doc->fresh()->corporate_soft_file_id);
@@ -467,6 +561,297 @@ class CorporateSoftFileTest extends TestCase
         $this->assertTrue($hasHeader, 'Header1 should exist');
         $this->assertStringContainsString('SURAT KEPUTUSAN DIREKSI NOMOR 999', $docXml, 'User content should be preserved');
         $this->assertStringContainsString('Menimbang: Kepentingan operasional.', $docXml, 'User content should be preserved');
+    }
+
+    public function test_apply_corporate_soft_file_preserves_explicit_headers_and_footers(): void
+    {
+        $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
+
+        // Create a DOCX with explicit header, explicit footer, and custom style
+        $phpWordKop = new \PhpOffice\PhpWord\PhpWord();
+        $sectionKop = $phpWordKop->addSection([
+            'marginTop' => 1200,
+            'marginBottom' => 1300,
+            'marginLeft' => 1400,
+            'marginRight' => 1400,
+            'headerHeight' => 600,
+            'footerHeight' => 600,
+        ]);
+        $header = $sectionKop->addHeader();
+        $header->addText("EXPLICIT HEADER PT DOCUFLOW");
+        $footer = $sectionKop->addFooter();
+        $footer->addText("EXPLICIT FOOTER GEDUNG DOCUFLOW LT 5");
+
+        $tmpKop = tempnam(sys_get_temp_dir(), 'test_exp_') . '.docx';
+        $writerKop = \PhpOffice\PhpWord\IOFactory::createWriter($phpWordKop, 'Word2007');
+        $writerKop->save($tmpKop);
+        $kopDocx = file_get_contents($tmpKop);
+        @unlink($tmpKop);
+
+        $softFilePath = 'corporate_soft_files/kop_explicit_hf_test.docx';
+        $disk->put($softFilePath, $kopDocx);
+
+        $softFile = CorporateSoftFile::create([
+            'title' => 'Kop Explicit HF Test',
+            'file_path' => $softFilePath,
+            'file_original_name' => 'kop_explicit_hf_test.docx',
+            'status' => 'active',
+            'is_all_companies' => true,
+            'is_all_branches' => true,
+            'allowed_roles' => ['staff'],
+            'created_by' => $this->admin->id,
+        ]);
+
+        $doc = Document::create([
+            'title' => 'Surat Explicit HF Test',
+            'document_number' => '101/EXPHF/IX/2026',
+            'document_type_id' => $this->docType->id,
+            'owner_id' => $this->staffA->id,
+            'company_id' => $this->companyA->id,
+            'branch_id' => $this->branchA->id,
+            'unit_kerja_id' => $this->unitKerjaA->id,
+            'status' => 'draft',
+        ]);
+        $docPath = 'documents/' . $doc->id . '/v1.docx';
+
+        $phpWordDoc = new \PhpOffice\PhpWord\PhpWord();
+        $sectionDoc = $phpWordDoc->addSection();
+        $sectionDoc->addText("Teks Asli Dokumen User Explicit HF");
+
+        $tmpDoc = tempnam(sys_get_temp_dir(), 'test_expdoc_') . '.docx';
+        $writerDoc = \PhpOffice\PhpWord\IOFactory::createWriter($phpWordDoc, 'Word2007');
+        $writerDoc->save($tmpDoc);
+        $userDocx = file_get_contents($tmpDoc);
+        @unlink($tmpDoc);
+
+        $disk->put($docPath, $userDocx);
+
+        $version = $doc->versions()->create([
+            'version_number' => 1,
+            'file_path' => $docPath,
+            'file_original_name' => 'Surat Explicit HF Test.docx',
+            'content' => '',
+            'author_name' => $this->staffA->name,
+            'status' => 'pending',
+            'author_id' => $this->staffA->id,
+        ]);
+        $doc->update(['current_version_id' => $version->id]);
+
+        $response = $this->actingAs($this->staffA)->postJson(
+            route('documents.corporate-soft-files.apply', [$doc, $softFile])
+        );
+
+        $response->assertOk();
+
+        // Verify that header1.xml and footer1.xml both exist and contain the explicit text
+        $appliedDocx = $disk->get($docPath);
+        $tmpCheck = tempnam(sys_get_temp_dir(), 'chk_exphf_');
+        file_put_contents($tmpCheck, $appliedDocx);
+        $zip = new \ZipArchive();
+        $zip->open($tmpCheck);
+        $hdrXml = $zip->getFromName('word/header1.xml');
+        $ftrXml = $zip->getFromName('word/footer1.xml');
+        $docXml = $zip->getFromName('word/document.xml');
+        $zip->close();
+        @unlink($tmpCheck);
+
+        $this->assertNotEmpty($hdrXml, 'Header1 should exist');
+        $this->assertStringContainsString('EXPLICIT HEADER PT DOCUFLOW', $hdrXml);
+        $this->assertNotEmpty($ftrXml, 'Footer1 should exist');
+        $this->assertStringContainsString('EXPLICIT FOOTER GEDUNG DOCUFLOW LT 5', $ftrXml);
+        $this->assertStringContainsString('Teks Asli Dokumen User Explicit HF', $docXml);
+        $this->assertStringContainsString('w:footerReference', $docXml);
+    }
+
+    public function test_admin_can_upload_a4_docx_successfully(): void
+    {
+        // Generate an A4 DOCX (11906 x 16838 twips)
+        $phpWord = new \PhpOffice\PhpWord\PhpWord();
+        $section = $phpWord->addSection([
+            'pageSizeW' => 11906,
+            'pageSizeH' => 16838,
+        ]);
+        $header = $section->addHeader();
+        $header->addText("Kop Surat A4 Cabang Jakarta");
+
+        $tmp = tempnam(sys_get_temp_dir(), 'test_a4_') . '.docx';
+        $writer = \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007');
+        $writer->save($tmp);
+
+        $file = new UploadedFile($tmp, 'kop_a4.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', null, true);
+
+        $response = $this->actingAs($this->admin)->post(route('admin.corporate-soft-files.store'), [
+            'title' => 'Kop Surat A4 Jakarta',
+            'paper_size' => 'a4',
+            'file' => $file,
+            'is_all_companies' => '1',
+            'is_all_branches' => '1',
+        ]);
+
+        @unlink($tmp);
+
+        $response->assertRedirect(route('admin.corporate-soft-files.index'));
+        $response->assertSessionHas('success');
+
+        $this->assertDatabaseHas('corporate_soft_files', [
+            'title' => 'Kop Surat A4 Jakarta',
+            'paper_size' => 'a4',
+        ]);
+    }
+
+    public function test_admin_uploading_non_a4_docx_with_target_a4_is_accepted_and_converted_to_a4(): void
+    {
+        $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
+
+        // Generate an F4 DOCX (11906 x 18709 twips)
+        $phpWord = new \PhpOffice\PhpWord\PhpWord();
+        $section = $phpWord->addSection([
+            'pageSizeW' => 11906,
+            'pageSizeH' => 18709,
+        ]);
+        $header = $section->addHeader();
+        $header->addText("Kop Surat Asli F4 yang akan dikonversi ke A4");
+
+        $tmp = tempnam(sys_get_temp_dir(), 'test_f4_as_a4_') . '.docx';
+        $writer = \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007');
+        $writer->save($tmp);
+
+        $file = new UploadedFile($tmp, 'kop_f4.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', null, true);
+
+        $response = $this->actingAs($this->admin)->post(route('admin.corporate-soft-files.store'), [
+            'title' => 'Kop Surat Otomatis Konversi A4',
+            'paper_size' => 'a4',
+            'file' => $file,
+            'is_all_companies' => '1',
+            'is_all_branches' => '1',
+        ]);
+
+        @unlink($tmp);
+
+        $response->assertRedirect(route('admin.corporate-soft-files.index'));
+        $response->assertSessionHas('success');
+
+        $this->assertDatabaseHas('corporate_soft_files', [
+            'title' => 'Kop Surat Otomatis Konversi A4',
+            'paper_size' => 'a4',
+        ]);
+
+        $softFile = CorporateSoftFile::where('title', 'Kop Surat Otomatis Konversi A4')->first();
+        $storedContent = $disk->get($softFile->file_path);
+
+        $tmpCheck = tempnam(sys_get_temp_dir(), 'chk_conv_a4_');
+        file_put_contents($tmpCheck, $storedContent);
+        $zip = new \ZipArchive();
+        $zip->open($tmpCheck);
+        $docXml = $zip->getFromName('word/document.xml');
+        $zip->close();
+        @unlink($tmpCheck);
+
+        // Stored DOCX must be converted to A4 (16838 twips height)
+        $this->assertMatchesRegularExpression('/<w:pgSz\b[^>]*w:h="16838"[^>]*\/>|<w:pgSz\b[^>]*w:w="11906"\s+w:h="16838"/i', $docXml);
+    }
+
+    public function test_apply_a4_corporate_soft_file_locks_document_to_a4(): void
+    {
+        $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
+
+        // 1. Create A4 master kop
+        $phpWordKop = new \PhpOffice\PhpWord\PhpWord();
+        $sectionKop = $phpWordKop->addSection([
+            'pageSizeW' => 11906,
+            'pageSizeH' => 16838,
+        ]);
+        $header = $sectionKop->addHeader();
+        $header->addText("HEADER RESMI A4 PT DOCUFLOW");
+        $footer = $sectionKop->addFooter();
+        $footer->addText("FOOTER RESMI A4 PT DOCUFLOW");
+
+        $tmpKop = tempnam(sys_get_temp_dir(), 'test_a4kop_') . '.docx';
+        $writerKop = \PhpOffice\PhpWord\IOFactory::createWriter($phpWordKop, 'Word2007');
+        $writerKop->save($tmpKop);
+        $kopDocx = file_get_contents($tmpKop);
+        @unlink($tmpKop);
+
+        $softFilePath = 'corporate_soft_files/master_a4.docx';
+        $disk->put($softFilePath, $kopDocx);
+
+        $softFile = CorporateSoftFile::create([
+            'title' => 'Master Kop A4 Jakarta',
+            'paper_size' => 'a4',
+            'file_path' => $softFilePath,
+            'file_original_name' => 'master_a4.docx',
+            'status' => 'active',
+            'is_all_companies' => true,
+            'is_all_branches' => true,
+            'allowed_roles' => ['staff'],
+            'created_by' => $this->admin->id,
+        ]);
+
+        // 2. User creates a document in F4
+        $doc = Document::create([
+            'title' => 'Surat A4 Lock Test',
+            'document_number' => '202/A4LOCK/IX/2026',
+            'document_type_id' => $this->docType->id,
+            'owner_id' => $this->staffA->id,
+            'company_id' => $this->companyA->id,
+            'branch_id' => $this->branchA->id,
+            'unit_kerja_id' => $this->unitKerjaA->id,
+            'status' => 'draft',
+        ]);
+        $docPath = 'documents/' . $doc->id . '/v1.docx';
+
+        $phpWordDoc = new \PhpOffice\PhpWord\PhpWord();
+        $sectionDoc = $phpWordDoc->addSection([
+            'pageSizeW' => 11906,
+            'pageSizeH' => 18709,
+        ]);
+        $sectionDoc->addText("Isi Dokumen A4 Lock Test");
+
+        $tmpDoc = tempnam(sys_get_temp_dir(), 'test_a4doc_') . '.docx';
+        $writerDoc = \PhpOffice\PhpWord\IOFactory::createWriter($phpWordDoc, 'Word2007');
+        $writerDoc->save($tmpDoc);
+        $userDocx = file_get_contents($tmpDoc);
+        @unlink($tmpDoc);
+
+        $disk->put($docPath, $userDocx);
+
+        $version = $doc->versions()->create([
+            'version_number' => 1,
+            'file_path' => $docPath,
+            'file_original_name' => 'Surat A4 Lock Test.docx',
+            'content' => '',
+            'author_name' => $this->staffA->name,
+            'status' => 'pending',
+            'author_id' => $this->staffA->id,
+        ]);
+        $doc->update(['current_version_id' => $version->id]);
+
+        $response = $this->actingAs($this->staffA)->postJson(
+            route('documents.corporate-soft-files.apply', [$doc, $softFile])
+        );
+
+        $response->assertOk();
+
+        // 3. Inspect the applied document: must be A4 (w:w="11906" w:h="16838")
+        $appliedDocx = $disk->get($docPath);
+        $tmpCheck = tempnam(sys_get_temp_dir(), 'chk_a4lock_');
+        file_put_contents($tmpCheck, $appliedDocx);
+        $zip = new \ZipArchive();
+        $zip->open($tmpCheck);
+        $docXml = $zip->getFromName('word/document.xml');
+        $hdrXml = $zip->getFromName('word/header1.xml');
+        $ftrXml = $zip->getFromName('word/footer1.xml');
+        $zip->close();
+        @unlink($tmpCheck);
+
+        $this->assertNotEmpty($hdrXml);
+        $this->assertStringContainsString('HEADER RESMI A4 PT DOCUFLOW', $hdrXml);
+        $this->assertNotEmpty($ftrXml);
+        $this->assertStringContainsString('FOOTER RESMI A4 PT DOCUFLOW', $ftrXml);
+        $this->assertStringContainsString('Isi Dokumen A4 Lock Test', $docXml);
+
+        // Page size in document.xml must be A4 (16838 twips height)
+        $this->assertMatchesRegularExpression('/<w:pgSz\b[^>]*w:h="16838"[^>]*\/>|<w:pgSz\b[^>]*w:w="11906"\s+w:h="16838"/i', $docXml);
     }
 }
 
