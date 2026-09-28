@@ -407,72 +407,80 @@
                                 $unseenInGroup = $groupDocs->whereNull('director_read_at')->count();
                                 $totalInGroup = $groupDocs->count();
                             @endphp
-                            <div class="bg-base-100 border border-base-300 rounded-2xl p-3.5 sm:p-5 shadow-xs transition-all space-y-3 sm:space-y-4">
-                                {{-- Card Header: Click to collapse/expand --}}
+                            <div class="bg-base-100 border border-base-300 rounded-2xl shadow-xs overflow-hidden transition-all duration-200">
+                                {{-- Card Header: Clean, minimal, click to collapse/expand --}}
                                 <div @click="openDays['{{ $dateKey }}'] = !openDays['{{ $dateKey }}']" 
-                                     class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer select-none group/day">
-                                    <div class="flex items-start sm:items-center gap-2.5 sm:gap-3 min-w-0">
-                                        <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl {{ $unseenInGroup > 0 ? 'bg-primary/10 text-primary' : 'bg-success/10 text-success' }} flex items-center justify-center font-bold text-xs shadow-xs group-hover/day:bg-primary group-hover/day:text-white transition-colors shrink-0 mt-0.5 sm:mt-0">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                            </svg>
-                                        </div>
-                                        <div class="min-w-0 flex-1">
-                                            <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                                                <h4 class="font-bold text-xs sm:text-sm text-base-content group-hover/day:text-primary transition-colors whitespace-nowrap">
-                                                    {{ $groupDate->translatedFormat('d F Y') }}
-                                                </h4>
-                                                @if($groupDate->isToday())
-                                                    <span class="badge badge-xs sm:badge-sm badge-secondary text-white font-bold shrink-0 whitespace-nowrap">{{ __('Hari Ini') }}</span>
-                                                @elseif($groupDate->isYesterday())
-                                                    <span class="badge badge-xs sm:badge-sm badge-ghost text-xs font-semibold shrink-0 whitespace-nowrap">{{ __('Kemarin') }}</span>
-                                                @endif
-
-                                                {{-- Review Status Badge for this day --}}
-                                                @if($unseenInGroup > 0)
-                                                    <span class="badge badge-warning badge-xs sm:badge-sm font-semibold gap-1 text-[10px] sm:text-[11px] border border-warning/30 shrink-0 whitespace-nowrap">
-                                                        <span class="w-1.5 h-1.5 rounded-full bg-warning animate-pulse"></span>
-                                                        {{ __(':count Belum Ditinjau', ['count' => $unseenInGroup]) }}
-                                                    </span>
-                                                @else
-                                                    <span class="badge badge-success/15 text-success border border-success/30 badge-xs sm:badge-sm font-semibold gap-1 text-[10px] sm:text-[11px] shrink-0 whitespace-nowrap">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
-                                                        {{ __('Semua Ditinjau') }}
-                                                    </span>
-                                                @endif
-                                            </div>
-                                            <p class="text-[11px] text-base-content/60 mt-0.5 truncate">
-                                                {{ __(':count dokumen diaktifkan pada tanggal ini', ['count' => $totalInGroup]) }}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <div class="w-full sm:w-auto flex items-center justify-between sm:justify-end gap-2 pt-2.5 sm:pt-0 border-t sm:border-t-0 border-base-200/60 shrink-0">
-                                        {{-- 1-Click Day Review Button if there are unseen docs in this group --}}
-                                        @if($unseenInGroup > 0)
-                                            <button type="button" 
-                                                    @click.stop="acknowledgeGroup(@json($groupDocs->whereNull('director_read_at')->pluck('id')))" 
-                                                    class="btn btn-ghost btn-xs text-[10px] sm:text-[11px] text-primary hover:bg-primary/10 hover:border-primary/30 border border-transparent font-semibold gap-1 rounded-lg px-2 sm:px-2.5 shrink-0 whitespace-nowrap"
-                                                    title="{{ __('Tandai semua dokumen pada tanggal ini sebagai sudah ditinjau') }}">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
-                                                <span>{{ __('Tandai 1 Hari Selesai') }}</span>
-                                            </button>
-                                        @endif
-
-                                        <div class="flex items-center gap-2 shrink-0 ml-auto sm:ml-0">
-                                            <span class="badge badge-xs sm:badge-sm badge-ghost font-bold border-base-300 shrink-0 whitespace-nowrap leading-normal py-1 px-2">{{ $totalInGroup }} {{ __('Dokumen') }}</span>
-                                            <div class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-base-200/60 flex items-center justify-center text-base-content/60 group-hover/day:bg-base-200 transition-transform duration-200 shrink-0" 
-                                                 :class="{ 'rotate-180': openDays['{{ $dateKey }}'] }">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                     class="p-3.5 sm:p-4.5 cursor-pointer select-none hover:bg-base-200/50 transition-colors group/day">
+                                    <div class="flex items-center justify-between gap-3">
+                                        {{-- Left: Icon + Date & Subtitle Info --}}
+                                        <div class="flex items-center gap-3 min-w-0 flex-1">
+                                            <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl {{ $unseenInGroup > 0 ? 'bg-primary/10 text-primary ring-1 ring-primary/20' : 'bg-base-200 text-base-content/70 ring-1 ring-base-300' }} flex items-center justify-center font-bold text-xs shrink-0 shadow-xs group-hover/day:scale-105 transition-all duration-200">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4.5 h-4.5 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                                 </svg>
                                             </div>
+                                            <div class="min-w-0 flex-1">
+                                                {{-- Line 1: Date Title + Context Badge (Always strictly non-wrapping) --}}
+                                                <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                                                    <h4 class="font-bold text-sm sm:text-base text-base-content group-hover/day:text-primary transition-colors whitespace-nowrap">
+                                                        {{ $groupDate->translatedFormat('d F Y') }}
+                                                    </h4>
+                                                    @if($groupDate->isToday())
+                                                        <span class="badge badge-secondary badge-xs sm:badge-sm text-white font-bold shrink-0 shadow-xs">{{ __('Hari Ini') }}</span>
+                                                    @elseif($groupDate->isYesterday())
+                                                        <span class="badge badge-ghost badge-xs sm:badge-sm font-semibold border-base-300 text-base-content/70 shrink-0">{{ __('Kemarin') }}</span>
+                                                    @endif
+                                                </div>
+
+                                                {{-- Line 2: Count + High-Contrast Status Badge --}}
+                                                <div class="flex items-center gap-1.5 sm:gap-2 mt-1 flex-wrap">
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] sm:text-xs font-semibold bg-base-200 text-base-content/80 border border-base-300 shrink-0">
+                                                        {{ $totalInGroup }} {{ __('Dokumen') }}
+                                                    </span>
+
+                                                    @if($unseenInGroup > 0)
+                                                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] sm:text-xs font-bold bg-amber-100 text-amber-900 dark:bg-amber-950/70 dark:text-amber-200 border border-amber-300 dark:border-amber-700/60 shrink-0">
+                                                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                                            <span>{{ __(':count Belum Ditinjau', ['count' => $unseenInGroup]) }}</span>
+                                                        </span>
+                                                    @else
+                                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] sm:text-xs font-semibold bg-emerald-100 text-emerald-900 dark:bg-emerald-950/70 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700/60 shrink-0">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                                                            <span>{{ __('Semua Ditinjau') }}</span>
+                                                        </span>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {{-- Right: Chevron Toggle Only --}}
+                                        <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-base-200/80 flex items-center justify-center text-base-content/60 group-hover/day:bg-base-200 group-hover/day:text-base-content transition-all duration-200 shrink-0 ml-1 sm:ml-2" 
+                                             :class="{ 'rotate-180': openDays['{{ $dateKey }}'] }">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
+                                            </svg>
                                         </div>
                                     </div>
                                 </div>
 
                                 {{-- Card Body (Collapsible Content) --}}
-                                <div x-show="openDays['{{ $dateKey }}']" x-transition class="pt-3 border-t border-base-200/70">
+                                <div x-show="openDays['{{ $dateKey }}']" x-transition class="p-4 sm:p-5 pt-0 space-y-4">
+                                    {{-- Sub-header Action Bar inside opened card --}}
+                                    <div class="pt-3 border-t border-base-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                                        <p class="text-xs text-base-content/60">
+                                            {{ __('Menampilkan :count dokumen aktif pada tanggal ini.', ['count' => $totalInGroup]) }}
+                                        </p>
+                                        @if($unseenInGroup > 0)
+                                            <button type="button" 
+                                                    @click="acknowledgeGroup(@json($groupDocs->whereNull('director_read_at')->pluck('id')))" 
+                                                    class="btn btn-secondary btn-xs sm:btn-sm text-white font-semibold gap-1.5 rounded-xl shadow-xs self-start sm:self-auto shrink-0"
+                                                    title="{{ __('Tandai semua dokumen pada tanggal ini sebagai sudah ditinjau') }}">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                                                <span>{{ __('Tandai 1 Hari Selesai (:count)', ['count' => $unseenInGroup]) }}</span>
+                                            </button>
+                                        @endif
+                                    </div>
+
                                     @if($viewMode === 'grid')
                                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-stretch">
                                             @foreach($groupDocs as $doc)
