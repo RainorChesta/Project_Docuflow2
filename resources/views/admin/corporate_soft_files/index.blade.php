@@ -343,11 +343,50 @@
 
             {{-- Modal Body Viewport --}}
             <div class="flex-1 bg-base-200/40 p-0 overflow-hidden relative flex flex-col items-center justify-center">
-                {{-- Spinner Loader --}}
-                <div id="modal-sf-loader" class="absolute inset-0 bg-base-100/90 z-20 flex flex-col items-center justify-center gap-2">
-                    <span class="loading loading-spinner loading-md text-primary"></span>
-                    <span class="text-xs text-base-content/60 font-medium">{{ __('Memuat pratinjau soft file...') }}</span>
+                {{-- DokuFlow ONLYOFFICE-Style Animated Loader --}}
+                <div id="modal-sf-loader" class="absolute inset-0 bg-base-100/95 backdrop-blur-xs z-20 flex flex-col items-center justify-center p-6 transition-all duration-300">
+                    <div class="flex flex-col items-center justify-center text-center">
+                        <div class="relative w-[88px] h-[88px] flex items-center justify-center mb-3">
+                            {{-- Aura Glow --}}
+                            <div class="absolute w-[100px] h-[100px] rounded-full blur-md opacity-70 animate-pulse"
+                                 style="background: radial-gradient(circle, rgba(37, 99, 235, 0.35) 0%, rgba(16, 185, 129, 0.25) 55%, transparent 72%);"></div>
+                            
+                            {{-- Rotating Gradient Conic Ring --}}
+                            <div class="relative w-[78px] h-[78px] rounded-full p-[3px] shadow-lg shadow-primary/20 flex items-center justify-center animate-spin"
+                                 style="background: conic-gradient(from 0deg, #2563eb, #10b981, #06b6d4, #2563eb); animation-duration: 1.8s;">
+                                <div class="w-full h-full bg-base-100 rounded-full"></div>
+                            </div>
+
+                            {{-- Floating DokuFlow SVG Logo --}}
+                            <div class="absolute inset-0 flex items-center justify-center pointer-events-none" style="animation: dokuflowModalFloat 2.2s ease-in-out infinite;">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-11 h-11 drop-shadow-md" fill="none">
+                                    <rect x="18" y="12" width="50" height="70" rx="10" fill="#2563EB"/>
+                                    <rect x="25" y="8" width="42" height="54" rx="7" fill="#FFFFFF" opacity="0.97"/>
+                                    <rect x="33" y="21" width="26" height="4.5" rx="2.25" fill="#94A3B8"/>
+                                    <rect x="33" y="31" width="20" height="4.5" rx="2.25" fill="#94A3B8"/>
+                                    <rect x="33" y="41" width="26" height="4.5" rx="2.25" fill="#94A3B8"/>
+                                    <path d="M20 63 C23 83 41 83 54 83 L63 83 C76 83 80 69 80 54 L80 43 C64 43 54 53 44 63 Z" fill="#10B981"/>
+                                    <path d="M24 68 L41 68 L41 63 L51 71 L41 79 L41 74 L24 74 Z" fill="#FFFFFF"/>
+                                    <circle cx="68" cy="71" r="13" fill="#059669" stroke="#FFFFFF" stroke-width="2.5"/>
+                                    <path d="M62 71 L66 75 L74 65" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </div>
+                        </div>
+
+                        {{-- Loader Text --}}
+                        <div class="text-center">
+                            <h4 class="font-bold text-sm text-base-content tracking-wide">DokuFlow</h4>
+                            <p class="text-xs font-medium text-base-content/60 mt-0.5">{{ __('Memuat pratinjau soft file...') }}</p>
+                        </div>
+                    </div>
                 </div>
+
+                <style>
+                    @keyframes dokuflowModalFloat {
+                        0%, 100% { transform: translateY(0px) scale(1); }
+                        50% { transform: translateY(-3px) scale(1.04); }
+                    }
+                </style>
 
                 {{-- Image Viewport Container --}}
                 <div id="modal-sf-image-container" class="hidden w-full h-full flex flex-col items-center justify-start overflow-auto p-4 sm:p-8 bg-slate-900/5 dark:bg-base-300/30">

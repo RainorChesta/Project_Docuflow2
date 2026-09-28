@@ -55,4 +55,19 @@ return [
     */
     'autosave' => env('ONLYOFFICE_AUTOSAVE', true),
     'forcesave' => env('ONLYOFFICE_FORCESAVE', true),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Remote Docker / SSH Configuration (for Multi-Server setups)
+    |--------------------------------------------------------------------------
+    |
+    | When OnlyOffice container is hosted on a separate server (e.g. 202.10.46.4),
+    | configure SSH connection details for remote operations and F4 patching.
+    |
+    */
+    'container' => env('ONLYOFFICE_CONTAINER', 'dokuflow-onlyoffice'),
+    'ssh_host'  => env('ONLYOFFICE_SSH_HOST', null),
+    'ssh_port'  => env('ONLYOFFICE_SSH_PORT', 22),
+    'ssh_user'  => env('ONLYOFFICE_SSH_USER', 'root'),
+    'ssh_key'   => env('ONLYOFFICE_SSH_KEY', null),
 ];

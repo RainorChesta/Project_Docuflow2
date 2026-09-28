@@ -21,7 +21,7 @@
         <!-- Scripts & Styles -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
-    <body class="h-screen max-h-[100dvh] w-full bg-gradient-to-br from-primary/10 via-base-200 to-secondary/10 font-sans antialiased flex flex-col justify-between p-3 sm:p-4 md:p-6 overflow-y-auto [@media(min-height:600px)_and_(min-width:768px)]:overflow-y-hidden"
+    <body class="min-h-screen min-h-[100dvh] w-full bg-gradient-to-br from-primary/10 via-base-200 to-secondary/10 font-sans antialiased flex flex-col justify-between p-4 sm:p-6 md:p-8 overflow-y-auto"
           x-data="{
               hasUnitKerja: {{ !empty($hasUnitKerja) ? 'true' : 'false' }},
               unitKerjaNames: {{ Js::from($unitKerjaNames ?? []) }},
@@ -95,7 +95,7 @@
               }
           }">
         <!-- Top Controls: Logo, Language & Theme -->
-        <header class="w-full max-w-xl md:max-w-2xl mx-auto flex justify-between items-center shrink-0 mb-2 sm:mb-3">
+        <header class="w-full max-w-xl md:max-w-2xl mx-auto flex justify-between items-center shrink-0 mb-4 sm:mb-6">
             <div class="flex items-center gap-2">
                 <a href="/" class="flex items-center gap-2 text-base-content hover:opacity-80 transition-opacity">
                     <x-application-logo class="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
@@ -108,12 +108,12 @@
             </div>
         </header>
 
-        <!-- Main Locked Card (Responsive, Longer / Better Screen Utilization, Fits 100vh) -->
-        <div class="w-full max-w-xl md:max-w-2xl mx-auto my-auto card bg-base-100 shadow-xl border border-base-200 dark:border-base-300 overflow-hidden shrink min-h-0">
+        <!-- Main Locked Card (Responsive, Naturally Centered with Smooth Scrolling) -->
+        <div class="w-full max-w-xl md:max-w-2xl mx-auto my-auto card bg-base-100 shadow-2xl border border-base-200 dark:border-base-300 overflow-hidden shrink-0">
             <!-- Top Brand Accent Ribbon -->
             <div class="h-1.5 w-full bg-gradient-to-r from-primary via-primary/80 to-accent shrink-0"></div>
 
-            <div class="card-body p-4 sm:p-5 md:p-6 space-y-3 sm:space-y-3.5">
+            <div class="card-body p-4 sm:p-6 md:p-7 space-y-3.5 sm:space-y-4">
                 <!-- 1. Header: Icon, Status Pill & Title -->
                 <div class="flex items-start sm:items-center gap-3 sm:gap-4">
                     <!-- Security Lock Icon with Pulse Aura -->
@@ -406,7 +406,7 @@
         </div>
 
         <!-- Footer -->
-        <footer class="w-full text-center text-[10.5px] sm:text-[11px] text-base-content/40 shrink-0 mt-2">
+        <footer class="w-full text-center text-xs text-base-content/40 shrink-0 mt-4 sm:mt-6 pb-2">
             &copy; {{ date('Y') }} {{ config('app.name', 'DokuFlow') }} &bull; Enterprise Document Workflow System
         </footer>
     </body>

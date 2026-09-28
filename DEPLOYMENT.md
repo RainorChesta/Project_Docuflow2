@@ -89,13 +89,52 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
+    # ONLYOFFICE Document Server Reverse Proxy (Rumahweb Server 202.10.46.4:8884)
+    location ^~ /ds-vpath/ {
+        proxy_pass http://202.10.46.4:8884/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "Upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host $host/ds-vpath;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
     location ~ \.php$ {
-        include snippets/fastcgi-php.conf;
         fastcgi_pass unix:/var/run/php/php8.3-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
     }
 
     location ~ /\.ht {
         deny all;
+    }
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name dokuflow.cmhgroup.id;
+
+    root /var/www/dokuflow.cmhgroup.id/public;
+    index index.php index.html;
+
+    # Handle ONLYOFFICE container internal HTTP requests directly (without SSL)
+    location ^~ /onlyoffice/ {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        fastcgi_pass unix:/var/run/php/php8.3-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
     }
 }
 ```
@@ -228,31 +267,99 @@ php -r "echo bin2hex(random_bytes(32));"
 
 ---
 
-### 4.3 Deploying via Docker (Recommended Production Approach)
+### 4.3 Multi-Server Architecture & Deployment on RumahWeb
 
-Docker is the safest and recommended method because it encapsulates PostgreSQL, RabbitMQ, and C++ dependencies in an isolated container without conflicting with host web servers (cPanel, Nginx, or Apache).
+DokuFlow in production operates on a multi-server setup:
+- **Application Web Server**: `hyu.cmhgroup.id` (`/var/www/dokuflow.cmhgroup.id/`)
+- **ONLYOFFICE Document Server**: Dedicated RumahWeb VPS (`202.10.46.4:8884`), running container `dokuflow-onlyoffice`.
+- **Reverse Proxy**: Nginx on `hyu.cmhgroup.id` forwards browser traffic from `/ds-vpath/` to `http://202.10.46.4:8884/`.
 
-#### Method 1: Single `docker run` Command (Fastest)
+---
 
-Run this command on your ONLYOFFICE server (replace `<YOUR_GENERATED_JWT_SECRET>` with the key generated above):
+#### 4.3.1 Syncing Custom Brand & F4 Assets to RumahWeb Server
+
+To provide native **F4 (21 x 33 cm)** paper presets and custom **DokuFlow** branding that persist across container restarts, sync the custom asset directory from the web server to the RumahWeb server:
 
 ```bash
+# 1. From web server (hyu.cmhgroup.id), transfer files to RumahWeb user home directory:
+scp -r /var/www/dokuflow.cmhgroup.id/docker/onlyoffice wito_general@202.10.46.4:~/custom_assets
+
+# 2. On RumahWeb server (202.10.46.4), move custom assets to /opt/onlyoffice/ (run as root or sudo):
+sudo mkdir -p /opt/onlyoffice
+sudo mv /home/wito_general/custom_assets /opt/onlyoffice/custom_assets
+sudo chown -R root:root /opt/onlyoffice/custom_assets
+```
+
+Verify that `/opt/onlyoffice/custom_assets` contains `app/`, `code.js`, `common/`, etc.:
+```bash
+ls -la /opt/onlyoffice/custom_assets
+```
+
+---
+
+#### 4.3.2 Method 1: Single `docker run` Command with Volume Mounts (Recommended without Docker Compose)
+
+If Docker Compose is not installed on your RumahWeb server, use `docker run` with volume mounts to permanently embed F4 paper sizes and DokuFlow custom branding: 
+
+```bash
+# 1. Stop and remove existing container if running
+docker stop dokuflow-onlyoffice && docker rm dokuflow-onlyoffice
+
+# 2. Run ONLYOFFICE container with persistent data & custom asset volume mounts
 docker run -d -p 8884:80 \
   --name dokuflow-onlyoffice \
   --restart=always \
   -e JWT_ENABLED=true \
-  -e JWT_SECRET=<YOUR_GENERATED_JWT_SECRET> \
+  -e JWT_SECRET=de1e91347d7abd4c831649a098693b4c21fcc932f21b9b97fc7bec2dbb957f6d \
   -e JWT_HEADER=Authorization \
+  -e JWT_IN_BODY=true \
   -v /app/onlyoffice/DocumentServer/logs:/var/log/onlyoffice \
   -v /app/onlyoffice/DocumentServer/data:/var/www/onlyoffice/Data \
   -v /app/onlyoffice/DocumentServer/lib:/var/lib/onlyoffice \
   -v /app/onlyoffice/DocumentServer/db:/var/lib/postgresql \
+  -v /opt/onlyoffice/custom_assets/app/view/PageSizeDialog.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/PageSizeDialog.js:ro \
+  -v /opt/onlyoffice/custom_assets/app/view/PageSizeDialog.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/PageSizeDialog.js.gz:ro \
+  -v /opt/onlyoffice/custom_assets/app/view/FileMenuPanels.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/FileMenuPanels.js:ro \
+  -v /opt/onlyoffice/custom_assets/app/view/FileMenuPanels.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/FileMenuPanels.js.gz:ro \
+  -v /opt/onlyoffice/custom_assets/app/view/Toolbar.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/Toolbar.js:ro \
+  -v /opt/onlyoffice/custom_assets/app/view/Toolbar.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/Toolbar.js.gz:ro \
+  -v /opt/onlyoffice/custom_assets/app/controller/Main.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/controller/Main.js:ro \
+  -v /opt/onlyoffice/custom_assets/app/controller/Main.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/controller/Main.js.gz:ro \
+  -v /opt/onlyoffice/custom_assets/code.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/code.js:ro \
+  -v /opt/onlyoffice/custom_assets/code.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/code.js.gz:ro \
+  -v /opt/onlyoffice/custom_assets/common/img/dokuflow-logo.webp:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/dokuflow-logo.webp:ro \
+  -v /opt/onlyoffice/custom_assets/common/img/header/header-logo_s.svg:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/header/header-logo_s.svg:ro \
+  -v /opt/onlyoffice/custom_assets/common/img/header/header-logo_s.svg.gz:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/header/header-logo_s.svg.gz:ro \
+  -v /opt/onlyoffice/custom_assets/common/lib/view/Header.js:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/lib/view/Header.js:ro \
+  -v /opt/onlyoffice/custom_assets/common/lib/view/Header.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/lib/view/Header.js.gz:ro \
+  -v /opt/onlyoffice/custom_assets/documenteditor/main/index_loader.html:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/index_loader.html:ro \
+  -v /opt/onlyoffice/custom_assets/documenteditor/main/index_loader.html.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/index_loader.html.gz:ro \
   onlyoffice/documentserver:latest
+
+# 3. Allow Private IP addresses for downloading docs from DokuFlow:
+docker exec -it dokuflow-onlyoffice sed -i 's/"allowPrivateIPAddress": false/"allowPrivateIPAddress": true/g' /etc/onlyoffice/documentserver/default.json
+docker exec -it dokuflow-onlyoffice supervisorctl restart all
 ```
 
-#### Method 2: Docker Compose (`docker-compose.yml`)
+---
 
-Create `/opt/onlyoffice/docker-compose.yml` on the ONLYOFFICE server:
+#### 4.3.3 Method 2: Live In-Container Patching (Zero-Downtime Script)
+
+If you already have `dokuflow-onlyoffice` running and do not want to restart or recreate the container, run the automated Python patch script directly inside the container:
+
+```bash
+# Option A: Run directly in RumahWeb server terminal
+docker exec -i dokuflow-onlyoffice python3 - < patch_onlyoffice_f4.py
+
+# Option B: Run via Artisan command from web server (hyu.cmhgroup.id)
+php artisan onlyoffice:setup-f4 --ssh-host=202.10.46.4 --ssh-user=root
+```
+
+---
+
+#### 4.3.4 Method 3: Docker Compose (`docker-compose.yml`)
+
+If Docker Compose is installed on the server, create `/opt/onlyoffice/docker-compose.yml`:
 
 ```yaml
 version: '3.8'
@@ -266,60 +373,36 @@ services:
       - "8884:80"
     environment:
       - JWT_ENABLED=true
-      - JWT_SECRET=<YOUR_GENERATED_JWT_SECRET>
+      - JWT_SECRET=de1e91347d7abd4c831649a098693b4c21fcc932f21b9b97fc7bec2dbb957f6d
       - JWT_HEADER=Authorization
       - JWT_IN_BODY=true
     volumes:
-      - /app/onlyoffice/logs:/var/log/onlyoffice
-      - /app/onlyoffice/data:/var/www/onlyoffice/Data
-      - /app/onlyoffice/lib:/var/lib/onlyoffice
-      - /app/onlyoffice/db:/var/lib/postgresql
+      - /app/onlyoffice/DocumentServer/logs:/var/log/onlyoffice
+      - /app/onlyoffice/DocumentServer/data:/var/www/onlyoffice/Data
+      - /app/onlyoffice/DocumentServer/lib:/var/lib/onlyoffice
+      - /app/onlyoffice/DocumentServer/db:/var/lib/postgresql
+      - /opt/onlyoffice/custom_assets/app/view/PageSizeDialog.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/PageSizeDialog.js:ro
+      - /opt/onlyoffice/custom_assets/app/view/PageSizeDialog.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/PageSizeDialog.js.gz:ro
+      - /opt/onlyoffice/custom_assets/app/view/FileMenuPanels.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/FileMenuPanels.js:ro
+      - /opt/onlyoffice/custom_assets/app/view/FileMenuPanels.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/FileMenuPanels.js.gz:ro
+      - /opt/onlyoffice/custom_assets/app/view/Toolbar.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/Toolbar.js:ro
+      - /opt/onlyoffice/custom_assets/app/view/Toolbar.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/Toolbar.js.gz:ro
+      - /opt/onlyoffice/custom_assets/app/controller/Main.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/controller/Main.js:ro
+      - /opt/onlyoffice/custom_assets/app/controller/Main.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/controller/Main.js.gz:ro
+      - /opt/onlyoffice/custom_assets/code.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/code.js:ro
+      - /opt/onlyoffice/custom_assets/code.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/code.js.gz:ro
+      - /opt/onlyoffice/custom_assets/common/img/dokuflow-logo.webp:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/dokuflow-logo.webp:ro
+      - /opt/onlyoffice/custom_assets/common/img/header/header-logo_s.svg:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/header/header-logo_s.svg:ro
+      - /opt/onlyoffice/custom_assets/common/img/header/header-logo_s.svg.gz:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/header/header-logo_s.svg.gz:ro
+      - /opt/onlyoffice/custom_assets/common/lib/view/Header.js:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/lib/view/Header.js:ro
+      - /opt/onlyoffice/custom_assets/common/lib/view/Header.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/lib/view/Header.js.gz:ro
+      - /opt/onlyoffice/custom_assets/documenteditor/main/index_loader.html:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/index_loader.html:ro
+      - /opt/onlyoffice/custom_assets/documenteditor/main/index_loader.html.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/index_loader.html.gz:ro
 ```
 
 Launch the service:
 ```bash
 docker compose up -d
-```
-
----
-
-### 4.3 Setting up Nginx Reverse Proxy with SSL (Optional / Production Domain)
-
-If hosting ONLYOFFICE on a subdomain (e.g. `office.cmhgroup.id`) with HTTPS:
-
-Create Nginx site config `/etc/nginx/sites-available/onlyoffice.conf`:
-
-```nginx
-server {
-    listen 80;
-    server_name office.cmhgroup.id;
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name office.cmhgroup.id;
-
-    ssl_certificate /etc/letsencrypt/live/office.cmhgroup.id/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/office.cmhgroup.id/privkey.pem;
-
-    location / {
-        proxy_pass http://127.0.0.1:8884;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "Upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-Enable site & reload Nginx:
-```bash
-ln -s /etc/nginx/sites-available/onlyoffice.conf /etc/nginx/sites-enabled/
-nginx -t && systemctl reload nginx
 ```
 
 ---
@@ -330,17 +413,22 @@ On your DokuFlow application server (`/var/www/dokuflow.cmhgroup.id/.env`):
 
 ```env
 # ONLYOFFICE Configuration
-# ONLYOFFICE_URL: Public URL of ONLYOFFICE Docker server (accessed by user browser)
-ONLYOFFICE_URL=http://<ONLYOFFICE_VPS_IP>:8884
+# ONLYOFFICE_URL: Public URL of ONLYOFFICE via Nginx ds-vpath reverse proxy
+ONLYOFFICE_URL=https://dokuflow.cmhgroup.id/ds-vpath
 
-# ONLYOFFICE_INTERNAL_URL: Public URL/IP of DokuFlow (accessed by ONLYOFFICE to download DOCX & post callbacks)
+# ONLYOFFICE_INTERNAL_URL: URL used by ONLYOFFICE container to download DOCX & post callbacks via HTTP port 80
 ONLYOFFICE_INTERNAL_URL=http://dokuflow.cmhgroup.id
 
 ONLYOFFICE_JWT_ENABLED=true
-ONLYOFFICE_JWT_SECRET=<YOUR_GENERATED_JWT_SECRET>
+ONLYOFFICE_JWT_SECRET=de1e91347d7abd4c831649a098693b4c21fcc932f21b9b97fc7bec2dbb957f6d
 DOCUMENT_STORAGE_DISK=local
 ONLYOFFICE_AUTOSAVE=false
 ONLYOFFICE_FORCESAVE=false
+
+# Remote SSH for Artisan setup-f4 command (optional)
+ONLYOFFICE_SSH_HOST=202.10.46.4
+ONLYOFFICE_SSH_USER=root
+ONLYOFFICE_CONTAINER=dokuflow-onlyoffice
 ```
 
 After updating `.env`, clear Laravel configuration cache:

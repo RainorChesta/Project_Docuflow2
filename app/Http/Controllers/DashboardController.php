@@ -91,7 +91,7 @@ class DashboardController extends Controller
 
             $documents = $query->latest()->paginate(15)->withQueryString();
 
-            $unitKerjas = UnitKerja::orderBy('code')->get();
+            $unitKerjas = UnitKerja::orderBy('kode_unit_kerja')->get();
             $documentTypes = DocumentType::orderBy('name')->get();
 
             return view('dashboard', compact('results', 'documents', 'unitKerjas', 'documentTypes'));

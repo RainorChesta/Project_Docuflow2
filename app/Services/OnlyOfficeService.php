@@ -125,8 +125,8 @@ class OnlyOfficeService
             return '';
         }
 
-        $cacheKey = 'oo_placeholder_png_' . md5(($text ?? '') . '_' . ($requestId ?? 0) . '_' . ($isStamp ? '1' : '0'));
-        return \Illuminate\Support\Facades\Cache::rememberForever($cacheKey, function () use ($text, $requestId, $isStamp) {
+        $cacheKey = 'oo_placeholder_png_b64_' . md5(($text ?? '') . '_' . ($requestId ?? 0) . '_' . ($isStamp ? '1' : '0'));
+        $cached = \Illuminate\Support\Facades\Cache::rememberForever($cacheKey, function () use ($text, $requestId, $isStamp) {
             $width = 400;
             $height = 400;
 
@@ -229,8 +229,11 @@ class OnlyOfficeService
             }
         }
 
-        return $imageData ?: '';
+        return base64_encode($imageData ?: '');
     });
+
+    $decoded = base64_decode($cached, true);
+    return $decoded !== false ? $decoded : '';
 }
 
     /**
@@ -280,8 +283,8 @@ class OnlyOfficeService
             return $rawPngBytes;
         }
 
-        $cacheKey = 'oo_sq_sig_' . md5($rawPngBytes) . '_' . $targetSize . '_' . $padding . '_' . ($requestId ?? 0) . '_' . ($isStamp ? '1' : '0');
-        return \Illuminate\Support\Facades\Cache::rememberForever($cacheKey, function () use ($rawPngBytes, $targetSize, $padding, $requestId, $isStamp) {
+        $cacheKey = 'oo_sq_sig_b64_' . md5($rawPngBytes) . '_' . $targetSize . '_' . $padding . '_' . ($requestId ?? 0) . '_' . ($isStamp ? '1' : '0');
+        $cached = \Illuminate\Support\Facades\Cache::rememberForever($cacheKey, function () use ($rawPngBytes, $targetSize, $padding, $requestId, $isStamp) {
             $src = @imagecreatefromstring($rawPngBytes);
             if (!$src) {
                 return $rawPngBytes;
@@ -447,8 +450,11 @@ class OnlyOfficeService
             }
         }
 
-        return $result ?: $rawPngBytes;
+        return base64_encode($result ?: $rawPngBytes);
         });
+
+        $decoded = base64_decode($cached, true);
+        return $decoded !== false ? $decoded : $rawPngBytes;
     }
 
     /**

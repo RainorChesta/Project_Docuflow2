@@ -426,7 +426,7 @@ define([
                     if (e) { e.preventDefault(); e.stopPropagation(); }
                     window.open('https://cmhgroup.id/', '_blank');
                 });
-                me.logo.find('i, img').off('click').on('click', function (e) {
+                me.logo.find('i, img, svg').off('click').on('click', function (e) {
                     if (e) { e.preventDefault(); e.stopPropagation(); }
                     window.open('https://cmhgroup.id/', '_blank');
                 });

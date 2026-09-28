@@ -237,7 +237,7 @@ class DirectorDocumentController extends Controller
                     ->groupBy('unit_kerja_id')
                     ->pluck('count', 'unit_kerja_id');
 
-                $allUnitKerjas = UnitKerja::orderBy('code')->get();
+                $allUnitKerjas = UnitKerja::orderBy('kode_unit_kerja')->get();
                 
                 $folders = $allUnitKerjas->map(function ($uk) use ($branchDocUnits, $selectedCompanyId, $selectedBranchId, $viewMode) {
                     $count = $branchDocUnits[$uk->id] ?? 0;
