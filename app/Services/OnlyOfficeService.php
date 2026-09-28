@@ -1622,7 +1622,21 @@ class OnlyOfficeService
                 $kopDocx = $this->createDocxFromCorporateSoftFileImage($corporateSoftFile);
             } else {
                 // DOCX corporate soft file
-                $kopDocx = $disk->get($corporateSoftFile->file_path);
+                $rawDocxBytes = $disk->get($corporateSoftFile->file_path);
+                $localPath = $disk->path($corporateSoftFile->file_path);
+
+                // If the DOCX does not have both native explicit header AND footer, or is designed on the body canvas,
+                // render via Docker x2t to generate perfectly aligned and proportioned header/footer components
+                if (!$this->docxHasExplicitHeaderAndFooter($rawDocxBytes) && file_exists($localPath)) {
+                    $convertedDocx = $this->convertDocxUsingDockerX2t($localPath, $targetPaperSize);
+                    if ($convertedDocx && substr($convertedDocx, 0, 2) === 'PK') {
+                        $kopDocx = $convertedDocx;
+                    }
+                }
+
+                if (!$kopDocx) {
+                    $kopDocx = $rawDocxBytes;
+                }
             }
 
             if (!$kopDocx || substr($kopDocx, 0, 2) !== 'PK') {
