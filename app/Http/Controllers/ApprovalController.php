@@ -231,7 +231,7 @@ class ApprovalController extends Controller
                 $vq->orWhereHas('document', function ($dq) use ($search) {
                     $dq->where('title', 'like', "%{$search}%")
                        ->orWhere('document_number', 'like', "%{$search}%")
-                       ->orWhereHas('unitKerja', fn($ukQ) => $ukQ->where('name', 'like', "%{$search}%"))
+                       ->orWhereHas('unitKerja', fn($ukQ) => $ukQ->where('nama_unit_kerja', 'like', "%{$search}%")->orWhere('kode_unit_kerja', 'like', "%{$search}%"))
                        ->orWhereHas('branch', fn($brQ) => $brQ->where('name', 'like', "%{$search}%"));
                 });
 
@@ -306,7 +306,7 @@ class ApprovalController extends Controller
                        $uq->where('name', 'like', "%{$search}%")
                           ->orWhere('email', 'like', "%{$search}%");
                    })
-                   ->orWhereHas('unitKerja', fn($ukQ) => $ukQ->where('name', 'like', "%{$search}%"))
+                   ->orWhereHas('unitKerja', fn($ukQ) => $ukQ->where('nama_unit_kerja', 'like', "%{$search}%")->orWhere('kode_unit_kerja', 'like', "%{$search}%"))
                    ->orWhereHas('branch', fn($brQ) => $brQ->where('name', 'like', "%{$search}%"));
             });
         }
@@ -376,7 +376,7 @@ class ApprovalController extends Controller
                             $vq->where('version_number', (int) $trimmedVersion);
                        }
                    })
-                   ->orWhereHas('unitKerja', fn($ukQ) => $ukQ->where('name', 'like', "%{$search}%"))
+                   ->orWhereHas('unitKerja', fn($ukQ) => $ukQ->where('nama_unit_kerja', 'like', "%{$search}%")->orWhere('kode_unit_kerja', 'like', "%{$search}%"))
                    ->orWhereHas('branch', fn($brQ) => $brQ->where('name', 'like', "%{$search}%"));
             });
         }

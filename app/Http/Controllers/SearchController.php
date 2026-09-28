@@ -70,7 +70,7 @@ class SearchController extends Controller
                     ->orWhere('document_number', 'like', "%{$q}%")
                     ->orWhere('summary', 'like', "%{$q}%")
                     ->orWhereHas('unitKerja', function ($ukQuery) use ($q) {
-                        $ukQuery->where('name', 'like', "%{$q}%")->orWhere('code', 'like', "%{$q}%");
+                        $ukQuery->where('nama_unit_kerja', 'like', "%{$q}%")->orWhere('kode_unit_kerja', 'like', "%{$q}%");
                     })
                     ->orWhereHas('branch', function ($bQuery) use ($q) {
                         $bQuery->where('name', 'like', "%{$q}%")->orWhere('code', 'like', "%{$q}%");

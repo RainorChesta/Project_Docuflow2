@@ -1,77 +1,3 @@
-<?php
-
-namespace App\Console\Commands;
-
-use Illuminate\Console\Attributes\Description;
-use Illuminate\Console\Attributes\Signature;
-use Illuminate\Console\Command;
-use Symfony\Component\Process\Process;
-
-#[Signature('onlyoffice:setup-f4 
-    {--container= : Nama container Docker OnlyOffice (default: dokuflow-onlyoffice)}
-    {--ssh-host= : IP/hostname server jika Docker OnlyOffice berada di server terpisah}
-    {--ssh-port= : Port SSH server OnlyOffice (default: 22)}
-    {--ssh-user= : Username SSH (default: root)}
-    {--ssh-key= : Path ke private key SSH}
-')]
-#[Description('Konfigurasi otomatis ukuran kertas F4 (21x33 cm) sebagai opsi dan default print di Docker OnlyOffice (lokal atau remote SSH)')]
-class SetupOnlyOfficeF4Command extends Command
-{
-    public function handle(): int
-    {
-        $container = $this->option('container') ?: config('onlyoffice.container', 'dokuflow-onlyoffice');
-        $sshHost   = $this->option('ssh-host') ?: config('onlyoffice.ssh_host');
-        $sshPort   = (int) ($this->option('ssh-port') ?: config('onlyoffice.ssh_port', 22));
-        $sshUser   = $this->option('ssh-user') ?: config('onlyoffice.ssh_user', 'root');
-        $sshKey    = $this->option('ssh-key') ?: config('onlyoffice.ssh_key');
-
-        $this->info("==================================================");
-        $this->info("   DocuFlow - OnlyOffice F4 Setup & Patch Tool   ");
-        $this->info("==================================================");
-        $this->line("Target Container : <comment>{$container}</comment>");
-        if ($sshHost) {
-            $this->line("Target Server    : <comment>{$sshUser}@{$sshHost}:{$sshPort}</comment> (via SSH)");
-            if ($sshKey) {
-                $this->line("SSH Key          : <comment>{$sshKey}</comment>");
-            }
-        } else {
-            $this->line("Target Mode      : <comment>Local Docker Daemon</comment>");
-        }
-        $this->newLine();
-
-        // 1. Cek status container (lokal atau remote via SSH)
-        $this->line("1. Memeriksa status Docker container [{$container}]...");
-        $inspectProcess = $this->runDockerCommand(
-            "docker inspect -f '{{.State.Running}}' {$container}",
-            $sshHost,
-            $sshPort,
-            $sshUser,
-            $sshKey
-        );
-
-        if (!$inspectProcess->isSuccessful() || trim($inspectProcess->getOutput()) !== 'true') {
-            $this->error("   [ERROR] Container [{$container}] tidak ditemukan atau sedang mati.");
-            if (!$sshHost) {
-                $this->newLine();
-                $this->warn("   💡 INFORMASI ARSITEKTUR MULTI-SERVER:");
-                $this->line("   Jika Docker OnlyOffice berada di server terpisah (misalnya <comment>202.10.46.4</comment> sesuai config Nginx / ds-vpath),");
-                $this->line("   jalankan command ini dengan menyertakan opsi <comment>--ssh-host</comment>:");
-                $this->line("   <info>php artisan onlyoffice:setup-f4 --ssh-host=202.10.46.4 --ssh-user=root</info>");
-                $this->newLine();
-                $this->line("   Atau jalankan patch langsung di server OnlyOffice menggunakan script:");
-                $this->line("   <info>docker exec -i {$container} python3 - < patch_onlyoffice_f4.py</info>");
-            } else {
-                $errorMsg = trim($inspectProcess->getErrorOutput() ?: $inspectProcess->getOutput());
-                $this->line("   Output/Error: " . ($errorMsg ?: 'Connection refused or container not running'));
-                $this->line("   Pastikan koneksi SSH ke [{$sshHost}] valid dan container [{$container}] sedang aktif.");
-            }
-            return Command::FAILURE;
-        }
-        $this->info("   [OK] Container [{$container}] sedang aktif.");
-        $this->newLine();
-
-        // 2. Siapkan python patch script untuk dieksekusi di dalam container
-        $pythonScript = <<<'PY'
 import os
 import re
 import time
@@ -79,6 +5,10 @@ import subprocess
 
 ts = str(int(time.time() * 1000))
 web_apps = '/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main'
+
+print('==================================================')
+print('  DocuFlow - OnlyOffice F4 Setup & Patch Tool     ')
+print('==================================================')
 
 # 1. Patch Main.js -> Enable canPreviewPrint for web
 main_js = f'{web_apps}/app/controller/Main.js'
@@ -93,7 +23,7 @@ if os.path.exists(main_js):
             f.write(content)
         print('[+] Main.js canPreviewPrint patched')
     else:
-        print('[i] Main.js already patched or target signature not found')
+        print('[i] Main.js already patched or target signature changed')
 
 # 2. Patch FileMenuPanels.js -> F4 in print list & default print size F4
 panels_js = f'{web_apps}/app/view/FileMenuPanels.js'
@@ -217,73 +147,5 @@ for f in files_to_gzip:
 
 # 7. Reload Nginx
 subprocess.run(['nginx', '-s', 'reload'], check=True)
-print('[+] Nginx inside OnlyOffice container reloaded successfully')
-PY;
-
-        // 3. Terapkan patch ke container via streaming stdin
-        $this->line("2. Menyuntikkan patch F4 ke dalam OnlyOffice Document Server...");
-        $execProcess = $this->runDockerCommand(
-            "docker exec -i {$container} python3 -",
-            $sshHost,
-            $sshPort,
-            $sshUser,
-            $sshKey,
-            $pythonScript
-        );
-
-        if (!$execProcess->isSuccessful()) {
-            $this->error("   [ERROR] Gagal menjalankan patch: " . $execProcess->getErrorOutput());
-            return Command::FAILURE;
-        }
-
-        $output = trim($execProcess->getOutput());
-        if ($output) {
-            $this->line($output);
-        }
-
-        $this->info("   [OK] Patch berhasil disuntikkan dan Nginx berhasil dimuat ulang.");
-        $this->newLine();
-
-        $this->info("==================================================");
-        $this->info("   BERHASIL: Konfigurasi F4 Telah Diterapkan!   ");
-        $this->info("==================================================");
-        $this->line("1. Toolbar <comment>Layout -> Size</comment> kini memiliki preset <comment>F4 (21 x 33 cm)</comment>.");
-        $this->line("2. Fitur <comment>File -> Print (Ctrl+P)</comment> otomatis default ke ukuran <comment>F4</comment>.");
-        $this->line("3. Opsi format lain (A4, Letter, Legal, Custom) tetap bisa dipilih.");
-        $this->line("4. Buka browser dan lakukan <comment>Ctrl + F5</comment> (Hard Refresh) untuk memuat aset terbaru.");
-        $this->newLine();
-
-        return Command::SUCCESS;
-    }
-
-    /**
-     * Jalankan perintah Docker, baik di mesin lokal atau melalui remote SSH.
-     */
-    protected function runDockerCommand(string $dockerCommand, ?string $sshHost, int $sshPort, string $sshUser, ?string $sshKey, ?string $stdinInput = null): Process
-    {
-        if (!empty($sshHost)) {
-            $args = ['ssh', '-p', (string) $sshPort];
-            if (!empty($sshKey)) {
-                $args[] = '-i';
-                $args[] = $sshKey;
-            }
-            $args[] = '-o';
-            $args[] = 'StrictHostKeyChecking=no';
-            $args[] = "{$sshUser}@{$sshHost}";
-            $args[] = $dockerCommand;
-
-            $process = new Process($args);
-        } else {
-            $process = Process::fromShellCommandline($dockerCommand);
-        }
-
-        if ($stdinInput !== null) {
-            $process->setInput($stdinInput);
-        }
-
-        $process->setTimeout(300);
-        $process->run();
-
-        return $process;
-    }
-}
+print('[+] Nginx reloaded successfully')
+print('[+] Done! F4 paper preset and default print size applied.')

@@ -206,11 +206,11 @@ class DocumentController extends Controller
                 ->groupBy('unit_kerja_id')
                 ->pluck('count', 'unit_kerja_id');
 
-            $allUnitKerjas = UnitKerja::orderBy('code');
+            $allUnitKerjas = UnitKerja::orderBy('kode_unit_kerja');
             if (!empty($search)) {
                 $allUnitKerjas->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('code', 'like', "%{$search}%");
+                    $q->where('nama_unit_kerja', 'like', "%{$search}%")
+                      ->orWhere('kode_unit_kerja', 'like', "%{$search}%");
                 });
             }
             $allUnitKerjas = $allUnitKerjas->get();
