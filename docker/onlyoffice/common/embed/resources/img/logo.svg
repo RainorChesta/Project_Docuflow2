@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="105" height="20" viewBox="0 0 105 20" fill="none">
+  <!-- Dokuflow icon: document (blue bg) -->
+  <rect x="1" y="2" width="10" height="14" rx="2" fill="#2563EB"/>
+  <!-- white paper -->
+  <rect x="2.5" y="1" width="8" height="11" rx="1.2" fill="#fff" opacity="0.95"/>
+  <!-- paper lines -->
+  <rect x="4" y="3.5" width="5" height="1" rx="0.4" fill="#94a3b8"/>
+  <rect x="4" y="5.5" width="4" height="1" rx="0.4" fill="#94a3b8"/>
+  <rect x="4" y="7.5" width="5" height="1" rx="0.4" fill="#94a3b8"/>
+  <!-- green bottom sweep -->
+  <path d="M2 13 Q2.5 17 7 17 L10 17 Q13.5 17 13.5 13.5 L13.5 11.5 Q10.5 11.5 8.5 13 Z" fill="#10B981"/>
+  <!-- arrow -->
+  <path d="M3.2 14 L6.2 14 L6.2 13.1 L7.8 14.4 L6.2 15.7 L6.2 14.8 L3.2 14.8 Z" fill="#fff"/>
+  <!-- check badge -->
+  <circle cx="12.5" cy="15.5" r="2.8" fill="#059669" stroke="#fff" stroke-width="0.7"/>
+  <path d="M11.2 15.5 L12.2 16.5 L14 14.2" stroke="#fff" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- CMHGROUP text -->
+  <text x="19" y="14.5" fill="#334155" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif" font-size="11.5" font-weight="800" letter-spacing="0.4">CMHGROUP</text>
+</svg>

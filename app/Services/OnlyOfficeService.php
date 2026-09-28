@@ -849,6 +849,10 @@ class OnlyOfficeService
                     'feedback' => false,
                     'leftMenu' => false,
                     'rightMenu' => false,
+                    'logo' => [
+                        'url' => 'https://cmhgroup.id/',
+                        'visible' => true,
+                    ],
                     'embedded' => [
                         'toolbarDockPosition' => 'bottom',
                     ],

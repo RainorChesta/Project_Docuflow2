@@ -31,6 +31,24 @@ services:
       - ./docker/onlyoffice/common/img/header/dark-logo_s.svg.gz:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/header/dark-logo_s.svg.gz:ro
       - ./docker/onlyoffice/common/lib/view/Header.js:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/lib/view/Header.js:ro
       - ./docker/onlyoffice/common/lib/view/Header.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/lib/view/Header.js.gz:ro
+      - ./docker/onlyoffice/common/embed/resources/img/logo.svg:/var/www/onlyoffice/documentserver/web-apps/apps/common/embed/resources/img/logo.svg:ro
+      - ./docker/onlyoffice/common/embed/resources/img/logo.svg.gz:/var/www/onlyoffice/documentserver/web-apps/apps/common/embed/resources/img/logo.svg.gz:ro
+      - ./docker/onlyoffice/documenteditor/embed/index.html:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/embed/index.html:ro
+      - ./docker/onlyoffice/documenteditor/embed/index.html.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/embed/index.html.gz:ro
+      - ./docker/onlyoffice/documenteditor/embed/index_loader.html:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/embed/index_loader.html:ro
+      - ./docker/onlyoffice/documenteditor/embed/index_loader.html.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/embed/index_loader.html.gz:ro
+      - ./docker/onlyoffice/documenteditor/embed/resources/css/app-all.css:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/embed/resources/css/app-all.css:ro
+      - ./docker/onlyoffice/documenteditor/embed/resources/css/app-all.css.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/embed/resources/css/app-all.css.gz:ro
+      - ./docker/onlyoffice/spreadsheeteditor/embed/index_loader.html:/var/www/onlyoffice/documentserver/web-apps/apps/spreadsheeteditor/embed/index_loader.html:ro
+      - ./docker/onlyoffice/spreadsheeteditor/embed/index_loader.html.gz:/var/www/onlyoffice/documentserver/web-apps/apps/spreadsheeteditor/embed/index_loader.html.gz:ro
+      - ./docker/onlyoffice/presentationeditor/embed/index_loader.html:/var/www/onlyoffice/documentserver/web-apps/apps/presentationeditor/embed/index_loader.html:ro
+      - ./docker/onlyoffice/presentationeditor/embed/index_loader.html.gz:/var/www/onlyoffice/documentserver/web-apps/apps/presentationeditor/embed/index_loader.html.gz:ro
+      - ./docker/onlyoffice/visioeditor/embed/index_loader.html:/var/www/onlyoffice/documentserver/web-apps/apps/visioeditor/embed/index_loader.html:ro
+      - ./docker/onlyoffice/visioeditor/embed/index_loader.html.gz:/var/www/onlyoffice/documentserver/web-apps/apps/visioeditor/embed/index_loader.html.gz:ro
+      - ./docker/onlyoffice/common/embed/resources/img/dokuflow-logo.webp:/var/www/onlyoffice/documentserver/web-apps/apps/common/embed/resources/img/dokuflow-logo.webp:ro
+      - ./docker/onlyoffice/common/img/dokuflow-logo.webp:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/dokuflow-logo.webp:ro
+      - ./docker/onlyoffice/documenteditor/main/index_loader.html:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/index_loader.html:ro
+      - ./docker/onlyoffice/documenteditor/main/index_loader.html.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/index_loader.html.gz:ro
 
 volumes:
   onlyoffice_data:
