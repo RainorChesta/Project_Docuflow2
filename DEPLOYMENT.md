@@ -89,13 +89,52 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
+    # ONLYOFFICE Document Server Reverse Proxy (Rumahweb Server 202.10.46.4:8884)
+    location ^~ /ds-vpath/ {
+        proxy_pass http://202.10.46.4:8884/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "Upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host $host/ds-vpath;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
     location ~ \.php$ {
-        include snippets/fastcgi-php.conf;
         fastcgi_pass unix:/var/run/php/php8.3-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
     }
 
     location ~ /\.ht {
         deny all;
+    }
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name dokuflow.cmhgroup.id;
+
+    root /var/www/dokuflow.cmhgroup.id/public;
+    index index.php index.html;
+
+    # Handle ONLYOFFICE container internal HTTP requests directly (without SSL)
+    location ^~ /onlyoffice/ {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        fastcgi_pass unix:/var/run/php/php8.3-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
     }
 }
 ```
