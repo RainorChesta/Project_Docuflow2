@@ -299,7 +299,7 @@ ls -la /opt/onlyoffice/custom_assets
 
 #### 4.3.2 Method 1: Single `docker run` Command with Volume Mounts (Recommended without Docker Compose)
 
-If Docker Compose is not installed on your RumahWeb server, use `docker run` with volume mounts to permanently embed F4 paper sizes and DokuFlow custom branding:
+If Docker Compose is not installed on your RumahWeb server, use `docker run` with volume mounts to permanently embed F4 paper sizes and DokuFlow custom branding: 
 
 ```bash
 # 1. Stop and remove existing container if running
@@ -330,6 +330,8 @@ docker run -d -p 8884:80 \
   -v /opt/onlyoffice/custom_assets/common/img/dokuflow-logo.webp:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/dokuflow-logo.webp:ro \
   -v /opt/onlyoffice/custom_assets/common/img/header/header-logo_s.svg:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/header/header-logo_s.svg:ro \
   -v /opt/onlyoffice/custom_assets/common/img/header/header-logo_s.svg.gz:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/header/header-logo_s.svg.gz:ro \
+  -v /opt/onlyoffice/custom_assets/common/lib/view/Header.js:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/lib/view/Header.js:ro \
+  -v /opt/onlyoffice/custom_assets/common/lib/view/Header.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/lib/view/Header.js.gz:ro \
   -v /opt/onlyoffice/custom_assets/documenteditor/main/index_loader.html:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/index_loader.html:ro \
   -v /opt/onlyoffice/custom_assets/documenteditor/main/index_loader.html.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/index_loader.html.gz:ro \
   onlyoffice/documentserver:latest
@@ -392,6 +394,8 @@ services:
       - /opt/onlyoffice/custom_assets/common/img/dokuflow-logo.webp:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/dokuflow-logo.webp:ro
       - /opt/onlyoffice/custom_assets/common/img/header/header-logo_s.svg:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/header/header-logo_s.svg:ro
       - /opt/onlyoffice/custom_assets/common/img/header/header-logo_s.svg.gz:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/header/header-logo_s.svg.gz:ro
+      - /opt/onlyoffice/custom_assets/common/lib/view/Header.js:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/lib/view/Header.js:ro
+      - /opt/onlyoffice/custom_assets/common/lib/view/Header.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/lib/view/Header.js.gz:ro
       - /opt/onlyoffice/custom_assets/documenteditor/main/index_loader.html:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/index_loader.html:ro
       - /opt/onlyoffice/custom_assets/documenteditor/main/index_loader.html.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/index_loader.html.gz:ro
 ```
