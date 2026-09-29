@@ -68,16 +68,16 @@ Route::middleware('auth')->group(function () {
     Route::get('/document-numbers/preview', [DocumentController::class, 'nextNumber'])->name('documents.next-number');
     Route::get('/document-numbers/check', [DocumentController::class, 'checkNumber'])->name('documents.check-number');
     Route::get('/documents/{document}/edit', [DocumentController::class, 'edit'])->name('documents.edit');
-    Route::get('/documents/{document}/download', [DocumentController::class, 'download'])->name('documents.download');
-    Route::get('/documents/{document}/preview', [DocumentController::class, 'preview'])->name('documents.preview');
+    Route::get('/documents/{document}/download', [DocumentController::class, 'download'])->name('documents.download')->withTrashed();
+    Route::get('/documents/{document}/preview', [DocumentController::class, 'preview'])->name('documents.preview')->withTrashed();
     Route::get('/documents/templates/{template}/preview', [DocumentTemplateController::class, 'preview'])->name('templates.preview');
     Route::get('/documents/templates/{template}/preview-config', [DocumentTemplateController::class, 'previewConfig'])->name('templates.preview-config');
     Route::post('/documents/{document}/summarize', [DocumentController::class, 'summarize'])->name('documents.summarize');
     Route::get('/documents/{document}/summary-status', [DocumentController::class, 'summaryStatus'])->name('documents.summary-status');
     Route::get('/documents/{document}/onlyoffice-status', [DocumentController::class, 'onlyofficeStatus'])->name('documents.onlyoffice-status');
-    Route::get('/documents/{document}/preview-content', [DocumentController::class, 'previewContent'])->name('documents.preview-content');
-    Route::get('/documents/{document}/versions/{version}/preview', [DocumentController::class, 'previewVersion'])->name('documents.preview-version');
-    Route::get('/documents/{document}/versions/{version}/file', [DocumentController::class, 'file'])->name('documents.file');
+    Route::get('/documents/{document}/preview-content', [DocumentController::class, 'previewContent'])->name('documents.preview-content')->withTrashed();
+    Route::get('/documents/{document}/versions/{version}/preview', [DocumentController::class, 'previewVersion'])->name('documents.preview-version')->withTrashed();
+    Route::get('/documents/{document}/versions/{version}/file', [DocumentController::class, 'file'])->name('documents.file')->withTrashed();
     Route::get('/documents/{document}/qrcode', [DocumentController::class, 'qrCode'])->name('documents.qrcode');
     Route::put('/documents/{document}/save', [DocumentController::class, 'save'])->name('documents.save');
     Route::put('/documents/{document}/save-draft', [DocumentController::class, 'saveDraft'])->name('documents.save-draft');
@@ -138,6 +138,7 @@ Route::middleware('auth')->group(function () {
 
     // Trash (Sampah Dokumen) - Accessible to all roles
     Route::get('/trash', [\App\Http\Controllers\TrashController::class, 'index'])->name('trash.index');
+    Route::get('/trash/{id}/preview', [\App\Http\Controllers\TrashController::class, 'preview'])->name('trash.preview');
     Route::post('/trash/bulk-restore', [\App\Http\Controllers\TrashController::class, 'bulkRestore'])->name('trash.bulk-restore');
     Route::delete('/trash/bulk-force-delete', [\App\Http\Controllers\TrashController::class, 'bulkForceDelete'])->name('trash.bulk-force-delete');
     Route::post('/trash/{id}/restore', [\App\Http\Controllers\TrashController::class, 'restore'])->name('trash.restore');
@@ -170,6 +171,11 @@ Route::middleware('auth')->group(function () {
         Route::patch('/corporate-soft-files/{corporateSoftFile}/toggle-status', [\App\Http\Controllers\Admin\CorporateSoftFileController::class, 'toggleStatus'])->name('corporate-soft-files.toggle-status');
         Route::get('/corporate-soft-files/{corporateSoftFile}/download', [\App\Http\Controllers\Admin\CorporateSoftFileController::class, 'download'])->name('corporate-soft-files.download');
         Route::get('/documents', [AdminDocumentController::class, 'index'])->name('documents.index');
+        Route::get('/documents/{document}/edit', [AdminDocumentController::class, 'edit'])->name('documents.edit');
+        Route::put('/documents/{document}', [AdminDocumentController::class, 'update'])->name('documents.update');
+        Route::get('/documents/{document}/download', [AdminDocumentController::class, 'download'])->name('documents.download');
+        Route::post('/documents/bulk-download', [AdminDocumentController::class, 'bulkDownload'])->name('documents.bulk-download');
+        Route::delete('/documents/bulk-delete', [AdminDocumentController::class, 'bulkDestroy'])->name('documents.bulk-delete');
         Route::delete('/documents/{document}', [AdminDocumentController::class, 'destroy'])->name('documents.destroy');
 
         // Trash (Sampah Dokumen) - Legacy admin aliases redirecting to general trash
@@ -190,7 +196,7 @@ Route::middleware('auth')->group(function () {
 });
 
 // ONLYOFFICE Routes (Accessed server-to-server by ONLYOFFICE Document Server)
-Route::get('/onlyoffice/documents/{document}/versions/{version}/file', [\App\Http\Controllers\OnlyOfficeController::class, 'file'])->name('onlyoffice.file');
+Route::get('/onlyoffice/documents/{document}/versions/{version}/file', [\App\Http\Controllers\OnlyOfficeController::class, 'file'])->name('onlyoffice.file')->withTrashed();
 Route::get('/onlyoffice/users/{user}/signature.png', [\App\Http\Controllers\OnlyOfficeController::class, 'signature'])->name('onlyoffice.signature');
 Route::get('/onlyoffice/signatures/{signature}/image.png', [\App\Http\Controllers\OnlyOfficeController::class, 'signatureImage'])->name('onlyoffice.signature.image');
 Route::get('/onlyoffice/signature-placeholder.png', [\App\Http\Controllers\OnlyOfficeController::class, 'signaturePlaceholder'])->name('onlyoffice.signature.placeholder');

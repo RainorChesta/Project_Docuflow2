@@ -129,7 +129,11 @@
                                                class="checkbox checkbox-sm">
                                     </td>
                                     <td>
-                                        <div class="font-bold text-base-content">{{ $doc->title }}</div>
+                                        <a href="{{ route('documents.preview', ['document' => $doc->id, 'from' => 'trash']) }}" 
+                                           class="font-bold text-base-content hover:text-primary transition-colors line-clamp-1 break-words"
+                                           title="{{ __('Pratinjau Dokumen') }}: {{ $doc->title }}">
+                                            {{ $doc->title }}
+                                        </a>
                                         <div class="flex flex-wrap items-center gap-1.5 mt-1">
                                             <span class="font-mono text-xs font-medium text-base-content/70 bg-base-200/60 px-1.5 py-0.5 rounded border border-base-300/40 shrink-0">{{ $doc->document_number }}</span>
                                             <x-document-format-badge :format="$doc->format_choice" />
@@ -184,6 +188,16 @@
                                     </td>
                                     <td class="text-right">
                                         <div class="flex items-center justify-end gap-1">
+                                            {{-- Preview Button (Eye Icon) --}}
+                                            <a href="{{ route('documents.preview', ['document' => $doc->id, 'from' => 'trash']) }}" 
+                                               class="btn btn-ghost btn-xs btn-square text-base-content/70 hover:text-primary hover:bg-primary/10" 
+                                               title="{{ __('Pratinjau Dokumen') }}">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                </svg>
+                                            </a>
+
                                             {{-- Restore Button --}}
                                             @can('restore', $doc)
                                                 <button type="button" 

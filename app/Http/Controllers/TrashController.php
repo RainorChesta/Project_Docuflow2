@@ -81,6 +81,19 @@ class TrashController extends Controller
     }
 
     /**
+     * Preview a soft-deleted document.
+     */
+    public function preview(Request $request, int $id): RedirectResponse
+    {
+        $user = $request->user();
+        $document = $this->getScopedTrashQuery($user)->findOrFail($id);
+
+        $this->authorize('view', $document);
+
+        return redirect()->route('documents.preview', ['document' => $document->id, 'from' => 'trash']);
+    }
+
+    /**
      * Restore a soft-deleted document.
      */
     public function restore(Request $request, int $id): RedirectResponse
