@@ -112,7 +112,53 @@ if os.path.exists(ps_js):
             f.write(content)
         print('[+] PageSizeDialog.js patched')
 
-# 5. Update cache busters
+# 5. Patch Header.js -> CMH Group logo redirection
+header_js = '/var/www/onlyoffice/documentserver/web-apps/apps/common/main/lib/view/Header.js'
+if os.path.exists(header_js):
+    with open(header_js, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    # Replace onlyoffice.com fallback URL with cmhgroup.id
+    target_click = """            if ( me.logo )
+                me.logo.children(0).on('click', function (e) {
+                    var _url = !!me.branding && !!me.branding.logo && (me.branding.logo.url!==undefined) ?
+                        me.branding.logo.url : 'https://www.onlyoffice.com';
+                    if (_url) {
+                        var newDocumentPage = window.open(_url);
+                        newDocumentPage && newDocumentPage.focus();
+                    }
+                });"""
+
+    rep_click = """            if ( me.logo ) {
+                me.logo.off('click').on('click', function (e) {
+                    if (e) { e.preventDefault(); e.stopPropagation(); }
+                    window.open('https://cmhgroup.id', '_blank');
+                });
+                me.logo.find('i, img, svg').off('click').on('click', function (e) {
+                    if (e) { e.preventDefault(); e.stopPropagation(); }
+                    window.open('https://cmhgroup.id', '_blank');
+                });
+            }"""
+
+    if target_click in content:
+        content = content.replace(target_click, rep_click)
+        print('[+] Header.js logo click handler patched')
+    elif "'https://www.onlyoffice.com'" in content:
+        content = content.replace("'https://www.onlyoffice.com'", "'https://cmhgroup.id'")
+        print('[+] Header.js fallback url replaced with cmhgroup.id')
+    else:
+        print('[i] Header.js logo click already patched')
+
+    # Also update events if present
+    content = content.replace(
+        "// 'click #header-logo': function (e) {}",
+        "'click #header-logo': function (e) { if (e) { e.preventDefault(); e.stopPropagation(); } window.open('https://cmhgroup.id', '_blank'); }"
+    )
+
+    with open(header_js, 'w', encoding='utf-8') as f:
+        f.write(content)
+
+# 6. Update cache busters
 app_js = f'{web_apps}/app.js'
 if os.path.exists(app_js):
     with open(app_js, 'r', encoding='utf-8') as f:
@@ -129,7 +175,7 @@ if os.path.exists(api_js):
     with open(api_js, 'w', encoding='utf-8') as f:
         f.write(content)
 
-# 6. Gzip assets
+# 7. Gzip assets
 files_to_gzip = [
     f'{web_apps}/app/controller/Main.js',
     f'{web_apps}/app/view/FileMenuPanels.js',
@@ -138,6 +184,7 @@ files_to_gzip = [
     f'{web_apps}/app/view/Toolbar.js',
     f'{web_apps}/code.js',
     f'{web_apps}/app.js',
+    header_js,
     api_js,
 ]
 
@@ -145,7 +192,8 @@ for f in files_to_gzip:
     if os.path.exists(f):
         subprocess.run(['gzip', '-k', '-f', f], check=True)
 
-# 7. Reload Nginx
+# 8. Reload Nginx
 subprocess.run(['nginx', '-s', 'reload'], check=True)
 print('[+] Nginx reloaded successfully')
-print('[+] Done! F4 paper preset and default print size applied.')
+print('[+] Done! F4 paper preset and CMH Group logo redirection applied.')
+

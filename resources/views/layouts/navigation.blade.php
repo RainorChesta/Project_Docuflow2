@@ -14,31 +14,58 @@
         border: 1px solid rgba(255, 255, 255, 0.08) !important;
         box-shadow: 0 24px 48px -12px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.1) !important;
     }
-    
+
+    /* ── Nav item base ── */
     .nav-item-new {
-        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         position: relative;
+        transition:
+            background-color 0.2s ease,
+            box-shadow      0.2s ease,
+            transform       0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        will-change: transform;
+        overflow: hidden;
+        isolation: isolate;
     }
-    
+
+    /* Subtle pill highlight on hover (replaces heavy drop-shadow) */
+    .nav-item-new::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: oklch(var(--p) / 0);
+        transition: background 0.22s ease;
+        pointer-events: none;
+        z-index: 0;
+    }
+
     .nav-item-new:hover {
-        background-color: transparent !important;
-        transform: translateY(-2px);
-        filter: drop-shadow(0px 8px 16px rgba(0, 0, 0, 1)) drop-shadow(0px 4px 6px rgba(0, 0, 0, 0));
+        transform: translateX(3px);
+        background-color: oklch(var(--b2) / 0.7) !important;
+        box-shadow: 0 4px 18px -6px oklch(var(--p) / 0.18);
     }
-    
+
+    .nav-item-new:hover::before {
+        background: oklch(var(--p) / 0.06);
+    }
+
     [data-theme='dark'] .nav-item-new:hover {
-        filter: drop-shadow(0px 8px 16px rgba(255, 255, 255, 1)) drop-shadow(0px 4px 6px rgba(255, 255, 255, 1));
+        background-color: oklch(var(--b2) / 0.6) !important;
+        box-shadow: 0 4px 18px -6px oklch(var(--p) / 0.25);
     }
-    
-    /* Tactile click effect */
+
+    /* Tactile press effect */
     .nav-item-new:active {
-        transform: scale(0.96) translateY(0) !important;
-        transition-duration: 0.1s !important;
+        transform: translateX(2px) scale(0.97) !important;
+        transition: transform 0.08s ease, background-color 0.08s ease !important;
         background-color: oklch(var(--b2)) !important;
+        box-shadow: none !important;
     }
-    
+
+    /* ── Icon wrapper ── */
     .nav-item-new .icon-wrapper {
-        transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        position: relative;
+        z-index: 1;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -46,53 +73,88 @@
         height: 38px;
         border-radius: 12px;
         background-color: oklch(var(--b2));
-        color: oklch(var(--bc) / 0.5);
+        color: oklch(var(--bc) / 0.45);
+        transition:
+            background-color 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+            color            0.2s ease,
+            transform        0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+            box-shadow       0.25s ease;
+        flex-shrink: 0;
     }
-    
+
     .nav-item-new:hover .icon-wrapper {
         background-color: oklch(var(--p));
         color: oklch(var(--pc));
-        transform: scale(1.1) rotate(-4deg);
-        box-shadow: 0 6px 16px -4px oklch(var(--p) / 0.5);
+        transform: scale(1.12) rotate(-6deg);
+        box-shadow:
+            0 6px 20px -4px oklch(var(--p) / 0.45),
+            0 0 0 2px oklch(var(--p) / 0.12);
     }
 
-    /* Icon squish on click */
     .nav-item-new:active .icon-wrapper {
-        transform: scale(0.92) !important;
-        transition-duration: 0.1s !important;
+        transform: scale(0.9) rotate(0deg) !important;
+        transition-duration: 0.08s !important;
     }
-    
+
+    /* ── Text label ── */
+    .nav-item-new span.text-label {
+        position: relative;
+        z-index: 1;
+        transition:
+            transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+            color     0.2s ease,
+            opacity   0.2s ease;
+    }
+
+    .nav-item-new:hover span.text-label {
+        color: oklch(var(--bc));
+    }
+
+    .nav-item-new:active span.text-label {
+        transform: none !important;
+        transition-duration: 0.08s !important;
+    }
+
+    /* ── Active state ── */
     .nav-item-new-active {
-        background-color: oklch(var(--b2) / 0.8) !important;
-        box-shadow: inset 4px 0 0 0 oklch(var(--p)), 0 4px 12px -4px rgba(0,0,0,0.05) !important;
+        background-color: oklch(var(--p) / 0.1) !important;
+        box-shadow:
+            inset 3px 0 0 0 oklch(var(--p)),
+            0 2px 12px -4px oklch(var(--p) / 0.2) !important;
         color: oklch(var(--bc)) !important;
     }
-    
+
+    .nav-item-new-active::before {
+        background: oklch(var(--p) / 0.04) !important;
+    }
+
     .nav-item-new-active .icon-wrapper {
         background-color: oklch(var(--p));
         color: oklch(var(--pc));
-        box-shadow: 0 6px 16px -4px oklch(var(--p) / 0.5);
-        transform: scale(1.05);
+        box-shadow:
+            0 6px 18px -4px oklch(var(--p) / 0.5),
+            0 0 0 2px oklch(var(--p) / 0.15);
+        transform: scale(1.07);
     }
 
     .nav-item-new-active span.text-label {
         color: oklch(var(--bc)) !important;
         font-weight: 700;
     }
-    
-    .nav-item-new span.text-label {
-        transition: transform 0.25s ease, color 0.2s ease;
+
+    /* Active item hover: keep it subtle, don't re-animate icon */
+    .nav-item-new-active:hover {
+        transform: translateX(2px);
+        box-shadow:
+            inset 3px 0 0 0 oklch(var(--p)),
+            0 4px 18px -6px oklch(var(--p) / 0.3) !important;
     }
-    .nav-item-new:hover span.text-label {
-        transform: translateX(3px);
-        color: oklch(var(--bc));
+
+    .nav-item-new-active:hover .icon-wrapper {
+        transform: scale(1.1) rotate(-3deg);
     }
-    
-    .nav-item-new:active span.text-label {
-        transform: translateX(1px) !important;
-        transition-duration: 0.1s !important;
-    }
-    
+
+    /* ── Scrollbar ── */
     .scrollbar-hide::-webkit-scrollbar {
         display: none;
     }
