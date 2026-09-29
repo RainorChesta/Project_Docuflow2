@@ -133,6 +133,51 @@
         @else
             {{-- ONLYOFFICE / Document Preview Viewport --}}
             <div class="flex-1 bg-base-100 rounded-2xl border border-base-300 shadow-sm overflow-hidden relative">
+                {{-- DokuFlow ONLYOFFICE-Style Animated Loader --}}
+                <div id="page-sf-loader" class="absolute inset-0 bg-base-100/95 backdrop-blur-xs z-20 flex flex-col items-center justify-center p-6 transition-all duration-300">
+                    <div class="flex flex-col items-center justify-center text-center">
+                        <div class="relative w-[88px] h-[88px] flex items-center justify-center mb-3">
+                            {{-- Aura Glow --}}
+                            <div class="absolute w-[100px] h-[100px] rounded-full blur-md opacity-70 animate-pulse"
+                                 style="background: radial-gradient(circle, rgba(37, 99, 235, 0.35) 0%, rgba(16, 185, 129, 0.25) 55%, transparent 72%);"></div>
+                            
+                            {{-- Rotating Gradient Conic Ring --}}
+                            <div class="relative w-[78px] h-[78px] rounded-full p-[3px] shadow-lg shadow-primary/20 flex items-center justify-center animate-spin"
+                                 style="background: conic-gradient(from 0deg, #2563eb, #10b981, #06b6d4, #2563eb); animation-duration: 1.8s;">
+                                <div class="w-full h-full bg-base-100 rounded-full"></div>
+                            </div>
+
+                            {{-- Floating DokuFlow SVG Logo --}}
+                            <div class="absolute inset-0 flex items-center justify-center pointer-events-none" style="animation: dokuflowPageFloat 2.2s ease-in-out infinite;">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-11 h-11 drop-shadow-md" fill="none">
+                                    <rect x="18" y="12" width="50" height="70" rx="10" fill="#2563EB"/>
+                                    <rect x="25" y="8" width="42" height="54" rx="7" fill="#FFFFFF" opacity="0.97"/>
+                                    <rect x="33" y="21" width="26" height="4.5" rx="2.25" fill="#94A3B8"/>
+                                    <rect x="33" y="31" width="20" height="4.5" rx="2.25" fill="#94A3B8"/>
+                                    <rect x="33" y="41" width="26" height="4.5" rx="2.25" fill="#94A3B8"/>
+                                    <path d="M20 63 C23 83 41 83 54 83 L63 83 C76 83 80 69 80 54 L80 43 C64 43 54 53 44 63 Z" fill="#10B981"/>
+                                    <path d="M24 68 L41 68 L41 63 L51 71 L41 79 L41 74 L24 74 Z" fill="#FFFFFF"/>
+                                    <circle cx="68" cy="71" r="13" fill="#059669" stroke="#FFFFFF" stroke-width="2.5"/>
+                                    <path d="M62 71 L66 75 L74 65" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </div>
+                        </div>
+
+                        {{-- Loader Text --}}
+                        <div class="text-center">
+                            <h4 class="font-bold text-sm text-base-content tracking-wide">DokuFlow</h4>
+                            <p class="text-xs font-medium text-base-content/60 mt-0.5">{{ __('Memuat pratinjau dokumen...') }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <style>
+                    @keyframes dokuflowPageFloat {
+                        0%, 100% { transform: translateY(0px) scale(1); }
+                        50% { transform: translateY(-3px) scale(1.04); }
+                    }
+                </style>
+
                 <div id="onlyoffice-editor-container" class="w-full h-full"></div>
 
                 <div id="onlyoffice-fallback" class="hidden absolute inset-0 bg-base-100/95 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center z-20">
@@ -158,18 +203,23 @@
                 </div>
             </div>
 
-            <script src="{{ rtrim(config('onlyoffice.url'), '/') }}/web-apps/apps/api/documents/api.js?v=9.4.0-f4-v2"
-                    onerror="document.getElementById('onlyoffice-fallback')?.classList.remove('hidden');"></script>
+            <script src="{{ rtrim(config('onlyoffice.url'), '/') }}/web-apps/apps/api/documents/api.js?v=9.4.0-dokuflow-v3"
+                    onerror="document.getElementById('page-sf-loader')?.classList.add('hidden'); document.getElementById('onlyoffice-fallback')?.classList.remove('hidden');"></script>
             <script>
                 document.addEventListener('DOMContentLoaded', function () {
+                    const loader = document.getElementById('page-sf-loader');
                     if (typeof DocsAPI === 'undefined') {
+                        if (loader) loader.classList.add('hidden');
                         document.getElementById('onlyoffice-fallback')?.classList.remove('hidden');
                         return;
                     }
 
                     try {
                         const config = @json($onlyOfficeConfig);
-                        if (!config) return;
+                        if (!config) {
+                            if (loader) loader.classList.add('hidden');
+                            return;
+                        }
 
                         config.type = 'embedded';
                         config.document = config.document || {};
@@ -195,9 +245,35 @@
                         config.editorConfig.customization.embedded = config.editorConfig.customization.embedded || { toolbarDockPosition: 'bottom' };
                         config.editorConfig.customization.zoom = -2; // Fit to Width
 
+                        // Smooth transition on document ready
+                        config.events = config.events || {};
+                        const hideLoaderSmooth = function() {
+                            if (loader && !loader.classList.contains('hidden')) {
+                                loader.style.opacity = '0';
+                                setTimeout(() => {
+                                    loader.classList.add('hidden');
+                                    loader.style.opacity = '';
+                                }, 250);
+                            }
+                        };
+
+                        config.events.onDocumentReady = hideLoaderSmooth;
+                        config.events.onAppReady = function() {
+                            setTimeout(hideLoaderSmooth, 3000);
+                        };
+                        config.events.onError = function(event) {
+                            console.error("ONLYOFFICE editor error:", event);
+                            if (loader) loader.classList.add('hidden');
+                            document.getElementById('onlyoffice-fallback')?.classList.remove('hidden');
+                        };
+
                         new DocsAPI.DocEditor("onlyoffice-editor-container", config);
+
+                        // Safety fallback
+                        setTimeout(hideLoaderSmooth, 8000);
                     } catch (e) {
                         console.error("ONLYOFFICE initialization error:", e);
+                        if (loader) loader.classList.add('hidden');
                         document.getElementById('onlyoffice-fallback')?.classList.remove('hidden');
                     }
                 });

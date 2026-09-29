@@ -537,7 +537,10 @@
                     if (imageEl) {
                         imageEl.src = contentUrl;
                         imageEl.onload = function() {
-                            if (loader) loader.classList.add('hidden');
+                            if (loader) {
+                                loader.style.opacity = '0';
+                                setTimeout(() => { loader.classList.add('hidden'); loader.style.opacity = ''; }, 200);
+                            }
                             if (imageContainer) imageContainer.classList.remove('hidden');
                         };
                         imageEl.onerror = function() {
@@ -557,7 +560,6 @@
                     })
                     .then(res => res.json())
                     .then(config => {
-                        if (loader) loader.classList.add('hidden');
                         if (typeof DocsAPI !== 'undefined' && !window._onlyofficeFailed) {
                             try {
                                 config.type = 'embedded';
@@ -584,13 +586,42 @@
                                 config.editorConfig.customization.embedded = config.editorConfig.customization.embedded || { toolbarDockPosition: 'bottom' };
                                 config.editorConfig.customization.zoom = -2; // Fit to Width
 
+                                // Attach events for smooth seamless loading
+                                config.events = config.events || {};
+                                const hideLoaderSmooth = function() {
+                                    if (loader && !loader.classList.contains('hidden')) {
+                                        loader.style.opacity = '0';
+                                        setTimeout(() => {
+                                            loader.classList.add('hidden');
+                                            loader.style.opacity = '';
+                                        }, 250);
+                                    }
+                                };
+
+                                config.events.onDocumentReady = hideLoaderSmooth;
+                                config.events.onAppReady = function() {
+                                    // Fallback hide after brief delay if onDocumentReady doesn't fire
+                                    setTimeout(hideLoaderSmooth, 3000);
+                                };
+                                config.events.onError = function(event) {
+                                    console.error("ONLYOFFICE editor error event:", event);
+                                    if (loader) loader.classList.add('hidden');
+                                    if (docContainer) docContainer.classList.add('hidden');
+                                    if (fallbackBox) fallbackBox.classList.remove('hidden');
+                                };
+
                                 currentModalDocEditor = new DocsAPI.DocEditor("modal-onlyoffice-container", config);
+
+                                // Safety fallback timeout in case of network freeze
+                                setTimeout(hideLoaderSmooth, 8000);
                             } catch (err) {
                                 console.error("ONLYOFFICE modal editor init error:", err);
+                                if (loader) loader.classList.add('hidden');
                                 if (docContainer) docContainer.classList.add('hidden');
                                 if (fallbackBox) fallbackBox.classList.remove('hidden');
                             }
                         } else {
+                            if (loader) loader.classList.add('hidden');
                             if (docContainer) docContainer.classList.add('hidden');
                             if (fallbackBox) fallbackBox.classList.remove('hidden');
                         }
