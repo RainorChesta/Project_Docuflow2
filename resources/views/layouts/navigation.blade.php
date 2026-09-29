@@ -162,6 +162,12 @@
         -ms-overflow-style: none;
         scrollbar-width: none;
     }
+
+    /* ── Nav Scroll Container ── */
+    #sidebar-nav {
+        scroll-behavior: smooth;
+        overscroll-behavior: contain;
+    }
 </style>
 
 <aside class="glass-panel flex flex-col shrink-0
@@ -193,7 +199,7 @@
     </div>
 
     <!-- Navigation List -->
-    <nav class="flex-1 px-4 mt-2 space-y-1 overflow-y-auto overflow-x-hidden scrollbar-hide">
+    <nav id="sidebar-nav" class="flex-1 px-4 mt-2 space-y-1 overflow-y-auto overflow-x-hidden scrollbar-hide">
         @php
             $navUser = auth()->user();
             $sharedDocsCount = $navUser ? $navUser->sharedDocumentsCount() : 0;
@@ -212,6 +218,7 @@
         <a href="{{ route('dashboard') }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('dashboard') ? 'nav-item-new-active' : '' }}"
+           {{ request()->routeIs('dashboard') ? 'data-nav-active=true aria-current=page' : '' }}
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Dashboard') }}'">
             <div class="icon-wrapper shrink-0">
@@ -224,6 +231,7 @@
         <a href="{{ route('director.active-documents.index') }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('director.active-documents.*') ? 'nav-item-new-active' : '' }}"
+           {{ request()->routeIs('director.active-documents.*') ? 'data-nav-active=true aria-current=page' : '' }}
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Dokumen Aktif') }}'">
             <div class="icon-wrapper shrink-0 relative">
@@ -250,6 +258,7 @@
         <a href="{{ route('director.documents.index') }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('director.documents.*') ? 'nav-item-new-active' : '' }}"
+           {{ request()->routeIs('director.documents.*') ? 'data-nav-active=true aria-current=page' : '' }}
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Direktori Folder') }}'">
             <div class="icon-wrapper shrink-0">
@@ -264,6 +273,7 @@
         <a href="{{ route('documents.index', ['type' => 'general']) }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('documents.*') && request('type', '') === 'general' ? 'nav-item-new-active' : '' }}"
+           {{ (request()->routeIs('documents.*') && request('type', '') === 'general') ? 'data-nav-active=true aria-current=page' : '' }}
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Dokumen Umum') }}'">
             <div class="icon-wrapper shrink-0">
@@ -276,6 +286,7 @@
         <a href="{{ route('documents.index', ['type' => 'mine']) }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('documents.*') && request('type', '') === 'mine' ? 'nav-item-new-active' : '' }}"
+           {{ (request()->routeIs('documents.*') && request('type', '') === 'mine') ? 'data-nav-active=true aria-current=page' : '' }}
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Dokumen Saya') }}'">
             <div class="icon-wrapper shrink-0">
@@ -288,6 +299,7 @@
         <a href="{{ route('documents.index', ['type' => 'shared']) }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('documents.*') && request('type', '') === 'shared' ? 'nav-item-new-active' : '' }}"
+           {{ (request()->routeIs('documents.*') && request('type', '') === 'shared') ? 'data-nav-active=true aria-current=page' : '' }}
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Dokumen Dibagikan') }}'">
             <div class="icon-wrapper shrink-0 relative">
@@ -312,6 +324,7 @@
         <a href="{{ route('documents.index', ['type' => 'unit_kerja']) }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('documents.*') && request('type', '') === 'unit_kerja' ? 'nav-item-new-active' : '' }}"
+           {{ (request()->routeIs('documents.*') && request('type', '') === 'unit_kerja') ? 'data-nav-active=true aria-current=page' : '' }}
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Dokumen Unit Kerja') }}'">
             <div class="icon-wrapper shrink-0">
@@ -332,6 +345,7 @@
         <a href="{{ route('approvals.versions') }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ $isApprovalActive ? 'nav-item-new-active' : '' }}"
+           {{ $isApprovalActive ? 'data-nav-active=true aria-current=page' : '' }}
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Document Approval & Signature') }}'">
             <div class="icon-wrapper shrink-0 relative">
@@ -354,7 +368,9 @@
         </a>
         @elseif($canSeeApproval)
         {{-- For Management / Leaders: Multi-tier Approval Dropdown with Version and Rollback approvals --}}
-        <div x-data="{ approvalOpen: {{ $isApprovalActive ? 'true' : 'false' }} }" class="space-y-1">
+        <div x-data="{ approvalOpen: {{ $isApprovalActive ? 'true' : 'false' }} }"
+             x-effect="if (approvalOpen) { $nextTick(() => setTimeout(() => window.scrollSidebarToActive && window.scrollSidebarToActive('smooth'), 120)); }"
+             class="space-y-1">
             <button type="button"
                     @click="open ? (approvalOpen = !approvalOpen) : (toggle(), approvalOpen = true)"
                     class="w-full nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
@@ -402,6 +418,7 @@
                 <a href="{{ route('approvals.versions') }}"
                    class="flex items-center justify-between gap-1.5 px-2 py-2 rounded-xl text-[12.5px] font-medium transition-all duration-200
                           {{ request()->routeIs('approvals.versions') || (request()->routeIs('approvals.index') && !in_array(request('tab'), ['rollbacks', 'renames'])) ? 'bg-primary/10 text-primary font-bold shadow-xs' : 'text-base-content/60 hover:text-base-content hover:bg-base-200/60' }}"
+                   {{ (request()->routeIs('approvals.versions') || (request()->routeIs('approvals.index') && !in_array(request('tab'), ['rollbacks', 'renames']))) ? 'data-nav-active=true aria-current=page' : '' }}
                    title="{{ __('Document Approval & Signature') }}">
                     <span class="flex items-center gap-2 min-w-0 flex-1">
                         <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ request()->routeIs('approvals.versions') || (request()->routeIs('approvals.index') && !in_array(request('tab'), ['rollbacks', 'renames'])) ? 'bg-primary' : 'bg-base-content/30' }}"></span>
@@ -418,6 +435,7 @@
                 <a href="{{ route('approvals.rollbacks') }}"
                    class="flex items-center justify-between gap-1.5 px-2 py-2 rounded-xl text-[12.5px] font-medium transition-all duration-200
                           {{ request()->routeIs('approvals.rollbacks') || (request()->routeIs('approvals.index') && request('tab') === 'rollbacks') ? 'bg-purple-500/15 text-purple-800 dark:text-purple-200 font-bold shadow-xs' : 'text-base-content/60 hover:text-base-content hover:bg-base-200/60' }}"
+                   {{ (request()->routeIs('approvals.rollbacks') || (request()->routeIs('approvals.index') && request('tab') === 'rollbacks')) ? 'data-nav-active=true aria-current=page' : '' }}
                    title="{{ __('Rollback Approval') }}">
                     <span class="flex items-center gap-2 min-w-0 flex-1">
                         <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ request()->routeIs('approvals.rollbacks') || (request()->routeIs('approvals.index') && request('tab') === 'rollbacks') ? 'bg-purple-500' : 'bg-base-content/30' }}"></span>
@@ -437,6 +455,7 @@
         <a href="{{ route('documents.index', ['type' => 'mine']) }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('documents.*') && request('type', '') === 'mine' ? 'nav-item-new-active' : '' }}"
+           {{ (request()->routeIs('documents.*') && request('type', '') === 'mine') ? 'data-nav-active=true aria-current=page' : '' }}
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Dokumen Saya') }}'">
             <div class="icon-wrapper shrink-0">
@@ -451,6 +470,7 @@
         <a href="{{ route('trash.index') }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('trash.*') ? 'nav-item-new-active' : '' }}"
+           {{ request()->routeIs('trash.*') ? 'data-nav-active=true aria-current=page' : '' }}
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Sampah') }}'">
             <div class="icon-wrapper shrink-0">
@@ -468,6 +488,7 @@
         <a href="{{ route('admin.companies.index') }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('admin.companies.*') ? 'nav-item-new-active' : '' }}"
+           {{ request()->routeIs('admin.companies.*') ? 'data-nav-active=true aria-current=page' : '' }}
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Perusahaan') }}'">
             <div class="icon-wrapper shrink-0">
@@ -479,6 +500,7 @@
         <a href="{{ route('admin.branches.index') }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('admin.branches.*') ? 'nav-item-new-active' : '' }}"
+           {{ request()->routeIs('admin.branches.*') ? 'data-nav-active=true aria-current=page' : '' }}
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Cabang') }}'">
             <div class="icon-wrapper shrink-0">
@@ -490,6 +512,7 @@
         <a href="{{ route('admin.unit-kerja.index') }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('admin.unit-kerja.*') ? 'nav-item-new-active' : '' }}"
+           {{ request()->routeIs('admin.unit-kerja.*') ? 'data-nav-active=true aria-current=page' : '' }}
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Unit Kerja') }}'">
             <div class="icon-wrapper shrink-0">
@@ -498,13 +521,10 @@
             <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Unit Kerja') }}</span>
         </a>
 
-
-
-
-
         <a href="{{ route('admin.documents.index') }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('admin.documents.*') ? 'nav-item-new-active' : '' }}"
+           {{ request()->routeIs('admin.documents.*') ? 'data-nav-active=true aria-current=page' : '' }}
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Semua Dokumen') }}'">
             <div class="icon-wrapper shrink-0">
@@ -516,6 +536,7 @@
         <a href="{{ route('trash.index') }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('trash.*') || request()->routeIs('admin.trash.*') ? 'nav-item-new-active' : '' }}"
+           {{ (request()->routeIs('trash.*') || request()->routeIs('admin.trash.*')) ? 'data-nav-active=true aria-current=page' : '' }}
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Sampah') }}'">
             <div class="icon-wrapper shrink-0">
@@ -527,6 +548,7 @@
         <a href="{{ route('admin.document-types.index') }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('admin.document-types.*') ? 'nav-item-new-active' : '' }}"
+           {{ request()->routeIs('admin.document-types.*') ? 'data-nav-active=true aria-current=page' : '' }}
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Jenis Dokumen') }}'">
             <div class="icon-wrapper shrink-0">
@@ -538,6 +560,7 @@
         <a href="{{ route('admin.templates.index') }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('admin.templates.*') || request()->routeIs('admin.template-categories.*') ? 'nav-item-new-active' : '' }}"
+           {{ (request()->routeIs('admin.templates.*') || request()->routeIs('admin.template-categories.*')) ? 'data-nav-active=true aria-current=page' : '' }}
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Template Dokumen') }}'">
             <div class="icon-wrapper shrink-0">
@@ -549,6 +572,7 @@
         <a href="{{ route('admin.corporate-soft-files.index') }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('admin.corporate-soft-files.*') ? 'nav-item-new-active' : '' }}"
+           {{ request()->routeIs('admin.corporate-soft-files.*') ? 'data-nav-active=true aria-current=page' : '' }}
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Soft File Korporat') }}'">
             <div class="icon-wrapper shrink-0">
@@ -560,6 +584,7 @@
         <a href="{{ route('admin.users.index') }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('admin.users.*') ? 'nav-item-new-active' : '' }}"
+           {{ request()->routeIs('admin.users.*') ? 'data-nav-active=true aria-current=page' : '' }}
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Pengguna') }}'">
             <div class="icon-wrapper shrink-0">
@@ -571,6 +596,7 @@
         <a href="{{ route('admin.signatures.index') }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('admin.signatures.*') ? 'nav-item-new-active' : '' }}"
+           {{ request()->routeIs('admin.signatures.*') ? 'data-nav-active=true aria-current=page' : '' }}
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Tanda Tangan & Stempel') }}'">
             <div class="icon-wrapper shrink-0">
@@ -582,6 +608,7 @@
         <a href="{{ route('admin.retention.edit') }}"
            class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
                   {{ request()->routeIs('admin.retention.*') ? 'nav-item-new-active' : '' }}"
+           {{ request()->routeIs('admin.retention.*') ? 'data-nav-active=true aria-current=page' : '' }}
            :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
            :title="open ? '' : '{{ __('Retensi') }}'">
             <div class="icon-wrapper shrink-0">
@@ -639,4 +666,83 @@
         </div>
     </div>
 </aside>
+
+<script>
+    (function() {
+        function getActiveSidebarElement(nav) {
+            if (!nav) return null;
+
+            // 1. Prefer active sub-menu item if present
+            const activeSub = nav.querySelector('div[x-show*="approvalOpen"] a[data-nav-active="true"], div[x-show*="approvalOpen"] a.bg-primary\\/10, div[x-show*="approvalOpen"] a.bg-purple-500\\/15');
+            if (activeSub && activeSub.offsetParent !== null) return activeSub;
+
+            // 2. Active top-level item with data-nav-active
+            const activeWithAttr = nav.querySelector('[data-nav-active="true"]');
+            if (activeWithAttr) return activeWithAttr;
+
+            // 3. Fallback to active class or aria-current
+            const activeClass = nav.querySelector('.nav-item-new-active, [aria-current="page"]');
+            if (activeClass) return activeClass;
+
+            return null;
+        }
+
+        function scrollSidebarToElement(element, behavior = 'smooth') {
+            const nav = document.getElementById('sidebar-nav');
+            if (!nav || !element) return;
+
+            const navRect = nav.getBoundingClientRect();
+            const elemRect = element.getBoundingClientRect();
+
+            if (navRect.height === 0 || elemRect.height === 0) return;
+
+            const currentScroll = nav.scrollTop;
+            const relativeTop = elemRect.top - navRect.top;
+            
+            // Calculate target scroll to place active element centrally in the nav viewport
+            const targetScroll = currentScroll + relativeTop - (nav.clientHeight / 2) + (elemRect.height / 2);
+            const maxScroll = Math.max(0, nav.scrollHeight - nav.clientHeight);
+            const clampedScroll = Math.max(0, Math.min(targetScroll, maxScroll));
+
+            if (Math.abs(nav.scrollTop - clampedScroll) > 4) {
+                nav.scrollTo({
+                    top: clampedScroll,
+                    behavior: behavior
+                });
+            }
+        }
+
+        window.scrollSidebarToActive = function(behavior = 'smooth') {
+            const nav = document.getElementById('sidebar-nav');
+            if (!nav) return;
+            const target = getActiveSidebarElement(nav);
+            if (target) {
+                scrollSidebarToElement(target, behavior);
+            }
+        };
+
+        // Scroll on DOM ready and window load
+        const triggerInitialScroll = () => {
+            setTimeout(() => window.scrollSidebarToActive('smooth'), 60);
+            setTimeout(() => window.scrollSidebarToActive('smooth'), 220);
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', triggerInitialScroll);
+        } else {
+            triggerInitialScroll();
+        }
+        window.addEventListener('load', triggerInitialScroll);
+
+        // When user clicks any navigation link in sidebar, smoothly scroll it into center view immediately
+        document.addEventListener('click', function(e) {
+            const nav = document.getElementById('sidebar-nav');
+            if (!nav) return;
+            const link = e.target.closest('#sidebar-nav a, #sidebar-nav button.nav-item-new');
+            if (!link) return;
+
+            scrollSidebarToElement(link, 'smooth');
+        }, { passive: true });
+    })();
+</script>
 

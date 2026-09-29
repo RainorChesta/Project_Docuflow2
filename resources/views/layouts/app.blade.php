@@ -54,6 +54,9 @@
                  toggle() {
                      this.open = !this.open;
                      localStorage.setItem('dokuflow:sidebar', this.open ? 'open' : 'closed');
+                     if (this.open && typeof window.scrollSidebarToActive === 'function') {
+                         this.$nextTick(() => setTimeout(() => window.scrollSidebarToActive('smooth'), 120));
+                     }
                  }
              }"
              x-init="() => {
