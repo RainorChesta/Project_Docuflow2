@@ -232,10 +232,10 @@
 
         {{-- Notification list --}}
         <div class="max-h-[calc(50vh-3.25rem)] sm:max-h-[380px] overflow-y-auto flex-1 overscroll-contain">
-            {{-- Loading state --}}
+            {{-- Shimmer Loading State --}}
             <template x-if="loading">
-                <div class="flex items-center justify-center py-8">
-                    <span class="loading loading-spinner loading-md text-primary"></span>
+                <div class="p-1">
+                    <x-shimmer-loader type="list" count="4" />
                 </div>
             </template>
 

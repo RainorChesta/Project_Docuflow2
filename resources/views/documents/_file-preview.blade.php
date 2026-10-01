@@ -95,9 +95,12 @@
                     }
                 });
             </script>
-        @else
-            <div id="docx-preview-{{ $version->id }}" class="prose max-w-none p-6 sm:p-8 bg-base-100" style="min-height: 600px;">
-                <p class="text-base-content/50 text-sm">{{ __('Memuat isi dokumen...') }}</p>
+            <div id="docx-preview-{{ $version->id }}" class="p-6 sm:p-8 bg-base-100 rounded-2xl border border-base-300" style="min-height: 600px;">
+                <div class="flex items-center justify-center gap-2 text-xs font-semibold text-primary mb-4">
+                    <span class="loading loading-spinner loading-xs"></span>
+                    <span>{{ __('Memuat isi dokumen...') }}</span>
+                </div>
+                <x-shimmer-loader type="document" />
             </div>
 
             <script src="https://cdn.jsdelivr.net/npm/mammoth@1.7.0/mammoth.browser.min.js"></script>

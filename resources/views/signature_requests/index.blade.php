@@ -872,12 +872,23 @@
         </div>
     </div>
 
-    {{-- Loading Modal --}}
+    {{-- Loading Modal with Shimmer --}}
     <dialog id="loading-modal" class="modal">
-        <div class="modal-box flex flex-col items-center justify-center py-10">
-            <span class="loading loading-spinner loading-lg text-primary"></span>
-            <h3 class="font-bold text-lg mt-4">{{ __('Memproses Permintaan...') }}</h3>
-            <p class="text-sm text-base-content/70 mt-2 text-center">{{ __('Harap tunggu sebentar, sistem sedang memproses pembubuhan tanda tangan secara otomatis.') }}</p>
+        <div class="modal-box flex flex-col items-center justify-center p-8 sm:p-10 max-w-sm rounded-3xl border border-base-300 shadow-2xl relative overflow-hidden bg-base-100/95 backdrop-blur-md">
+            <div class="relative w-16 h-16 flex items-center justify-center mb-4">
+                <div class="absolute -inset-2 bg-gradient-to-tr from-primary/30 to-accent/30 rounded-full blur-xl animate-pulse"></div>
+                <div class="relative w-14 h-14 rounded-full p-[2.5px] bg-gradient-to-tr from-primary via-accent to-primary animate-spin flex items-center justify-center shadow-md shadow-primary/20" style="animation-duration: 1.8s;">
+                    <div class="w-full h-full bg-base-100 rounded-full"></div>
+                </div>
+                <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <img src="{{ asset('logo.webp') }}" alt="DokuFlow" class="w-7 h-7 object-contain animate-loading-float drop-shadow-sm" />
+                </div>
+            </div>
+            <h3 class="font-bold text-base text-base-content text-center">{{ __('Memproses Permintaan...') }}</h3>
+            <p class="text-xs text-base-content/60 mt-1 text-center max-w-xs leading-relaxed">{{ __('Harap tunggu sebentar, sistem sedang memproses pembubuhan tanda tangan secara otomatis.') }}</p>
+            <div class="w-40 h-1.5 rounded-full overflow-hidden mt-4 bg-base-200 border border-base-300/60">
+                <div class="shimmer-brand w-full h-full"></div>
+            </div>
         </div>
     </dialog>
 </x-app-layout>

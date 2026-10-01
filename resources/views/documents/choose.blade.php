@@ -321,9 +321,14 @@
                     </div>
 
                     {{-- Loading Indicator --}}
-                    <div x-show="previewLoading" class="absolute inset-0 flex flex-col items-center justify-center bg-base-100 z-10 mt-16">
-                        <span class="loading loading-spinner text-primary w-10 h-10 mb-4"></span>
-                        <p class="text-sm font-medium text-base-content/60 animate-pulse">{{ __('Memuat Preview Dokumen...') }}</p>
+                    <div x-show="previewLoading" class="absolute inset-0 flex flex-col items-center justify-start bg-base-100/95 backdrop-blur-xs z-10 mt-16 p-4 sm:p-8 overflow-y-auto">
+                        <div class="w-full max-w-3xl space-y-4">
+                            <div class="flex items-center justify-center gap-2 text-xs font-semibold text-primary py-2">
+                                <span class="loading loading-spinner loading-xs"></span>
+                                <span class="animate-pulse">{{ __('Memuat Preview Dokumen...') }}</span>
+                            </div>
+                            <x-shimmer-loader type="document" />
+                        </div>
                     </div>
 
                     {{-- Error State --}}

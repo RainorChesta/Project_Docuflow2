@@ -374,8 +374,8 @@
 
             {{-- User List --}}
             <div id="signature-users-list" class="space-y-2.5 max-h-72 overflow-y-auto overflow-x-hidden pr-1 min-w-0 max-w-full">
-                <div class="flex justify-center py-6 text-sm text-base-content/60">
-                    <span class="loading loading-spinner loading-sm mr-2"></span> {{ __('MEMUAT PENGGUNA...') }}
+                <div class="py-2">
+                    <x-shimmer-loader type="list" count="3" />
                 </div>
             </div>
 
@@ -458,9 +458,14 @@
 
                 {{-- PDF Canvas Workspace Viewport --}}
                 <div id="pdf-workspace-viewport" class="flex-1 overflow-auto bg-base-300/60 p-4 sm:p-6 flex items-start justify-center relative min-h-[350px]">
-                    <div id="pdf-visual-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-base-100/80 z-20">
-                        <span class="loading loading-spinner loading-lg text-primary mb-2"></span>
-                        <p class="text-xs font-semibold text-base-content/70 uppercase tracking-wider">{{ __('Memuat Dokumen PDF...') }}</p>
+                    <div id="pdf-visual-loading" class="absolute inset-0 flex flex-col items-center justify-start bg-base-100/95 backdrop-blur-xs z-20 p-6 overflow-y-auto">
+                        <div class="w-full max-w-2xl space-y-4">
+                            <div class="flex items-center justify-center gap-2 text-xs font-semibold text-primary py-2">
+                                <span class="loading loading-spinner loading-xs"></span>
+                                <span class="uppercase tracking-wider animate-pulse">{{ __('Memuat Dokumen PDF...') }}</span>
+                            </div>
+                            <x-shimmer-loader type="document" />
+                        </div>
                     </div>
 
                     <div id="pdf-page-wrapper" class="relative shadow-2xl rounded-lg overflow-hidden bg-white border border-base-content/10 select-none my-auto transition-all">

@@ -373,10 +373,13 @@
                             </div>
                         </div>
 
-                        {{-- Loader Text --}}
-                        <div class="text-center">
+                        {{-- Loader Text & Shimmer Bar --}}
+                        <div class="text-center flex flex-col items-center">
                             <h4 class="font-bold text-sm text-base-content tracking-wide">DokuFlow</h4>
                             <p class="text-xs font-medium text-base-content/60 mt-0.5">{{ __('Memuat pratinjau soft file...') }}</p>
+                            <div class="w-32 h-1.5 rounded-full overflow-hidden mt-3 bg-base-200 border border-base-300/60">
+                                <div class="shimmer-brand w-full h-full"></div>
+                            </div>
                         </div>
                     </div>
                 </div>

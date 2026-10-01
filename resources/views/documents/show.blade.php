@@ -1192,14 +1192,12 @@
                         </div>
                     </div>
 
-                    <div id="summary-loading" class="{{ $isProcessing ? '' : 'hidden' }} my-3">
-                        <div class="summary-loading-bar mb-3" aria-hidden="true">
-                            <span class="summary-loading-shimmer"></span>
-                        </div>
-                        <p class="text-xs text-primary font-medium inline-flex items-center gap-2">
+                    <div id="summary-loading" class="{{ $isProcessing ? '' : 'hidden' }} my-3 space-y-3">
+                        <div class="flex items-center gap-2 text-xs font-semibold text-primary">
                             <span class="loading loading-spinner loading-xs"></span>
-                            {{ __('AI is reading & summarizing the document... Please wait a moment.') }}
-                        </p>
+                            <span>{{ __('AI is reading & summarizing the document... Please wait a moment.') }}</span>
+                        </div>
+                        <x-shimmer-loader type="summary" />
                     </div>
 
                     <div id="summary-body-wrapper" class="{{ !$hasSummary || $isProcessing ? 'hidden' : '' }}">

@@ -354,11 +354,10 @@
                     </template>
                 </div>
 
-                {{-- Loading State --}}
+                {{-- Shimmer Loading State --}}
                 <template x-if="loading">
-                    <div class="flex flex-col items-center justify-center py-10 text-base-content/50 space-y-2">
-                        <span class="loading loading-spinner loading-md text-primary"></span>
-                        <span class="text-xs font-medium">{{ __('Mencari dokumen...') }}</span>
+                    <div class="p-1 space-y-1">
+                        <x-shimmer-loader type="search" count="3" />
                     </div>
                 </template>
 

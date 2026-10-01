@@ -397,7 +397,39 @@ dialog.modal,
 }
 
 
-/* ─── Animated Loading Blur Overlay ────────────────────────────── */
+/* ─── DokuFlow Shimmer Loading System ────────────────────────────── */
+@keyframes shimmer-sweep {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+@keyframes shimmer-progress {
+    0% {
+        transform: translateX(-100%);
+    }
+    50% {
+        transform: translateX(0%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+@keyframes shimmer-glow-pulse {
+    0%, 100% {
+        opacity: 0.4;
+        transform: scale(0.98);
+    }
+    50% {
+        opacity: 0.85;
+        transform: scale(1.03);
+    }
+}
+
 @keyframes loading-shimmer {
     0% { transform: translateX(-150%); }
     50% { transform: translateX(50%); }
@@ -417,10 +449,130 @@ dialog.modal,
     animation: loading-float 3s ease-in-out infinite;
 }
 
+/* Base Shimmer Element & DaisyUI Skeleton Enhancement */
+.shimmer,
+.animate-shimmer,
+.skeleton {
+    background: linear-gradient(
+        90deg,
+        oklch(0.93 0.01 250) 0%,
+        oklch(0.97 0.005 250) 25%,
+        oklch(1 0 0 / 0.8) 50%,
+        oklch(0.97 0.005 250) 75%,
+        oklch(0.93 0.01 250) 100%
+    ) !important;
+    background-size: 200% 100% !important;
+    animation: shimmer-sweep 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite !important;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Dark Mode Shimmer Element */
+.dark .shimmer,
+.dark .animate-shimmer,
+.dark .skeleton,
+[data-theme="dark"] .shimmer,
+[data-theme="dark"] .animate-shimmer,
+[data-theme="dark"] .skeleton {
+    background: linear-gradient(
+        90deg,
+        oklch(0.32 0.03 250) 0%,
+        oklch(0.38 0.03 250) 25%,
+        oklch(0.48 0.04 250 / 0.7) 50%,
+        oklch(0.38 0.03 250) 75%,
+        oklch(0.32 0.03 250) 100%
+    ) !important;
+    background-size: 200% 100% !important;
+}
+
+/* Enhanced Button Shimmer Loading Effect */
+.btn.loading,
+.btn:has(.loading-spinner) {
+    position: relative;
+    overflow: hidden;
+}
+
+.btn.loading::after,
+.btn:has(.loading-spinner)::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.2) 50%,
+        transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer-sweep 1.4s infinite;
+    pointer-events: none;
+}
+
+/* Brand Tinted Shimmer */
+.shimmer-brand {
+    background: linear-gradient(
+        90deg,
+        var(--brand-primary-soft) 0%,
+        color-mix(in srgb, var(--brand-primary) 20%, transparent) 50%,
+        var(--brand-primary-soft) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer-sweep 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Top Progress Shimmer Bar */
+#global-top-shimmer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    z-index: 10001;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease-out;
+    background: linear-gradient(90deg, var(--color-primary), var(--color-accent), var(--color-primary));
+    background-size: 200% 100%;
+    animation: shimmer-sweep 1.2s linear infinite;
+}
+
+/* Shimmer Skeleton Shape Utility Classes */
+.shimmer-text {
+    height: 0.75rem;
+    border-radius: 0.375rem;
+    display: inline-block;
+}
+
+.shimmer-title {
+    height: 1.125rem;
+    border-radius: 0.5rem;
+    display: inline-block;
+}
+
+.shimmer-pill {
+    height: 1.5rem;
+    border-radius: 9999px;
+    display: inline-flex;
+}
+
+.shimmer-circle {
+    border-radius: 9999px;
+    flex-shrink: 0;
+}
+
+.shimmer-box {
+    border-radius: 0.75rem;
+}
+
 /* Persistent Page Loading State across Navigation Transitions */
 html.is-page-loading #global-loading-blur {
     opacity: 1 !important;
     pointer-events: auto !important;
+    visibility: visible !important;
+}
+
+html.is-page-loading #global-top-shimmer {
+    opacity: 1 !important;
     visibility: visible !important;
 }
 
@@ -430,4 +582,5 @@ html.is-page-loading #loading-blur-card {
     transform: scale(1) !important;
     visibility: visible !important;
 }
+
 

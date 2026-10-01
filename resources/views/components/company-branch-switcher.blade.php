@@ -251,6 +251,10 @@
                     this.isSwitching = false;
                 }, 6000);
 
+                if (typeof window.showLoadingBlur === 'function') {
+                    window.showLoadingBlur();
+                }
+
                 form.submit();
             }
         }

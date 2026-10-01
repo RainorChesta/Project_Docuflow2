@@ -5,6 +5,10 @@
         pointer-events: auto !important;
         visibility: visible !important;
     }
+    html.is-page-loading #global-top-shimmer {
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
     html.is-page-loading #loading-blur-content {
         opacity: 1 !important;
         transform: scale(1) !important;
@@ -24,32 +28,45 @@
     })();
 </script>
 
+{{-- Top Shimmer Progress Bar --}}
+<div id="global-top-shimmer" class="fixed top-0 left-0 right-0 h-[3px] z-[10001] pointer-events-none opacity-0 transition-opacity duration-200" aria-hidden="true"></div>
+
 <div id="global-loading-blur"
      class="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/40 dark:bg-slate-950/70 backdrop-blur-md opacity-0 pointer-events-none transition-all duration-300 ease-out select-none cursor-wait"
      aria-hidden="true"
      role="status"
      aria-live="polite">
 
-    {{-- Center Animated Logo & Pulsing Ambient Aura --}}
+    {{-- Center Animated Logo & Pulsing Ambient Aura & Shimmer Pill --}}
     <div id="loading-blur-content"
-         class="relative flex items-center justify-center transform scale-95 opacity-0 transition-all duration-300 ease-out pointer-events-none">
+         class="relative flex flex-col items-center justify-center gap-3.5 transform scale-95 opacity-0 transition-all duration-300 ease-out pointer-events-none">
         
-        {{-- Ambient Glow Aura --}}
-        <div class="absolute -inset-4 bg-gradient-to-tr from-primary/40 via-accent/30 to-primary/40 rounded-full blur-2xl animate-pulse"></div>
+        <div class="relative flex items-center justify-center">
+            {{-- Ambient Glow Aura --}}
+            <div class="absolute -inset-4 bg-gradient-to-tr from-primary/40 via-accent/30 to-primary/40 rounded-full blur-2xl animate-pulse"></div>
 
-        {{-- Conic Rotating Spinner Ring --}}
-        <div class="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full p-[3px] bg-gradient-to-tr from-primary via-accent to-primary/20 animate-spin flex items-center justify-center shadow-2xl shadow-primary/20" style="animation-duration: 2s;">
-            <div class="w-full h-full bg-base-100/90 dark:bg-base-100/80 backdrop-blur-sm rounded-full"></div>
+            {{-- Conic Rotating Spinner Ring with Shimmer Aura --}}
+            <div class="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full p-[3px] bg-gradient-to-tr from-primary via-accent to-primary/20 animate-spin flex items-center justify-center shadow-2xl shadow-primary/20" style="animation-duration: 2s;">
+                <div class="w-full h-full bg-base-100/90 dark:bg-base-100/80 backdrop-blur-sm rounded-full"></div>
+            </div>
+
+            {{-- Floating Brand Logo --}}
+            <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <img src="{{ asset('logo.webp') }}"
+                     alt="{{ config('app.name', 'DokuFlow') }}"
+                     class="w-10 h-10 sm:w-12 sm:h-12 object-contain animate-loading-float drop-shadow-md" />
+            </div>
         </div>
 
-        {{-- Floating Brand Logo --}}
-        <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <img src="{{ asset('logo.webp') }}"
-                 alt="{{ config('app.name', 'DokuFlow') }}"
-                 class="w-10 h-10 sm:w-12 sm:h-12 object-contain animate-loading-float drop-shadow-md" />
+        {{-- Shimmering Status Indicator --}}
+        <div class="px-3.5 py-1.5 rounded-full bg-base-100/95 dark:bg-base-100/90 backdrop-blur-md border border-base-300/80 dark:border-white/10 shadow-lg flex items-center gap-2 overflow-hidden relative">
+            <div class="shimmer-brand absolute inset-0 opacity-40"></div>
+            <span class="w-2 h-2 rounded-full bg-primary animate-ping relative z-10"></span>
+            <span id="loading-blur-text" class="text-xs font-semibold text-base-content/80 tracking-wide relative z-10">{{ __('Memuat...') }}</span>
         </div>
     </div>
 </div>
+
 
 <script>
 (function() {

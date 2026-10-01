@@ -111,5 +111,6 @@
             </div>
         </div>
     </div>
+    <x-loading-blur />
 </body>
 </html>
