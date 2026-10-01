@@ -23,6 +23,10 @@ services:
       - ./docker/onlyoffice/app/view/Toolbar.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/Toolbar.js.gz:ro
       - ./docker/onlyoffice/app/controller/Main.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/controller/Main.js:ro
       - ./docker/onlyoffice/app/controller/Main.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/controller/Main.js.gz:ro
+      - ./docker/onlyoffice/app/controller/Toolbar.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/controller/Toolbar.js:ro
+      - ./docker/onlyoffice/app/controller/Toolbar.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/controller/Toolbar.js.gz:ro
+      - ./docker/onlyoffice/app/controller/LeftMenu.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/controller/LeftMenu.js:ro
+      - ./docker/onlyoffice/app/controller/LeftMenu.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/controller/LeftMenu.js.gz:ro
       - ./docker/onlyoffice/code.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/code.js:ro
       - ./docker/onlyoffice/code.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/code.js.gz:ro
       - ./docker/onlyoffice/common/img/header/header-logo_s.svg:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/header/header-logo_s.svg:ro

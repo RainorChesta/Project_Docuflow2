@@ -206,6 +206,11 @@ define([
                         dataHintTitle: 'P',
                         printType: 'print'
                     });
+                    this.btnPrint.on('click', function () {
+                        try {
+                            window.parent.postMessage({ type: 'onlyoffice-request-export', action: 'print' }, '*');
+                        } catch (err) {}
+                    });
                     this.toolbarControls.push(this.btnPrint);
                     this.shortcutHints.PrintPreviewAndPrint = {
                         btn: this.btnPrint,
@@ -1912,6 +1917,11 @@ define([
                             dataHintTitle: 'P',
                             printType: 'print'
                         });
+                        this.btnPrint.on('click', function () {
+                            try {
+                                window.parent.postMessage({ type: 'onlyoffice-request-export', action: 'print' }, '*');
+                            } catch (err) {}
+                        });
                         this.toolbarControls.push(this.btnPrint);
                         this.shortcutHints.PrintPreviewAndPrint = {
                             btn: this.btnPrint,
@@ -2349,6 +2359,11 @@ define([
                     resolve();
                 })).then(function () {
                     if(me.btnPrint && me.btnPrint.menu){
+                        me.btnPrint.menu.on('item:click', function () {
+                            try {
+                                window.parent.postMessage({ type: 'onlyoffice-request-export', action: 'print' }, '*');
+                            } catch (err) {}
+                        });
                         me.btnPrint.setMenu(
                             new Common.UI.Menu({
                                 items:[

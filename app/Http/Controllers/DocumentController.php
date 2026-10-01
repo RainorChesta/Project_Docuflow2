@@ -766,7 +766,7 @@ class DocumentController extends Controller
                 ->with('error', __('Dokumen sedang dalam alur persetujuan dan terkunci dari pengeditan.'));
         }
 
-        $this->authorize('update', $document);
+        $this->authorize('edit', $document);
 
         $document->load('currentVersion', 'versions', 'corporateSoftFile');
         $currentUser = auth()->user();
@@ -881,41 +881,70 @@ class DocumentController extends Controller
             return response()->json(['error' => __('Anda tidak memiliki hak akses untuk soft file ini.')], 403);
         }
 
-        $version = $document->displayVersion();
-        if (!$version) {
-            return response()->json(['error' => __('Versi dokumen tidak ditemukan.')], 404);
-        }
-
         $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
         if (!$disk->exists($corporateSoftFile->file_path)) {
             return response()->json(['error' => __('Berkas soft file korporat tidak ditemukan di storage.')], 404);
         }
 
-        // Flush any active in-memory edits from ONLYOFFICE to server storage first
-        $this->onlyOfficeService->forceSaveDocument($document, $version);
-        
-        // Wait briefly for ONLYOFFICE forcesave callback to flush content to disk
-        $initialMtime = ($version->file_path && $disk->exists($version->file_path)) ? $disk->lastModified($version->file_path) : 0;
-        $maxWaitMs = 1200;
-        $waited = 0;
-        while ($waited < $maxWaitMs) {
-            usleep(150000);
-            $waited += 150;
-            $currentMtime = ($version->file_path && $disk->exists($version->file_path)) ? $disk->lastModified($version->file_path) : 0;
-            if ($currentMtime > $initialMtime) {
-                break;
+        $version = $document->displayVersion();
+        if ($version) {
+            // Flush any active in-memory edits from ONLYOFFICE to server storage first
+            $this->onlyOfficeService->forceSaveDocument($document, $version);
+            
+            // Wait briefly for ONLYOFFICE forcesave callback to flush content to disk
+            $initialMtime = ($version->file_path && $disk->exists($version->file_path)) ? $disk->lastModified($version->file_path) : 0;
+            $maxWaitMs = 1200;
+            $waited = 0;
+            while ($waited < $maxWaitMs) {
+                usleep(150000);
+                $waited += 150;
+                $currentMtime = ($version->file_path && $disk->exists($version->file_path)) ? $disk->lastModified($version->file_path) : 0;
+                if ($currentMtime > $initialMtime) {
+                    break;
+                }
             }
+            $version->refresh();
         }
-        $version->refresh();
 
-        // Apply corporate soft file (Header & Footer) to current version's DOCX while strictly preserving existing content
-        $existingDocx = ($version->file_path && $disk->exists($version->file_path))
-            ? $disk->get($version->file_path)
+        $pending = $document->versions()->pending()->whereNull('discarded_at')->first();
+        $draft = $document->versions()->where('status', 'draft')->first();
+
+        if ($pending) {
+            $workingVersion = $pending;
+        } elseif ($draft) {
+            $workingVersion = $draft;
+        } else {
+            // Active/approved document is being edited -> create new pending revision version (v2, v3, etc.)
+            $currentVersion = $version ?? $document->displayVersion();
+            $newVersionNumber = ($document->versions()->max('version_number') ?? 0) + 1;
+            $storedPath = 'documents/' . $document->id . '/v' . $newVersionNumber . '.docx';
+
+            if ($currentVersion && $currentVersion->file_path && $disk->exists($currentVersion->file_path)) {
+                $disk->copy($currentVersion->file_path, $storedPath);
+            } else {
+                app(\App\Services\DocumentService::class)->createBlankDocx($document->id, $newVersionNumber);
+            }
+
+            $workingVersion = $document->versions()->create([
+                'version_number' => $newVersionNumber,
+                'content' => $currentVersion?->content ?? '',
+                'file_path' => $storedPath,
+                'file_original_name' => $document->title . '.docx',
+                'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'author_id' => $user->id,
+                'author_name' => $user->name,
+                'status' => 'pending',
+            ]);
+        }
+
+        // Apply corporate soft file (Header & Footer) to working version's DOCX while strictly preserving existing content
+        $existingDocx = ($workingVersion->file_path && $disk->exists($workingVersion->file_path))
+            ? $disk->get($workingVersion->file_path)
             : '';
 
         if (empty($existingDocx) || substr($existingDocx, 0, 2) !== 'PK') {
-            app(\App\Services\DocumentService::class)->createBlankDocx($document->id, $version->version_number);
-            $existingDocx = $disk->get($version->file_path);
+            app(\App\Services\DocumentService::class)->createBlankDocx($document->id, $workingVersion->version_number);
+            $existingDocx = $disk->get($workingVersion->file_path);
         }
 
         $originalBackup = $existingDocx;
@@ -927,8 +956,8 @@ class DocumentController extends Controller
                 throw new \RuntimeException('Gagal memproses penggabungan kop surat ke dokumen.');
             }
 
-            $disk->put($version->file_path, $mergedDocx);
-            $version->touch();
+            $disk->put($workingVersion->file_path, $mergedDocx);
+            $workingVersion->touch();
 
             // Update document reference to indicate which corporate soft file was applied
             $document->update([
@@ -937,11 +966,13 @@ class DocumentController extends Controller
                 'paper_size' => 'F4',
             ]);
 
-            // Invalidate ONLYOFFICE cached keys so editor reloads new content
-            $this->onlyOfficeService->rotateDocumentKey($document, $version);
+            // Invalidate ONLYOFFICE cached keys and ignore callbacks from the old session key so editor reloads new content safely
+            $oldKey = $this->onlyOfficeService->generateDocumentKey($document, $workingVersion);
+            Cache::put('ignore_onlyoffice_key_' . $oldKey, true, now()->addSeconds(30));
+            $this->onlyOfficeService->rotateDocumentKey($document, $workingVersion);
         } catch (\Throwable $e) {
-            if (!empty($originalBackup) && $version->file_path) {
-                $disk->put($version->file_path, $originalBackup);
+            if (!empty($originalBackup) && $workingVersion->file_path) {
+                $disk->put($workingVersion->file_path, $originalBackup);
             }
             Log::error('applyCorporateSoftFile error: ' . $e->getMessage(), ['exception' => $e]);
             return response()->json(['error' => __('Gagal menerapkan kop surat: :msg', ['msg' => $e->getMessage()])], 500);
@@ -960,12 +991,9 @@ class DocumentController extends Controller
     public function removeCorporateSoftFile(Request $request, Document $document): JsonResponse
     {
         $this->authorize('update', $document);
+        $user = auth()->user();
 
-        $document->update([
-            'corporate_soft_file_id' => null,
-            'format_choice' => 'A4',
-            'paper_size' => 'A4',
-        ]);
+        $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
 
         $version = $document->displayVersion();
         if ($version) {
@@ -973,16 +1001,55 @@ class DocumentController extends Controller
             $this->onlyOfficeService->forceSaveDocument($document, $version);
             usleep(300000);
             $version->refresh();
-
-            $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
-            if ($version->file_path && $disk->exists($version->file_path)) {
-                $rawDocx = $disk->get($version->file_path);
-                $cleanedDocx = $this->onlyOfficeService->removeHeaderAndFooterFromDocx($rawDocx);
-                $disk->put($version->file_path, $cleanedDocx);
-            }
-            $version->touch();
-            $this->onlyOfficeService->rotateDocumentKey($document, $version);
         }
+
+        $pending = $document->versions()->pending()->whereNull('discarded_at')->first();
+        $draft = $document->versions()->where('status', 'draft')->first();
+
+        if ($pending) {
+            $workingVersion = $pending;
+        } elseif ($draft) {
+            $workingVersion = $draft;
+        } else {
+            // Active/approved document is being edited -> create new pending revision version (v2, v3, etc.)
+            $currentVersion = $version ?? $document->displayVersion();
+            $newVersionNumber = ($document->versions()->max('version_number') ?? 0) + 1;
+            $storedPath = 'documents/' . $document->id . '/v' . $newVersionNumber . '.docx';
+
+            if ($currentVersion && $currentVersion->file_path && $disk->exists($currentVersion->file_path)) {
+                $disk->copy($currentVersion->file_path, $storedPath);
+            } else {
+                app(\App\Services\DocumentService::class)->createBlankDocx($document->id, $newVersionNumber);
+            }
+
+            $workingVersion = $document->versions()->create([
+                'version_number' => $newVersionNumber,
+                'content' => $currentVersion?->content ?? '',
+                'file_path' => $storedPath,
+                'file_original_name' => $document->title . '.docx',
+                'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'author_id' => $user->id,
+                'author_name' => $user->name,
+                'status' => 'pending',
+            ]);
+        }
+
+        $document->update([
+            'corporate_soft_file_id' => null,
+            'format_choice' => 'A4',
+            'paper_size' => 'A4',
+        ]);
+
+        if ($workingVersion->file_path && $disk->exists($workingVersion->file_path)) {
+            $rawDocx = $disk->get($workingVersion->file_path);
+            $cleanedDocx = $this->onlyOfficeService->removeHeaderAndFooterFromDocx($rawDocx);
+            $disk->put($workingVersion->file_path, $cleanedDocx);
+        }
+        $workingVersion->touch();
+
+        $oldKey = $this->onlyOfficeService->generateDocumentKey($document, $workingVersion);
+        Cache::put('ignore_onlyoffice_key_' . $oldKey, true, now()->addSeconds(30));
+        $this->onlyOfficeService->rotateDocumentKey($document, $workingVersion);
 
         return response()->json([
             'success' => true,
@@ -1042,7 +1109,7 @@ class DocumentController extends Controller
 
     public function save(Request $request, Document $document): RedirectResponse
     {
-        $this->authorize('update', $document);
+        $this->authorize('edit', $document);
 
         $validated = $request->validate([
             'content' => 'required|string',
@@ -1186,7 +1253,7 @@ class DocumentController extends Controller
 
     public function saveDraft(Request $request, Document $document): RedirectResponse
     {
-        $this->authorize('update', $document);
+        $this->authorize('edit', $document);
 
         $validated = $request->validate([
             'content' => 'required|string',
@@ -1222,7 +1289,7 @@ class DocumentController extends Controller
                 ->with('error', __('Dokumen sedang dalam alur persetujuan dan terkunci dari pengeditan.'));
         }
 
-        $this->authorize('update', $document);
+        $this->authorize('edit', $document);
 
         $validated = $request->validate([
             'file' => 'required|file|mimes:pdf,docx|max:10240',
@@ -1254,12 +1321,28 @@ class DocumentController extends Controller
         $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
         abort_unless($disk->exists($version->file_path), 404, 'Physical file not found');
 
+        $withKop = $request->boolean('with_kop', true);
+        $fileBytes = $disk->get($version->file_path);
+
         $downloadName = $version->file_original_name ?? $document->title;
-        if (!str_ends_with(strtolower($downloadName), '.docx') && !str_ends_with(strtolower($downloadName), '.pdf')) {
-            $downloadName .= '.docx';
+        $ext = strtolower(pathinfo($downloadName, PATHINFO_EXTENSION) ?: 'docx');
+        $baseName = pathinfo($downloadName, PATHINFO_FILENAME);
+
+        if (!$withKop && $ext === 'docx') {
+            $onlyOfficeService = app(\App\Services\OnlyOfficeService::class);
+            $fileBytes = $onlyOfficeService->removeHeaderAndFooterFromDocx($fileBytes);
+            $downloadName = $baseName . ' (Tanpa Kop).' . $ext;
+        } else {
+            if (!str_ends_with(strtolower($downloadName), '.docx') && !str_ends_with(strtolower($downloadName), '.pdf')) {
+                $downloadName .= '.docx';
+            }
         }
 
-        return $disk->download($version->file_path, $downloadName);
+        return response()->streamDownload(function () use ($fileBytes) {
+            echo $fileBytes;
+        }, $downloadName, [
+            'Content-Type' => $ext === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        ]);
     }
 
     public function file(Document $document, DocumentVersion $version)

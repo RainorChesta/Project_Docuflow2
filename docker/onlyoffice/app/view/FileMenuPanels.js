@@ -3081,8 +3081,18 @@ define([], function () {
                 el: $markup.findById('#print-btn-print'),
                 disabled: true
             });
+            this.btnPrint.on('click', function () {
+                try {
+                    window.parent.postMessage({ type: 'onlyoffice-request-export', action: 'print' }, '*');
+                } catch (err) {}
+            });
             this.btnPrintPdf = new Common.UI.Button({
                 el: $markup.findById('#print-btn-print-pdf')
+            });
+            this.btnPrintPdf.on('click', function () {
+                try {
+                    window.parent.postMessage({ type: 'onlyoffice-request-export', action: 'print' }, '*');
+                } catch (err) {}
             });
 
             this.btnPrevPage = new Common.UI.Button({

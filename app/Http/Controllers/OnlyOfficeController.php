@@ -303,6 +303,11 @@ class OnlyOfficeController extends Controller
                 return response()->json(['error' => 0]);
             }
 
+            if (!empty($payload['key']) && \Illuminate\Support\Facades\Cache::has('ignore_onlyoffice_key_' . $payload['key'])) {
+                Log::info("ONLYOFFICE callback status {$status} for document {$document->id} ignored due to key ignore flag: {$payload['key']}");
+                return response()->json(['error' => 0]);
+            }
+
             $downloadUrl = $payload['url'] ?? null;
 
             if (!$downloadUrl) {
@@ -333,8 +338,17 @@ class OnlyOfficeController extends Controller
 
                 $author = ($userId ? User::find($userId) : null) ?? $document->owner;
 
+                // Resolve the target version being edited if provided
+                $targetVersionId = $request->query('version_id');
+                if (!$targetVersionId && !empty($payload['key'])) {
+                    if (preg_match('/doc_\d+_v(\d+)_/', $payload['key'], $matches)) {
+                        $targetVersionId = (int) $matches[1];
+                    }
+                }
+                $targetVersion = $targetVersionId ? DocumentVersion::where('document_id', $document->id)->find($targetVersionId) : null;
+
                 // Save new or updated pending DOCX version
-                $version = $this->versionService->savePendingDocx($document, $fileContent, $author);
+                $version = $this->versionService->savePendingDocx($document, $fileContent, $author, $targetVersion);
 
                 // Automatically process any approved signatures that were just saved into the document
                 $approvedRequests = \App\Models\SignatureRequest::where('document_id', $document->id)

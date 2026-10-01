@@ -100,11 +100,39 @@ class PdfExportService
      *
      * @throws BusinessLogicException if the document has no exportable content
      */
-    public function export(Document $document, User $user, ?string $paperSizeOverride = null, ?array $customDimensions = null): array
+    public function export(Document $document, ?User $user = null, ?string $paperSizeOverride = null, ?array $customDimensions = null, bool $withKop = true): array
     {
         $display = $document->displayVersion();
 
-        if (!$display || !trim(strip_tags($display->content))) {
+        if (!$display) {
+            throw new BusinessLogicException('No content available to export.');
+        }
+
+        // Handle file-based (ONLYOFFICE / DOCX) documents
+        if (!empty($display->file_path) && empty(trim(strip_tags($display->content ?? '')))) {
+            $disk = \Illuminate\Support\Facades\Storage::disk(config('onlyoffice.storage_disk', 'local'));
+            if ($disk->exists($display->file_path)) {
+                $fileBytes = $disk->get($display->file_path);
+                $ext = strtolower(pathinfo($display->file_path, PATHINFO_EXTENSION));
+
+                if ($ext === 'docx') {
+                    $onlyOfficeService = app(OnlyOfficeService::class);
+                    $pdfBytes = $onlyOfficeService->convertDocxToPdf($fileBytes, $withKop, $paperSizeOverride);
+                    if ($pdfBytes) {
+                        $filename = $this->filename($document);
+                        $path = 'exports/' . $filename;
+                        \Illuminate\Support\Facades\Storage::disk('local')->put($path, $pdfBytes);
+
+                        return [
+                            'filename' => $filename,
+                            'path' => $path,
+                        ];
+                    }
+                }
+            }
+        }
+
+        if (!trim(strip_tags($display->content ?? ''))) {
             throw new BusinessLogicException('No content available to export.');
         }
 
@@ -119,6 +147,11 @@ class PdfExportService
 
         $content = app(SignatureResolverService::class)->resolve($display->content, $document, $user, true);
         $content = $this->qrCodeService->injectPlaceholder($content, $document);
+
+        if (!$withKop) {
+            $content = preg_replace('/<header\b[^>]*>.*?<\/header>/is', '', $content);
+            $content = preg_replace('/<div\b[^>]*class=["\'][^"\']*kop-surat[^"\']*["\'][^>]*>.*?<\/div>/is', '', $content);
+        }
 
         // WAJIB dipanggil SEBELUM buildHtml() — tanpa ini font custom user
         // (Roboto/Poppins/dst) tidak ter-render sama sekali di PDF.

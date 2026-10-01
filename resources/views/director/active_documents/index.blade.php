@@ -8,13 +8,13 @@
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                 {{-- Total Active Docs --}}
                 <a href="{{ request()->fullUrlWithQuery(['tab' => 'all', 'page' => 1]) }}" 
-                   class="bg-base-100 border {{ $tab === 'all' ? 'border-primary ring-2 ring-primary/25 bg-primary/[0.03] shadow-xs' : 'border-base-300 hover:border-primary/40' }} rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between transition-all duration-200 hover:shadow-md group">
+                   class="bg-base-100 border border-base-300 hover:border-primary/50 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between transition-all duration-200 hover:shadow-md group">
                     {{-- Top Row: Label & Icon --}}
                     <div class="flex items-center justify-between gap-3">
-                        <span class="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-base-content/60 group-hover:text-primary transition-colors">
+                        <span class="text-xs font-bold uppercase tracking-wider text-base-content/70 group-hover:text-primary transition-colors">
                             {{ __('Total Dokumen Aktif') }}
                         </span>
-                        <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 group-hover:scale-105 group-hover:bg-primary group-hover:text-white transition-all duration-200">
+                        <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 group-hover:bg-primary group-hover:text-white transition-all duration-200">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
@@ -22,13 +22,13 @@
                     </div>
 
                     {{-- Bottom Row: Value & Status Pill --}}
-                    <div class="mt-3 sm:mt-4 flex items-end justify-between gap-2 pt-2 border-t border-base-200/60">
+                    <div class="mt-3 sm:mt-4 flex items-end justify-between gap-2 pt-2 border-t border-base-200">
                         <div>
                             <span class="text-2xl sm:text-3xl font-black tracking-tight text-base-content leading-none block">
                                 {{ number_format($totalActiveCount) }}
                             </span>
                         </div>
-                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-[11px] sm:text-xs font-semibold bg-base-200 text-base-content/70 border border-base-300 shrink-0">
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-primary/10 text-primary border border-primary/20 shadow-2xs shrink-0">
                             <span class="w-1.5 h-1.5 rounded-full bg-primary shrink-0"></span>
                             {{ __('Semua Cabang') }}
                         </span>
@@ -37,13 +37,13 @@
 
                 {{-- Unseen by Director (Belum Ditinjau) --}}
                 <a href="{{ request()->fullUrlWithQuery(['tab' => 'unseen', 'page' => 1]) }}" 
-                   class="bg-base-100 border {{ $tab === 'unseen' ? 'border-primary ring-2 ring-primary/25 bg-primary/[0.03] shadow-xs' : 'border-base-300 hover:border-primary/40' }} rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between transition-all duration-200 hover:shadow-md group">
+                   class="bg-base-100 border border-base-300 hover:border-warning/50 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between transition-all duration-200 hover:shadow-md group">
                     {{-- Top Row: Label & Icon --}}
                     <div class="flex items-center justify-between gap-3">
-                        <span class="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-base-content/60 group-hover:text-primary transition-colors">
+                        <span class="text-xs font-bold uppercase tracking-wider text-base-content/70 group-hover:text-warning transition-colors">
                             {{ __('Belum Ditinjau') }}
                         </span>
-                        <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 group-hover:scale-105 group-hover:bg-primary group-hover:text-white transition-all duration-200">
+                        <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-warning/10 text-warning border border-warning/20 flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 group-hover:bg-warning group-hover:text-neutral transition-all duration-200">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
@@ -51,14 +51,14 @@
                     </div>
 
                     {{-- Bottom Row: Value & Status Pill --}}
-                    <div class="mt-3 sm:mt-4 flex items-end justify-between gap-2 pt-2 border-t border-base-200/60">
+                    <div class="mt-3 sm:mt-4 flex items-end justify-between gap-2 pt-2 border-t border-base-200">
                         <div>
-                            <span class="text-2xl sm:text-3xl font-black tracking-tight text-base-content leading-none block">
+                            <span class="text-2xl sm:text-3xl font-black tracking-tight text-warning leading-none block">
                                 {{ number_format($unseenActiveCount) }}
                             </span>
                         </div>
-                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-[11px] sm:text-xs font-semibold bg-base-200 text-base-content/70 border border-base-300 shrink-0">
-                            <span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shrink-0"></span>
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-warning/10 text-warning border border-warning/20 shadow-2xs shrink-0">
+                            <span class="w-1.5 h-1.5 rounded-full bg-warning animate-pulse shrink-0"></span>
                             {{ __('Perlu Ditinjau') }}
                         </span>
                     </div>
@@ -66,13 +66,13 @@
 
                 {{-- Seen by Director (Sudah Ditinjau) --}}
                 <a href="{{ request()->fullUrlWithQuery(['tab' => 'seen', 'page' => 1]) }}" 
-                   class="bg-base-100 border {{ $tab === 'seen' ? 'border-secondary ring-2 ring-secondary/25 bg-secondary/[0.03] shadow-xs' : 'border-base-300 hover:border-secondary/40' }} rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between transition-all duration-200 hover:shadow-md group">
+                   class="bg-base-100 border border-base-300 hover:border-success/50 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between transition-all duration-200 hover:shadow-md group">
                     {{-- Top Row: Label & Icon --}}
                     <div class="flex items-center justify-between gap-3">
-                        <span class="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-base-content/60 group-hover:text-secondary transition-colors">
+                        <span class="text-xs font-bold uppercase tracking-wider text-base-content/70 group-hover:text-success transition-colors">
                             {{ __('Sudah Ditinjau') }}
                         </span>
-                        <div class="w-10 h-10 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center shrink-0 group-hover:scale-105 group-hover:bg-secondary group-hover:text-white transition-all duration-200">
+                        <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-success/10 text-success border border-success/20 flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 group-hover:bg-success group-hover:text-white transition-all duration-200">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
@@ -80,15 +80,15 @@
                     </div>
 
                     {{-- Bottom Row: Value & Status Pill --}}
-                    <div class="mt-3 sm:mt-4 flex items-end justify-between gap-2 pt-2 border-t border-base-200/60">
+                    <div class="mt-3 sm:mt-4 flex items-end justify-between gap-2 pt-2 border-t border-base-200">
                         <div>
-                            <span class="text-2xl sm:text-3xl font-black tracking-tight text-base-content leading-none block">
+                            <span class="text-2xl sm:text-3xl font-black tracking-tight text-success leading-none block">
                                 {{ number_format($seenActiveCount) }}
                             </span>
                         </div>
-                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-[11px] sm:text-xs font-semibold bg-base-200 text-base-content/70 border border-base-300 shrink-0">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-secondary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-success/10 text-success border border-success/20 shadow-2xs shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-success shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
                             </svg>
                             {{ __('Terkonfirmasi') }}
                         </span>
@@ -104,21 +104,21 @@
                     {{-- Status Tabs (Scrollable on small mobile) --}}
                     <div class="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 sm:pb-0 -mx-1 px-1 flex-nowrap sm:flex-wrap">
                         <a href="{{ request()->fullUrlWithQuery(['tab' => 'all', 'page' => 1]) }}" 
-                           class="btn btn-xs sm:btn-sm rounded-xl gap-1.5 sm:gap-2 font-semibold transition-all shrink-0 {{ $tab === 'all' ? 'btn-primary text-white shadow-xs' : 'btn-ghost text-base-content/70 hover:bg-base-200' }}">
+                           class="btn btn-xs sm:btn-sm rounded-xl gap-1.5 sm:gap-2 font-bold transition-all shrink-0 {{ $tab === 'all' ? 'btn-primary text-white shadow-xs' : 'btn-ghost text-base-content/70 hover:bg-base-200' }}">
                             <span>{{ __('Semua Dokumen Aktif') }}</span>
-                            <span class="badge {{ $tab === 'all' ? 'badge-primary-content text-primary' : 'badge-ghost' }} badge-xs sm:badge-sm font-bold">{{ $totalActiveCount }}</span>
+                            <span class="badge {{ $tab === 'all' ? 'bg-white/20 text-white border-0' : 'badge-ghost border border-base-300' }} badge-xs sm:badge-sm font-bold">{{ $totalActiveCount }}</span>
                         </a>
                         <a href="{{ request()->fullUrlWithQuery(['tab' => 'unseen', 'page' => 1]) }}" 
-                           class="btn btn-xs sm:btn-sm rounded-xl gap-1.5 sm:gap-2 font-semibold transition-all shrink-0 {{ $tab === 'unseen' ? 'btn-primary text-white shadow-xs' : 'btn-ghost text-base-content/70 hover:bg-base-200' }}">
-                            <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full {{ $tab === 'unseen' ? 'bg-white' : 'bg-primary animate-pulse' }}"></span>
+                           class="btn btn-xs sm:btn-sm rounded-xl gap-1.5 sm:gap-2 font-bold transition-all shrink-0 {{ $tab === 'unseen' ? 'btn-warning text-neutral shadow-xs' : 'btn-ghost text-base-content/70 hover:bg-base-200' }}">
+                            <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full {{ $tab === 'unseen' ? 'bg-neutral' : 'bg-warning animate-pulse' }}"></span>
                             <span>{{ __('Belum Ditinjau') }}</span>
-                            <span class="badge {{ $tab === 'unseen' ? 'badge-primary-content text-primary' : 'badge-ghost' }} badge-xs sm:badge-sm font-bold">{{ $unseenActiveCount }}</span>
+                            <span class="badge {{ $tab === 'unseen' ? 'bg-neutral/20 text-neutral border-0' : 'badge-ghost border border-base-300' }} badge-xs sm:badge-sm font-bold">{{ $unseenActiveCount }}</span>
                         </a>
                         <a href="{{ request()->fullUrlWithQuery(['tab' => 'seen', 'page' => 1]) }}" 
-                           class="btn btn-xs sm:btn-sm rounded-xl gap-1.5 sm:gap-2 font-semibold transition-all shrink-0 {{ $tab === 'seen' ? 'btn-secondary text-white shadow-xs' : 'btn-ghost text-base-content/70 hover:bg-base-200' }}">
+                           class="btn btn-xs sm:btn-sm rounded-xl gap-1.5 sm:gap-2 font-bold transition-all shrink-0 {{ $tab === 'seen' ? 'btn-success text-white shadow-xs' : 'btn-ghost text-base-content/70 hover:bg-base-200' }}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
                             <span>{{ __('Sudah Ditinjau') }}</span>
-                            <span class="badge {{ $tab === 'seen' ? 'badge-secondary-content text-secondary' : 'badge-ghost' }} badge-xs sm:badge-sm font-bold">{{ $seenActiveCount }}</span>
+                            <span class="badge {{ $tab === 'seen' ? 'bg-white/20 text-white border-0' : 'badge-ghost border border-base-300' }} badge-xs sm:badge-sm font-bold">{{ $seenActiveCount }}</span>
                         </a>
                     </div>
 

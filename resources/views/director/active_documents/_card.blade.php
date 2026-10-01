@@ -77,24 +77,24 @@
         {{-- Status Banner (Fixed height 34px for alignment) --}}
         <div id="seen-badge-{{ $doc->id }}" class="h-[34px] flex items-center">
             @if($isSeen)
-                <div class="w-full flex items-center justify-between gap-1.5 bg-secondary/10 border border-secondary/25 text-secondary px-2.5 py-1.5 rounded-xl text-xs font-semibold">
+                <div class="w-full flex items-center justify-between gap-1.5 bg-success/15 border border-success/30 text-success px-2.5 py-1.5 rounded-xl text-xs font-bold shadow-2xs">
                     <span class="flex items-center gap-1.5 truncate">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 shrink-0 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 shrink-0 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
                         </svg>
                         <span class="truncate">{{ __('Sudah Ditinjau') }}</span>
                     </span>
-                    <span class="text-[10px] text-secondary/70 shrink-0 font-normal" title="{{ __('Ditinjau pada:') }} {{ $doc->director_read_at?->format('d/m/Y H:i') }} WIB">
+                    <span class="text-[10px] text-success/80 shrink-0 font-normal" title="{{ __('Ditinjau pada:') }} {{ $doc->director_read_at?->format('d/m/Y H:i') }} WIB">
                         {{ $doc->director_read_at?->diffForHumans() }}
                     </span>
                 </div>
             @else
-                <div class="w-full flex items-center justify-between gap-1.5 bg-primary/5 border border-primary/20 text-primary px-2.5 py-1.5 rounded-xl text-xs font-semibold">
+                <div class="w-full flex items-center justify-between gap-1.5 bg-warning/15 border border-warning/30 text-warning px-2.5 py-1.5 rounded-xl text-xs font-bold shadow-2xs">
                     <span class="flex items-center gap-1.5 truncate">
-                        <span class="w-2 h-2 rounded-full bg-primary animate-pulse shrink-0"></span>
+                        <span class="w-2 h-2 rounded-full bg-warning animate-pulse shrink-0"></span>
                         <span class="truncate">{{ __('Belum Ditinjau') }}</span>
                     </span>
-                    <span class="text-[10px] text-primary/70 shrink-0 font-normal">
+                    <span class="text-[10px] text-warning/80 shrink-0 font-semibold">
                         {{ __('Perlu Ditinjau') }}
                     </span>
                 </div>
@@ -117,7 +117,7 @@
             <button type="button" 
                     id="btn-toggle-{{ $doc->id }}"
                     @click="toggleSeen({{ $doc->id }}, '{{ $isSeen ? 'unseen' : 'seen' }}')"
-                    class="btn btn-xs rounded-lg gap-1 font-semibold transition-all {{ $isSeen ? 'btn-ghost text-base-content/50 hover:text-error hover:bg-error/10' : 'btn-secondary text-white shadow-xs' }}">
+                    class="btn btn-xs rounded-lg gap-1 font-bold transition-all {{ $isSeen ? 'btn-ghost text-base-content/60 hover:text-error hover:bg-error/10' : 'btn-success text-white shadow-xs' }}">
                 @if($isSeen)
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                     <span>{{ __('Batal Ditinjau') }}</span>

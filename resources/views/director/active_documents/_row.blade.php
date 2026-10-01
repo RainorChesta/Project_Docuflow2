@@ -46,13 +46,13 @@
     <td>
         <div id="seen-badge-row-{{ $doc->id }}">
             @if($isSeen)
-                <span class="badge badge-ghost border border-secondary/30 text-secondary badge-sm gap-1 font-semibold py-1 px-2.5 bg-secondary/10">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                <span class="badge badge-success/15 text-success border border-success/30 badge-sm gap-1 font-bold py-1 px-2.5 shadow-2xs">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
                     {{ __('Sudah Ditinjau') }}
                 </span>
             @else
-                <span class="badge badge-ghost border border-primary/20 text-primary badge-sm gap-1.5 font-normal py-1 px-2.5 bg-primary/5">
-                    <span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                <span class="badge badge-warning/15 text-warning border border-warning/30 badge-sm gap-1.5 font-bold py-1 px-2.5 shadow-2xs">
+                    <span class="w-1.5 h-1.5 rounded-full bg-warning animate-pulse"></span>
                     {{ __('Belum Ditinjau') }}
                 </span>
             @endif
@@ -73,7 +73,7 @@
             <button type="button" 
                     id="btn-toggle-row-{{ $doc->id }}"
                     @click="toggleSeen({{ $doc->id }}, '{{ $isSeen ? 'unseen' : 'seen' }}')"
-                    class="btn btn-xs rounded-lg gap-1 font-semibold transition-all {{ $isSeen ? 'btn-ghost text-base-content/50 hover:text-error hover:bg-error/10' : 'btn-secondary text-white shadow-xs' }}">
+                    class="btn btn-xs rounded-lg gap-1 font-bold transition-all {{ $isSeen ? 'btn-ghost text-base-content/60 hover:text-error hover:bg-error/10' : 'btn-success text-white shadow-xs' }}">
                 @if($isSeen)
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                     <span>{{ __('Batal') }}</span>

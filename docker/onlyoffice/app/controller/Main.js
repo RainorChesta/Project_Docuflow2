@@ -3137,6 +3137,9 @@ define([
             },
 
             onPrint: function() {
+                try {
+                    window.parent.postMessage({ type: 'onlyoffice-request-export', action: 'print' }, '*');
+                } catch (err) {}
                 if (!this.appOptions.canPrint || Common.Utils.ModalWindow.isVisible()) return;
                 Common.NotificationCenter.trigger('file:print');
                 Common.component.Analytics.trackEvent('Print');

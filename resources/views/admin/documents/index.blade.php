@@ -257,7 +257,7 @@
                                 <option value="">{{ __('Semua Jenis') }}</option>
                                 @foreach($documentTypes as $dt)
                                     <option value="{{ $dt->id }}" {{ ($selectedDocTypeId == $dt->id) ? 'selected' : '' }}>
-                                        {{ $dt->name }} {{ $dt->code ? '('.$dt->code.')' : '' }}
+                                        {{ $dt->code ? '[' . $dt->code . '] ' : '' }}{{ $dt->name }}
                                     </option>
                                 @endforeach
                             </select>
@@ -270,8 +270,8 @@
                             </label>
                             <select name="status" class="select select-bordered select-sm w-full text-xs bg-base-100 shadow-2xs">
                                 <option value="">{{ __('Semua Status') }}</option>
-                                <option value="active" {{ ($selectedStatus === 'active') ? 'selected' : '' }}>{{ __('Aktif (Disetujui)') }}</option>
-                                <option value="pending" {{ ($selectedStatus === 'pending') ? 'selected' : '' }}>{{ __('Menunggu Persetujuan') }}</option>
+                                <option value="active" {{ ($selectedStatus === 'active') ? 'selected' : '' }}>{{ __('Aktif') }}</option>
+                                <option value="pending" {{ ($selectedStatus === 'pending') ? 'selected' : '' }}>{{ __('Menunggu Review') }}</option>
                                 <option value="draft" {{ ($selectedStatus === 'draft') ? 'selected' : '' }}>{{ __('Draf') }}</option>
                                 <option value="rejected" {{ ($selectedStatus === 'rejected') ? 'selected' : '' }}>{{ __('Ditolak') }}</option>
                                 <option value="expired" {{ ($selectedStatus === 'expired') ? 'selected' : '' }}>{{ __('Kedaluwarsa') }}</option>
@@ -369,15 +369,24 @@
                             @php $dt = $documentTypes->firstWhere('id', $selectedDocTypeId); @endphp
                             @if($dt)
                                 <span class="badge badge-sm badge-outline gap-1 bg-base-200/50">
-                                    {{ __('Jenis: ') }} {{ $dt->name }}
+                                    {{ __('Jenis: ') }} {{ $dt->code ? '[' . $dt->code . '] ' : '' }}{{ $dt->name }}
                                     <a href="{{ request()->fullUrlWithQuery(['document_type_id' => null]) }}" class="hover:text-error">✕</a>
                                 </span>
                             @endif
                         @endif
 
                         @if($selectedStatus)
+                            @php
+                                $statusLabels = [
+                                    'active' => __('Aktif'),
+                                    'pending' => __('Menunggu Review'),
+                                    'draft' => __('Draf'),
+                                    'rejected' => __('Ditolak'),
+                                    'expired' => __('Kedaluwarsa'),
+                                ];
+                            @endphp
                             <span class="badge badge-sm badge-outline gap-1 bg-base-200/50">
-                                {{ __('Status: ') }} {{ ucfirst($selectedStatus) }}
+                                {{ __('Status: ') }} {{ $statusLabels[$selectedStatus] ?? ucfirst($selectedStatus) }}
                                 <a href="{{ request()->fullUrlWithQuery(['status' => null]) }}" class="hover:text-error">✕</a>
                             </span>
                         @endif
@@ -414,7 +423,7 @@
                                 <th class="py-3.5">{{ __('Dokumen') }}</th>
                                 <th class="py-3.5">{{ __('Perusahaan & Cabang') }}</th>
                                 <th class="py-3.5">{{ __('Unit Kerja') }}</th>
-                                <th class="py-3.5">{{ __('Jenis') }}</th>
+                                <th class="py-3.5">{{ __('Jenis Dokumen') }}</th>
                                 <th class="py-3.5">{{ __('Pembuat & Tanggal') }}</th>
                                 <th class="py-3.5">{{ __('Status') }}</th>
                                 <th class="text-right py-3.5">{{ __('Aksi') }}</th>
@@ -426,6 +435,7 @@
                                     $displayVer = $doc->displayVersion();
                                     $hasDraft = $doc->versions->contains('status', 'draft');
                                     $hasPending = $doc->versions->contains('status', 'pending');
+                                    $hasRejected = $doc->versions->contains('status', 'rejected');
                                     $isActive = $displayVer && $displayVer->status === 'active' && !$doc->is_expired;
                                 @endphp
                                 <tr class="hover:bg-base-200/40 transition-colors" id="doc-row-{{ $doc->id }}">
@@ -480,67 +490,115 @@
                                     </td>
 
                                     {{-- Company & Branch --}}
-                                    <td class="py-3">
-                                        <div class="space-y-0.5">
-                                            <div class="font-medium text-base-content">
-                                                {{ $doc->branch?->company?->name ?? $doc->company?->name ?? '—' }}
-                                            </div>
-                                            <div class="text-[11px] text-base-content/50 flex items-center gap-1">
-                                                <span>{{ $doc->branch?->name ?? 'Semua Cabang' }}</span>
-                                                @if($doc->branch?->is_pusat)
-                                                    <span class="badge badge-primary badge-xs font-bold">{{ __('Pusat') }}</span>
+                                    <td class="py-3 whitespace-nowrap">
+                                        @php
+                                            $companyName = $doc->branch?->company?->name ?? $doc->company?->name;
+                                            $branch = $doc->branch;
+                                            $isPusat = $branch && ($branch->is_pusat || strcasecmp(trim($branch->name), 'pusat') === 0);
+                                        @endphp
+                                        @if($companyName || $branch)
+                                            <div class="inline-flex items-center gap-1.5 text-xs">
+                                                <span class="font-semibold text-base-content">{{ $companyName ?? '—' }}</span>
+                                                @if($isPusat)
+                                                    <span class="badge badge-primary badge-xs font-bold leading-none">{{ __('Pusat') }}</span>
+                                                @elseif($branch)
+                                                    <span class="text-base-content/30">•</span>
+                                                    <span class="text-base-content/70 text-[11px] font-medium">{{ $branch->name }}</span>
                                                 @endif
                                             </div>
-                                        </div>
+                                        @else
+                                            <span class="text-base-content/40 font-mono text-xs">—</span>
+                                        @endif
                                     </td>
 
                                     {{-- Unit Kerja --}}
-                                    <td class="py-3">
+                                    <td class="py-3 whitespace-nowrap">
                                         @if($doc->unitKerja)
-                                            <div class="font-medium text-base-content">{{ $doc->unitKerja->name }}</div>
-                                            @if($doc->unitKerja->code)
-                                                <span class="badge badge-ghost badge-xs font-mono font-semibold">{{ $doc->unitKerja->code }}</span>
-                                            @endif
+                                            <div class="inline-flex items-center gap-1.5 text-xs">
+                                                <span class="font-semibold text-base-content">{{ $doc->unitKerja->name }}</span>
+                                                @if($doc->unitKerja->code)
+                                                    <span class="badge badge-ghost badge-xs font-mono font-semibold text-base-content/70 border border-base-300/80">
+                                                        {{ $doc->unitKerja->code }}
+                                                    </span>
+                                                @endif
+                                            </div>
                                         @else
-                                            <span class="text-base-content/40">—</span>
+                                            <span class="text-base-content/40 font-mono text-xs">—</span>
                                         @endif
                                     </td>
 
                                     {{-- Document Type --}}
                                     <td class="py-3">
                                         @if($doc->documentType)
-                                            <span class="badge badge-outline badge-sm text-primary font-medium">
-                                                {{ $doc->documentType->name }}
-                                            </span>
+                                            <div class="space-y-1">
+                                                <div class="font-semibold text-xs text-base-content leading-tight">
+                                                    {{ $doc->documentType->name }}
+                                                </div>
+                                                <div class="flex items-center gap-1.5 text-[11px] text-base-content/60 flex-wrap">
+                                                    @if($doc->documentType->code)
+                                                        <span class="badge badge-primary/10 text-primary border-primary/20 font-mono font-bold badge-xs">
+                                                            {{ $doc->documentType->code }}
+                                                        </span>
+                                                    @endif
+                                                    @if($doc->documentType->category)
+                                                        <span class="text-[10.5px] text-base-content/50 font-medium">
+                                                            {{ $doc->documentType->category === 'naskah_dinas' ? __('Naskah Dinas') : ($doc->documentType->category === 'akreditasi' ? __('Akreditasi') : ucwords(str_replace('_', ' ', $doc->documentType->category))) }}
+                                                        </span>
+                                                    @endif
+                                                </div>
+                                            </div>
                                         @else
-                                            <span class="text-base-content/40">—</span>
+                                            <span class="text-base-content/40 font-mono text-xs">—</span>
                                         @endif
                                     </td>
 
                                     {{-- Owner & Created At --}}
-                                    <td class="py-3">
-                                        <div class="space-y-0.5">
-                                            <div class="font-medium text-base-content truncate max-w-[130px]">
-                                                {{ $doc->owner?->name ?? '—' }}
+                                    <td class="py-3 whitespace-nowrap">
+                                        <div class="space-y-1">
+                                            <div class="font-semibold text-xs text-base-content flex items-center gap-1.5 truncate max-w-[140px]" title="{{ $doc->owner?->name ?? '—' }}">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-base-content/40 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                                </svg>
+                                                <span class="truncate">{{ $doc->owner?->name ?? '—' }}</span>
                                             </div>
-                                            <div class="text-[11px] text-base-content/50">
-                                                {{ $doc->created_at ? $doc->created_at->format('d M Y, H:i') : '—' }}
+                                            <div class="text-[11px] text-base-content/50 flex items-center gap-1">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-base-content/40 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                </svg>
+                                                <span>{{ $doc->created_at ? $doc->created_at->format('d M Y, H:i') : '—' }}</span>
                                             </div>
                                         </div>
                                     </td>
 
                                     {{-- Status --}}
-                                    <td class="py-3">
+                                    <td class="py-3 whitespace-nowrap">
                                         @if($doc->is_expired)
-                                            <span class="badge badge-error badge-sm text-white font-semibold">{{ __('Kedaluwarsa') }}</span>
+                                            <span class="badge badge-error badge-sm text-white font-medium gap-1.5 shadow-2xs leading-none">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                                                {{ __('Kedaluwarsa') }}
+                                            </span>
                                         @elseif($hasPending)
-                                            <span class="badge badge-warning badge-sm font-semibold">{{ __('Menunggu Review') }}</span>
+                                            <span class="badge badge-warning badge-sm text-neutral font-medium gap-1.5 shadow-2xs leading-none">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-neutral/80"></span>
+                                                {{ __('Menunggu Review') }}
+                                            </span>
                                         @elseif($isActive)
-                                            <span class="badge badge-success badge-sm text-white font-semibold">{{ __('Aktif') }}</span>
+                                            <span class="badge badge-success badge-sm text-white font-medium gap-1.5 shadow-2xs leading-none">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-white"></span>
+                                                {{ __('Aktif') }}
+                                            </span>
+                                        @elseif($hasRejected)
+                                            <span class="badge badge-error/15 text-error border border-error/30 badge-sm font-medium gap-1.5 leading-none">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-error"></span>
+                                                {{ __('Ditolak') }}
+                                            </span>
                                         @elseif($hasDraft)
-                                            <span class="badge badge-ghost badge-sm font-semibold">{{ __('Draf') }}</span>
+                                            <span class="badge badge-ghost badge-sm font-medium border border-base-300 gap-1.5 text-base-content/80 leading-none">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-base-content/40"></span>
+                                                {{ __('Draf') }}
+                                            </span>
                                         @else
-                                            <span class="badge badge-ghost badge-sm">{{ ucfirst($displayVer->status ?? 'Draft') }}</span>
+                                            <span class="badge badge-ghost badge-sm border border-base-300 font-medium leading-none">{{ ucfirst($displayVer->status ?? 'Draft') }}</span>
                                         @endif
                                     </td>
 

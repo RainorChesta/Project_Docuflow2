@@ -68,7 +68,13 @@ class DirectorDocumentController extends Controller
             $currentUnitKerja = UnitKerja::find($selectedUnitKerjaId);
         }
 
-        // Build Breadcrumbs trail
+        // Verify document type if specified
+        $currentDocType = null;
+        if ($selectedDocTypeId) {
+            $currentDocType = DocumentType::find($selectedDocTypeId);
+        }
+
+        // Build Breadcrumbs trail: Perusahaan -> Cabang -> Tipe Dokumen
         $breadcrumbs = [
             [
                 'name' => __('Semua Perusahaan'),
@@ -99,7 +105,21 @@ class DirectorDocumentController extends Controller
                     'view_mode' => $viewMode,
                 ])),
                 'icon' => 'branch',
-                'active' => $selectedBranchId && !$selectedUnitKerjaId,
+                'active' => $selectedBranchId && !$selectedDocTypeId && !$selectedUnitKerjaId,
+            ];
+        }
+
+        if ($currentDocType) {
+            $breadcrumbs[] = [
+                'name' => $currentDocType->name,
+                'url' => route('director.documents.index', array_filter([
+                    'company_id' => $currentCompany?->id,
+                    'branch_id' => $currentBranch?->id,
+                    'document_type_id' => $currentDocType->id,
+                    'view_mode' => $viewMode,
+                ])),
+                'icon' => 'document_type',
+                'active' => !$selectedUnitKerjaId,
             ];
         }
 
@@ -109,6 +129,7 @@ class DirectorDocumentController extends Controller
                 'url' => route('director.documents.index', array_filter([
                     'company_id' => $currentCompany?->id,
                     'branch_id' => $currentBranch?->id,
+                    'document_type_id' => $selectedDocTypeId,
                     'unit_kerja_id' => $currentUnitKerja->id,
                     'view_mode' => $viewMode,
                 ])),
@@ -120,6 +141,13 @@ class DirectorDocumentController extends Controller
         // Parent URL for "Up one level"
         $parentUrl = null;
         if ($selectedUnitKerjaId) {
+            $parentUrl = route('director.documents.index', array_filter([
+                'company_id' => $selectedCompanyId,
+                'branch_id' => $selectedBranchId,
+                'document_type_id' => $selectedDocTypeId,
+                'view_mode' => $viewMode,
+            ]));
+        } elseif ($selectedDocTypeId) {
             $parentUrl = route('director.documents.index', array_filter([
                 'company_id' => $selectedCompanyId,
                 'branch_id' => $selectedBranchId,
@@ -165,7 +193,6 @@ class DirectorDocumentController extends Controller
         $selectedStatus = $request->get('status');
 
         $hasSearchOrFilter = ($search !== null && trim($search) !== '') 
-            || ($selectedDocTypeId !== null && $selectedDocTypeId !== '') 
             || ($selectedOwnerId !== null && $selectedOwnerId !== '')
             || ($selectedFormatChoice !== null && $selectedFormatChoice !== '')
             || ($selectedStatus !== null && $selectedStatus !== '');
@@ -174,8 +201,8 @@ class DirectorDocumentController extends Controller
         $folders = collect();
         $documents = collect();
 
-        // When NO search/filter is active: Browse Google Drive folder structure
-        if (!$hasSearchOrFilter && !$selectedUnitKerjaId) {
+        // When NO general search/filter is active: Browse Google Drive folder structure (Company -> Branch -> Document Type)
+        if (!$hasSearchOrFilter && !$selectedDocTypeId && !$selectedUnitKerjaId) {
             // Level 0: Root -> Show Company folders
             if (!$selectedCompanyId) {
                 $companiesQuery = Company::query();
@@ -228,29 +255,30 @@ class DirectorDocumentController extends Controller
                     ];
                 });
             }
-            // Level 2: Inside Branch -> Show Unit Kerja folders
-            elseif ($selectedBranchId && !$selectedUnitKerjaId) {
-                $branchDocUnits = Document::where('branch_id', $selectedBranchId)
-                    ->whereNotNull('unit_kerja_id')
-                    ->select('unit_kerja_id')
+            // Level 2: Inside Branch -> Show Document Type folders
+            elseif ($selectedBranchId && !$selectedDocTypeId) {
+                $branchDocTypes = Document::where('branch_id', $selectedBranchId)
+                    ->whereNotNull('document_type_id')
+                    ->select('document_type_id')
                     ->selectRaw('count(*) as count')
-                    ->groupBy('unit_kerja_id')
-                    ->pluck('count', 'unit_kerja_id');
+                    ->groupBy('document_type_id')
+                    ->pluck('count', 'document_type_id');
 
-                $allUnitKerjas = UnitKerja::orderBy('kode_unit_kerja')->get();
+                $allDocumentTypes = DocumentType::orderBy('name')->get();
                 
-                $folders = $allUnitKerjas->map(function ($uk) use ($branchDocUnits, $selectedCompanyId, $selectedBranchId, $viewMode) {
-                    $count = $branchDocUnits[$uk->id] ?? 0;
+                $folders = $allDocumentTypes->map(function ($dt) use ($branchDocTypes, $selectedCompanyId, $selectedBranchId, $viewMode) {
+                    $count = $branchDocTypes[$dt->id] ?? 0;
                     return [
-                        'id' => $uk->id,
-                        'type' => 'unit_kerja',
-                        'name' => $uk->name,
-                        'code' => strtoupper($uk->code),
+                        'id' => $dt->id,
+                        'type' => 'document_type',
+                        'name' => $dt->name,
+                        'code' => strtoupper($dt->code ?? ''),
+                        'category' => $dt->category,
                         'doc_count' => $count,
                         'url' => route('director.documents.index', array_filter([
                             'company_id' => $selectedCompanyId,
                             'branch_id' => $selectedBranchId,
-                            'unit_kerja_id' => $uk->id,
+                            'document_type_id' => $dt->id,
                             'view_mode' => $viewMode,
                         ])),
                     ];
@@ -258,8 +286,8 @@ class DirectorDocumentController extends Controller
             }
         }
 
-        // When searching, filtering, OR inside a Unit Kerja -> Query Documents
-        if ($hasSearchOrFilter || $selectedUnitKerjaId) {
+        // When searching, filtering, OR inside a Document Type / Unit Kerja -> Query Documents
+        if ($hasSearchOrFilter || $selectedDocTypeId || $selectedUnitKerjaId) {
             $docQuery = Document::visibleTo($user)
                 ->with(['owner', 'unitKerja', 'documentType', 'currentVersion', 'versions', 'branch.company', 'company']);
 

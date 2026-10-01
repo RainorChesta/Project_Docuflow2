@@ -263,6 +263,16 @@ class Document extends Model
     }
 
     /**
+     * Determine if the document has been approved and released (active v1 or finalized version).
+     */
+    public function isReleased(): bool
+    {
+        return !is_null($this->current_version_id)
+            || ($this->currentVersion && $this->currentVersion->status === 'active')
+            || $this->versions()->where('status', 'active')->exists();
+    }
+
+    /**
      * Get the newest pending version undergoing review.
      */
     public function pendingVersion(): ?DocumentVersion
@@ -528,5 +538,33 @@ class Document extends Model
     public function scopeFormatChoice(Builder $query, string $format): Builder
     {
         return $query->where('format_choice', $format);
+    }
+
+    /**
+     * Check if the document has a corporate letterhead / kop surat attached.
+     */
+    public function hasKop(): bool
+    {
+        if (!is_null($this->corporate_soft_file_id)) {
+            return true;
+        }
+
+        if ($this->template_id && $this->template?->corporate_soft_file_id) {
+            return true;
+        }
+
+        $content = $this->displayVersion()?->content;
+        if ($content && (
+            str_contains($content, 'kop-surat') ||
+            str_contains($content, 'kop_header') ||
+            str_contains($content, 'class="kop') ||
+            str_contains($content, "class='kop") ||
+            str_contains($content, 'id="kop') ||
+            str_contains($content, "id='kop")
+        )) {
+            return true;
+        }
+
+        return false;
     }
 }

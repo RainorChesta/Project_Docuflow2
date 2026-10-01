@@ -30,6 +30,7 @@ class DocumentExportController extends Controller
             'custom_width' => 'nullable|numeric|gt:0|required_if:paper_size,Custom',
             'custom_height' => 'nullable|numeric|gt:0|required_if:paper_size,Custom',
             'custom_unit' => 'nullable|string|in:cm,mm',
+            'with_kop' => 'nullable|boolean',
         ], [
             'custom_width.required_if' => __('Lebar kertas wajib diisi untuk ukuran custom.'),
             'custom_width.gt' => __('Lebar kertas harus bernilai lebih dari 0.'),
@@ -40,6 +41,7 @@ class DocumentExportController extends Controller
         ]);
 
         $paperSize = $validated['paper_size'] ?? $document->paper_size ?? 'A4';
+        $withKop = $request->boolean('with_kop', true);
         $customDimensions = null;
         if ($paperSize === 'Custom') {
             $customDimensions = [
@@ -50,7 +52,7 @@ class DocumentExportController extends Controller
         }
 
         try {
-            $result = $this->pdfService->export($document, auth()->user(), $paperSize, $customDimensions);
+            $result = $this->pdfService->export($document, auth()->user(), $paperSize, $customDimensions, $withKop);
 
             $this->auditService->log(auth()->user(), 'document.exported', 'document', $document->id, [
                 'document_id' => $document->id,
@@ -60,17 +62,33 @@ class DocumentExportController extends Controller
                     : $paperSize,
             ]);
 
+            $url = Storage::disk('local')->temporaryUrl($result['path'], now()->addMinutes(5), [
+                'filename' => $result['filename'],
+            ]);
+
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'filename' => $result['filename'],
+                    'url' => $url,
+                ]);
+            }
+
             return back()->with('pdf_export', [
                 'filename' => $result['filename'],
-                'url' => Storage::disk('local')->temporaryUrl($result['path'], now()->addMinutes(5), [
-                    'filename' => $result['filename'],
-                ]),
+                'url' => $url,
             ]);
         } catch (BusinessLogicException $e) {
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            }
             return back()->withErrors(['export' => $e->getMessage()]);
         } catch (\Throwable $e) {
             report($e);
 
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'PDF generation failed. Please try again.'], 500);
+            }
             return back()->withErrors(['export' => 'PDF generation failed. Please try again.']);
         }
     }

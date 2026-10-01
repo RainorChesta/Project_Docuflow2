@@ -468,13 +468,16 @@ class OnlyOfficeService
     /**
      * Get the callback URL ONLYOFFICE calls to save the document.
      */
-    public function getCallbackUrl(Document $document): string
+    public function getCallbackUrl(Document $document, ?DocumentVersion $version = null): string
     {
         $internalBase = rtrim(config('onlyoffice.internal_url'), '/');
 
-        return $internalBase . route('onlyoffice.callback', [
-            'document' => $document->id,
-        ], false);
+        $params = ['document' => $document->id];
+        if ($version) {
+            $params['version_id'] = $version->id;
+        }
+
+        return $internalBase . route('onlyoffice.callback', $params, false);
     }
 
     /**
@@ -594,7 +597,7 @@ class OnlyOfficeService
         string $mode = 'edit'
     ): array {
         $fileUrl = $this->getDocumentFileUrl($document, $version);
-        $callbackUrl = $this->getCallbackUrl($document);
+        $callbackUrl = $this->getCallbackUrl($document, $version);
         $documentKey = $this->generateDocumentKey($document, $version);
 
         // Detect extension and file type
@@ -1114,6 +1117,71 @@ class OnlyOfficeService
             @exec(sprintf('docker exec %s rm -f %s %s 2>&1', escapeshellarg($container), escapeshellarg($containerIn), escapeshellarg($containerPngOut)));
         } catch (\Throwable $e) {
             Log::warning('convertDocxUsingDockerX2t failed: ' . $e->getMessage());
+        }
+
+        return null;
+    }
+
+    /**
+     * Convert DOCX binary to PDF, optionally removing header/footer if without kop.
+     */
+    public function convertDocxToPdf(string $docxBinary, bool $withKop = true, ?string $paperSize = null): ?string
+    {
+        try {
+            if (!$withKop) {
+                $docxBinary = $this->removeHeaderAndFooterFromDocx($docxBinary);
+            }
+
+            $container = env('ONLYOFFICE_DOCKER_CONTAINER', 'dokuflow-onlyoffice');
+            $uid = uniqid('docx_pdf_', true);
+            $tempLocalDocx = storage_path("app/temp_{$uid}.docx");
+            $tempLocalPdf = storage_path("app/temp_{$uid}.pdf");
+            $containerIn = "/var/www/onlyoffice/Data/in_{$uid}.docx";
+            $containerPdfOut = "/var/www/onlyoffice/Data/out_{$uid}.pdf";
+
+            file_put_contents($tempLocalDocx, $docxBinary);
+
+            // 1. Copy DOCX into container
+            $cpInCmd = sprintf('docker cp %s %s:%s 2>&1', escapeshellarg($tempLocalDocx), escapeshellarg($container), escapeshellarg($containerIn));
+            @exec($cpInCmd, $outIn, $codeIn);
+
+            if ($codeIn === 0) {
+                // 2. Convert to PDF using x2t
+                $x2tCmd = sprintf(
+                    'docker exec %s /var/www/onlyoffice/documentserver/server/FileConverter/bin/x2t %s %s 2>&1',
+                    escapeshellarg($container),
+                    escapeshellarg($containerIn),
+                    escapeshellarg($containerPdfOut)
+                );
+                @exec($x2tCmd, $outX2t, $codeX2t);
+
+                if ($codeX2t === 0) {
+                    $cpPdfCmd = sprintf('docker cp %s:%s %s 2>&1', escapeshellarg($container), escapeshellarg($containerPdfOut), escapeshellarg($tempLocalPdf));
+                    @exec($cpPdfCmd, $outCpPdf, $codeCpPdf);
+
+                    @exec(sprintf('docker exec %s rm -f %s %s 2>&1', escapeshellarg($container), escapeshellarg($containerIn), escapeshellarg($containerPdfOut)));
+                    @unlink($tempLocalDocx);
+
+                    if ($codeCpPdf === 0 && file_exists($tempLocalPdf) && filesize($tempLocalPdf) > 500) {
+                        $pdfBytes = file_get_contents($tempLocalPdf);
+                        @unlink($tempLocalPdf);
+
+                        if ($paperSize && strtolower($paperSize) === 'f4') {
+                            return $this->convertPdfToF4($pdfBytes);
+                        } elseif ($paperSize && strtolower($paperSize) === 'a4') {
+                            return $this->convertPdfToA4($pdfBytes);
+                        }
+
+                        return $pdfBytes;
+                    }
+                }
+            }
+
+            @exec(sprintf('docker exec %s rm -f %s %s 2>&1', escapeshellarg($container), escapeshellarg($containerIn), escapeshellarg($containerPdfOut)));
+            if (file_exists($tempLocalDocx)) @unlink($tempLocalDocx);
+            if (file_exists($tempLocalPdf)) @unlink($tempLocalPdf);
+        } catch (\Throwable $e) {
+            Log::warning('convertDocxToPdf failed: ' . $e->getMessage());
         }
 
         return null;

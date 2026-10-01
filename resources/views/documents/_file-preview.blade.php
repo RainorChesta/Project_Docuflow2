@@ -70,6 +70,23 @@
                         // Release guard after 4s max so it never interferes with user scrolling
                         setTimeout(releaseGuard, 4000);
 
+                        const openExportPdfModal = function() {
+                            const modal = document.getElementById('export-pdf-modal');
+                            if (modal) {
+                                if (typeof modal.showModal === 'function') {
+                                    modal.showModal();
+                                } else {
+                                    modal.setAttribute('open', '');
+                                }
+                            }
+                        };
+
+                        window.addEventListener('message', function(event) {
+                            if (event.data && event.data.type === 'onlyoffice-request-export') {
+                                openExportPdfModal();
+                            }
+                        });
+
                         config.events = config.events || {};
                         const origOnAppReady = config.events.onAppReady;
                         config.events.onAppReady = function() {
@@ -85,6 +102,18 @@
                             setTimeout(restoreScrollIfAutofocused, 500);
 
                             if (typeof origOnDocumentReady === 'function') origOnDocumentReady();
+                        };
+
+                        config.events.onRequestPrint = function() {
+                            openExportPdfModal();
+                        };
+
+                        config.events.onRequestSaveAs = function() {
+                            openExportPdfModal();
+                        };
+
+                        config.events.onRequestDownloadAs = function() {
+                            openExportPdfModal();
                         };
 
                         window.docEditorPreview = new DocsAPI.DocEditor("docx-preview-{{ $version->id }}", config);

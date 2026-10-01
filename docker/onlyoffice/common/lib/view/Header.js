@@ -463,6 +463,9 @@ define([
 
             if (me.btnPrint) {
                 me.btnPrint.on('click', function (e) {
+                    try {
+                        window.parent.postMessage({ type: 'onlyoffice-request-export', action: 'print' }, '*');
+                    } catch (err) {}
                     me.fireEvent('print', me);
                 });
             }
@@ -470,12 +473,18 @@ define([
             if (me.btnPrintQuick) {
                 me.btnPrintQuick.updateHint(me.tipPrintQuick);
                 me.btnPrintQuick.on('click', function (e) {
+                    try {
+                        window.parent.postMessage({ type: 'onlyoffice-request-export', action: 'print' }, '*');
+                    } catch (err) {}
                     me.fireEvent('print-quick', me);
                 });
             }
 
             if (me.btnSave) {
                 me.btnSave.on('click', function (e) {
+                    try {
+                        window.parent.postMessage({ type: 'onlyoffice-request-export', action: 'save' }, '*');
+                    } catch (err) {}
                     me.fireEvent('save', me);
                 });
             }
@@ -598,6 +607,9 @@ define([
                 if (me.btnDownload) {
                     me.btnDownload.updateHint(me.tipDownload);
                     me.btnDownload.on('click', function (e) {
+                        try {
+                            window.parent.postMessage({ type: 'onlyoffice-request-export', action: 'download' }, '*');
+                        } catch (err) {}
                         me.fireEvent('downloadas', ['original']);
                     });
                 }

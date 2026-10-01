@@ -51,27 +51,27 @@
                                 <span class="label-text-alt text-base-content/50">{{ __('Menentukan format standar dokumen saat kop diterapkan') }}</span>
                             </label>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <label class="flex items-center gap-3 p-3.5 rounded-2xl border transition-all cursor-pointer select-none"
+                                <label class="flex items-start gap-3 p-3.5 rounded-2xl border transition-all cursor-pointer select-none"
                                        :class="paperSize === 'f4' ? 'bg-primary/10 border-primary shadow-xs ring-1 ring-primary/30' : 'bg-base-100 border-base-300 hover:bg-base-200/50'">
-                                    <input type="radio" name="paper_size" value="f4" x-model="paperSize" class="radio radio-primary radio-sm">
+                                    <input type="radio" name="paper_size" value="f4" x-model="paperSize" class="radio radio-primary radio-sm mt-0.5 shrink-0">
                                     <div class="min-w-0 flex-1">
-                                        <div class="flex items-center justify-between gap-1">
-                                            <span class="text-xs sm:text-sm font-bold text-base-content">{{ __('F4 / Folio (Standar)') }}</span>
-                                            <span class="badge badge-neutral badge-xs font-mono font-semibold">210 × 330 mm</span>
+                                        <div class="flex items-start justify-between gap-2">
+                                            <span class="text-xs sm:text-sm font-bold text-base-content leading-tight">{{ __('F4 / Folio (Standar)') }}</span>
+                                            <span class="badge badge-neutral badge-xs font-mono font-semibold shrink-0">210 × 330 mm</span>
                                         </div>
-                                        <p class="text-[11px] text-base-content/60 mt-0.5">{{ __('Ukuran kertas standar default untuk operasional korporat.') }}</p>
+                                        <p class="text-[11px] text-base-content/60 mt-1 leading-normal">{{ __('Ukuran kertas standar default untuk operasional korporat.') }}</p>
                                     </div>
                                 </label>
 
-                                <label class="flex items-center gap-3 p-3.5 rounded-2xl border transition-all cursor-pointer select-none"
+                                <label class="flex items-start gap-3 p-3.5 rounded-2xl border transition-all cursor-pointer select-none"
                                        :class="paperSize === 'a4' ? 'bg-secondary/10 border-secondary shadow-xs ring-1 ring-secondary/30' : 'bg-base-100 border-base-300 hover:bg-base-200/50'">
-                                    <input type="radio" name="paper_size" value="a4" x-model="paperSize" class="radio radio-secondary radio-sm">
+                                    <input type="radio" name="paper_size" value="a4" x-model="paperSize" class="radio radio-secondary radio-sm mt-0.5 shrink-0">
                                     <div class="min-w-0 flex-1">
-                                        <div class="flex items-center justify-between gap-1">
-                                            <span class="text-xs sm:text-sm font-bold text-base-content">{{ __('A4 (Khusus Cabang / Internasional)') }}</span>
-                                            <span class="badge badge-secondary badge-xs font-mono font-semibold">210 × 297 mm</span>
+                                        <div class="flex items-start justify-between gap-2">
+                                            <span class="text-xs sm:text-sm font-bold text-base-content leading-tight">{{ __('A4 (Khusus Cabang Cahaya Diagnostic Centre)') }}</span>
+                                            <span class="badge badge-secondary badge-xs font-mono font-semibold shrink-0">210 × 297 mm</span>
                                         </div>
-                                        <p class="text-[11px] text-base-content/60 mt-0.5">{{ __('Berkas selain A4 (seperti F4, Letter, Legal) akan diizinkan dan otomatis dikonversi ke format A4.') }}</p>
+                                        <p class="text-[11px] text-base-content/60 mt-1 leading-normal">{{ __('Berkas selain A4 (seperti F4, Letter, Legal) akan diizinkan dan otomatis dikonversi ke format A4 untuk cabang Cahaya Diagnostic Centre.') }}</p>
                                     </div>
                                 </label>
                             </div>

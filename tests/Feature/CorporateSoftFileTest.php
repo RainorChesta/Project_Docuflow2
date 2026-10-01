@@ -853,5 +853,199 @@ class CorporateSoftFileTest extends TestCase
         // Page size in document.xml must be A4 (16838 twips height)
         $this->assertMatchesRegularExpression('/<w:pgSz\b[^>]*w:h="16838"[^>]*\/>|<w:pgSz\b[^>]*w:w="11906"\s+w:h="16838"/i', $docXml);
     }
+
+    public function test_applying_corporate_soft_file_and_saving_keeps_document_version_at_v1(): void
+    {
+        $storageDisk = config('onlyoffice.storage_disk', 'local');
+        $disk = Storage::disk($storageDisk);
+
+        // 1. Create a Letterhead Corporate Soft File
+        $softFilePath = 'corporate_soft_files/kop_version_test.docx';
+        $phpWord = new \PhpOffice\PhpWord\PhpWord();
+        $section = $phpWord->addSection();
+        $header = $section->addHeader();
+        $header->addText("KOP SURAT RESMI PT DOCUFLOW");
+        $section->addText("Master letterhead content");
+
+        $tmpFile = tempnam(sys_get_temp_dir(), 'test_kopver_') . '.docx';
+        $objWriter = \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007');
+        $objWriter->save($tmpFile);
+        $disk->put($softFilePath, file_get_contents($tmpFile));
+        @unlink($tmpFile);
+
+        $softFile = CorporateSoftFile::create([
+            'title' => 'Kop Surat Versi Test',
+            'file_type' => 'docx',
+            'file_path' => $softFilePath,
+            'file_original_name' => 'kop_version_test.docx',
+            'status' => 'active',
+            'is_all_companies' => true,
+            'is_all_branches' => true,
+            'allowed_roles' => ['staff', 'head'],
+            'created_by' => $this->admin->id,
+        ]);
+
+        // 2. Staff creates a new document (v1 draft)
+        $doc = Document::create([
+            'title' => 'Dokumen Surat Resmi v1',
+            'document_number' => '303/KOPVER/IX/2026',
+            'document_type_id' => $this->docType->id,
+            'owner_id' => $this->staffA->id,
+            'company_id' => $this->companyA->id,
+            'branch_id' => $this->branchA->id,
+            'unit_kerja_id' => $this->unitKerjaA->id,
+            'status' => 'draft',
+        ]);
+        $docPath = 'documents/' . $doc->id . '/v1.docx';
+
+        $phpWordDoc = new \PhpOffice\PhpWord\PhpWord();
+        $sectionDoc = $phpWordDoc->addSection();
+        $sectionDoc->addText("Isi Dokumen Penting Yang Ditulis User");
+
+        $tmpDoc = tempnam(sys_get_temp_dir(), 'test_docver_') . '.docx';
+        $writerDoc = \PhpOffice\PhpWord\IOFactory::createWriter($phpWordDoc, 'Word2007');
+        $writerDoc->save($tmpDoc);
+        $userDocx = file_get_contents($tmpDoc);
+        @unlink($tmpDoc);
+
+        $disk->put($docPath, $userDocx);
+
+        $version = $doc->versions()->create([
+            'version_number' => 1,
+            'file_path' => $docPath,
+            'file_original_name' => 'Dokumen Surat Resmi v1.docx',
+            'content' => '',
+            'author_name' => $this->staffA->name,
+            'status' => 'draft',
+            'author_id' => $this->staffA->id,
+        ]);
+
+        // 3. User applies Corporate Soft File / Kop Surat
+        $applyResponse = $this->actingAs($this->staffA)->postJson(
+            route('documents.corporate-soft-files.apply', [$doc, $softFile])
+        );
+        $applyResponse->assertOk();
+
+        // 4. Simulate ONLYOFFICE saving content via callback for this version
+        $updatedDocxBytes = $disk->get($docPath);
+        $savedVersion = app(\App\Services\VersionService::class)->savePendingDocx(
+            $doc,
+            $updatedDocxBytes,
+            $this->staffA,
+            $version
+        );
+
+        $this->assertEquals(1, $savedVersion->version_number);
+
+        // 5. User finishes editing
+        $finishResponse = $this->actingAs($this->staffA)->post(
+            route('documents.finish-editing', $doc)
+        );
+        $finishResponse->assertRedirect();
+
+        // 6. Simulate any post-finish close/destroy callback from OnlyOffice
+        $postFinishVersion = app(\App\Services\VersionService::class)->savePendingDocx(
+            $doc,
+            $updatedDocxBytes,
+            $this->staffA,
+            $version
+        );
+
+        // Assert: Document version MUST remain v1 and NOT become v2
+        $this->assertEquals(1, $postFinishVersion->version_number);
+        $this->assertEquals(1, $doc->versions()->count());
+        $this->assertEquals(1, $doc->versions()->max('version_number'));
+        $this->assertEquals(1, $doc->displayVersion()->version_number);
+        $this->assertEquals($softFile->id, $doc->fresh()->corporate_soft_file_id);
+    }
+
+    public function test_editing_active_document_and_removing_kop_surat_creates_v2(): void
+    {
+        $storageDisk = config('onlyoffice.storage_disk', 'local');
+        $disk = Storage::disk($storageDisk);
+
+        // 1. Create a Letterhead Corporate Soft File
+        $softFilePath = 'corporate_soft_files/kop_active_test.docx';
+        $phpWord = new \PhpOffice\PhpWord\PhpWord();
+        $section = $phpWord->addSection();
+        $header = $section->addHeader();
+        $header->addText("KOP SURAT AKTIF RESMI");
+        $section->addText("Master letterhead content");
+
+        $tmpFile = tempnam(sys_get_temp_dir(), 'test_kopact_') . '.docx';
+        $objWriter = \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007');
+        $objWriter->save($tmpFile);
+        $disk->put($softFilePath, file_get_contents($tmpFile));
+        @unlink($tmpFile);
+
+        $softFile = CorporateSoftFile::create([
+            'title' => 'Kop Surat Aktif Test',
+            'file_type' => 'docx',
+            'file_path' => $softFilePath,
+            'file_original_name' => 'kop_active_test.docx',
+            'status' => 'active',
+            'is_all_companies' => true,
+            'is_all_branches' => true,
+            'allowed_roles' => ['staff', 'head'],
+            'created_by' => $this->admin->id,
+        ]);
+
+        // 2. Document is already released / active at v1 with kop surat
+        $doc = Document::create([
+            'title' => 'Dokumen Aktif v1 Dengan Kop',
+            'document_number' => '404/ACTKOP/IX/2026',
+            'document_type_id' => $this->docType->id,
+            'owner_id' => $this->staffA->id,
+            'company_id' => $this->companyA->id,
+            'branch_id' => $this->branchA->id,
+            'unit_kerja_id' => $this->unitKerjaA->id,
+            'corporate_soft_file_id' => $softFile->id,
+            'status' => 'active',
+        ]);
+        $docPathV1 = 'documents/' . $doc->id . '/v1.docx';
+
+        $phpWordDoc = new \PhpOffice\PhpWord\PhpWord();
+        $sectionDoc = $phpWordDoc->addSection();
+        $sectionDoc->addText("Isi Dokumen Versi 1 Asli");
+
+        $tmpDoc = tempnam(sys_get_temp_dir(), 'test_v1doc_') . '.docx';
+        $writerDoc = \PhpOffice\PhpWord\IOFactory::createWriter($phpWordDoc, 'Word2007');
+        $writerDoc->save($tmpDoc);
+        $userDocx = file_get_contents($tmpDoc);
+        @unlink($tmpDoc);
+
+        $disk->put($docPathV1, $userDocx);
+
+        $v1 = $doc->versions()->create([
+            'version_number' => 1,
+            'file_path' => $docPathV1,
+            'file_original_name' => 'Dokumen Aktif v1 Dengan Kop.docx',
+            'content' => '',
+            'author_name' => $this->staffA->name,
+            'status' => 'active',
+            'author_id' => $this->staffA->id,
+        ]);
+        $doc->update(['current_version_id' => $v1->id]);
+
+        // 3. User clicks "Hapus Kop Surat" on the active document
+        $removeResponse = $this->actingAs($this->staffA)->postJson(
+            route('documents.corporate-soft-files.remove', $doc)
+        );
+        $removeResponse->assertOk();
+
+        // Assert: A new pending revision (v2) MUST have been created
+        $doc->refresh();
+        $this->assertEquals(2, $doc->versions()->count());
+        $this->assertEquals(2, $doc->versions()->max('version_number'));
+
+        $v2 = $doc->versions()->where('version_number', 2)->first();
+        $this->assertNotNull($v2);
+        $this->assertEquals('pending', $v2->status);
+        $this->assertEquals($v2->id, $doc->displayVersion()->id);
+
+        // Original v1 MUST remain intact as the current released active version
+        $this->assertEquals($v1->id, $doc->current_version_id);
+    }
 }
+
 

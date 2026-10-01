@@ -36,8 +36,8 @@
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
                                     @elseif(($crumb['icon'] ?? '') === 'branch')
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" /></svg>
-                                    @elseif(($crumb['icon'] ?? '') === 'unit_kerja')
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+                                    @elseif(($crumb['icon'] ?? '') === 'document_type' || ($crumb['icon'] ?? '') === 'unit_kerja')
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9h1m-1 4h6m-6 4h6" /></svg>
                                     @endif
                                     {{ $crumb['name'] }}
                                 </span>
@@ -50,6 +50,8 @@
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
                                     @elseif(($crumb['icon'] ?? '') === 'branch')
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" /></svg>
+                                    @elseif(($crumb['icon'] ?? '') === 'document_type' || ($crumb['icon'] ?? '') === 'unit_kerja')
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9h1m-1 4h6m-6 4h6" /></svg>
                                     @endif
                                     {{ $crumb['name'] }}
                                 </a>
@@ -63,6 +65,7 @@
                     <form method="GET" action="{{ route('director.documents.index') }}" class="space-y-3">
                         @if($selectedCompanyId)<input type="hidden" name="company_id" value="{{ $selectedCompanyId }}">@endif
                         @if($selectedBranchId)<input type="hidden" name="branch_id" value="{{ $selectedBranchId }}">@endif
+                        @if($selectedDocTypeId)<input type="hidden" name="document_type_id" value="{{ $selectedDocTypeId }}">@endif
                         @if($selectedUnitKerjaId)<input type="hidden" name="unit_kerja_id" value="{{ $selectedUnitKerjaId }}">@endif
                         <input type="hidden" name="view_mode" value="{{ $viewMode }}">
 
@@ -70,10 +73,10 @@
                             {{-- Search Input with Context-Aware Placeholder --}}
                             <div class="flex-grow relative">
                                 @php
-                                    if ($selectedUnitKerjaId) {
+                                    if ($selectedDocTypeId || $selectedUnitKerjaId) {
                                         $searchPlaceholder = __('Cari dokumen...');
                                     } elseif ($selectedBranchId) {
-                                        $searchPlaceholder = __('Cari folder unit kerja...');
+                                        $searchPlaceholder = __('Cari tipe dokumen...');
                                     } elseif ($selectedCompanyId) {
                                         $searchPlaceholder = __('Cari cabang...');
                                     } else {
@@ -95,7 +98,8 @@
                                 @endif
                             </div>
 
-                            {{-- Document Type Filter --}}
+                            {{-- Document Type Filter (only show if not already inside a specific doc type folder) --}}
+                            @if(!$selectedDocTypeId)
                             <div class="w-full sm:w-44 lg:w-44 shrink-0">
                                 <select name="document_type_id" 
                                         class="select select-bordered select-sm w-full text-xs bg-base-100 shadow-xs focus:shadow-md focus:border-primary transition-all">
@@ -107,6 +111,7 @@
                                     @endforeach
                                 </select>
                             </div>
+                            @endif
 
                             {{-- Status Filter --}}
                             <div class="w-full sm:w-36 lg:w-36 shrink-0">
@@ -158,25 +163,38 @@
 
                     {{-- Active Filter Badges & Reset Filter button --}}
                     @php
-                        $hasActiveFilters = $search || $selectedDocTypeId || $selectedOwnerId || $selectedFormatChoice || $selectedStatus;
+                        // Filter pencarian yang aktif (di luar navigasi hierarki folder)
+                        $hasSearchFilter = !empty($search) || !empty($selectedStatus) || !empty($selectedOwnerId) || !empty($selectedFormatChoice);
+                        // Jika berada di luar folder tipe dokumen tapi memilih filter tipe dokumen dari dropdown
+                        $isDocTypeSelectedAsFilter = !empty($selectedDocTypeId) && (empty($selectedCompanyId) || empty($selectedBranchId));
+                        $hasActiveFilters = $hasSearchFilter || $isDocTypeSelectedAsFilter;
+
+                        // Parameter folder yang harus dipertahankan saat reset filter
+                        $folderParams = array_filter([
+                            'company_id' => $selectedCompanyId,
+                            'branch_id' => $selectedBranchId,
+                            'document_type_id' => ($selectedCompanyId && $selectedBranchId && $selectedDocTypeId) ? $selectedDocTypeId : null,
+                            'unit_kerja_id' => $selectedUnitKerjaId,
+                            'view_mode' => $viewMode !== 'grid' ? $viewMode : null,
+                        ]);
                     @endphp
-                    @if($hasActiveFilters || $selectedUnitKerjaId)
+                    @if($hasActiveFilters || ($selectedDocTypeId && !$selectedBranchId))
                         <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-base-200 text-xs">
                             <span class="text-base-content/50 font-medium">{{ __('Filter Aktif:') }}</span>
                             
                             @if($search)
                                 <span class="badge badge-sm badge-outline gap-1 bg-base-200/50">
                                     {{ __('Cari: ') }} "{{ $search }}"
-                                    <a href="{{ request()->fullUrlWithQuery(['search' => null]) }}" class="hover:text-error">✕</a>
+                                    <a href="{{ request()->fullUrlWithQuery(['search' => null]) }}" class="hover:text-error" title="{{ __('Hapus filter ini') }}">✕</a>
                                 </span>
                             @endif
 
-                            @if($selectedDocTypeId)
+                            @if($selectedDocTypeId && (!$selectedCompanyId || !$selectedBranchId))
                                 @php $activeDocType = $availableDocumentTypes->firstWhere('id', $selectedDocTypeId); @endphp
                                 @if($activeDocType)
                                     <span class="badge badge-sm badge-outline gap-1 bg-base-200/50">
                                         {{ __('Tipe: ') }} {{ $activeDocType->name }}
-                                        <a href="{{ request()->fullUrlWithQuery(['document_type_id' => null]) }}" class="hover:text-error">✕</a>
+                                        <a href="{{ request()->fullUrlWithQuery(['document_type_id' => null]) }}" class="hover:text-error" title="{{ __('Hapus filter ini') }}">✕</a>
                                     </span>
                                 @endif
                             @endif
@@ -184,7 +202,7 @@
                             @if($selectedStatus)
                                 <span class="badge badge-sm badge-outline gap-1 bg-base-200/50">
                                     {{ __('Status: ') }} {{ ucfirst($selectedStatus) }}
-                                    <a href="{{ request()->fullUrlWithQuery(['status' => null]) }}" class="hover:text-error">✕</a>
+                                    <a href="{{ request()->fullUrlWithQuery(['status' => null]) }}" class="hover:text-error" title="{{ __('Hapus filter ini') }}">✕</a>
                                 </span>
                             @endif
 
@@ -193,7 +211,7 @@
                                 @if($activeOwner)
                                     <span class="badge badge-sm badge-outline gap-1 bg-base-200/50">
                                         {{ __('Pembuat: ') }} {{ $activeOwner->name }}
-                                        <a href="{{ request()->fullUrlWithQuery(['owner_id' => null]) }}" class="hover:text-error">✕</a>
+                                        <a href="{{ request()->fullUrlWithQuery(['owner_id' => null]) }}" class="hover:text-error" title="{{ __('Hapus filter ini') }}">✕</a>
                                     </span>
                                 @endif
                             @endif
@@ -201,12 +219,13 @@
                             @if($selectedFormatChoice)
                                 <span class="badge badge-sm badge-outline gap-1 bg-base-200/50">
                                     {{ __('Format: ') }} {{ $selectedFormatChoice === 'lama' ? __('Format Lama') : __('Format Baru') }}
-                                    <a href="{{ request()->fullUrlWithQuery(['format_choice' => null]) }}" class="hover:text-error">✕</a>
+                                    <a href="{{ request()->fullUrlWithQuery(['format_choice' => null]) }}" class="hover:text-error" title="{{ __('Hapus filter ini') }}">✕</a>
                                 </span>
                             @endif
 
-                            <a href="{{ route('director.documents.index', array_filter(['company_id' => $selectedCompanyId, 'branch_id' => $selectedBranchId])) }}" 
-                               class="btn btn-ghost btn-xs text-error hover:bg-error/10 ml-auto font-medium">
+                            <a href="{{ route('director.documents.index', $folderParams) }}" 
+                               class="btn btn-ghost btn-xs text-error hover:bg-error/10 ml-auto font-medium"
+                               title="{{ __('Reset semua filter pencarian dan tetap di folder ini') }}">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                 </svg>
@@ -217,7 +236,7 @@
                 </div>
             </div>
 
-            {{-- 3. FOLDERS SECTION (Company / Branch / Unit Kerja Folders) --}}
+            {{-- 3. FOLDERS SECTION (Company / Branch / Document Type Folders) --}}
             @if($folders->isNotEmpty())
                 <div class="space-y-3">
                     <div class="flex items-center justify-between">
@@ -230,11 +249,11 @@
                             @elseif($selectedCompanyId && !$selectedBranchId)
                                 {{ __('Folder Cabang') }} ({{ $folders->count() }})
                             @else
-                                {{ __('Folder Unit Kerja') }} ({{ $folders->count() }})
+                                {{ __('Folder Tipe Dokumen') }} ({{ $folders->count() }})
                             @endif
                         </h3>
 
-                        {{-- View Mode Toggle for Folders / Unit Kerja --}}
+                        {{-- View Mode Toggle for Folders --}}
                         <div class="join border border-base-300 bg-base-200/50 p-0.5 rounded-lg">
                             <a href="{{ request()->fullUrlWithQuery(['view_mode' => 'grid']) }}" 
                                class="join-item btn btn-xs {{ $viewMode === 'grid' ? 'btn-primary shadow-xs' : 'btn-ghost' }}"
@@ -266,7 +285,7 @@
                                     <div class="flex items-start justify-between gap-2.5">
                                         {{-- Folder Icon --}}
                                         <div class="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 
-                                            {{ $folder['type'] === 'company' ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : ($folder['type'] === 'branch' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'bg-primary/10 text-primary') }}
+                                            {{ $folder['type'] === 'company' ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : ($folder['type'] === 'branch' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'bg-sky-500/10 text-sky-600 dark:text-sky-400') }}
                                             group-hover:scale-110 transition-transform duration-200 shadow-xs">
                                             @if($folder['type'] === 'company')
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -274,11 +293,12 @@
                                                 </svg>
                                             @elseif($folder['type'] === 'branch')
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" />
                                                 </svg>
                                             @else
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M9 9h1m-1 4h6m-6 4h6" />
                                                 </svg>
                                             @endif
                                         </div>
@@ -335,7 +355,7 @@
                                                 @elseif($selectedCompanyId && !$selectedBranchId)
                                                     {{ __('Nama Cabang') }}
                                                 @else
-                                                    {{ __('Nama Unit Kerja') }}
+                                                    {{ __('Tipe Dokumen') }}
                                                 @endif
                                             </th>
                                             <th>{{ __('Kode') }}</th>
@@ -350,7 +370,7 @@
                                                 <td>
                                                     <div class="flex items-center gap-3">
                                                         <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 
-                                                            {{ $folder['type'] === 'company' ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : ($folder['type'] === 'branch' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'bg-primary/10 text-primary') }}">
+                                                            {{ $folder['type'] === 'company' ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : ($folder['type'] === 'branch' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'bg-sky-500/10 text-sky-600 dark:text-sky-400') }}">
                                                             @if($folder['type'] === 'company')
                                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -361,7 +381,8 @@
                                                                 </svg>
                                                             @else
                                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9h1m-1 4h6m-6 4h6" />
                                                                 </svg>
                                                             @endif
                                                         </div>
@@ -391,7 +412,7 @@
                                                     @elseif($folder['type'] === 'branch')
                                                         <span class="badge badge-outline badge-sm text-amber-600 dark:text-amber-400">{{ __('Cabang') }}</span>
                                                     @else
-                                                        <span class="badge badge-outline badge-sm text-primary">{{ __('Unit Kerja') }}</span>
+                                                        <span class="badge badge-outline badge-sm text-sky-600 dark:text-sky-400">{{ __('Tipe Dokumen') }}</span>
                                                     @endif
                                                 </td>
                                                 <td>
@@ -414,7 +435,7 @@
                         </div>
                     @endif
                 </div>
-            @elseif(!$hasSearchOrFilter && $folders->isEmpty() && !$selectedUnitKerjaId)
+            @elseif(!$hasSearchOrFilter && $folders->isEmpty() && !$selectedDocTypeId && !$selectedUnitKerjaId)
                 <div class="bg-base-100 border border-base-300 rounded-2xl p-10 text-center shadow-xs">
                     <div class="w-14 h-14 rounded-2xl bg-base-200/80 text-base-content/30 flex items-center justify-center mx-auto mb-3">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -422,11 +443,11 @@
                         </svg>
                     </div>
                     @if(!$selectedCompanyId)
-                        <h4 class="font-bold text-base text-base-content">{{ __('No company folders found.') }}</h4>
+                        <h4 class="font-bold text-base text-base-content">{{ __('Tidak ada folder perusahaan ditemukan.') }}</h4>
                     @elseif($selectedCompanyId && !$selectedBranchId)
-                        <h4 class="font-bold text-base text-base-content">{{ __('No branch folders found.') }}</h4>
+                        <h4 class="font-bold text-base text-base-content">{{ __('Tidak ada folder cabang ditemukan.') }}</h4>
                     @else
-                        <h4 class="font-bold text-base text-base-content">{{ __('No unit kerja folders found.') }}</h4>
+                        <h4 class="font-bold text-base text-base-content">{{ __('Tidak ada folder tipe dokumen ditemukan.') }}</h4>
                     @endif
                     <p class="text-xs text-base-content/60 mt-1 max-w-md mx-auto">
                         {{ __('Tidak ada folder yang tersedia pada level ini.') }}
@@ -434,8 +455,8 @@
                 </div>
             @endif
 
-            {{-- 4. DOCUMENT RESULTS SECTION (Rendered when in a unit kerja or when searching/filtering globally) --}}
-            @if($selectedUnitKerjaId || $hasSearchOrFilter)
+            {{-- 4. DOCUMENT RESULTS SECTION (Rendered when in a document type folder or when searching/filtering) --}}
+            @if($selectedDocTypeId || $selectedUnitKerjaId || $hasSearchOrFilter)
                 <div class="space-y-4 pt-2">
                     
                     {{-- Results Header with View Mode Toggle --}}

@@ -55,6 +55,7 @@ class VersionService
                 return $draft;
             }
 
+            // Dokumen active yang diedit kembali -> buat versi pending baru (v2, v3, dst.)
             $versionNumber = ($document->versions()->max('version_number') ?? 0) + 1;
 
             $version = $document->versions()->create([
@@ -72,15 +73,20 @@ class VersionService
     /**
      * Save DOCX binary content received from ONLYOFFICE callback into document versions.
      */
-    public function savePendingDocx(Document $document, string $docxBinaryContent, User $author): DocumentVersion
-    {
-        return DB::transaction(function () use ($document, $docxBinaryContent, $author) {
+    public function savePendingDocx(
+        Document $document,
+        string $docxBinaryContent,
+        User $author,
+        ?DocumentVersion $targetVersion = null
+    ): DocumentVersion {
+        return DB::transaction(function () use ($document, $docxBinaryContent, $author, $targetVersion) {
+            $disk = config('onlyoffice.storage_disk', 'local');
+
+            // 1. Cek apakah ada versi pending aktif
             $pending = $document->versions()->pending()
                 ->whereNull('discarded_at')
                 ->orderBy('version_number', 'desc')
                 ->first();
-
-            $disk = config('onlyoffice.storage_disk', 'local');
 
             if ($pending) {
                 $document->versions()->where('status', 'draft')->delete();
@@ -102,6 +108,7 @@ class VersionService
                 return $pending;
             }
 
+            // 2. Cek apakah ada draft (mis. v1 awal)
             $draft = $document->versions()->where('status', 'draft')
                 ->orderBy('version_number', 'desc')
                 ->first();
@@ -125,6 +132,24 @@ class VersionService
                 return $draft;
             }
 
+            // 3. Tangani race condition callback saat finishEditing:
+            // Jika targetVersion baru saja di-auto-approve dalam beberapa detik terakhir pada sesi yang sama, update berkas targetVersion
+            if ($targetVersion && $targetVersion->document_id === $document->id && $targetVersion->status === 'active' && $targetVersion->updated_at >= now()->subSeconds(20)) {
+                $storedPath = 'documents/' . $document->id . '/v' . $targetVersion->version_number . '.docx';
+                Storage::disk($disk)->put($storedPath, $docxBinaryContent);
+
+                $targetVersion->update([
+                    'file_path' => $storedPath,
+                    'file_original_name' => $document->title . '.docx',
+                    'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'updated_at' => now(),
+                ]);
+
+                $document->touch();
+                return $targetVersion;
+            }
+
+            // 4. Dokumen active yang diedit kembali -> buat versi revisi baru (v2, v3, dst.) dengan status pending
             $versionNumber = ($document->versions()->max('version_number') ?? 0) + 1;
             $storedPath = 'documents/' . $document->id . '/v' . $versionNumber . '.docx';
             Storage::disk($disk)->put($storedPath, $docxBinaryContent);
