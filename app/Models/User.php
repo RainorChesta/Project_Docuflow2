@@ -69,7 +69,7 @@ class User extends Authenticatable
         if ($branchId !== null) {
             $ids = $this->unitKerjas()
                 ->where(function ($q) use ($branchId) {
-                    $q->wherePivot('branch_id', $branchId)
+                    $q->where('unit_kerja_user.branch_id', $branchId)
                       ->orWhereNull('unit_kerja_user.branch_id');
                 })
                 ->pluck('unit_kerjas.id')

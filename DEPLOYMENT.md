@@ -35,6 +35,7 @@ rsync -avz -e "ssh -p 2022 -i ~/.ssh/hyu_deploy_key" --progress \
   --exclude='.git' \
   --exclude='.env' \
   --exclude='node_modules' \
+  --exclude='public/hot' \
   --exclude='public/storage' \
   --exclude='storage/*.key' \
   --exclude='storage/logs/*' \
@@ -542,6 +543,7 @@ rsync -avz -e "${SSH_CMD}" --progress \
   --exclude='.git' \
   --exclude='.env' \
   --exclude='node_modules' \
+  --exclude='public/hot' \
   --exclude='public/storage' \
   --exclude='storage/*.key' \
   --exclude='storage/logs/*' \

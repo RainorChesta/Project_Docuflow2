@@ -380,7 +380,18 @@ class UserController extends Controller
         }
 
         if (!empty($unitKerjaRows)) {
-            DB::table('unit_kerja_user')->insert($unitKerjaRows);
+            // Deduplicate by composite key to prevent UniqueConstraintViolationException
+            // when multiple branches fall back to the same $flatUnitKerjaIds set.
+            $seen = [];
+            $uniqueRows = [];
+            foreach ($unitKerjaRows as $row) {
+                $key = $row['user_id'] . '-' . $row['unit_kerja_id'] . '-' . ($row['branch_id'] ?? 'null');
+                if (!isset($seen[$key])) {
+                    $seen[$key] = true;
+                    $uniqueRows[] = $row;
+                }
+            }
+            DB::table('unit_kerja_user')->insert($uniqueRows);
         }
     }
 
