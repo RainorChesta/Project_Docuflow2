@@ -108,7 +108,7 @@ class VersionService
                 return $pending;
             }
 
-            // 2. Cek apakah ada draft (mis. v1 awal)
+            // 2. Cek apakah ada draft (mis. v1 awal atau v2 revisi yang sedang diedit)
             $draft = $document->versions()->where('status', 'draft')
                 ->orderBy('version_number', 'desc')
                 ->first();
@@ -149,7 +149,7 @@ class VersionService
                 return $targetVersion;
             }
 
-            // 4. Dokumen active yang diedit kembali -> buat versi revisi baru (v2, v3, dst.) dengan status pending
+            // 4. Dokumen active yang diedit kembali -> buat versi revisi baru (v2, v3, dst.) dengan status draft
             $versionNumber = ($document->versions()->max('version_number') ?? 0) + 1;
             $storedPath = 'documents/' . $document->id . '/v' . $versionNumber . '.docx';
             Storage::disk($disk)->put($storedPath, $docxBinaryContent);
@@ -164,7 +164,7 @@ class VersionService
                 'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                 'author_id' => $author->id,
                 'author_name' => $author->name,
-                'status' => 'pending',
+                'status' => 'draft',
                 'updated_at' => now(),
             ]);
         });
@@ -192,7 +192,7 @@ class VersionService
                     Storage::disk('local')->delete($pending->file_path);
                 }
 
-                $stored = $this->storeVersionFile($document->id, $pending->version_number, $file);
+                $stored = $this->storeVersionFile($document->id, $pending->version_number, $file, $document);
 
                 $pending->update([
                     'content' => '',
@@ -214,7 +214,7 @@ class VersionService
                 ? $draft->version_number
                 : ($document->versions()->max('version_number') ?? 0) + 1;
 
-            $stored = $this->storeVersionFile($document->id, $versionNumber, $file);
+            $stored = $this->storeVersionFile($document->id, $versionNumber, $file, $document);
 
             if ($draft) {
                 $draft->update([
@@ -243,19 +243,104 @@ class VersionService
         });
     }
 
-    private function storeVersionFile(int $documentId, int $versionNumber, UploadedFile $file): array
+    /**
+     * Save an uploaded file as a working draft/pending version for the document editor session.
+     */
+    public function saveWorkingFile(Document $document, UploadedFile $file, User $author): DocumentVersion
     {
-        $extension = $file->getClientOriginalExtension();
+        return DB::transaction(function () use ($document, $file, $author) {
+            $pending = $document->versions()->pending()
+                ->whereNull('discarded_at')
+                ->orderBy('version_number', 'desc')
+                ->first();
+
+            if ($pending) {
+                $document->versions()->where('status', 'draft')->delete();
+
+                if ($pending->file_path) {
+                    Storage::disk('local')->delete($pending->file_path);
+                }
+
+                $stored = $this->storeVersionFile($document->id, $pending->version_number, $file, $document);
+
+                $pending->update([
+                    'content' => '',
+                    'file_path' => $stored['path'],
+                    'file_original_name' => $stored['name'],
+                    'file_mime' => $stored['mime'],
+                    'author_id' => $author->id,
+                    'author_name' => $author->name,
+                ]);
+
+                $document->touch();
+
+                return $pending;
+            }
+
+            $draft = $document->versions()->where('status', 'draft')
+                ->orderBy('version_number', 'desc')
+                ->first();
+
+            if ($draft) {
+                if ($draft->file_path) {
+                    Storage::disk('local')->delete($draft->file_path);
+                }
+
+                $stored = $this->storeVersionFile($document->id, $draft->version_number, $file, $document);
+
+                $draft->update([
+                    'content' => '',
+                    'file_path' => $stored['path'],
+                    'file_original_name' => $stored['name'],
+                    'file_mime' => $stored['mime'],
+                    'author_id' => $author->id,
+                    'author_name' => $author->name,
+                ]);
+
+                $document->touch();
+
+                return $draft;
+            }
+
+            // Active document being edited: create new working draft version
+            $versionNumber = ($document->versions()->max('version_number') ?? 0) + 1;
+            $stored = $this->storeVersionFile($document->id, $versionNumber, $file, $document);
+
+            $version = $document->versions()->create([
+                'version_number' => $versionNumber,
+                'content' => '',
+                'file_path' => $stored['path'],
+                'file_original_name' => $stored['name'],
+                'file_mime' => $stored['mime'],
+                'author_id' => $author->id,
+                'author_name' => $author->name,
+                'status' => 'draft',
+            ]);
+
+            $document->touch();
+
+            return $version;
+        });
+    }
+
+    private function storeVersionFile(int $documentId, int $versionNumber, UploadedFile $file, ?Document $document = null): array
+    {
+        $extension = $file->getClientOriginalExtension() ?: 'docx';
         $path = $file->storeAs(
             'documents/' . $documentId,
             'v' . $versionNumber . '.' . $extension,
             'local'
         );
 
+        $docTitle = $document ? trim($document->title ?? '') : '';
+        $name = $docTitle !== '' 
+            ? (str_ends_with(strtolower($docTitle), '.' . strtolower($extension)) ? $docTitle : $docTitle . '.' . $extension)
+            : $file->getClientOriginalName();
+
         return [
             'path' => $path,
-            'name' => $file->getClientOriginalName(),
-            'mime' => $file->getClientMimeType(),
+            'name' => $name,
+            'mime' => $file->getClientMimeType() ?: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         ];
     }
 
@@ -708,6 +793,62 @@ class VersionService
                 'is_used' => false,
                 'rejected_reason' => null,
                 'responded_at' => null,
+            ]);
+
+            $document->touch();
+            app(OnlyOfficeService::class)->rotateDocumentKey($document, $newVersion);
+
+            return $newVersion;
+        });
+    }
+
+    /**
+     * Prepare a new working revision version from an active (released) version.
+     * Clones the active file to a new draft revision (e.g. v2), and returns the new version.
+     */
+    public function prepareRevisionFromActive(Document $document, User $author): DocumentVersion
+    {
+        return DB::transaction(function () use ($document, $author) {
+            // Check if there is already an active draft version
+            $existingDraft = $document->versions()
+                ->where('status', 'draft')
+                ->whereNull('discarded_at')
+                ->orderBy('version_number', 'desc')
+                ->first();
+
+            if ($existingDraft) {
+                return $existingDraft;
+            }
+
+            // Find the active or current version to base the revision on
+            $baseVersion = $document->currentVersion 
+                ?? $document->versions()->where('status', 'active')->orderBy('version_number', 'desc')->first() 
+                ?? $document->displayVersion();
+
+            $versionNumber = ($document->versions()->max('version_number') ?? 0) + 1;
+            $disk = config('onlyoffice.storage_disk', 'local');
+
+            $storedPath = null;
+            $fileOriginalName = $document->title . '.docx';
+            $fileMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+            if ($baseVersion && $baseVersion->file_path && Storage::disk($disk)->exists($baseVersion->file_path)) {
+                $storedPath = 'documents/' . $document->id . '/v' . $versionNumber . '.docx';
+                $baseContent = Storage::disk($disk)->get($baseVersion->file_path);
+                Storage::disk($disk)->put($storedPath, $baseContent);
+                $fileOriginalName = $baseVersion->file_original_name ?? $fileOriginalName;
+                $fileMime = $baseVersion->file_mime ?? $fileMime;
+            }
+
+            $newVersion = $document->versions()->create([
+                'version_number' => $versionNumber,
+                'content' => $baseVersion?->content ?? '',
+                'file_path' => $storedPath,
+                'file_original_name' => $fileOriginalName,
+                'file_mime' => $fileMime,
+                'author_id' => $author->id,
+                'author_name' => $author->name,
+                'status' => 'draft',
             ]);
 
             $document->touch();

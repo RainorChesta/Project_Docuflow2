@@ -356,7 +356,7 @@
                                                 </div>
                                             </div>
                                             <div class="w-full bg-base-200 rounded-full h-2 overflow-hidden">
-                                                <div class="bg-gradient-to-r from-primary to-sky-400 h-2 rounded-full" style="width: {{ max(6, $uk['percentage']) }}%"></div>
+                                                <div class="bg-primary h-2 rounded-full" style="width: {{ max(6, $uk['percentage']) }}%"></div>
                                             </div>
                                         </div>
                                     @empty
@@ -537,9 +537,9 @@
 
                 </div>
 
-                {{-- Admin Expiring Documents Modal --}}
-                <dialog id="admin-expiring-modal" class="modal">
-                    <div class="modal-box max-w-2xl">
+                {{-- Admin & PIC Expiring Documents Recap Modal --}}
+                <dialog id="admin-expiring-modal" class="modal" x-data="{ tab: '{{ $isPicUnitKerja && $picExpiringDocs->isNotEmpty() ? 'pic' : ($ownerExpiringDocs->isNotEmpty() ? 'owner' : 'shared') }}' }">
+                    <div class="modal-box max-w-3xl">
                         <form method="dialog">
                             <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
                         </form>
@@ -550,13 +550,61 @@
                                 </svg>
                             </div>
                             <div>
-                                <h3 class="font-bold text-base text-base-content">{{ __('Dokumen Mendekati Masa Kedaluwarsa') }}</h3>
-                                <p class="text-xs text-base-content/60">{{ __('Daftar dokumen dengan retensi habis dalam 30 hari ke depan.') }}</p>
+                                <h3 class="font-bold text-base text-base-content">{{ __('Rekap Dokumen Masa Berlaku & Kadaluwarsa') }}</h3>
+                                <p class="text-xs text-base-content/60">{{ __('Menampilkan dokumen berbatas waktu yang mendekati kadaluwarsa (≤30 hari) atau telah kadaluwarsa.') }}</p>
                             </div>
                         </div>
 
-                        <div class="divide-y divide-base-200 max-h-96 overflow-y-auto">
-                            @forelse($expiringDocuments as $doc)
+                        {{-- Modal Tabs --}}
+                        <div class="flex items-center gap-2 border-b border-base-200 pb-2 mb-3">
+                            @if($isPicUnitKerja)
+                                <button type="button" @click="tab = 'pic'" :class="tab === 'pic' ? 'btn-primary text-white' : 'btn-ghost text-base-content/70'" class="btn btn-xs rounded-lg font-semibold">
+                                    {{ __('Rekap Unit Kerja') }} ({{ $picExpiringDocs->count() }})
+                                </button>
+                            @endif
+                            <button type="button" @click="tab = 'owner'" :class="tab === 'owner' ? 'btn-primary text-white' : 'btn-ghost text-base-content/70'" class="btn btn-xs rounded-lg font-semibold">
+                                {{ __('Dokumen Saya') }} ({{ $ownerExpiringDocs->count() }})
+                            </button>
+                            <button type="button" @click="tab = 'shared'" :class="tab === 'shared' ? 'btn-primary text-white' : 'btn-ghost text-base-content/70'" class="btn btn-xs rounded-lg font-semibold">
+                                {{ __('Dibagikan ke Saya') }} ({{ $sharedExpiringDocs->count() }})
+                            </button>
+                        </div>
+
+                        {{-- Tab 1: PIC Unit Kerja Recap --}}
+                        @if($isPicUnitKerja)
+                            <div x-show="tab === 'pic'" class="divide-y divide-base-200 max-h-96 overflow-y-auto">
+                                @forelse($picExpiringDocs as $doc)
+                                    @php $days = $doc->daysUntilExpiration(); @endphp
+                                    <div class="py-3 flex items-center justify-between gap-3 text-xs">
+                                        <div class="space-y-0.5 min-w-0 flex-1">
+                                            <a href="{{ route('documents.show', $doc) }}" class="font-bold text-base-content hover:text-primary transition-colors block truncate">
+                                                {{ $doc->title }}
+                                            </a>
+                                            <div class="text-[11px] text-base-content/50">
+                                                <span>{{ $doc->document_number ?? '—' }}</span> • <span>{{ $doc->unitKerja?->nama_unit_kerja ?? '—' }}</span> • <span class="font-medium text-base-content/70">{{ $doc->owner?->name ?? '-' }}</span>
+                                            </div>
+                                        </div>
+                                        <div class="text-right shrink-0">
+                                            <div class="font-semibold text-xs text-base-content">{{ $doc->expiration_date->format('d M Y') }}</div>
+                                            @if($doc->isExpired())
+                                                <span class="badge badge-error badge-xs text-white mt-0.5">{{ __('Kadaluwarsa') }}</span>
+                                            @elseif($days <= 1)
+                                                <span class="badge badge-warning badge-xs text-white mt-0.5">{{ __('Besok / Hari ini') }}</span>
+                                            @else
+                                                <span class="badge badge-warning badge-xs text-white mt-0.5">{{ __('Sisa :days hari', ['days' => $days]) }}</span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @empty
+                                    <p class="text-xs text-center py-6 text-base-content/50">{{ __('Tidak ada dokumen unit kerja yang mendekati masa kadaluwarsa.') }}</p>
+                                @endforelse
+                            </div>
+                        @endif
+
+                        {{-- Tab 2: Owner Recap --}}
+                        <div x-show="tab === 'owner'" class="divide-y divide-base-200 max-h-96 overflow-y-auto">
+                            @forelse($ownerExpiringDocs as $doc)
+                                @php $days = $doc->daysUntilExpiration(); @endphp
                                 <div class="py-3 flex items-center justify-between gap-3 text-xs">
                                     <div class="space-y-0.5 min-w-0 flex-1">
                                         <a href="{{ route('documents.show', $doc) }}" class="font-bold text-base-content hover:text-primary transition-colors block truncate">
@@ -567,11 +615,47 @@
                                         </div>
                                     </div>
                                     <div class="text-right shrink-0">
-                                        <span class="badge badge-warning badge-sm font-semibold">{{ $doc->expiration_date ? $doc->expiration_date->format('d M Y') : 'Retensi Standar' }}</span>
+                                        <div class="font-semibold text-xs text-base-content">{{ $doc->expiration_date->format('d M Y') }}</div>
+                                        @if($doc->isExpired())
+                                            <span class="badge badge-error badge-xs text-white mt-0.5">{{ __('Kadaluwarsa') }}</span>
+                                        @elseif($days <= 1)
+                                            <span class="badge badge-warning badge-xs text-white mt-0.5">{{ __('Besok / Hari ini') }}</span>
+                                        @else
+                                            <span class="badge badge-warning badge-xs text-white mt-0.5">{{ __('Sisa :days hari', ['days' => $days]) }}</span>
+                                        @endif
                                     </div>
                                 </div>
                             @empty
-                                <p class="text-xs text-center py-6 text-base-content/50">{{ __('Tidak ada dokumen yang mendekati masa kedaluwarsa.') }}</p>
+                                <p class="text-xs text-center py-6 text-base-content/50">{{ __('Tidak ada dokumen milik Anda yang mendekati masa kadaluwarsa.') }}</p>
+                            @endforelse
+                        </div>
+
+                        {{-- Tab 3: Shared Recap --}}
+                        <div x-show="tab === 'shared'" class="divide-y divide-base-200 max-h-96 overflow-y-auto">
+                            @forelse($sharedExpiringDocs as $doc)
+                                @php $days = $doc->daysUntilExpiration(); @endphp
+                                <div class="py-3 flex items-center justify-between gap-3 text-xs">
+                                    <div class="space-y-0.5 min-w-0 flex-1">
+                                        <a href="{{ route('documents.show', $doc) }}" class="font-bold text-base-content hover:text-primary transition-colors block truncate">
+                                            {{ $doc->title }}
+                                        </a>
+                                        <div class="text-[11px] text-base-content/50">
+                                            <span>{{ $doc->document_number ?? '—' }}</span> • <span>{{ $doc->unitKerja?->nama_unit_kerja ?? '—' }}</span> • <span>Pemilik: {{ $doc->owner?->name ?? '-' }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="text-right shrink-0">
+                                        <div class="font-semibold text-xs text-base-content">{{ $doc->expiration_date->format('d M Y') }}</div>
+                                        @if($doc->isExpired())
+                                            <span class="badge badge-error badge-xs text-white mt-0.5">{{ __('Kadaluwarsa') }}</span>
+                                        @elseif($days <= 1)
+                                            <span class="badge badge-warning badge-xs text-white mt-0.5">{{ __('Besok / Hari ini') }}</span>
+                                        @else
+                                            <span class="badge badge-warning badge-xs text-white mt-0.5">{{ __('Sisa :days hari', ['days' => $days]) }}</span>
+                                        @endif
+                                    </div>
+                                </div>
+                            @empty
+                                <p class="text-xs text-center py-6 text-base-content/50">{{ __('Tidak ada dokumen dibagikan yang mendekati masa kadaluwarsa.') }}</p>
                             @endforelse
                         </div>
 
@@ -579,15 +663,6 @@
                             <form method="dialog">
                                 <button class="btn btn-sm btn-ghost">{{ __('Tutup') }}</button>
                             </form>
-                            @if(auth()->user()->isDirector())
-                                <a href="{{ route('director.active-documents.index') }}" class="btn btn-sm btn-primary">
-                                    {{ __('Buka Dokumen Terbit') }}
-                                </a>
-                            @else
-                                <a href="{{ route('admin.documents.index', ['status' => 'expired']) }}" class="btn btn-sm btn-primary">
-                                    {{ __('Kelola Dokumen Kedaluwarsa') }}
-                                </a>
-                            @endif
                         </div>
                     </div>
                     <form method="dialog" class="modal-backdrop">
@@ -626,13 +701,8 @@
                                 dashArray: [0, 4]
                             },
                             fill: {
-                                type: 'gradient',
-                                gradient: {
-                                    shadeIntensity: 1,
-                                    opacityFrom: 0.4,
-                                    opacityTo: 0.05,
-                                    stops: [0, 90, 100]
-                                }
+                                type: 'solid',
+                                opacity: [0.15, 0.05]
                             },
                             xaxis: {
                                 categories: @json($chartDates),
@@ -704,17 +774,7 @@
                                 }
                             },
                             fill: {
-                                type: 'gradient',
-                                gradient: {
-                                    shade: 'dark',
-                                    type: 'horizontal',
-                                    shadeIntensity: 0.5,
-                                    gradientToColors: ['#38bdf8'],
-                                    inverseColors: true,
-                                    opacityFrom: 1,
-                                    opacityTo: 1,
-                                    stops: [0, 100]
-                                }
+                                type: 'solid'
                             },
                             colors: ['#0F6DB7'],
                             labels: ['{{ __("Tingkat Kepatuhan") }}'],
@@ -868,18 +928,21 @@
                         </div>
                         
                         <!-- Expiring Documents Stat -->
+                        @php
+                            $totalExpiringCount = $ownerExpiringDocs->count() + $sharedExpiringDocs->count() + ($isPicUnitKerja ? $picExpiringDocs->count() : 0);
+                        @endphp
                         <div class="stat bg-base-100 border border-base-300 hover:border-warning/50 rounded-box p-4 cursor-pointer hover:bg-base-200 transition-colors" onclick="document.getElementById('expiring-modal').showModal()" title="{{ __('Lihat Daftar Dokumen') }}">
                             <div class="stat-title text-base-content/50 text-xs font-medium flex items-center gap-1">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                 </svg>
-                                {{ __('Hampir Kedaluwarsa') }}
+                                {{ __('Masa Berlaku Dokumen') }}
                             </div>
                             <div class="stat-value text-2xl font-bold text-warning mt-1 flex justify-between items-end">
-                                <span>{{ isset($expiringDocuments) ? $expiringDocuments->count() : 0 }}</span>
+                                <span>{{ $totalExpiringCount }}</span>
                             </div>
                             <div class="stat-desc text-xs text-base-content/40 mt-1 flex items-center gap-1">
-                                <span>{{ __('Dalam 30 hari') }}</span>
+                                <span>{{ __('Dokumen berbatas waktu') }}</span>
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 ml-auto text-base-content/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                                 </svg>
@@ -942,72 +1005,131 @@
         </div>
     </div>
 
-    <!-- Expiring Documents Modal -->
-    <dialog id="expiring-modal" class="modal">
+    <!-- Expiring Documents Modal (User / Staff / PIC Recap) -->
+    <dialog id="expiring-modal" class="modal" x-data="{ tab: '{{ $ownerExpiringDocs->isNotEmpty() ? 'owner' : ($sharedExpiringDocs->isNotEmpty() ? 'shared' : 'pic') }}' }">
         <div class="modal-box w-11/12 max-w-3xl">
             <form method="dialog">
                 <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
             </form>
-            <h3 class="font-bold text-lg flex items-center gap-2">
+            <h3 class="font-bold text-lg flex items-center gap-2 text-warning">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
-                {{ __('Dokumen Segera Kedaluwarsa') }}
+                <span class="text-base-content">{{ __('Rekap Dokumen Masa Berlaku') }}</span>
             </h3>
-            <p class="py-4 text-sm text-base-content/70">
-                {{ __('Berikut adalah daftar dokumen yang akan kedaluwarsa dalam 30 hari ke depan.') }}
+            <p class="py-2 text-xs text-base-content/70">
+                {{ __('Daftar dokumen yang memiliki masa berlaku khusus yang mendekati kadaluwarsa (≤30 hari) atau telah kadaluwarsa.') }}
             </p>
-            @if(isset($expiringDocuments) && $expiringDocuments->count() > 0)
-                <div class="overflow-x-auto border border-base-200 rounded-lg">
-                    <table class="table table-sm w-full min-w-[500px]">
-                        <thead class="bg-base-200/50">
-                            <tr>
-                                <th>{{ __('Nomor & Judul') }}</th>
-                                <th>{{ __('Sisa Waktu') }}</th>
-                                <th>{{ __('Tanggal Kedaluwarsa') }}</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($expiringDocuments as $doc)
-                                @php
-                                    $days = now()->startOfDay()->diffInDays($doc->expires_at->startOfDay(), false);
-                                @endphp
-                                <tr class="hover">
-                                    <td>
-                                        <div class="font-medium text-base-content">{{ $doc->title }}</div>
-                                        <div class="text-xs text-base-content/50">{{ $doc->document_number }}</div>
-                                    </td>
-                                    <td>
-                                        @if($days == 0)
-                                            <span class="badge badge-error badge-sm">{{ __('Hari ini') }}</span>
-                                        @elseif($days == 1)
-                                            <span class="badge badge-error badge-sm">{{ __('Besok') }}</span>
-                                        @elseif($days <= 7)
-                                            <span class="badge badge-warning badge-sm">{{ __(':days hari', ['days' => $days]) }}</span>
-                                        @else
-                                            <span class="badge badge-ghost badge-sm">{{ __(':days hari', ['days' => $days]) }}</span>
-                                        @endif
-                                    </td>
-                                    <td class="text-sm">
-                                        {{ $doc->expires_at->format('d M Y') }}
-                                    </td>
-                                    <td class="text-right">
-                                        <a href="{{ route('documents.show', $doc) }}" class="btn btn-ghost btn-xs">{{ __('Lihat') }}</a>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            @else
-                <div class="py-8 text-center text-sm text-base-content/60">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 mx-auto text-base-content/20 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <p>{{ __('Tidak ada dokumen yang hampir kedaluwarsa.') }}</p>
+
+            {{-- Modal Tabs --}}
+            <div class="flex items-center gap-2 border-b border-base-200 pb-2 mb-3 mt-2">
+                <button type="button" @click="tab = 'owner'" :class="tab === 'owner' ? 'btn-primary text-white' : 'btn-ghost text-base-content/70'" class="btn btn-xs rounded-lg font-semibold">
+                    {{ __('Dokumen Saya') }} ({{ $ownerExpiringDocs->count() }})
+                </button>
+                <button type="button" @click="tab = 'shared'" :class="tab === 'shared' ? 'btn-primary text-white' : 'btn-ghost text-base-content/70'" class="btn btn-xs rounded-lg font-semibold">
+                    {{ __('Dibagikan ke Saya') }} ({{ $sharedExpiringDocs->count() }})
+                </button>
+                @if($isPicUnitKerja)
+                    <button type="button" @click="tab = 'pic'" :class="tab === 'pic' ? 'btn-primary text-white' : 'btn-ghost text-base-content/70'" class="btn btn-xs rounded-lg font-semibold">
+                        {{ __('Rekap Unit Kerja') }} ({{ $picExpiringDocs->count() }})
+                    </button>
+                @endif
+            </div>
+
+            {{-- Tab 1: Owner --}}
+            <div x-show="tab === 'owner'" class="divide-y divide-base-200 max-h-80 overflow-y-auto">
+                @forelse($ownerExpiringDocs as $doc)
+                    @php $days = $doc->daysUntilExpiration(); @endphp
+                    <div class="py-3 flex items-center justify-between gap-3 text-xs">
+                        <div class="space-y-0.5 min-w-0 flex-1">
+                            <a href="{{ route('documents.show', $doc) }}" class="font-bold text-base-content hover:text-primary transition-colors block truncate">
+                                {{ $doc->title }}
+                            </a>
+                            <div class="text-[11px] text-base-content/50">
+                                <span>{{ $doc->document_number ?? '—' }}</span> • <span>{{ $doc->unitKerja?->nama_unit_kerja ?? '—' }}</span>
+                            </div>
+                        </div>
+                        <div class="text-right shrink-0">
+                            <div class="font-semibold text-xs text-base-content">{{ $doc->expiration_date->format('d M Y') }}</div>
+                            @if($doc->isExpired())
+                                <span class="badge badge-error badge-xs text-white mt-0.5">{{ __('Kadaluwarsa') }}</span>
+                            @elseif($days <= 1)
+                                <span class="badge badge-warning badge-xs text-white mt-0.5">{{ __('Besok / Hari ini') }}</span>
+                            @else
+                                <span class="badge badge-warning badge-xs text-white mt-0.5">{{ __('Sisa :days hari', ['days' => $days]) }}</span>
+                            @endif
+                        </div>
+                    </div>
+                @empty
+                    <p class="text-xs text-center py-6 text-base-content/50">{{ __('Tidak ada dokumen milik Anda yang mendekati masa kadaluwarsa.') }}</p>
+                @endforelse
+            </div>
+
+            {{-- Tab 2: Shared --}}
+            <div x-show="tab === 'shared'" class="divide-y divide-base-200 max-h-80 overflow-y-auto">
+                @forelse($sharedExpiringDocs as $doc)
+                    @php $days = $doc->daysUntilExpiration(); @endphp
+                    <div class="py-3 flex items-center justify-between gap-3 text-xs">
+                        <div class="space-y-0.5 min-w-0 flex-1">
+                            <a href="{{ route('documents.show', $doc) }}" class="font-bold text-base-content hover:text-primary transition-colors block truncate">
+                                {{ $doc->title }}
+                            </a>
+                            <div class="text-[11px] text-base-content/50">
+                                <span>{{ $doc->document_number ?? '—' }}</span> • <span>{{ $doc->unitKerja?->nama_unit_kerja ?? '—' }}</span> • <span>Pemilik: {{ $doc->owner?->name ?? '-' }}</span>
+                            </div>
+                        </div>
+                        <div class="text-right shrink-0">
+                            <div class="font-semibold text-xs text-base-content">{{ $doc->expiration_date->format('d M Y') }}</div>
+                            @if($doc->isExpired())
+                                <span class="badge badge-error badge-xs text-white mt-0.5">{{ __('Kadaluwarsa') }}</span>
+                            @elseif($days <= 1)
+                                <span class="badge badge-warning badge-xs text-white mt-0.5">{{ __('Besok / Hari ini') }}</span>
+                            @else
+                                <span class="badge badge-warning badge-xs text-white mt-0.5">{{ __('Sisa :days hari', ['days' => $days]) }}</span>
+                            @endif
+                        </div>
+                    </div>
+                @empty
+                    <p class="text-xs text-center py-6 text-base-content/50">{{ __('Tidak ada dokumen dibagikan yang mendekati masa kadaluwarsa.') }}</p>
+                @endforelse
+            </div>
+
+            {{-- Tab 3: PIC Unit Kerja --}}
+            @if($isPicUnitKerja)
+                <div x-show="tab === 'pic'" class="divide-y divide-base-200 max-h-80 overflow-y-auto">
+                    @forelse($picExpiringDocs as $doc)
+                        @php $days = $doc->daysUntilExpiration(); @endphp
+                        <div class="py-3 flex items-center justify-between gap-3 text-xs">
+                            <div class="space-y-0.5 min-w-0 flex-1">
+                                <a href="{{ route('documents.show', $doc) }}" class="font-bold text-base-content hover:text-primary transition-colors block truncate">
+                                    {{ $doc->title }}
+                                </a>
+                                <div class="text-[11px] text-base-content/50">
+                                    <span>{{ $doc->document_number ?? '—' }}</span> • <span>{{ $doc->unitKerja?->nama_unit_kerja ?? '—' }}</span> • <span class="font-medium text-base-content/70">{{ $doc->owner?->name ?? '-' }}</span>
+                                </div>
+                            </div>
+                            <div class="text-right shrink-0">
+                                <div class="font-semibold text-xs text-base-content">{{ $doc->expiration_date->format('d M Y') }}</div>
+                                @if($doc->isExpired())
+                                    <span class="badge badge-error badge-xs text-white mt-0.5">{{ __('Kadaluwarsa') }}</span>
+                                @elseif($days <= 1)
+                                    <span class="badge badge-warning badge-xs text-white mt-0.5">{{ __('Besok / Hari ini') }}</span>
+                                @else
+                                    <span class="badge badge-warning badge-xs text-white mt-0.5">{{ __('Sisa :days hari', ['days' => $days]) }}</span>
+                                @endif
+                            </div>
+                        </div>
+                    @empty
+                        <p class="text-xs text-center py-6 text-base-content/50">{{ __('Tidak ada dokumen unit kerja yang mendekati masa kadaluwarsa.') }}</p>
+                    @endforelse
                 </div>
             @endif
+
+            <div class="modal-action mt-4">
+                <form method="dialog">
+                    <button class="btn btn-sm btn-ghost">{{ __('Tutup') }}</button>
+                </form>
+            </div>
         </div>
         <form method="dialog" class="modal-backdrop">
             <button>close</button>

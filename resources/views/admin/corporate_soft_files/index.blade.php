@@ -347,13 +347,9 @@
                 <div id="modal-sf-loader" class="absolute inset-0 bg-base-100/95 backdrop-blur-xs z-20 flex flex-col items-center justify-center p-6 transition-all duration-300">
                     <div class="flex flex-col items-center justify-center text-center">
                         <div class="relative w-[88px] h-[88px] flex items-center justify-center mb-3">
-                            {{-- Aura Glow --}}
-                            <div class="absolute w-[100px] h-[100px] rounded-full blur-md opacity-70 animate-pulse"
-                                 style="background: radial-gradient(circle, rgba(37, 99, 235, 0.35) 0%, rgba(16, 185, 129, 0.25) 55%, transparent 72%);"></div>
-                            
-                            {{-- Rotating Gradient Conic Ring --}}
-                            <div class="relative w-[78px] h-[78px] rounded-full p-[3px] shadow-lg shadow-primary/20 flex items-center justify-center animate-spin"
-                                 style="background: conic-gradient(from 0deg, #2563eb, #10b981, #06b6d4, #2563eb); animation-duration: 1.8s;">
+                            {{-- Clean Solid Rotating Spinner Ring --}}
+                            <div class="relative w-[78px] h-[78px] rounded-full border-3 border-base-300 border-t-primary shadow-lg flex items-center justify-center animate-spin"
+                                 style="animation-duration: 1.2s;">
                                 <div class="w-full h-full bg-base-100 rounded-full"></div>
                             </div>
 

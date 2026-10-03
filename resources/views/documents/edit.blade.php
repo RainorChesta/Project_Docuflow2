@@ -265,8 +265,8 @@
                                     </svg>
                                 </a>
                                 <div class="text-xs sm:text-sm text-base-content/60 flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
-                                    <span class="font-medium text-base-content truncate max-w-[140px] sm:max-w-xs" title="{{ $version->file_original_name ?? ($document->title . '.docx') }}">
-                                        {{ $version->file_original_name ?? ($document->title . '.docx') }}
+                                    <span class="font-medium text-base-content truncate max-w-[140px] sm:max-w-xs" title="{{ $document->title ? ($document->title . '.' . ($isPdf ? 'pdf' : 'docx')) : ($version->file_original_name ?? ($document->title . '.docx')) }}">
+                                        {{ $document->title ? ($document->title . '.' . ($isPdf ? 'pdf' : 'docx')) : ($version->file_original_name ?? ($document->title . '.docx')) }}
                                     </span>
                                     @if($document->document_number)
                                         <span class="badge badge-ghost badge-xs font-mono shrink-0">{{ $document->document_number }}</span>

@@ -124,6 +124,7 @@
                     }
                 });
             </script>
+        @else
             <div id="docx-preview-{{ $version->id }}" class="p-6 sm:p-8 bg-base-100 rounded-2xl border border-base-300" style="min-height: 600px;">
                 <div class="flex items-center justify-center gap-2 text-xs font-semibold text-primary mb-4">
                     <span class="loading loading-spinner loading-xs"></span>

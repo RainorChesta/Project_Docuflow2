@@ -602,6 +602,51 @@ class OnlyOfficeIntegrationTest extends TestCase
 
         $this->assertNotNull($sigRequest->fresh()->notified_at);
     }
+
+    public function test_upload_file_for_editing_retains_original_document_title_in_onlyoffice_editor(): void
+    {
+        $document = Document::create([
+            'title' => 'SOP Pelayanan Radiologi 2026',
+            'document_number' => '001/RAD/2026',
+            'owner_id' => $this->user->id,
+            'unit_kerja_id' => $this->unitKerja->id,
+            'document_type_id' => $this->document->document_type_id,
+        ]);
+
+        $v1 = $document->versions()->create([
+            'version_number' => 1,
+            'content' => 'v1 content',
+            'file_path' => 'documents/' . $document->id . '/v1.docx',
+            'file_original_name' => 'SOP Pelayanan Radiologi 2026.docx',
+            'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'author_id' => $this->user->id,
+            'author_name' => $this->user->name,
+            'status' => 'active',
+        ]);
+        $document->update(['current_version_id' => $v1->id]);
+
+        $fakeFile = \Illuminate\Http\UploadedFile::fake()->create('random_local_pc_file.docx', 50, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+
+        // User uploads a file with a different name to edit
+        $response = $this->actingAs($this->user)->post(route('documents.upload-edit', $document), [
+            'file' => $fakeFile,
+        ]);
+
+        $response->assertRedirect(route('documents.edit', $document));
+
+        // Now open the editor
+        $editResponse = $this->actingAs($this->user)->get(route('documents.edit', $document));
+        $editResponse->assertOk();
+
+        // Ensure the editor header and OnlyOffice config use the document's created title
+        $editResponse->assertSee('SOP Pelayanan Radiologi 2026.docx');
+        
+        $service = app(OnlyOfficeService::class);
+        $pendingVersion = $document->versions()->where('status', 'draft')->orWhere('status', 'pending')->latest('id')->first();
+        $config = $service->generateEditorConfig($document, $pendingVersion, $this->user, 'edit');
+        
+        $this->assertEquals('SOP Pelayanan Radiologi 2026.docx', $config['document']['title']);
+    }
 }
 
 

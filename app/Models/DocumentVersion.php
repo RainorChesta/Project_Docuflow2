@@ -23,6 +23,15 @@ class DocumentVersion extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::saved(function (DocumentVersion $version) {
+            if ($version->status === 'active' && $version->document) {
+                $version->document->checkExpirationNotification();
+            }
+        });
+    }
+
     public function isRename(): bool
     {
         return $this->change_type === 'rename' || !empty($this->old_title);

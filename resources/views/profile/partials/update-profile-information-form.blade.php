@@ -31,7 +31,7 @@
                         <img :src="avatarPreview" alt="{{ $user->name }}" class="h-20 w-20 rounded-full object-cover border-2 border-base-300 shadow-sm ring-2 ring-primary/20">
                     </template>
                     <template x-if="!avatarPreview || removeAvatar">
-                        <div class="h-20 w-20 rounded-full bg-gradient-to-br from-primary/20 via-primary/10 to-base-200 text-primary flex items-center justify-center font-extrabold text-2xl border-2 border-base-300 shadow-sm">
+                        <div class="h-20 w-20 rounded-full bg-primary/10 text-primary flex items-center justify-center font-extrabold text-2xl border-2 border-base-300 shadow-sm">
                             {{ strtoupper(substr($user->name, 0, 2)) }}
                         </div>
                     </template>

@@ -624,7 +624,8 @@ class OnlyOfficeService
             $canEdit = true;
         }
 
-        $fileName = $version->file_original_name ?? $document->title;
+        $docTitle = trim($document->title ?? '');
+        $fileName = $docTitle !== '' ? $docTitle : ($version->file_original_name ?? 'Dokumen');
         if (!str_ends_with(strtolower($fileName), '.' . $extension)) {
             $fileName .= '.' . $extension;
         }

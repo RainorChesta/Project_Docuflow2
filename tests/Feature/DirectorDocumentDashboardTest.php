@@ -87,7 +87,7 @@ class DirectorDocumentDashboardTest extends TestCase
         $response->assertDontSee('name="filter_unit_kerja_id"', false);
     }
 
-    public function test_director_can_drill_into_branch_and_see_unit_kerja_folders_without_documents_by_default(): void
+    public function test_director_can_drill_into_branch_and_see_document_type_folders_without_documents_by_default(): void
     {
         $doc = Document::create([
             'title' => 'SOP Pelayanan Manyar',
@@ -106,14 +106,15 @@ class DirectorDocumentDashboardTest extends TestCase
         ]));
 
         $response->assertOk();
-        // Search controls for unit kerja folders are present
-        $response->assertSee('placeholder="' . __('Cari folder unit kerja...') . '"', false);
+        $response->assertSee('Policy');
+        $response->assertSee('POL');
+        $response->assertSee(__('Folder Tipe Dokumen'));
         // Documents must NOT be shown by default before search
         $response->assertDontSee('SOP Pelayanan Manyar');
         $response->assertDontSee('001/POL/KMY/2026');
     }
 
-    public function test_director_can_drill_into_unit_kerja_level(): void
+    public function test_director_can_drill_into_document_type_level(): void
     {
         $doc = Document::create([
             'title' => 'HRD Handbook 2026',
@@ -129,11 +130,11 @@ class DirectorDocumentDashboardTest extends TestCase
         $response = $this->actingAs($this->director)->get(route('director.documents.index', [
             'company_id' => $this->company->id,
             'branch_id' => $this->cabangBranch->id,
-            'unit_kerja_id' => $this->hrdUnit->id,
+            'document_type_id' => $this->policyType->id,
         ]));
 
         $response->assertOk();
-        $response->assertSee('Human Resources Department');
+        $response->assertSee('Policy');
         $response->assertSee('HRD Handbook 2026');
     }
 
@@ -213,7 +214,7 @@ class DirectorDocumentDashboardTest extends TestCase
         $listResp = $this->actingAs($this->director)->get(route('director.documents.index', [
             'company_id' => $this->company->id,
             'branch_id' => $this->cabangBranch->id,
-            'unit_kerja_id' => $this->hrdUnit->id,
+            'document_type_id' => $this->policyType->id,
             'search' => 'Sample',
             'view_mode' => 'list',
         ]));
@@ -225,7 +226,7 @@ class DirectorDocumentDashboardTest extends TestCase
         $gridResp = $this->actingAs($this->director)->get(route('director.documents.index', [
             'company_id' => $this->company->id,
             'branch_id' => $this->cabangBranch->id,
-            'unit_kerja_id' => $this->hrdUnit->id,
+            'document_type_id' => $this->policyType->id,
             'search' => 'Sample',
             'view_mode' => 'grid',
         ]));
@@ -233,28 +234,28 @@ class DirectorDocumentDashboardTest extends TestCase
         $gridResp->assertSee('Sample View Document');
     }
 
-    public function test_director_can_switch_folder_view_mode_for_unit_kerjas(): void
+    public function test_director_can_switch_folder_view_mode_for_document_types(): void
     {
-        // 1. Unit Kerja Folders in List view
+        // 1. Document Type Folders in List view
         $listResp = $this->actingAs($this->director)->get(route('director.documents.index', [
             'company_id' => $this->company->id,
             'branch_id' => $this->cabangBranch->id,
             'view_mode' => 'list',
         ]));
         $listResp->assertOk();
-        $listResp->assertSee('Nama Unit Kerja');
-        $listResp->assertSee('Human Resources Department');
-        $listResp->assertSee('HRD');
+        $listResp->assertSee('Tipe Dokumen');
+        $listResp->assertSee('Policy');
+        $listResp->assertSee('POL');
 
-        // 2. Unit Kerja Folders in Grid view
+        // 2. Document Type Folders in Grid view
         $gridResp = $this->actingAs($this->director)->get(route('director.documents.index', [
             'company_id' => $this->company->id,
             'branch_id' => $this->cabangBranch->id,
             'view_mode' => 'grid',
         ]));
         $gridResp->assertOk();
-        $gridResp->assertSee('Human Resources Department');
-        $gridResp->assertSee('HRD');
+        $gridResp->assertSee('Policy');
+        $gridResp->assertSee('POL');
     }
 
     public function test_director_can_search_documents_globally_from_root_across_all_companies_and_branches(): void

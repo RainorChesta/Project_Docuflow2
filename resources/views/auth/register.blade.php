@@ -21,8 +21,7 @@
 </head>
 <body class="bg-base-100 text-base-content antialiased selection:bg-primary selection:text-primary-content relative overflow-x-hidden">
 
-    <!-- Decorative background elements -->
-    <div class="fixed top-0 left-0 w-full h-96 bg-gradient-to-b from-primary/10 to-transparent pointer-events-none z-0"></div>
+
     
     <!-- Top-right controls -->
     <div class="absolute top-6 right-6 flex items-center gap-2 z-50">

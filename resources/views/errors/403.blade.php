@@ -69,7 +69,7 @@
     <link rel="shortcut icon" type="image/webp" href="{{ asset('logo.webp') }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="min-h-screen bg-gradient-to-br from-primary/10 via-base-200 to-secondary/10 font-sans antialiased flex items-center justify-center p-4">
+<body class="min-h-screen bg-base-200 font-sans antialiased flex items-center justify-center p-4">
     <div class="card bg-base-100/90 backdrop-blur-md shadow-2xl border border-base-300 max-w-md w-full text-center p-6 sm:p-8 space-y-6 rounded-3xl">
         <div class="inline-flex items-center justify-center relative mx-auto">
             <div class="w-20 h-20 rounded-2xl bg-error/10 border border-error/20 flex items-center justify-center">

@@ -215,6 +215,25 @@ class User extends Authenticatable
         return $this->system_role === 'staff' || $this->system_role === 'user' || (!$this->isAdmin() && !$this->isDirector() && !$this->isPicKlinik() && !$this->isHead());
     }
 
+    public function isPicUnitKerja(): bool
+    {
+        return $this->isHead() || UnitKerja::where('pic_user_id', $this->id)->exists();
+    }
+
+    public function managedUnitKerjaIds(): array
+    {
+        if ($this->isAdmin() || $this->isDirector()) {
+            return UnitKerja::pluck('id')->all();
+        }
+
+        $picUnitIds = UnitKerja::where('pic_user_id', $this->id)->pluck('id')->all();
+        if ($this->isHead()) {
+            $picUnitIds = array_merge($picUnitIds, $this->allUnitKerjaIds());
+        }
+
+        return array_values(array_unique($picUnitIds));
+    }
+
     /**
      * Check if user can access corporate soft files feature.
      */

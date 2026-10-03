@@ -524,7 +524,7 @@
         {{-- Context Picker Modal (accessible on all screen sizes) --}}
         <dialog id="company-branch-modal" x-ref="mobileModal" class="modal modal-bottom sm:modal-middle" @close="closeMobileModal()">
             <div class="modal-box w-full sm:max-w-md p-0 overflow-hidden rounded-t-3xl sm:rounded-3xl bg-base-100 shadow-2xl border border-base-200/80 text-left">
-                <div class="h-1.5 w-full bg-gradient-to-r from-primary via-indigo-500 to-primary/40"></div>
+                <div class="h-1.5 w-full bg-primary"></div>
                 
                 <div class="p-5 sm:p-6 space-y-4">
                     {{-- Modal Header --}}
@@ -624,13 +624,13 @@
         <dialog id="context-confirm-dialog" x-ref="confirmModal" class="modal modal-bottom sm:modal-middle" @close="closeConfirmModal()">
             <div class="modal-box w-full sm:max-w-md p-0 overflow-hidden rounded-t-3xl sm:rounded-3xl bg-base-100 shadow-2xl border border-base-200/80 text-left">
                 
-                {{-- Top gradient hairline --}}
-                <div class="h-1.5 w-full bg-gradient-to-r from-primary via-indigo-500 to-primary/40"></div>
+                {{-- Top hairline --}}
+                <div class="h-1.5 w-full bg-primary"></div>
 
                 <div class="p-5 sm:p-7 space-y-5">
                     {{-- Header with icon --}}
                     <div class="flex items-start gap-3.5">
-                        <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-primary/20 via-primary/10 to-transparent border border-primary/25 flex items-center justify-center shrink-0 text-primary shadow-sm">
+                        <div class="w-11 h-11 rounded-2xl bg-primary/10 border border-primary/25 flex items-center justify-center shrink-0 text-primary shadow-sm">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                             </svg>

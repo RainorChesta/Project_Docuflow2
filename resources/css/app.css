@@ -455,16 +455,7 @@ dialog.modal,
 .shimmer,
 .animate-shimmer,
 .skeleton {
-    background: linear-gradient(
-        90deg,
-        oklch(0.93 0.01 250) 0%,
-        oklch(0.97 0.005 250) 25%,
-        oklch(1 0 0 / 0.8) 50%,
-        oklch(0.97 0.005 250) 75%,
-        oklch(0.93 0.01 250) 100%
-    ) !important;
-    background-size: 200% 100% !important;
-    animation: shimmer-sweep 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite !important;
+    background-color: oklch(0.93 0.01 250) !important;
     position: relative;
     overflow: hidden;
 }
@@ -476,50 +467,13 @@ dialog.modal,
 [data-theme="dark"] .shimmer,
 [data-theme="dark"] .animate-shimmer,
 [data-theme="dark"] .skeleton {
-    background: linear-gradient(
-        90deg,
-        oklch(0.32 0.03 250) 0%,
-        oklch(0.38 0.03 250) 25%,
-        oklch(0.48 0.04 250 / 0.7) 50%,
-        oklch(0.38 0.03 250) 75%,
-        oklch(0.32 0.03 250) 100%
-    ) !important;
-    background-size: 200% 100% !important;
-}
-
-/* Enhanced Button Shimmer Loading Effect */
-.btn.loading,
-.btn:has(.loading-spinner) {
-    position: relative;
-    overflow: hidden;
-}
-
-.btn.loading::after,
-.btn:has(.loading-spinner)::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-        90deg,
-        transparent 0%,
-        rgba(255, 255, 255, 0.2) 50%,
-        transparent 100%
-    );
-    background-size: 200% 100%;
-    animation: shimmer-sweep 1.4s infinite;
-    pointer-events: none;
+    background-color: oklch(0.32 0.03 250) !important;
 }
 
 /* Brand Tinted Shimmer */
 .shimmer-brand {
-    background: linear-gradient(
-        90deg,
-        var(--brand-primary-soft) 0%,
-        color-mix(in srgb, var(--brand-primary) 20%, transparent) 50%,
-        var(--brand-primary-soft) 100%
-    );
-    background-size: 200% 100%;
-    animation: shimmer-sweep 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    background: var(--color-primary);
+    opacity: 0.15;
 }
 
 /* Top Progress Shimmer Bar */

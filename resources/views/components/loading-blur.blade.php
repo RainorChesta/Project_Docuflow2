@@ -45,7 +45,7 @@
             {{-- Ambient Glow Aura --}}
             <div class="absolute -inset-4 bg-gradient-to-tr from-primary/40 via-accent/30 to-primary/40 rounded-full blur-2xl animate-pulse"></div>
 
-            {{-- Conic Rotating Spinner Ring with Shimmer Aura --}}
+            {{-- Conic Rotating Spinner Ring with Gradient Aura --}}
             <div class="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full p-[3px] bg-gradient-to-tr from-primary via-accent to-primary/20 animate-spin flex items-center justify-center shadow-2xl shadow-primary/20" style="animation-duration: 2s;">
                 <div class="w-full h-full bg-base-100/90 dark:bg-base-100/80 backdrop-blur-sm rounded-full"></div>
             </div>
@@ -58,11 +58,10 @@
             </div>
         </div>
 
-        {{-- Shimmering Status Indicator --}}
-        <div class="px-3.5 py-1.5 rounded-full bg-base-100/95 dark:bg-base-100/90 backdrop-blur-md border border-base-300/80 dark:border-white/10 shadow-lg flex items-center gap-2 overflow-hidden relative">
-            <div class="shimmer-brand absolute inset-0 opacity-40"></div>
-            <span class="w-2 h-2 rounded-full bg-primary animate-ping relative z-10"></span>
-            <span id="loading-blur-text" class="text-xs font-semibold text-base-content/80 tracking-wide relative z-10">{{ __('Memuat...') }}</span>
+        {{-- Status Indicator --}}
+        <div class="px-3.5 py-1.5 rounded-full bg-base-100/95 dark:bg-base-100/90 backdrop-blur-md border border-base-300/80 dark:border-white/10 shadow-lg flex items-center gap-2 relative">
+            <span class="w-2 h-2 rounded-full bg-primary animate-ping"></span>
+            <span id="loading-blur-text" class="text-xs font-semibold text-base-content/80 tracking-wide">{{ __('Memuat...') }}</span>
         </div>
     </div>
 </div>

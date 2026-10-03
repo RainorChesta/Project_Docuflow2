@@ -82,6 +82,7 @@ Route::middleware('auth')->group(function () {
     Route::put('/documents/{document}/save', [DocumentController::class, 'save'])->name('documents.save');
     Route::put('/documents/{document}/save-draft', [DocumentController::class, 'saveDraft'])->name('documents.save-draft');
     Route::post('/documents/{document}/versions/upload', [DocumentController::class, 'uploadVersion'])->name('documents.upload-version');
+    Route::post('/documents/{document}/upload-edit', [DocumentController::class, 'uploadAndEdit'])->name('documents.upload-edit');
     Route::patch('/documents/{document}/visibility', [DocumentController::class, 'updateVisibility'])->name('documents.update-visibility');
     Route::post('/documents/{document}/discard', [DocumentController::class, 'discard'])->name('documents.discard');
     Route::post('/documents/{document}/finish-editing', [DocumentController::class, 'finishEditing'])->name('documents.finish-editing');

@@ -20,6 +20,12 @@ class DocumentPolicy
             return true;
         }
 
+        // Assigned Approval Step or Document Approver:
+        // Users directly assigned to review/approve this document version
+        if ($document->approver_id === $user->id || $document->approvalSteps()->where('assigned_user_id', $user->id)->exists()) {
+            return true;
+        }
+
         // Owner always has access to their own documents
         if ($user->id === $document->owner_id) {
             return true;

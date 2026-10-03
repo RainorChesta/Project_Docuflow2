@@ -251,4 +251,60 @@ class UnifiedApprovalNotificationTest extends TestCase
         $response->assertJsonPath('unread_count', 1);
         $this->assertCount(1, $response->json('notifications'));
     }
+
+    public function test_head_receives_approval_request_and_document_appears_in_approvals_list(): void
+    {
+        $document = Document::create([
+            'title' => 'Dokumen Pengajuan Staff',
+            'document_number' => '099/SK-04/MMC-DHU/X/2026',
+            'company_id' => $this->company->id,
+            'branch_id' => $this->branch->id,
+            'unit_kerja_id' => $this->unitKerja->id,
+            'document_type_id' => $this->docType->id,
+            'owner_id' => $this->author->id,
+            'visibility' => Document::VISIBILITY_UNIT_KERJA,
+        ]);
+
+        $version = $document->versions()->create([
+            'version_number' => 1,
+            'author_id' => $this->author->id,
+            'author_name' => $this->author->name,
+            'status' => 'draft',
+            'content' => '<p>Draft awal dokumen</p>',
+        ]);
+
+        // 1. Staff completes editing and submits for approval
+        $response = $this->actingAs($this->author)->post(route('documents.finish-editing', $document));
+        $response->assertRedirect();
+
+        // 2. Version status is updated to pending
+        $version->refresh();
+        $this->assertEquals('pending', $version->status);
+
+        // 3. Head user can view and approve the document
+        $this->assertTrue($this->signerHead->can('view', $document));
+        $this->assertTrue($this->signerHead->can('approve', $document));
+
+        // 4. Head user has pending version count = 1
+        $this->assertEquals(1, $this->signerHead->pendingVersionApprovalsCount());
+
+        // 5. Head user receives DocumentApprovalRequested notification
+        $notif = $this->signerHead->notifications()->latest()->first();
+        $this->assertNotNull($notif);
+        $this->assertEquals(DocumentApprovalRequested::class, $notif->type);
+
+        // 6. Notification API endpoint returns the notification for Head user
+        $notifResponse = $this->actingAs($this->signerHead)->getJson(route('notifications.index'));
+        $notifResponse->assertOk();
+        $notifResponse->assertJsonPath('unread_count', 1);
+        $this->assertCount(1, $notifResponse->json('notifications'));
+        $this->assertEquals('approval_request', $notifResponse->json('notifications.0.type'));
+        $this->assertEquals($document->id, $notifResponse->json('notifications.0.document_id'));
+
+        // 7. Head user sees document in /approvals/versions
+        $approvalsResponse = $this->actingAs($this->signerHead)->get(route('approvals.versions'));
+        $approvalsResponse->assertOk();
+        $approvalsResponse->assertSee($document->title);
+    }
 }
+

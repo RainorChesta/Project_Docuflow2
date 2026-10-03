@@ -1,10 +1,7 @@
 <?php
 
-use App\Console\Commands\DeleteExpiredVersions;
-use Illuminate\Support\Facades\Schedule;
-use Illuminate\Foundation\Inspiring;
-
 use App\Console\Commands\CheckDocumentExpiration;
+use App\Console\Commands\DeleteExpiredVersions;
 use App\Console\Commands\PruneTrashedDocuments;
 
 Schedule::command(DeleteExpiredVersions::class)->daily();

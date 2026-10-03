@@ -308,7 +308,7 @@
                 {{-- Section Header Banner --}}
                 @if($isSpecificDateFilter)
                     {{-- Specific Date / Range Filter Banner --}}
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-primary/15 via-secondary/10 to-transparent border-l-4 border-primary rounded-r-2xl p-3.5 sm:p-5 shadow-xs">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-base-200/60 border-l-4 border-primary rounded-r-2xl p-3.5 sm:p-5 shadow-xs">
                         <div class="flex items-start sm:items-center gap-3 min-w-0">
                             <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-primary text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5 sm:mt-0">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

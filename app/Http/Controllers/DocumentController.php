@@ -771,10 +771,14 @@ class DocumentController extends Controller
         $document->load('currentVersion', 'versions', 'corporateSoftFile');
         $currentUser = auth()->user();
 
-        // If the latest version was rejected and no active pending/draft version exists, prepare a new revision version with reverted placeholders
+        // If the latest version was rejected, prepare a new revision version with reverted placeholders
         $latestVersion = $document->versions()->orderBy('version_number', 'desc')->first();
         if ($latestVersion && $latestVersion->status === 'rejected') {
             $version = $this->versionService->prepareRevisionFromRejected($document, $currentUser);
+        } elseif ($latestVersion && $latestVersion->status === 'draft') {
+            $version = $latestVersion;
+        } elseif ($document->isReleased()) {
+            $version = $this->versionService->prepareRevisionFromActive($document, $currentUser);
         } else {
             $version = $document->displayVersion();
         }
@@ -1213,7 +1217,13 @@ class DocumentController extends Controller
         $this->authorize('update', $document);
 
         $user = auth()->user();
-        $version = $document->displayVersion();
+        $latestWorkingVersion = $document->versions()
+            ->whereIn('status', ['draft', 'pending'])
+            ->whereNull('discarded_at')
+            ->orderBy('version_number', 'desc')
+            ->first();
+
+        $version = $latestWorkingVersion ?? $document->displayVersion();
 
         $this->onlyOfficeService->rotateDocumentKey($document, $version);
 
@@ -1308,6 +1318,39 @@ class DocumentController extends Controller
         return redirect()->route('documents.show', $document)->with('success', __('Versi baru diunggah. Menunggu persetujuan.'));
     }
 
+    public function uploadAndEdit(Request $request, Document $document): RedirectResponse
+    {
+        if ($document->isLockedForEditing()) {
+            return redirect()->route('documents.show', $document)
+                ->with('error', __('Dokumen sedang dalam alur persetujuan dan terkunci dari pengeditan.'));
+        }
+
+        $this->authorize('edit', $document);
+
+        $validated = $request->validate([
+            'file' => 'required|file|mimes:docx|max:10240',
+        ], [
+            'file.required' => __('Silakan pilih berkas DOCX untuk diunggah.'),
+            'file.mimes' => __('Format berkas harus berupa dokumen Word (.docx) agar dapat diedit di editor.'),
+            'file.max' => __('Ukuran berkas maksimal 10MB.'),
+        ]);
+
+        $user = auth()->user();
+        $version = $this->versionService->saveWorkingFile($document, $request->file('file'), $user);
+
+        // Invalidate ONLYOFFICE key so the editor gets fresh file
+        $oldKey = $this->onlyOfficeService->generateDocumentKey($document, $version);
+        Cache::put('ignore_onlyoffice_key_' . $oldKey, true, now()->addSeconds(30));
+        $this->onlyOfficeService->rotateDocumentKey($document, $version);
+
+        $this->auditService->log($user, 'version.uploaded_for_edit', 'document_version', $version->id, [
+            'document_id' => $document->id,
+            'version_number' => $version->version_number,
+        ]);
+
+        return redirect()->route('documents.edit', $document)->with('success', __('Berkas baru berhasil diunggah. Silakan lakukan penyesuaian di editor.'));
+    }
+
     public function download(Request $request, Document $document)
     {
         $this->authorize('view', $document);
@@ -1325,7 +1368,7 @@ class DocumentController extends Controller
         $fileBytes = $disk->get($version->file_path);
 
         $downloadName = $version->file_original_name ?? $document->title;
-        $ext = strtolower(pathinfo($downloadName, PATHINFO_EXTENSION) ?: 'docx');
+        $ext = strtolower(pathinfo($downloadName, PATHINFO_EXTENSION) ?: (pathinfo($version->file_path, PATHINFO_EXTENSION) ?: 'docx'));
         $baseName = pathinfo($downloadName, PATHINFO_FILENAME);
 
         if (!$withKop && $ext === 'docx') {
@@ -1334,7 +1377,7 @@ class DocumentController extends Controller
             $downloadName = $baseName . ' (Tanpa Kop).' . $ext;
         } else {
             if (!str_ends_with(strtolower($downloadName), '.docx') && !str_ends_with(strtolower($downloadName), '.pdf')) {
-                $downloadName .= '.docx';
+                $downloadName .= '.' . $ext;
             }
         }
 
@@ -1352,10 +1395,16 @@ class DocumentController extends Controller
         abort_unless($version->document_id === $document->id, 404);
         abort_unless($version->file_path, 404);
 
+        $docTitle = trim($document->title ?? '');
+        $ext = pathinfo($version->file_path, PATHINFO_EXTENSION) ?: 'docx';
+        $effectiveName = $docTitle !== ''
+            ? (str_ends_with(strtolower($docTitle), '.' . strtolower($ext)) ? $docTitle : $docTitle . '.' . $ext)
+            : ($version->file_original_name ?? ($document->title . '.' . $ext));
+
         return Storage::disk(config('onlyoffice.storage_disk', 'local'))->response(
             $version->file_path,
-            $version->file_original_name ?? ($document->title . '.docx'),
-            ['Content-Disposition' => 'inline; filename="' . ($version->file_original_name ?? ($document->title . '.docx')) . '"']
+            $effectiveName,
+            ['Content-Disposition' => 'inline; filename="' . $effectiveName . '"']
         );
     }
 

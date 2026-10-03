@@ -25,29 +25,6 @@
         @stack('after-styles')
     </head>
     <body class="h-full overflow-hidden font-sans antialiased bg-base-200 text-base-content print:bg-white print:h-auto print:overflow-visible relative">
-        
-        <style>
-            @keyframes blob {
-                0% { transform: translate(0px, 0px) scale(1); }
-                33% { transform: translate(30px, -50px) scale(1.1); }
-                66% { transform: translate(-20px, 20px) scale(0.9); }
-                100% { transform: translate(0px, 0px) scale(1); }
-            }
-            .animate-blob {
-                animation: blob 15s infinite alternate ease-in-out;
-            }
-            .animation-delay-2000 { animation-delay: 2s; }
-            .animation-delay-4000 { animation-delay: 4s; }
-        </style>
-
-        <!-- Ambient Background Blobs for Glassmorphism Refraction -->
-        <!-- Heavily dimmed and using a safe, harmonious cool palette (blue/purple) so it doesn't distract from main content -->
-        <div class="absolute inset-0 overflow-hidden pointer-events-none z-0 opacity-50 dark:opacity-30 [contain:paint]">
-            <div class="absolute top-[-10%] left-[-5%] w-[40vw] h-[40vw] max-w-[600px] max-h-[600px] bg-blue-500/20 rounded-full blur-[120px] animate-blob transform-gpu will-change-transform"></div>
-            <div class="absolute top-[20%] right-[-10%] w-[35vw] h-[35vw] max-w-[500px] max-h-[500px] bg-indigo-500/20 rounded-full blur-[120px] animate-blob animation-delay-2000 transform-gpu will-change-transform"></div>
-            <div class="absolute bottom-[-10%] left-[20%] w-[45vw] h-[45vw] max-w-[700px] max-h-[700px] bg-purple-500/20 rounded-full blur-[140px] animate-blob animation-delay-4000 transform-gpu will-change-transform"></div>
-        </div>
-
         <div class="flex h-full w-full overflow-hidden relative z-10 print:block print:h-auto print:overflow-visible"
              x-data="{
                  open: localStorage.getItem('dokuflow:sidebar') === 'closed' ? false : window.innerWidth >= 1024,

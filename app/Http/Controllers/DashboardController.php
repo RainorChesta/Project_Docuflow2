@@ -94,7 +94,7 @@ class DashboardController extends Controller
 
             // Stats Counts
             $totalDocsCount = (clone $scopedDocQuery)->count();
-            $activeDocsCount = (clone $scopedDocQuery)->where('is_expired', false)
+            $activeDocsCount = (clone $scopedDocQuery)
                 ->whereHas('currentVersion', fn($q) => $q->where('status', 'active'))
                 ->count();
             $pendingDocsCount = (clone $scopedDocQuery)->whereHas('versions', fn($q) => $q->where('status', 'pending'))->count();
@@ -102,7 +102,7 @@ class DashboardController extends Controller
                 $q->whereHas('versions', fn($v) => $v->where('status', 'draft'))
                   ->orWhereDoesntHave('versions');
             })->count();
-            $expiredDocsCount = (clone $scopedDocQuery)->where('is_expired', true)->count();
+            $expiredDocsCount = 0;
             
             $totalUsersCount = \App\Models\User::count();
             $totalUnitKerjaCount = UnitKerja::count();
@@ -212,29 +212,58 @@ class DashboardController extends Controller
                 ->take(6)
                 ->get();
 
-            // Expiring soon documents within 30 days
-            $retentionYears = (int) Setting::get('document_retention_years', config('app.document_retention_years', 2));
-            $now = now();
-            $in30Days = $now->copy()->addDays(30);
-
-            $expiringDocuments = (clone $scopedDocQuery)
-                ->with(['unitKerja', 'owner', 'documentType'])
-                ->where('is_expired', false)
-                ->whereHas('currentVersion', fn($q) => $q->where('status', 'active'))
-                ->where(function ($q) use ($now, $in30Days, $retentionYears) {
-                    $q->whereBetween('expiration_date', [$now->toDateString(), $in30Days->toDateString()])
-                      ->orWhere(function ($fallback) use ($now, $in30Days, $retentionYears) {
-                          $fallback->whereNull('expiration_date')
-                                   ->whereBetween('created_at', [
-                                       $now->copy()->subYears($retentionYears)->toDateTimeString(),
-                                       $in30Days->copy()->subYears($retentionYears)->toDateTimeString()
-                                   ]);
-                      });
+            // Expiration recaps for Director / Admin / PIC
+            $ownerDocQuery = Document::withoutTrashed()
+                ->where('owner_id', $user->id)
+                ->whereNotNull('expiration_date')
+                ->where(function ($q) {
+                    $q->whereNotNull('current_version_id')
+                      ->whereHas('currentVersion', fn($sub) => $sub->where('status', 'active'))
+                      ->orWhereHas('versions', fn($sub) => $sub->where('status', 'active'));
                 })
-                ->latest()
-                ->take(5)
+                ->with(['unitKerja', 'currentVersion'])
                 ->get();
+            $ownerExpiringDocs = $ownerDocQuery->filter(fn($d) => $d->isExpired() || $d->isExpiringSoon(30))->sortBy(fn($d) => $d->expiration_date);
 
+            $isPicUnitKerja = $user->isPicUnitKerja();
+            $picExpiringDocs = collect();
+            if ($isPicUnitKerja) {
+                $managedUnitIds = $user->managedUnitKerjaIds();
+                $picExpiringDocs = Document::withoutTrashed()
+                    ->whereIn('unit_kerja_id', $managedUnitIds)
+                    ->whereNotNull('expiration_date')
+                    ->where(function ($q) {
+                        $q->whereNotNull('current_version_id')
+                          ->whereHas('currentVersion', fn($sub) => $sub->where('status', 'active'))
+                          ->orWhereHas('versions', fn($sub) => $sub->where('status', 'active'));
+                    })
+                    ->with(['owner', 'unitKerja', 'currentVersion'])
+                    ->get()
+                    ->filter(fn($d) => $d->isExpired() || $d->isExpiringSoon(30))
+                    ->sortBy(fn($d) => $d->expiration_date);
+            }
+
+            $unitKerjaIds = $user->allUnitKerjaIds();
+            $sharedExpiringDocs = Document::withoutTrashed()
+                ->where('owner_id', '!=', $user->id)
+                ->whereNotNull('expiration_date')
+                ->where(function ($q) use ($user, $unitKerjaIds) {
+                    $q->whereHas('shares', fn($sq) => $sq->where('user_id', $user->id));
+                    if (!empty($unitKerjaIds)) {
+                        $q->orWhereHas('unitKerjaShares', fn($dq) => $dq->whereIn('unit_kerja_id', $unitKerjaIds));
+                    }
+                })
+                ->where(function ($q) {
+                    $q->whereNotNull('current_version_id')
+                      ->whereHas('currentVersion', fn($sub) => $sub->where('status', 'active'))
+                      ->orWhereHas('versions', fn($sub) => $sub->where('status', 'active'));
+                })
+                ->with(['owner', 'unitKerja', 'currentVersion'])
+                ->get()
+                ->filter(fn($d) => $d->isExpired() || $d->isExpiringSoon(30))
+                ->sortBy(fn($d) => $d->expiration_date);
+
+            $expiringDocuments = $picExpiringDocs->isNotEmpty() ? $picExpiringDocs : $ownerExpiringDocs;
             $unitKerjas = UnitKerja::orderBy('kode_unit_kerja')->get();
             $documentTypes = DocumentType::orderBy('name')->get();
 
@@ -257,6 +286,10 @@ class DashboardController extends Controller
                 'topUnitKerjas',
                 'recentDocuments',
                 'expiringDocuments',
+                'ownerExpiringDocs',
+                'sharedExpiringDocs',
+                'picExpiringDocs',
+                'isPicUnitKerja',
                 'unitKerjas',
                 'documentTypes'
             ));
@@ -288,26 +321,56 @@ class DashboardController extends Controller
 
         $recent = (clone $baseDocQuery)->with('unitKerja', 'currentVersion')->latest()->take(5)->get();
 
-        $retentionYears = (int) Setting::get('document_retention_years', config('app.document_retention_years', 2));
-        $now = now();
-        $in30Days = $now->copy()->addDays(30);
-
-        $expiringDocuments = (clone $baseDocQuery)
-            ->with('unitKerja')
-            ->where('is_expired', false)
-            ->whereHas('currentVersion', fn($q) => $q->where('status', 'active'))
-            ->where(function ($q) use ($now, $in30Days, $retentionYears) {
-                $q->whereBetween('expiration_date', [$now->toDateString(), $in30Days->toDateString()])
-                  ->orWhere(function ($fallback) use ($now, $in30Days, $retentionYears) {
-                      $fallback->whereNull('expiration_date')
-                               ->whereBetween('created_at', [
-                                   $now->copy()->subYears($retentionYears)->toDateTimeString(),
-                                   $in30Days->copy()->subYears($retentionYears)->toDateTimeString()
-                               ]);
-                  });
+        // Expiration recaps for Staff / General User
+        $ownerDocQuery = Document::withoutTrashed()
+            ->where('owner_id', $user->id)
+            ->whereNotNull('expiration_date')
+            ->where(function ($q) {
+                $q->whereNotNull('current_version_id')
+                  ->whereHas('currentVersion', fn($sub) => $sub->where('status', 'active'))
+                  ->orWhereHas('versions', fn($sub) => $sub->where('status', 'active'));
             })
+            ->with(['unitKerja', 'currentVersion'])
+            ->get();
+        $ownerExpiringDocs = $ownerDocQuery->filter(fn($d) => $d->isExpired() || $d->isExpiringSoon(30))->sortBy(fn($d) => $d->expiration_date);
+
+        $isPicUnitKerja = $user->isPicUnitKerja();
+        $picExpiringDocs = collect();
+        if ($isPicUnitKerja) {
+            $managedUnitIds = $user->managedUnitKerjaIds();
+            $picExpiringDocs = Document::withoutTrashed()
+                ->whereIn('unit_kerja_id', $managedUnitIds)
+                ->whereNotNull('expiration_date')
+                ->where(function ($q) {
+                    $q->whereNotNull('current_version_id')
+                      ->whereHas('currentVersion', fn($sub) => $sub->where('status', 'active'))
+                      ->orWhereHas('versions', fn($sub) => $sub->where('status', 'active'));
+                })
+                ->with(['owner', 'unitKerja', 'currentVersion'])
+                ->get()
+                ->filter(fn($d) => $d->isExpired() || $d->isExpiringSoon(30))
+                ->sortBy(fn($d) => $d->expiration_date);
+        }
+
+        $unitKerjaIds = $user->allUnitKerjaIds();
+        $sharedExpiringDocs = Document::withoutTrashed()
+            ->where('owner_id', '!=', $user->id)
+            ->whereNotNull('expiration_date')
+            ->where(function ($q) use ($user, $unitKerjaIds) {
+                $q->whereHas('shares', fn($sq) => $sq->where('user_id', $user->id));
+                if (!empty($unitKerjaIds)) {
+                    $q->orWhereHas('unitKerjaShares', fn($dq) => $dq->whereIn('unit_kerja_id', $unitKerjaIds));
+                }
+            })
+            ->where(function ($q) {
+                $q->whereNotNull('current_version_id')
+                  ->whereHas('currentVersion', fn($sub) => $sub->where('status', 'active'))
+                  ->orWhereHas('versions', fn($sub) => $sub->where('status', 'active'));
+            })
+            ->with(['owner', 'unitKerja', 'currentVersion'])
             ->get()
-            ->sortBy(fn($doc) => $doc->expires_at);
+            ->filter(fn($d) => $d->isExpired() || $d->isExpiringSoon(30))
+            ->sortBy(fn($d) => $d->expiration_date);
 
         $documentTypes = DocumentType::orderBy('name')->get();
 
@@ -315,10 +378,13 @@ class DashboardController extends Controller
             'results',
             'recent',
             'documentTypes',
-            'expiringDocuments',
             'totalDocsCount',
             'activeDocsCount',
-            'pendingDocsCount'
+            'pendingDocsCount',
+            'ownerExpiringDocs',
+            'sharedExpiringDocs',
+            'picExpiringDocs',
+            'isPicUnitKerja'
         ));
     }
 }

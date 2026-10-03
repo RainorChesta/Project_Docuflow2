@@ -22,20 +22,6 @@
             font-family: 'Plus Jakarta Sans', sans-serif; 
         }
         
-        /* Minimalist Grid Pattern */
-        .bg-grid-pattern {
-            background-image: linear-gradient(to right, rgba(0,0,0,0.1) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.1) 1px, transparent 1px);
-            background-size: 32px 32px;
-        }
-        @media (min-width: 640px) {
-            .bg-grid-pattern {
-                background-size: 40px 40px;
-            }
-        }
-        [data-theme='dark'] .bg-grid-pattern {
-            background-image: linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px);
-        }
-        
         /* Typing Animation - Fluid and Adaptive on all screen sizes */
         .typing-text {
             display: inline;
@@ -55,7 +41,7 @@
 
     <!-- Nav -->
     @if (Route::has('login'))
-    <nav class="sticky top-0 z-50 w-full border-b border-base-200 bg-base-100/80 backdrop-blur-md">
+    <nav class="sticky top-0 z-50 w-full border-b border-base-200 bg-base-100">
         <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16 items-center gap-1.5 sm:gap-4">
                 <div class="flex items-center gap-2 shrink-0">
@@ -84,9 +70,7 @@
     @endif
 
     <!-- Hero Section -->
-    <main class="flex-1 relative flex flex-col items-center justify-center py-8 sm:py-16 md:py-20 lg:py-24 px-4 sm:px-6 lg:px-8 overflow-hidden bg-grid-pattern">
-        <!-- Radial gradient to highlight the center and fade the grid -->
-        <div class="absolute inset-0 bg-base-100 [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black_70%)] pointer-events-none"></div>
+    <main class="flex-1 relative flex flex-col items-center justify-center py-8 sm:py-16 md:py-20 lg:py-24 px-4 sm:px-6 lg:px-8 overflow-hidden bg-base-100">
         
         <div class="relative z-10 w-full max-w-4xl mx-auto text-center flex flex-col items-center">
             
@@ -97,7 +81,7 @@
             
             <h1 class="text-[23px] min-[390px]:text-[26px] min-[520px]:text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight sm:tracking-tighter leading-[1.2] sm:leading-[1.1] mb-4 sm:mb-6 w-full text-center">
                 <span class="block text-center">{{ __('Control your documents.') }}</span>
-                <span class="block text-base-content/60 transition-all duration-300 hover:text-transparent hover:bg-clip-text hover:bg-gradient-to-r hover:from-primary hover:to-secondary cursor-default mt-1 sm:mt-2 text-center">
+                <span class="block text-base-content/60 transition-all duration-300 hover:text-primary cursor-default mt-1 sm:mt-2 text-center">
                     <span class="typing-text inline text-center" id="typewriter-text"></span>
                 </span>
             </h1>

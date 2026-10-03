@@ -354,6 +354,8 @@
                                                     {{ __('Nama Perusahaan') }}
                                                 @elseif($selectedCompanyId && !$selectedBranchId)
                                                     {{ __('Nama Cabang') }}
+                                                @elseif($selectedDocTypeId)
+                                                    {{ __('Nama Unit Kerja') }}
                                                 @else
                                                     {{ __('Tipe Dokumen') }}
                                                 @endif

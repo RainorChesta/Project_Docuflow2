@@ -60,20 +60,6 @@ class AuthenticatedSessionController extends Controller
             $baseDocQuery->whereIn('company_id', $userCompanyIds);
         }
 
-        $expiringCount = $baseDocQuery
-            ->where('is_expired', false)
-            ->whereHas('currentVersion', fn($q) => $q->where('status', 'active'))
-            ->get()
-            ->filter(function ($doc) {
-                if (!$doc->expires_at) return false;
-                $days = now()->startOfDay()->diffInDays($doc->expires_at->startOfDay(), false);
-                return $days >= 0 && $days <= 3;
-            })->count();
-
-        if ($expiringCount > 0) {
-            $request->session()->flash('urgent_expiring_count', $expiringCount);
-        }
-
         return redirect()->intended(route('dashboard', absolute: false));
     }
 

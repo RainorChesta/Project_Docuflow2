@@ -313,8 +313,7 @@
                                         @if($hasOriginal)
                                             <div class="mt-4 flex flex-col sm:flex-row items-center sm:items-start gap-4">
                                                 {{-- Checkerboard transparent preview frame --}}
-                                                <div class="w-32 h-32 shrink-0 rounded-xl border border-base-300 p-2 relative flex items-center justify-center shadow-inner overflow-hidden"
-                                                     style="background-image: repeating-conic-gradient(#f3f4f6 0% 25%, #ffffff 0% 50%); background-size: 16px 16px;">
+                                                <div class="w-32 h-32 shrink-0 rounded-xl border border-base-300 bg-base-200 p-2 relative flex items-center justify-center shadow-inner overflow-hidden">
                                                     <img src="{{ $userOriginalSig->url }}" alt="Original Signature" class="max-w-full max-h-full object-contain drop-shadow-xs" />
                                                 </div>
 
@@ -406,8 +405,7 @@
                                                     <div class="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-base-200 bg-base-200/30 hover:bg-base-200/60 transition-colors">
                                                         <div class="flex items-center gap-3 min-w-0">
                                                             {{-- Checkerboard transparent preview frame --}}
-                                                            <div class="w-16 h-16 shrink-0 rounded-lg border border-base-300 p-1.5 flex items-center justify-center shadow-inner overflow-hidden"
-                                                                 style="background-image: repeating-conic-gradient(#f3f4f6 0% 25%, #ffffff 0% 50%); background-size: 12px 12px;">
+                                                            <div class="w-16 h-16 shrink-0 rounded-lg border border-base-300 bg-base-200 p-1.5 flex items-center justify-center shadow-inner overflow-hidden">
                                                                 <img src="{{ $stamp->url }}" alt="Company Stamp" class="max-w-full max-h-full object-contain drop-shadow-xs" />
                                                             </div>
 
@@ -581,8 +579,7 @@
                     {{-- Current Preview --}}
                     <div class="form-control">
                         <label class="label"><span class="label-text text-xs font-semibold">{{ __('Gambar Saat Ini:') }}</span></label>
-                        <div class="w-24 h-24 rounded-xl border border-base-300 p-2 flex items-center justify-center shadow-inner overflow-hidden mx-auto"
-                             style="background-image: repeating-conic-gradient(#f3f4f6 0% 25%, #ffffff 0% 50%); background-size: 12px 12px;">
+                        <div class="w-24 h-24 rounded-xl border border-base-300 bg-base-200 p-2 flex items-center justify-center shadow-inner overflow-hidden mx-auto">
                             <img :src="editCurrentUrl" alt="Current Signature" class="max-w-full max-h-full object-contain drop-shadow-xs" />
                         </div>
                     </div>

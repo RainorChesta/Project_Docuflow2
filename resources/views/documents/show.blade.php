@@ -98,6 +98,54 @@
                     <span>{{ session('error') }}</span>
                 </div>
             @endif
+            {{-- Document Expiration Warning / Expired Banner (Khusus Owner & Admin) --}}
+            @if($document->hasExpiration())
+                @php
+                    $isOwnerOrAdmin = auth()->id() === $document->owner_id || auth()->user()->isAdmin() || auth()->user()->isDirector();
+                    $daysRemaining = $document->daysUntilExpiration();
+                @endphp
+                @if($isOwnerOrAdmin)
+                    @if($document->isExpired())
+                        <div class="alert alert-error mb-3 sm:mb-4 rounded-2xl shadow-xs print:hidden text-white">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+                                <div class="flex items-start sm:items-center gap-3 min-w-0">
+                                    <div class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                                        <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <p class="font-bold text-sm">{{ __('Dokumen Telah Kadaluwarsa') }}</p>
+                                        <p class="text-xs opacity-90">
+                                            {{ __('Masa berlaku dokumen ini berakhir pada :date. Harap segera lakukan revisi jika diperlukan.', ['date' => $document->expiration_date->translatedFormat('d F Y')]) }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    @elseif($document->isExpiringSoon(30))
+                        <div class="alert alert-warning mb-3 sm:mb-4 rounded-2xl shadow-xs print:hidden">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+                                <div class="flex items-start sm:items-center gap-3 min-w-0">
+                                    <div class="w-9 h-9 rounded-xl bg-warning/20 text-warning flex items-center justify-center shrink-0">
+                                        <svg class="w-5 h-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <p class="font-bold text-sm text-base-content">
+                                            {{ __('Masa Berlaku Dokumen Segera Berakhir') }} ({{ $daysRemaining <= 1 ? __('Besok / Hari ini') : __(':days hari lagi', ['days' => $daysRemaining]) }})
+                                        </p>
+                                        <p class="text-xs text-base-content/70">
+                                            {{ __('Masa berlaku dokumen ini akan berakhir pada :date. Harap lakukan peninjauan atau buat versi revisi baru.', ['date' => $document->expiration_date->translatedFormat('d F Y')]) }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+                @endif
+            @endif
 
             <!-- Pending Rollback Approval Banner -->
             @if($document->hasPendingRollback())
@@ -999,18 +1047,20 @@
                                 @endif
                             </p>
                         </div>
-                        <div>
-                            <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Kedaluwarsa') }}</span>
-                            <p class="font-medium mt-0.5">
-                                @if($document->expires_at)
-                                    <span class="{{ $document->is_expired ? 'text-error font-semibold' : '' }}">
-                                        {{ $document->expires_at->format('d M Y') }}
-                                    </span>
-                                @else
-                                    —
-                                @endif
-                            </p>
-                        </div>
+                        @if($document->hasExpiration())
+                            <div>
+                                <span class="text-xs uppercase tracking-wide text-base-content/50">{{ __('Masa Berlaku') }}</span>
+                                <p class="font-medium mt-0.5 text-xs flex items-center gap-1.5 flex-wrap">
+                                    <span>{{ $document->expiration_date->translatedFormat('d M Y') }}</span>
+                                    @if($document->isExpired())
+                                        <span class="badge badge-error badge-xs text-white">{{ __('Kadaluwarsa') }}</span>
+                                    @elseif($document->isExpiringSoon(30))
+                                        <span class="badge badge-warning badge-xs text-white">{{ __(':days hari lagi', ['days' => $document->daysUntilExpiration()]) }}</span>
+                                    @endif
+                                </p>
+                            </div>
+                        @endif
+
                     </div>
 
                     {{-- Actions Bar --}}
@@ -1035,13 +1085,13 @@
                                             <span id="text-edit-document" class="hidden sm:inline">{{ __('Menyimpan...') }}</span>
                                         </a>
                                     @else
-                                        <a href="{{ route('documents.edit', $document) }}" id="btn-edit-document" class="btn btn-primary btn-sm gap-1.5 shrink-0" title="{{ __('Edit Dokumen') }}">
+                                        <button type="button" onclick="openModal('edit-choice-modal-{{ $document->id }}')" id="btn-edit-document" class="btn btn-primary btn-sm gap-1.5 shrink-0" title="{{ __('Edit Dokumen') }}">
                                             <span id="spinner-edit-document" class="loading loading-spinner loading-xs hidden"></span>
                                             <svg id="icon-edit-document" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                             </svg>
                                             <span id="text-edit-document" class="hidden sm:inline">{{ __('Edit Dokumen') }}</span>
-                                        </a>
+                                        </button>
                                     @endif
                                 @endcan
                             @endif
@@ -1596,7 +1646,7 @@
             inset: 0;
             width: 40%;
             border-radius: 9999px;
-            background: linear-gradient(90deg, transparent, var(--fallback-p, oklch(0.546 0.245 262.881)), transparent);
+            background: var(--color-primary);
             animation: summary-shimmer 1.2s ease-in-out infinite;
         }
         @keyframes summary-shimmer {
@@ -2521,7 +2571,153 @@
         <form method="dialog" class="modal-backdrop">
             <button>close</button>
         </form>
-    </dialog>
+    {{-- Modal Pilihan Edit / Unggah Dokumen --}}
+    @can('edit', $document)
+        <dialog id="edit-choice-modal-{{ $document->id }}" class="modal modal-bottom sm:modal-middle text-left whitespace-normal backdrop-blur-xs text-base-content">
+            <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-2xl text-base-content">
+                {{-- Header --}}
+                <div class="p-6 pb-4 border-b border-base-200">
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="flex items-center gap-3.5">
+                            <div class="w-11 h-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0 ring-4 ring-primary/5 shadow-xs">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-lg text-base-content leading-snug">
+                                    {{ __('Edit & Perbarui Dokumen') }}
+                                </h3>
+                                <p class="text-xs text-base-content/60 mt-0.5">
+                                    {{ __('Pilih metode untuk melanjutkan pengeditan atau memperbarui isi dokumen.') }}
+                                </p>
+                            </div>
+                        </div>
+                        <button type="button" onclick="document.getElementById('edit-choice-modal-{{ $document->id }}').close()" class="btn btn-ghost btn-sm btn-circle text-base-content/50 hover:text-base-content hover:bg-base-200">
+                            ✕
+                        </button>
+                    </div>
+
+                    {{-- Target Info Box --}}
+                    <div class="mt-4 p-3 rounded-xl bg-base-200/50 border border-base-300/60 flex items-center justify-between gap-3 text-xs">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span class="font-semibold text-base-content truncate">{{ $document->title }}</span>
+                            <span class="badge badge-neutral badge-xs font-mono shrink-0">{{ $document->document_number }}</span>
+                        </div>
+                        <span class="text-success text-[11px] font-medium shrink-0 flex items-center gap-1">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                            {{ __('Nomor dokumen tetap sama') }}
+                        </span>
+                    </div>
+                </div>
+
+                {{-- Options Content with Alpine.js --}}
+                <div x-data="{ tab: 'edit_online', uploading: false }" class="p-6 space-y-5">
+                    {{-- Toggle buttons --}}
+                    <div class="grid grid-cols-2 gap-3 p-1 rounded-xl bg-base-200/70 border border-base-300/60">
+                        <button type="button" 
+                                @click="tab = 'edit_online'" 
+                                :class="tab === 'edit_online' ? 'bg-base-100 text-primary font-semibold shadow-xs' : 'text-base-content/70 hover:text-base-content'"
+                                class="flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs transition-all">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                            <span>{{ __('1. Edit Dokumen Saat Ini') }}</span>
+                        </button>
+                        <button type="button" 
+                                @click="tab = 'upload_new'" 
+                                :class="tab === 'upload_new' ? 'bg-base-100 text-primary font-semibold shadow-xs' : 'text-base-content/70 hover:text-base-content'"
+                                class="flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs transition-all">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                            <span>{{ __('2. Unggah Berkas Baru') }}</span>
+                        </button>
+                    </div>
+
+                    {{-- Option 1: Edit Dokumen Online (Existing Content) --}}
+                    <div x-show="tab === 'edit_online'" class="space-y-4">
+                        <div class="p-4 rounded-2xl border border-primary/20 bg-primary/5 flex items-start gap-3.5">
+                            <div class="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                            </div>
+                            <div class="space-y-1">
+                                <h4 class="font-bold text-sm text-base-content">{{ __('Lanjutkan Pengeditan Dokumen') }}</h4>
+                                <p class="text-xs text-base-content/70 leading-relaxed">
+                                    {{ __('Membuka editor dokumen dengan konten terakhir yang sudah tersimpan. Seluruh format, tanda tangan, dan nomor dokumen') }} <strong class="font-mono text-primary">{{ $document->document_number }}</strong> {{ __('akan tetap terjaga.') }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-end gap-2 pt-2">
+                            <button type="button" onclick="document.getElementById('edit-choice-modal-{{ $document->id }}').close()" class="btn btn-ghost btn-sm rounded-xl">
+                                {{ __('Batal') }}
+                            </button>
+                            <a href="{{ route('documents.edit', $document) }}" class="btn btn-primary btn-sm rounded-xl px-5 gap-2 font-semibold shadow-xs hover:shadow-md">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                <span>{{ __('Buka di Editor') }}</span>
+                            </a>
+                        </div>
+                    </div>
+
+                    {{-- Option 2: Unggah Berkas Baru & Buka di Editor --}}
+                    <div x-show="tab === 'upload_new'" style="display: none;" class="space-y-4">
+                        <form method="POST" action="{{ route('documents.upload-edit', $document) }}" enctype="multipart/form-data" @submit="uploading = true">
+                            @csrf
+                            <div class="space-y-3">
+                                <div class="p-4 rounded-2xl border border-secondary/20 bg-secondary/5 flex items-start gap-3.5 mb-3">
+                                    <div class="w-10 h-10 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center shrink-0">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                        </svg>
+                                    </div>
+                                    <div class="space-y-1">
+                                        <h4 class="font-bold text-sm text-base-content">{{ __('Ganti Berkas Dokumen') }}</h4>
+                                        <p class="text-xs text-base-content/70 leading-relaxed">
+                                            {{ __('Unggah berkas Word (.docx) baru dari laptop/komputer Anda. Setelah diunggah, dokumen akan otomatis terbuka di editor untuk penyesuaian dengan nomor dokumen') }} <strong class="font-mono text-secondary">{{ $document->document_number }}</strong>.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div class="form-control w-full">
+                                    <label for="upload-edit-file-{{ $document->id }}" class="label py-1">
+                                        <span class="label-text font-semibold text-xs text-base-content uppercase tracking-wider">{{ __('Pilih Berkas Word (.docx)') }}</span>
+                                        <span class="label-text-alt text-[11px] text-base-content/50">{{ __('Maksimal 10MB') }}</span>
+                                    </label>
+                                    <input type="file" 
+                                           name="file" 
+                                           id="upload-edit-file-{{ $document->id }}" 
+                                           accept=".docx" 
+                                           required 
+                                           class="file-input file-input-bordered file-input-primary w-full rounded-xl text-sm" />
+                                </div>
+                            </div>
+
+                            <div class="flex items-center justify-end gap-2 pt-4 border-t border-base-200 mt-4">
+                                <button type="button" onclick="document.getElementById('edit-choice-modal-{{ $document->id }}').close()" class="btn btn-ghost btn-sm rounded-xl">
+                                    {{ __('Batal') }}
+                                </button>
+                                <button type="submit" :disabled="uploading" class="btn btn-secondary btn-sm text-white rounded-xl px-5 gap-2 font-semibold shadow-xs hover:shadow-md">
+                                    <span x-show="uploading" class="loading loading-spinner loading-xs"></span>
+                                    <svg x-show="!uploading" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                    </svg>
+                                    <span x-text="uploading ? '{{ __('Mengunggah...') }}' : '{{ __('Unggah & Buka Editor') }}'"></span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <form method="dialog" class="modal-backdrop">
+                <button>{{ __('Batal') }}</button>
+            </form>
+        </dialog>
+    @endcan
 
     {{-- Rename Document Modal --}}
     @can('rename', $document)

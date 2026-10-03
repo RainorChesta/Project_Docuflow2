@@ -74,7 +74,7 @@
                         @if($user->avatar_url)
                             <img src="{{ $user->avatar_url }}" alt="{{ $user->name }}" class="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-full object-cover border-2 border-base-300 shadow-sm ring-2 sm:ring-4 ring-base-100">
                         @else
-                            <div class="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-full bg-gradient-to-br from-primary/20 via-primary/10 to-base-200 text-primary flex items-center justify-center font-extrabold text-sm sm:text-lg md:text-2xl border-2 border-base-300 shadow-sm ring-2 sm:ring-4 ring-base-100">
+                            <div class="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-full bg-primary/10 text-primary flex items-center justify-center font-extrabold text-sm sm:text-lg md:text-2xl border-2 border-base-300 shadow-sm ring-2 sm:ring-4 ring-base-100">
                                 {{ strtoupper(substr($user->name, 0, 2)) }}
                             </div>
                         @endif

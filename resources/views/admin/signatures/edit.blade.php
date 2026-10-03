@@ -7,8 +7,7 @@
                 <div class="card-body space-y-4">
                     <div class="flex items-center gap-4">
                         <div class="avatar">
-                            <div class="w-20 h-20 rounded-xl bg-base-200 p-2 border border-base-300 shadow-inner flex items-center justify-center overflow-hidden"
-                                 style="background-image: repeating-conic-gradient(#f3f4f6 0% 25%, #ffffff 0% 50%); background-size: 12px 12px;">
+                            <div class="w-20 h-20 rounded-xl bg-base-200 p-2 border border-base-300 shadow-inner flex items-center justify-center overflow-hidden">
                                 <img src="{{ $signature->url }}" alt="Signature" class="object-contain max-w-full max-h-full drop-shadow-xs" />
                             </div>
                         </div>

@@ -46,6 +46,8 @@ class NotificationController extends Controller
                 'document_shared',
                 'document_access_revoked',
                 'document_added',
+                'approval_request',
+                'approval_route_resolved',
                 'signature_request',
                 'signature_request_approved',
                 'signature_request_rejected',

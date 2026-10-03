@@ -46,13 +46,7 @@
         }
 
         .dokuflow-aura {
-            position: absolute;
-            width: 108px;
-            height: 108px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(37, 99, 235, 0.3) 0%, rgba(16, 185, 129, 0.22) 55%, transparent 72%);
-            filter: blur(14px);
-            animation: dokuflow-pulse 2.4s ease-in-out infinite;
+            display: none;
         }
 
         .dokuflow-ring {
@@ -60,10 +54,9 @@
             width: 82px;
             height: 82px;
             border-radius: 50%;
-            padding: 3px;
-            background: conic-gradient(from 0deg, #2563eb, #10b981, #06b6d4, #2563eb);
-            animation: dokuflow-spin 1.8s linear infinite;
-            box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.25);
+            border: 3px solid #e2e8f0;
+            border-top-color: #0F6DB7;
+            animation: dokuflow-spin 1.2s linear infinite;
             display: flex;
             align-items: center;
             justify-content: center;

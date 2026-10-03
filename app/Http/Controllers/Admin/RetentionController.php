@@ -15,9 +15,8 @@ class RetentionController extends Controller
         $this->authorize('admin');
 
         $retentionDays = (int) Setting::get('version_retention_days', config('app.version_retention_days', 365));
-        $documentRetentionYears = (int) Setting::get('document_retention_years', config('app.document_retention_years', 2));
 
-        return view('admin.retention.edit', compact('retentionDays', 'documentRetentionYears'));
+        return view('admin.retention.edit', compact('retentionDays'));
     }
 
     public function update(Request $request): RedirectResponse
@@ -26,12 +25,11 @@ class RetentionController extends Controller
 
         $validated = $request->validate([
             'retention_days' => 'required|integer|min:1|max:3650',
-            'document_retention_years' => 'required|integer|min:1|max:100',
         ]);
 
-        Setting::set('version_retention_days', $validated['retention_days']);
-        Setting::set('document_retention_years', $validated['document_retention_years']);
+        $retentionDays = (int) $validated['retention_days'];
+        Setting::set('version_retention_days', $retentionDays);
 
-        return back()->with('success', __('Periode retensi berhasil disimpan.'));
+        return back()->with('success', __('Pengaturan retensi berkas versi non-aktif berhasil disimpan.'));
     }
 }

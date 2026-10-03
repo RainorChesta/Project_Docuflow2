@@ -51,24 +51,103 @@ class Document extends Model
                 $document->general_access = \App\Services\DocumentShareService::GENERAL_ACCESS_RESTRICTED;
             }
         });
+
+        static::saved(function (Document $document) {
+            if ($document->hasExpiration() && $document->isReleased()) {
+                $document->checkExpirationNotification();
+            }
+        });
     }
 
     /**
-     * Get the effective expiration date.
-     * Uses manual expiration_date if set, otherwise calculates from created_at + default_retention_years.
+     * Determine if this document has an explicitly configured expiration date.
      */
-    protected function expiresAt(): \Illuminate\Database\Eloquent\Casts\Attribute
+    public function hasExpiration(): bool
     {
-        return \Illuminate\Database\Eloquent\Casts\Attribute::make(
-            get: function () {
-                if ($this->expiration_date) {
-                    return $this->expiration_date;
-                }
-                
-                $retentionYears = (int) Setting::get('document_retention_years', config('app.document_retention_years', 2));
-                return $this->created_at ? $this->created_at->copy()->addYears($retentionYears) : null;
+        return !is_null($this->expiration_date);
+    }
+
+    /**
+     * Determine if this document is expired (only applicable if expiration_date is set and document is released).
+     */
+    public function isExpired(): bool
+    {
+        if (!$this->hasExpiration() || !$this->isReleased()) {
+            return false;
+        }
+
+        if ($this->is_expired) {
+            return true;
+        }
+
+        return now()->startOfDay()->greaterThan($this->expiration_date->startOfDay());
+    }
+
+    /**
+     * Determine if this document is expiring soon within the given days threshold.
+     */
+    public function isExpiringSoon(int $days = 30): bool
+    {
+        if (!$this->hasExpiration() || !$this->isReleased() || $this->isExpired()) {
+            return false;
+        }
+
+        $remainingDays = $this->daysUntilExpiration();
+
+        return $remainingDays !== null && $remainingDays >= 0 && $remainingDays <= $days;
+    }
+
+    /**
+     * Get remaining days until expiration (null if no expiration configured or not released).
+     */
+    public function daysUntilExpiration(): ?int
+    {
+        if (!$this->hasExpiration() || !$this->isReleased()) {
+            return null;
+        }
+
+        return (int) now()->startOfDay()->diffInDays($this->expiration_date->startOfDay(), false);
+    }
+
+    /**
+     * Check and immediately dispatch expiration notification to owner if within thresholds (H-7, H-1, Expired).
+     */
+    public function checkExpirationNotification(): void
+    {
+        if (!$this->hasExpiration() || !$this->isReleased()) {
+            return;
+        }
+
+        $days = $this->daysUntilExpiration();
+        if ($days === null) {
+            return;
+        }
+
+        $owner = $this->owner;
+        if (!$owner) {
+            return;
+        }
+
+        if ($days < 0) {
+            if (!$this->is_expired || $this->expiration_notif_status !== 'expired') {
+                $this->updateQuietly([
+                    'is_expired' => true,
+                    'is_expiration_notified' => true,
+                    'expiration_notif_status' => 'expired',
+                ]);
+                $owner->notify(new \App\Notifications\DocumentExpiredNotification($this));
             }
-        );
+        } elseif ($days <= 1) {
+            if ($this->expiration_notif_status !== '1day' && $this->expiration_notif_status !== 'expired') {
+                $this->updateQuietly(['expiration_notif_status' => '1day']);
+                $owner->notify(new \App\Notifications\DocumentExpiringWarningNotification($this, $days, '1day'));
+            }
+        } elseif ($days <= 7) {
+            if (!in_array($this->expiration_notif_status, ['7days', '1day', 'expired'])) {
+                $this->updateQuietly(['expiration_notif_status' => '7days']);
+                $owner->notify(new \App\Notifications\DocumentExpiringWarningNotification($this, $days, '7days'));
+            }
+        }
     }
 
     /**

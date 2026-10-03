@@ -2,61 +2,55 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Document;
+use App\Notifications\DocumentExpiredNotification;
+use App\Notifications\DocumentExpiringWarningNotification;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 
 #[Signature('app:check-document-expiration')]
-#[Description('Mark documents as expired if they pass their expiration date')]
+#[Description('Check documents with explicit expiration dates and notify document owners')]
 class CheckDocumentExpiration extends Command
 {
     /**
      * Execute the console command.
      */
-    public function handle()
+    public function handle(): int
     {
+        $this->info('Starting document expiration check...');
+
         $expiredCount = 0;
-        
-        \App\Models\User::chunk(50, function ($users) use (&$expiredCount) {
-            foreach ($users as $user) {
-                $docs = $user->documents()->where('is_expired', false)->get();
-                
-                $in30Days = 0;
-                $in7Days = 0;
-                
-                foreach ($docs as $document) {
-                    if (!$document->expires_at) continue;
+        $warning7Count = 0;
+        $warning1Count = 0;
+
+        // Query released documents that are not trashed and have an explicit expiration date
+        Document::withoutTrashed()
+            ->whereNotNull('expiration_date')
+            ->with(['owner', 'currentVersion', 'versions'])
+            ->chunk(50, function ($documents) use (&$expiredCount, &$warning7Count, &$warning1Count) {
+                foreach ($documents as $document) {
+                    $statusBefore = $document->expiration_notif_status;
+                    $document->checkExpirationNotification();
                     
-                    $days = now()->startOfDay()->diffInDays($document->expires_at->startOfDay(), false);
-                    
-                    if ($days < 0) {
-                        $document->update(['is_expired' => true]);
-                        $document->delete();
-                        $expiredCount++;
-                    } elseif ($days <= 1) {
-                        if ($document->expiration_notif_status !== 'urgent') {
-                            $user->notify(new \App\Notifications\UrgentDocumentExpiring($document, $days));
-                            $document->update(['expiration_notif_status' => 'urgent']);
-                        }
-                    } elseif ($days <= 7) {
-                        if ($document->expiration_notif_status !== '7days') {
-                            $user->notify(new \App\Notifications\WarningDocumentExpiring($document, $days));
-                            $document->update(['expiration_notif_status' => '7days']);
-                        }
-                    } elseif ($days <= 30) {
-                        if ($document->expiration_notif_status !== '30days') {
-                            $in30Days++;
-                            $document->update(['expiration_notif_status' => '30days']);
-                        }
+                    if ($document->expiration_notif_status !== $statusBefore) {
+                        if ($document->expiration_notif_status === 'expired') $expiredCount++;
+                        elseif ($document->expiration_notif_status === '1day') $warning1Count++;
+                        elseif ($document->expiration_notif_status === '7days') $warning7Count++;
                     }
                 }
-                
-                if ($in30Days > 0 || $in7Days > 0) {
-                    $user->notify(new \App\Notifications\GroupedDocumentExpiring($in30Days, $in7Days));
-                }
-            }
-        });
-        
-        $this->info("Processed expiration checks. Marked {$expiredCount} documents as expired.");
+            });
+
+        $this->info("Expiration check finished.");
+        $this->table(
+            ['Status', 'Jumlah Dokumen'],
+            [
+                ['Expired (Telah Kadaluwarsa)', $expiredCount],
+                ['Urgent Warning (H-1 / Hari-H)', $warning1Count],
+                ['Warning H-7', $warning7Count],
+            ]
+        );
+
+        return Command::SUCCESS;
     }
 }

@@ -395,15 +395,18 @@ class OnlyOfficeController extends Controller
                     'status' => $status,
                 ]);
 
-                // Trigger approval routing and notifications if the version is pending
+                // Trigger approval routing and notifications if the version is pending or was draft
                 // ONLY when status is 2 (final save on close / finish editing) - NOT on status 6 (intermediate save / forcesave while editing)
                 if ($status === 2) {
+                    if ($version->status === 'draft') {
+                        $version->update(['status' => 'pending']);
+                    }
                     if ($version->status === 'pending') {
                         \Illuminate\Support\Facades\Cache::forget('onlyoffice_pending_notif_' . $document->id);
                         $this->approvalRoutingService->compileWorkflowFromSignatures($document, $version, $author);
                     }
-                } elseif ($status === 6 && $version->status === 'pending') {
-                    // Mark that pending version was saved/modified in this session and will need notification when edit finishes
+                } elseif ($status === 6 && in_array($version->status, ['draft', 'pending'], true)) {
+                    // Mark that version was saved/modified in this session and will need notification when edit finishes
                     \Illuminate\Support\Facades\Cache::put('onlyoffice_pending_notif_' . $document->id, [
                         'version_id' => $version->id,
                         'author_id' => $author->id,
@@ -424,8 +427,13 @@ class OnlyOfficeController extends Controller
             if ($pendingNotif) {
                 $version = \App\Models\DocumentVersion::find($pendingNotif['version_id']);
                 $author = \App\Models\User::find($pendingNotif['author_id']) ?? $document->owner;
-                if ($version && $version->status === 'pending') {
-                    $this->approvalRoutingService->compileWorkflowFromSignatures($document, $version, $author);
+                if ($version) {
+                    if ($version->status === 'draft') {
+                        $version->update(['status' => 'pending']);
+                    }
+                    if ($version->status === 'pending') {
+                        $this->approvalRoutingService->compileWorkflowFromSignatures($document, $version, $author);
+                    }
                 }
             }
 

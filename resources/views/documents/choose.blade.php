@@ -72,7 +72,7 @@
                     @if(isset($frequentTemplates) && $frequentTemplates->isNotEmpty())
                         @foreach($frequentTemplates as $tmpl)
                         <div class="group w-36 h-48 flex flex-col rounded-xl border-2 border-base-300 bg-base-100 hover:border-primary hover:bg-primary/5 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md overflow-hidden relative">
-                            <div @click="window.location.href = '{{ route('documents.create') }}?template_id={{ $tmpl->id }}'" class="flex-1 bg-gradient-to-br from-base-200/70 to-base-300/30 p-2.5 flex items-center justify-center relative overflow-hidden">
+                            <div @click="window.location.href = '{{ route('documents.create') }}?template_id={{ $tmpl->id }}'" class="flex-1 bg-base-200/50 p-2.5 flex items-center justify-center relative overflow-hidden">
                                 <div class="absolute top-2 left-2 bg-primary/15 text-primary text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide z-10 backdrop-blur-sm">
                                     {{ __('Top') }}
                                 </div>
@@ -156,7 +156,7 @@
                             <template x-for="tmpl in items.slice(0, 10)" :key="tmpl.id">
                                 <div class="group flex-none w-40 h-48 flex flex-col rounded-xl border-2 border-base-300 bg-base-100 hover:border-primary hover:bg-primary/5 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md overflow-hidden snap-start relative">
                                     {{-- Preview thumbnail area --}}
-                                    <div @click="window.location.href = '{{ route('documents.create') }}?template_id=' + tmpl.id" class="flex-1 bg-gradient-to-br from-base-200/70 to-base-300/30 p-2.5 flex items-center justify-center relative overflow-hidden">
+                                    <div @click="window.location.href = '{{ route('documents.create') }}?template_id=' + tmpl.id" class="flex-1 bg-base-200/50 p-2.5 flex items-center justify-center relative overflow-hidden">
                                         {{-- Stylized Mini Paper Document --}}
                                         <div class="w-22 h-26 bg-base-100 rounded-lg shadow-xs border border-base-300/70 p-2 flex flex-col justify-between group-hover:shadow-sm group-hover:scale-105 transition-all duration-200">
                                             <div>
@@ -251,7 +251,7 @@
                     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 max-h-[60vh] overflow-y-auto p-1">
                         <template x-for="tmpl in selectedModalItems" :key="tmpl.id">
                             <div class="group flex flex-col h-48 rounded-xl border-2 border-base-300 bg-base-100 hover:border-primary hover:bg-primary/5 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md overflow-hidden relative">
-                                <div @click="window.location.href = '{{ route('documents.create') }}?template_id=' + tmpl.id" class="flex-1 bg-gradient-to-br from-base-200/70 to-base-300/30 p-2.5 flex items-center justify-center relative overflow-hidden">
+                                <div @click="window.location.href = '{{ route('documents.create') }}?template_id=' + tmpl.id" class="flex-1 bg-base-200/50 p-2.5 flex items-center justify-center relative overflow-hidden">
                                     {{-- Stylized Mini Paper Document --}}
                                     <div class="w-22 h-26 bg-base-100 rounded-lg shadow-xs border border-base-300/70 p-2 flex flex-col justify-between group-hover:shadow-sm group-hover:scale-105 transition-all duration-200">
                                         <div>

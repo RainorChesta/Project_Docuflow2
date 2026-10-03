@@ -876,8 +876,7 @@
     <dialog id="loading-modal" class="modal">
         <div class="modal-box flex flex-col items-center justify-center p-8 sm:p-10 max-w-sm rounded-3xl border border-base-300 shadow-2xl relative overflow-hidden bg-base-100/95 backdrop-blur-md">
             <div class="relative w-16 h-16 flex items-center justify-center mb-4">
-                <div class="absolute -inset-2 bg-gradient-to-tr from-primary/30 to-accent/30 rounded-full blur-xl animate-pulse"></div>
-                <div class="relative w-14 h-14 rounded-full p-[2.5px] bg-gradient-to-tr from-primary via-accent to-primary animate-spin flex items-center justify-center shadow-md shadow-primary/20" style="animation-duration: 1.8s;">
+                <div class="relative w-14 h-14 rounded-full border-3 border-base-300 border-t-primary animate-spin flex items-center justify-center shadow-md" style="animation-duration: 1.2s;">
                     <div class="w-full h-full bg-base-100 rounded-full"></div>
                 </div>
                 <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
