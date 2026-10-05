@@ -404,8 +404,9 @@
                                 <span id="expiration_info_text"></span>
                             </div>
 
-                            <p class="text-xs text-base-content/50 mt-2">
-                                {{ __('Jika dikosongkan, dokumen akan otomatis kedaluwarsa sesuai masa retensi default yang diatur admin.') }}
+                            <p class="text-xs text-base-content/60 mt-2 flex items-center gap-1.5">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                <span>{{ __('Jika dikosongkan, dokumen bersifat permanen (berlaku selamanya tanpa tanggal kedaluwarsa dan tanpa notifikasi kedaluwarsa).') }}</span>
                             </p>
                             @error('expiration_date') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                         </div>

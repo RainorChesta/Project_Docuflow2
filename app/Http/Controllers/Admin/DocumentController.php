@@ -9,6 +9,7 @@ use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\UnitKerja;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -200,6 +201,24 @@ class DocumentController extends Controller
             }
         }
 
+        $newExpDate = $validated['expiration_date'] ?? null;
+        $isExpired = false;
+        $isExpNotified = $document->is_expiration_notified;
+        $expNotifStatus = $document->expiration_notif_status;
+
+        if (!empty($newExpDate)) {
+            $isExpired = Carbon::parse($newExpDate)->startOfDay()->lt(now()->startOfDay());
+            if ($isExpired) {
+                $isExpNotified = true;
+                $expNotifStatus = 'expired';
+            }
+        } else {
+            $newExpDate = null;
+            $isExpired = false;
+            $isExpNotified = false;
+            $expNotifStatus = null;
+        }
+
         // Direct update on document
         $document->update([
             'title' => $validated['title'],
@@ -210,7 +229,10 @@ class DocumentController extends Controller
             'branch_id' => $validated['branch_id'] ?? null,
             'unit_kerja_id' => $validated['unit_kerja_id'] ?? null,
             'visibility' => $validated['visibility'],
-            'expiration_date' => $validated['expiration_date'] ?? null,
+            'expiration_date' => $newExpDate,
+            'is_expired' => $isExpired,
+            'is_expiration_notified' => $isExpNotified,
+            'expiration_notif_status' => $expNotifStatus,
             'paper_size' => $validated['paper_size'] ?? 'A4',
             // Clear pending rename request if any, because admin updated it directly
             'pending_title' => null,

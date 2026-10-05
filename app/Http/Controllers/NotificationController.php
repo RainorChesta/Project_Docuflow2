@@ -59,6 +59,8 @@ class NotificationController extends Controller
                 'rename_approved',
                 'rename_rejected',
                 'document_opened',
+                'document_expiring_soon',
+                'document_expired',
             ], true)) {
                 // If it's not a revocation, and the document exists, ensure user still has view access
                 if ($type !== 'document_access_revoked' && isset($docIds[$n->id])) {
@@ -186,6 +188,13 @@ class NotificationController extends Controller
                         return false;
                     }
                     $seen[$dedupKey] = true;
+                } elseif (in_array($type, ['document_expiring_soon', 'document_expired'], true)) {
+                    $warningType = $n->data['warning_type'] ?? $type;
+                    $dedupKey = "exp_{$docId}_{$warningType}";
+                    if (isset($seen[$dedupKey])) {
+                        return false;
+                    }
+                    $seen[$dedupKey] = true;
                 }
             }
             return true;
@@ -218,9 +227,12 @@ class NotificationController extends Controller
             $status = 'info';
             if ($icon === 'rejected' || str_contains($type, 'reject') || str_contains($type, 'revoked')) {
                 $status = 'rejected';
+            } elseif ($type === 'document_expired' || $icon === 'expired' || str_contains($type, 'expired') || str_contains($type, 'expir')) {
+                $status = 'expired';
+                $icon = 'expired';
             } elseif (str_contains($type, 'approved') || $icon === 'success') {
                 $status = 'approved';
-            } elseif (str_contains($type, 'request') || str_contains($type, 'expiring')) {
+            } elseif (str_contains($type, 'request')) {
                 $status = 'pending';
             }
 
@@ -269,7 +281,7 @@ class NotificationController extends Controller
             ];
         })->values();
 
-        $unreadCount = $filtered->whereNull('read_at')->count();
+        $unreadCount = $this->getUnreadCount($request->user());
 
         return response()->json([
             'notifications' => $notifications,
@@ -345,6 +357,13 @@ class NotificationController extends Controller
                 } elseif (in_array($type, ['approval_result', 'signature_request_approved', 'stamp_request_approved'], true)) {
                     $timeKey = $n->created_at ? $n->created_at->format('Y-m-d H:i') : '';
                     $dedupKey = "outcome_{$docId}_{$actorName}_{$timeKey}";
+                    if (isset($seen[$dedupKey])) {
+                        return false;
+                    }
+                    $seen[$dedupKey] = true;
+                } elseif (in_array($type, ['document_expiring_soon', 'document_expired'], true)) {
+                    $warningType = $n->data['warning_type'] ?? $type;
+                    $dedupKey = "exp_{$docId}_{$warningType}";
                     if (isset($seen[$dedupKey])) {
                         return false;
                     }

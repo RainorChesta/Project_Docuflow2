@@ -156,6 +156,10 @@ Route::middleware('auth')->group(function () {
         Route::resource('signatures', \App\Http\Controllers\Admin\SignatureController::class)->except(['show']);
         Route::get('/retention', [RetentionController::class, 'edit'])->name('retention.edit');
         Route::put('/retention', [RetentionController::class, 'update'])->name('retention.update');
+        Route::get('/document-expirations', [\App\Http\Controllers\Admin\DocumentExpirationController::class, 'index'])->name('expirations.index');
+        Route::put('/document-expirations/default-reminder', [\App\Http\Controllers\Admin\DocumentExpirationController::class, 'updateDefaultReminder'])->name('expirations.update-default');
+        Route::put('/document-expirations/{document}/reminder', [\App\Http\Controllers\Admin\DocumentExpirationController::class, 'updateDocumentReminder'])->name('expirations.update-document-reminder');
+        Route::post('/document-expirations/{document}/notify', [\App\Http\Controllers\Admin\DocumentExpirationController::class, 'notify'])->name('expirations.notify');
         Route::resource('document-types', DocumentTypeController::class);
         Route::get('/templates/create-manual', [DocumentTemplateController::class, 'createManual'])->name('templates.create-manual');
         Route::post('/templates/manual', [DocumentTemplateController::class, 'storeManual'])->name('templates.store-manual');

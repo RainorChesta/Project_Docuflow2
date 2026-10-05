@@ -223,7 +223,7 @@ class DashboardController extends Controller
                 })
                 ->with(['unitKerja', 'currentVersion'])
                 ->get();
-            $ownerExpiringDocs = $ownerDocQuery->filter(fn($d) => $d->isExpired() || $d->isExpiringSoon(30))->sortBy(fn($d) => $d->expiration_date);
+            $ownerExpiringDocs = $ownerDocQuery->filter(fn($d) => $d->isExpired() || $d->isExpiringSoon())->sortBy(fn($d) => $d->expiration_date);
 
             $isPicUnitKerja = $user->isPicUnitKerja();
             $picExpiringDocs = collect();
@@ -239,7 +239,7 @@ class DashboardController extends Controller
                     })
                     ->with(['owner', 'unitKerja', 'currentVersion'])
                     ->get()
-                    ->filter(fn($d) => $d->isExpired() || $d->isExpiringSoon(30))
+                    ->filter(fn($d) => $d->isExpired() || $d->isExpiringSoon())
                     ->sortBy(fn($d) => $d->expiration_date);
             }
 
@@ -260,7 +260,7 @@ class DashboardController extends Controller
                 })
                 ->with(['owner', 'unitKerja', 'currentVersion'])
                 ->get()
-                ->filter(fn($d) => $d->isExpired() || $d->isExpiringSoon(30))
+                ->filter(fn($d) => $d->isExpired() || $d->isExpiringSoon())
                 ->sortBy(fn($d) => $d->expiration_date);
 
             $expiringDocuments = $picExpiringDocs->isNotEmpty() ? $picExpiringDocs : $ownerExpiringDocs;
@@ -332,7 +332,7 @@ class DashboardController extends Controller
             })
             ->with(['unitKerja', 'currentVersion'])
             ->get();
-        $ownerExpiringDocs = $ownerDocQuery->filter(fn($d) => $d->isExpired() || $d->isExpiringSoon(30))->sortBy(fn($d) => $d->expiration_date);
+        $ownerExpiringDocs = $ownerDocQuery->filter(fn($d) => $d->isExpired() || $d->isExpiringSoon())->sortBy(fn($d) => $d->expiration_date);
 
         $isPicUnitKerja = $user->isPicUnitKerja();
         $picExpiringDocs = collect();
@@ -348,7 +348,7 @@ class DashboardController extends Controller
                 })
                 ->with(['owner', 'unitKerja', 'currentVersion'])
                 ->get()
-                ->filter(fn($d) => $d->isExpired() || $d->isExpiringSoon(30))
+                ->filter(fn($d) => $d->isExpired() || $d->isExpiringSoon())
                 ->sortBy(fn($d) => $d->expiration_date);
         }
 
@@ -369,7 +369,7 @@ class DashboardController extends Controller
             })
             ->with(['owner', 'unitKerja', 'currentVersion'])
             ->get()
-            ->filter(fn($d) => $d->isExpired() || $d->isExpiringSoon(30))
+            ->filter(fn($d) => $d->isExpired() || $d->isExpiringSoon())
             ->sortBy(fn($d) => $d->expiration_date);
 
         $documentTypes = DocumentType::orderBy('name')->get();

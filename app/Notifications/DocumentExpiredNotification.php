@@ -25,10 +25,11 @@ class DocumentExpiredNotification extends Notification
     {
         return [
             'type'            => 'document_expired',
+            'icon'            => 'expired',
             'document_id'     => $this->document->id,
             'document_title'  => $this->document->title,
             'document_number' => $this->document->document_number,
-            'title'           => __('Dokumen Telah Kadaluwarsa'),
+            'title'           => __('Dokumen Telah Kedaluwarsa'),
             'message'         => __('Masa berlaku dokumen Anda ":title" (:number) telah berakhir pada :date. Harap segera periksa dan buat versi revisi jika diperlukan.', [
                 'title'  => $this->document->title,
                 'number' => $this->document->document_number ?? '-',

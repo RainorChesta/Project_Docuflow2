@@ -277,7 +277,7 @@
                                        name="expiration_date"
                                        value="{{ old('expiration_date', $document->expiration_date ? $document->expiration_date->format('Y-m-d') : '') }}"
                                        class="input input-bordered w-full text-xs font-medium focus:border-primary">
-                                <p class="text-[11px] text-base-content/50">{{ __('Kosongkan jika mengikuti masa retensi standar.') }}</p>
+                                <p class="text-[11px] text-base-content/50">{{ __('Kosongkan jika dokumen bersifat permanen (tanpa tanggal kedaluwarsa).') }}</p>
                             </div>
 
                             {{-- Ukuran Kertas --}}

@@ -26,13 +26,14 @@ class DocumentExpiringWarningNotification extends Notification
     public function toArray(object $notifiable): array
     {
         $urgency = match($this->warningType) {
-            '1day' => $this->daysRemaining <= 0 ? __('hari ini') : __('besok'),
-            '7days' => __(':days hari', ['days' => $this->daysRemaining]),
-            default => __(':days hari', ['days' => $this->daysRemaining]),
+            '1day' => $this->daysRemaining <= 0 ? __('hari ini') : __('1 hari lagi'),
+            '7days' => __(':days hari lagi', ['days' => $this->daysRemaining]),
+            default => $this->daysRemaining === 0 ? __('hari ini') : ($this->daysRemaining > 0 ? __(':days hari lagi', ['days' => $this->daysRemaining]) : __(':days hari lalu', ['days' => abs($this->daysRemaining)])),
         };
 
         return [
             'type'            => 'document_expiring_soon',
+            'icon'            => 'expired',
             'document_id'     => $this->document->id,
             'document_title'  => $this->document->title,
             'document_number' => $this->document->document_number,

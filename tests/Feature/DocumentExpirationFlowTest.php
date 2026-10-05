@@ -106,28 +106,28 @@ class DocumentExpirationFlowTest extends TestCase
         $sharedUser->companies()->sync([$this->company->id]);
         $sharedUser->branches()->sync([$this->branch->id]);
 
-        // Document with 15 days remaining -> should NOT trigger notification (since we notify on H-7 and H-1)
-        $doc15 = Document::create([
-            'title' => 'Dokumen H-15',
-            'document_number' => '015/SK/TEST/X/2026',
+        // Document with 45 days remaining -> should NOT trigger notification (since default reminder is 30 days)
+        $doc45 = Document::create([
+            'title' => 'Dokumen H-45',
+            'document_number' => '045/SK/TEST/X/2026',
             'company_id' => $this->company->id,
             'branch_id' => $this->branch->id,
             'document_type_id' => $this->docType->id,
             'owner_id' => $owner->id,
             'unit_kerja_id' => $unit->id,
             'status' => 'released',
-            'expiration_date' => now()->addDays(15)->toDateString(),
+            'expiration_date' => now()->addDays(45)->toDateString(),
             'is_expired' => false,
         ]);
         DocumentVersion::create([
-            'document_id' => $doc15->id,
+            'document_id' => $doc45->id,
             'version_number' => 1,
-            'content' => '<p>Test 15</p>',
+            'content' => '<p>Test 45</p>',
             'author_name' => 'Admin',
             'status' => 'active',
-            'file_path' => 'docs/test15.pdf',
+            'file_path' => 'docs/test45.pdf',
         ]);
-        $doc15->update(['current_version_id' => 1]);
+        $doc45->update(['current_version_id' => 1]);
 
         $this->artisan('app:check-document-expiration')->assertSuccessful();
         Notification::assertNothingSent();
@@ -303,5 +303,177 @@ class DocumentExpirationFlowTest extends TestCase
         $picResponse = $this->actingAs($picUser)->get(route('dashboard'))->assertOk();
         $picExpiringDocs = $picResponse->viewData('picExpiringDocs');
         $this->assertTrue($picExpiringDocs->contains('id', $doc->id));
+    }
+
+    public function test_default_expiration_notification_is_sent_only_once_during_lifecycle(): void
+    {
+        Notification::fake();
+
+        $unit = UnitKerja::create(['nama_unit_kerja' => 'Unit SDM & Umum', 'kode_unit_kerja' => 'SDMU']);
+        $owner = User::factory()->create(['unit_kerja_id' => $unit->id, 'system_role' => 'staff']);
+        $owner->companies()->sync([$this->company->id]);
+        $owner->branches()->sync([$this->branch->id]);
+
+        $doc = Document::create([
+            'title' => 'Dokumen Default Expired 20 Hari',
+            'document_number' => '020/SK/TEST/X/2026',
+            'company_id' => $this->company->id,
+            'branch_id' => $this->branch->id,
+            'document_type_id' => $this->docType->id,
+            'owner_id' => $owner->id,
+            'unit_kerja_id' => $unit->id,
+            'status' => 'released',
+            'expiration_date' => now()->addDays(20)->toDateString(),
+            'expiration_reminder_days' => null, // Uses default global setting (30 days)
+            'is_expired' => false,
+        ]);
+
+        // Creating active version (triggers DocumentVersion saved event)
+        $version = DocumentVersion::create([
+            'document_id' => $doc->id,
+            'version_number' => 1,
+            'content' => '<p>Version 1</p>',
+            'author_name' => 'Admin User',
+            'status' => 'active',
+            'file_path' => 'docs/test20.pdf',
+        ]);
+
+        // Updating document pointer (triggers Document saved event)
+        $doc->update(['current_version_id' => $version->id]);
+
+        // Further document touch/save
+        $doc->touch();
+
+        // Running daily scheduler command
+        $this->artisan('app:check-document-expiration')->assertSuccessful();
+
+        // Notification must have been sent EXACTLY ONCE, not duplicated
+        Notification::assertSentToTimes($owner, DocumentExpiringWarningNotification::class, 1);
+    }
+
+    public function test_subsequent_saves_or_scheduler_runs_do_not_retrigger_default_expiration_notification(): void
+    {
+        Notification::fake();
+
+        $unit = UnitKerja::create(['nama_unit_kerja' => 'Unit Legal', 'kode_unit_kerja' => 'LEG']);
+        $owner = User::factory()->create(['unit_kerja_id' => $unit->id, 'system_role' => 'staff']);
+        $owner->companies()->sync([$this->company->id]);
+        $owner->branches()->sync([$this->branch->id]);
+
+        $doc = Document::create([
+            'title' => 'Dokumen Legal 25 Hari',
+            'document_number' => '025/SK/TEST/X/2026',
+            'company_id' => $this->company->id,
+            'branch_id' => $this->branch->id,
+            'document_type_id' => $this->docType->id,
+            'owner_id' => $owner->id,
+            'unit_kerja_id' => $unit->id,
+            'status' => 'released',
+            'expiration_date' => now()->addDays(25)->toDateString(),
+            'expiration_reminder_days' => null,
+            'is_expired' => false,
+        ]);
+
+        $version = DocumentVersion::create([
+            'document_id' => $doc->id,
+            'version_number' => 1,
+            'content' => '<p>Version 1</p>',
+            'author_name' => 'Admin User',
+            'status' => 'active',
+            'file_path' => 'docs/test25.pdf',
+        ]);
+        $doc->update(['current_version_id' => $version->id]);
+
+        // Re-saving the document multiple times (e.g. updating other attributes)
+        $doc->update(['title' => 'Dokumen Legal 25 Hari Updated']);
+        $doc->update(['paper_size' => 'Letter']);
+
+        // Running artisan command twice
+        $this->artisan('app:check-document-expiration')->assertSuccessful();
+        $this->artisan('app:check-document-expiration')->assertSuccessful();
+
+        // Must still be sent only 1 time
+        Notification::assertSentToTimes($owner, DocumentExpiringWarningNotification::class, 1);
+    }
+
+    public function test_manual_direct_send_notification_is_not_duplicated_by_scheduler(): void
+    {
+        Notification::fake();
+
+        $unit = UnitKerja::create(['nama_unit_kerja' => 'Unit Operasional', 'kode_unit_kerja' => 'OPS']);
+        $owner = User::factory()->create(['unit_kerja_id' => $unit->id, 'system_role' => 'staff']);
+        $owner->companies()->sync([$this->company->id]);
+        $owner->branches()->sync([$this->branch->id]);
+
+        $admin = User::factory()->create(['system_role' => 'admin']);
+        $admin->companies()->sync([$this->company->id]);
+        $admin->branches()->sync([$this->branch->id]);
+
+        $doc = Document::create([
+            'title' => 'Dokumen Kirim Langsung 45 Hari',
+            'document_number' => '021/SK/TEST/X/2026',
+            'company_id' => $this->company->id,
+            'branch_id' => $this->branch->id,
+            'document_type_id' => $this->docType->id,
+            'owner_id' => $owner->id,
+            'unit_kerja_id' => $unit->id,
+            'status' => 'released',
+            'expiration_date' => now()->addDays(45)->toDateString(),
+            'is_expired' => false,
+        ]);
+
+        $version = DocumentVersion::create([
+            'document_id' => $doc->id,
+            'version_number' => 1,
+            'content' => '<p>Content</p>',
+            'author_name' => 'Admin User',
+            'status' => 'active',
+            'file_path' => 'docs/test21.pdf',
+        ]);
+        $doc->update(['current_version_id' => $version->id]);
+
+        // Direct send by admin
+        $this->actingAs($admin)->post(route('admin.expirations.notify', $doc))->assertRedirect();
+
+        // Running daily scheduler command right after
+        $this->artisan('app:check-document-expiration')->assertSuccessful();
+
+        // Exactly 1 notification sent (direct send), scheduler does not duplicate
+        Notification::assertSentToTimes($owner, DocumentExpiringWarningNotification::class, 1);
+    }
+
+    public function test_notification_controller_deduplicates_unread_expiration_notifications(): void
+    {
+        $unit = UnitKerja::create(['nama_unit_kerja' => 'Unit Pelayanan 2', 'kode_unit_kerja' => 'YAN2']);
+        $owner = User::factory()->create(['unit_kerja_id' => $unit->id, 'system_role' => 'staff']);
+        $owner->companies()->sync([$this->company->id]);
+        $owner->branches()->sync([$this->branch->id]);
+
+        $doc = Document::create([
+            'title' => 'Dokumen Notif Duplikasi UI',
+            'document_number' => '099/SK/TEST/X/2026',
+            'company_id' => $this->company->id,
+            'branch_id' => $this->branch->id,
+            'document_type_id' => $this->docType->id,
+            'owner_id' => $owner->id,
+            'unit_kerja_id' => $unit->id,
+            'status' => 'released',
+            'expiration_date' => now()->addDays(20)->toDateString(),
+            'is_expired' => false,
+        ]);
+
+        // Simulate 2 unread database notifications of the same warning type for the same document
+        $owner->notify(new DocumentExpiringWarningNotification($doc, 20, '30days'));
+        $owner->notify(new DocumentExpiringWarningNotification($doc, 20, '30days'));
+
+        $this->assertEquals(2, $owner->unreadNotifications()->count());
+
+        // NotificationController index() and unreadCount() should deduplicate to 1
+        $response = $this->actingAs($owner)->getJson(route('notifications.index'))->assertOk();
+        $notifications = $response->json('notifications');
+        $this->assertCount(1, $notifications);
+
+        $unreadResponse = $this->actingAs($owner)->getJson(route('notifications.unread-count'))->assertOk();
+        $this->assertEquals(1, $unreadResponse->json('unread_count'));
     }
 }
