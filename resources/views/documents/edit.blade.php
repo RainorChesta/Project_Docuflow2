@@ -61,29 +61,10 @@
             .then(r => r.json())
             .then(data => {
                 if (data.success && data.url) {
-                    let printFrame = document.getElementById('print-direct-iframe');
-                    if (!printFrame) {
-                        printFrame = document.createElement('iframe');
-                        printFrame.id = 'print-direct-iframe';
-                        printFrame.style.position = 'fixed';
-                        printFrame.style.right = '0';
-                        printFrame.style.bottom = '0';
-                        printFrame.style.width = '0';
-                        printFrame.style.height = '0';
-                        printFrame.style.border = 'none';
-                        document.body.appendChild(printFrame);
+                    const printWin = window.open(data.url, '_blank');
+                    if (printWin) {
+                        printWin.focus();
                     }
-                    printFrame.src = data.url;
-                    printFrame.onload = function() {
-                        setTimeout(() => {
-                            try {
-                                printFrame.contentWindow.focus();
-                                printFrame.contentWindow.print();
-                            } catch(e) {
-                                window.open(data.url, '_blank');
-                            }
-                        }, 300);
-                    };
                     document.getElementById('export-pdf-modal').close();
                 } else {
                     form.submit();
@@ -915,6 +896,8 @@
                         config.editorConfig.customization.zoom = 100;
                     }
                     
+                    const hasDocumentKop = {{ $document->hasKop() ? 'true' : 'false' }};
+
                     const openExportPdfModal = function() {
                         const modal = document.getElementById('export-pdf-modal');
                         if (modal) {
@@ -924,6 +907,34 @@
                                 modal.setAttribute('open', '');
                             }
                         }
+                    };
+
+                    const directPrintDocument = function() {
+                        const formData = new FormData();
+                        formData.append('_token', '{{ csrf_token() }}');
+                        formData.append('paper_size', '{{ $document->paper_size ?? 'A4' }}');
+                        formData.append('with_kop', '1');
+
+                        fetch('{{ route('documents.export-pdf', $document) }}', {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                'Accept': 'application/json'
+                            },
+                            body: formData
+                        })
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.success && data.url) {
+                                const printWin = window.open(data.url, '_blank');
+                                if (printWin) {
+                                    printWin.focus();
+                                }
+                            }
+                        })
+                        .catch(err => {
+                            console.error('Direct print failed:', err);
+                        });
                     };
 
                     window.addEventListener('message', function(event) {
@@ -945,7 +956,11 @@
                     };
 
                     config.events.onRequestPrint = function() {
-                        openExportPdfModal();
+                        if (hasDocumentKop) {
+                            openExportPdfModal();
+                        } else {
+                            directPrintDocument();
+                        }
                     };
 
                     config.events.onRequestSaveAs = function() {

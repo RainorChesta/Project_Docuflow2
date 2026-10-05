@@ -1448,29 +1448,10 @@
                     .then(r => r.json())
                     .then(data => {
                         if (data.success && data.url) {
-                            let printFrame = document.getElementById('print-direct-iframe');
-                            if (!printFrame) {
-                                printFrame = document.createElement('iframe');
-                                printFrame.id = 'print-direct-iframe';
-                                printFrame.style.position = 'fixed';
-                                printFrame.style.right = '0';
-                                printFrame.style.bottom = '0';
-                                printFrame.style.width = '0';
-                                printFrame.style.height = '0';
-                                printFrame.style.border = 'none';
-                                document.body.appendChild(printFrame);
+                            const printWin = window.open(data.url, '_blank');
+                            if (printWin) {
+                                printWin.focus();
                             }
-                            printFrame.src = data.url;
-                            printFrame.onload = function() {
-                                setTimeout(() => {
-                                    try {
-                                        printFrame.contentWindow.focus();
-                                        printFrame.contentWindow.print();
-                                    } catch(e) {
-                                        window.open(data.url, '_blank');
-                                    }
-                                }, 300);
-                            };
                             document.getElementById('export-pdf-modal').close();
                         } else {
                             form.submit();
@@ -1496,11 +1477,7 @@
                             <div>
                                 <h3 class="font-bold text-base text-base-content leading-tight">{{ __('Cetak & Unduh Dokumen') }}</h3>
                                 <p class="text-xs text-base-content/60">
-                                    @if($document->hasKop())
-                                        {{ __('Pilih preferensi kop surat dan format cetak dokumen') }}
-                                    @else
-                                        {{ __('Pilih format dan ukuran kertas untuk mencetak atau mengunduh') }}
-                                    @endif
+                                    {{ __('Pilih preferensi kop surat dan format cetak dokumen') }}
                                 </p>
                             </div>
                         </div>

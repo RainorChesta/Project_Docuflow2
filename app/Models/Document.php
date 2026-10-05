@@ -687,7 +687,18 @@ class Document extends Model
             return true;
         }
 
-        $content = $this->displayVersion()?->content;
+        $version = $this->displayVersion();
+        if ($version && $version->file_path) {
+            $disk = \Illuminate\Support\Facades\Storage::disk(config('onlyoffice.storage_disk', 'local'));
+            if ($disk->exists($version->file_path)) {
+                $fileBytes = $disk->get($version->file_path);
+                if (app(\App\Services\OnlyOfficeService::class)->docxHasExplicitHeaderAndFooter($fileBytes)) {
+                    return true;
+                }
+            }
+        }
+
+        $content = $version?->content;
         if ($content && (
             str_contains($content, 'kop-surat') ||
             str_contains($content, 'kop_header') ||

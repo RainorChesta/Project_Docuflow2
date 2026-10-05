@@ -109,7 +109,7 @@ class PdfExportService
         }
 
         // Handle file-based (ONLYOFFICE / DOCX) documents
-        if (!empty($display->file_path) && empty(trim(strip_tags($display->content ?? '')))) {
+        if (!empty($display->file_path)) {
             $disk = \Illuminate\Support\Facades\Storage::disk(config('onlyoffice.storage_disk', 'local'));
             if ($disk->exists($display->file_path)) {
                 $fileBytes = $disk->get($display->file_path);

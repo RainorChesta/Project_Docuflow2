@@ -126,6 +126,8 @@ Route::middleware('auth')->group(function () {
     // PDF Export
     Route::post('/documents/{document}/export-pdf', [DocumentExportController::class, 'export'])
         ->name('documents.export-pdf');
+    Route::get('/documents/{document}/export-preview', [DocumentExportController::class, 'preview'])
+        ->name('documents.export-preview');
 
     // Context Switcher (Company & Branch)
     Route::post('/context/switch', [\App\Http\Controllers\ContextSwitchController::class, 'switch'])->name('context.switch');

@@ -359,29 +359,10 @@
                                     .then(r => r.json())
                                     .then(data => {
                                         if (data.success && data.url) {
-                                            let printFrame = document.getElementById('print-direct-iframe');
-                                            if (!printFrame) {
-                                                printFrame = document.createElement('iframe');
-                                                printFrame.id = 'print-direct-iframe';
-                                                printFrame.style.position = 'fixed';
-                                                printFrame.style.right = '0';
-                                                printFrame.style.bottom = '0';
-                                                printFrame.style.width = '0';
-                                                printFrame.style.height = '0';
-                                                printFrame.style.border = 'none';
-                                                document.body.appendChild(printFrame);
+                                            const printWin = window.open(data.url, '_blank');
+                                            if (printWin) {
+                                                printWin.focus();
                                             }
-                                            printFrame.src = data.url;
-                                            printFrame.onload = function() {
-                                                setTimeout(() => {
-                                                    try {
-                                                        printFrame.contentWindow.focus();
-                                                        printFrame.contentWindow.print();
-                                                    } catch(e) {
-                                                        window.open(data.url, '_blank');
-                                                    }
-                                                }, 300);
-                                            };
                                             document.getElementById('export-pdf-modal').close();
                                         } else {
                                             form.submit();
@@ -424,46 +405,46 @@
 
                                     {{-- Pilihan Kop Surat (Kop Options) - Hanya tampil jika dokumen memiliki Kop Surat --}}
                                     @if($document->hasKop())
-                                    <div class="mb-4">
-                                        <label class="label pt-0 pb-1.5">
-                                            <span class="label-text font-bold text-xs uppercase tracking-wider text-base-content/70">{{ __('Pilihan Kop Surat') }}</span>
-                                        </label>
-                                        <div class="grid grid-cols-1 gap-2.5">
-                                            {{-- Opsi 1: Dengan Kop Surat Resmi --}}
-                                            <label class="flex items-start gap-3 p-3.5 rounded-2xl border transition-all cursor-pointer select-none"
-                                                   :class="withKop === '1' ? 'bg-primary/10 border-primary shadow-xs ring-1 ring-primary/30' : 'bg-base-100 border-base-300 hover:bg-base-200/50'">
-                                                <input type="radio" name="with_kop_choice_preview" value="1" x-model="withKop" class="radio radio-primary radio-sm mt-0.5 shrink-0">
-                                                <div class="min-w-0 flex-1">
-                                                    <div class="flex items-center justify-between gap-1">
-                                                        <span class="text-xs sm:text-sm font-bold text-base-content flex items-center gap-1.5">
-                                                            {{ __('Dengan Kop Surat Resmi') }}
-                                                        </span>
-                                                        <span class="badge badge-primary badge-xs font-semibold shrink-0">{{ __('Kertas Polos') }}</span>
-                                                    </div>
-                                                    <p class="text-[11px] text-base-content/60 mt-1 leading-normal">
-                                                        {{ __('Menyertakan kop surat resmi korporat/cabang di bagian atas dokumen. Cocok untuk arsip digital atau dicetak di atas kertas kosong/polos.') }}
-                                                    </p>
-                                                </div>
+                                        <div class="mb-4">
+                                            <label class="label pt-0 pb-1.5">
+                                                <span class="label-text font-bold text-xs uppercase tracking-wider text-base-content/70">{{ __('Pilihan Kop Surat') }}</span>
                                             </label>
+                                            <div class="grid grid-cols-1 gap-2.5">
+                                                {{-- Opsi 1: Dengan Kop Surat Resmi --}}
+                                                <label class="flex items-start gap-3 p-3.5 rounded-2xl border transition-all cursor-pointer select-none"
+                                                       :class="withKop === '1' ? 'bg-primary/10 border-primary shadow-xs ring-1 ring-primary/30' : 'bg-base-100 border-base-300 hover:bg-base-200/50'">
+                                                    <input type="radio" name="with_kop_choice_preview" value="1" x-model="withKop" class="radio radio-primary radio-sm mt-0.5 shrink-0">
+                                                    <div class="min-w-0 flex-1">
+                                                        <div class="flex items-center justify-between gap-1">
+                                                            <span class="text-xs sm:text-sm font-bold text-base-content flex items-center gap-1.5">
+                                                                {{ __('Dengan Kop Surat Resmi') }}
+                                                            </span>
+                                                            <span class="badge badge-primary badge-xs font-semibold shrink-0">{{ __('Kertas Polos') }}</span>
+                                                        </div>
+                                                        <p class="text-[11px] text-base-content/60 mt-1 leading-normal">
+                                                            {{ __('Menyertakan kop surat resmi korporat/cabang di bagian atas dokumen. Cocok untuk arsip digital atau dicetak di atas kertas kosong/polos.') }}
+                                                        </p>
+                                                    </div>
+                                                </label>
 
-                                            {{-- Opsi 2: Tanpa Kop Surat --}}
-                                            <label class="flex items-start gap-3 p-3.5 rounded-2xl border transition-all cursor-pointer select-none"
-                                                   :class="withKop === '0' ? 'bg-secondary/10 border-secondary shadow-xs ring-1 ring-secondary/30' : 'bg-base-100 border-base-300 hover:bg-base-200/50'">
-                                                <input type="radio" name="with_kop_choice_preview" value="0" x-model="withKop" class="radio radio-secondary radio-sm mt-0.5 shrink-0">
-                                                <div class="min-w-0 flex-1">
-                                                    <div class="flex items-center justify-between gap-1">
-                                                        <span class="text-xs sm:text-sm font-bold text-base-content flex items-center gap-1.5">
-                                                            {{ __('Tanpa Kop Surat (Kertas Kop Fisik)') }}
-                                                        </span>
-                                                        <span class="badge badge-ghost badge-xs font-semibold shrink-0 border-base-300">{{ __('Pre-printed') }}</span>
+                                                {{-- Opsi 2: Tanpa Kop Surat --}}
+                                                <label class="flex items-start gap-3 p-3.5 rounded-2xl border transition-all cursor-pointer select-none"
+                                                       :class="withKop === '0' ? 'bg-secondary/10 border-secondary shadow-xs ring-1 ring-secondary/30' : 'bg-base-100 border-base-300 hover:bg-base-200/50'">
+                                                    <input type="radio" name="with_kop_choice_preview" value="0" x-model="withKop" class="radio radio-secondary radio-sm mt-0.5 shrink-0">
+                                                    <div class="min-w-0 flex-1">
+                                                        <div class="flex items-center justify-between gap-1">
+                                                            <span class="text-xs sm:text-sm font-bold text-base-content flex items-center gap-1.5">
+                                                                {{ __('Tanpa Kop Surat (Kertas Kop Fisik)') }}
+                                                            </span>
+                                                            <span class="badge badge-ghost badge-xs font-semibold shrink-0 border-base-300">{{ __('Pre-printed') }}</span>
+                                                        </div>
+                                                        <p class="text-[11px] text-base-content/60 mt-1 leading-normal">
+                                                            {{ __('Header kop surat dilepas otomatis. Cocok jika Anda mencetak langsung pada printer dengan kertas fisik yang sudah tercetak kop resminya.') }}
+                                                        </p>
                                                     </div>
-                                                    <p class="text-[11px] text-base-content/60 mt-1 leading-normal">
-                                                        {{ __('Header kop surat dilepas otomatis. Cocok jika Anda mencetak langsung pada printer dengan kertas fisik yang sudah tercetak kop resminya.') }}
-                                                    </p>
-                                                </div>
-                                            </label>
+                                                </label>
+                                            </div>
                                         </div>
-                                    </div>
                                     @endif
 
                                     {{-- Form Ekspor PDF & Download Actions --}}
