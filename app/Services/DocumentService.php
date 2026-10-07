@@ -275,8 +275,8 @@ class DocumentService
         $data['paper_size'] ??= 'A4';
 
         if (!empty($data['corporate_soft_file_id'])) {
-            $data['format_choice'] = 'F4';
-            $data['paper_size'] = 'F4';
+            $softFile = \App\Models\CorporateSoftFile::find($data['corporate_soft_file_id']);
+            $data['paper_size'] = ($softFile && $softFile->isA4()) ? 'A4' : 'F4';
         }
 
         return DB::transaction(function () use ($data) {

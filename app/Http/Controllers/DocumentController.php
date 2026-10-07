@@ -966,8 +966,7 @@ class DocumentController extends Controller
             // Update document reference to indicate which corporate soft file was applied
             $document->update([
                 'corporate_soft_file_id' => $corporateSoftFile->id,
-                'format_choice' => 'F4',
-                'paper_size' => 'F4',
+                'paper_size' => $corporateSoftFile->isA4() ? 'A4' : 'F4',
             ]);
 
             // Invalidate ONLYOFFICE cached keys and ignore callbacks from the old session key so editor reloads new content safely
@@ -1040,7 +1039,6 @@ class DocumentController extends Controller
 
         $document->update([
             'corporate_soft_file_id' => null,
-            'format_choice' => 'A4',
             'paper_size' => 'A4',
         ]);
 
