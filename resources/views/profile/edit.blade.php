@@ -124,16 +124,17 @@
                                     <span>{{ __('Semua Perusahaan & Cabang') }}</span>
                                 </span>
                             @else
-                                @if($user->unitKerjas->isNotEmpty())
-                                    @foreach($user->unitKerjas as $uk)
+                                @php
+                                    $editProfileUks = $user->unitKerjas->isNotEmpty()
+                                        ? $user->unitKerjas->unique(fn($uk) => trim($uk->kode_unit_kerja ?: $uk->nama_unit_kerja))
+                                        : ($user->unitKerja ? collect([$user->unitKerja]) : collect());
+                                @endphp
+                                @if($editProfileUks->isNotEmpty())
+                                    @foreach($editProfileUks as $uk)
                                         <span class="inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-semibold bg-base-200 text-base-content border border-base-300">
                                             📁 {{ $uk->kode_unit_kerja ?: $uk->nama_unit_kerja }}
                                         </span>
                                     @endforeach
-                                @elseif($user->unitKerja)
-                                    <span class="inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-semibold bg-base-200 text-base-content border border-base-300">
-                                        📁 {{ $user->unitKerja->kode_unit_kerja ?: $user->unitKerja->nama_unit_kerja }}
-                                    </span>
                                 @endif
 
                                 @if($user->companies->isNotEmpty())

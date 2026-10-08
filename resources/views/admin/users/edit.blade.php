@@ -12,9 +12,11 @@
                  x-data="{
                      role: '{{ old('system_role', $user->system_role) }}',
                      selectedCompanies: ({{ json_encode($userCompanyIds) }} || []).map(String),
-                     selectedBranches: ({{ json_encode($userBranchIds) }} || []).map(String)
+                     selectedBranches: ({{ json_encode($userBranchIds) }} || []).map(String),
+                     avatarPreview: {{ json_encode($user->avatar_url) }},
+                     removeAvatar: false
                  }">
-                <form method="POST" action="{{ route('admin.users.update', $user) }}" autocomplete="off">
+                <form method="POST" action="{{ route('admin.users.update', $user) }}" enctype="multipart/form-data" autocomplete="off">
                     @csrf @method('PUT')
                     @if($errors->any())
                         <div class="alert alert-error mb-4">
@@ -25,6 +27,43 @@
                             </ul>
                         </div>
                     @endif
+
+                    {{-- Foto Profil --}}
+                    <div class="rounded-xl border border-base-200 bg-base-200/30 p-4 mb-4">
+                        <label class="text-xs font-semibold text-base-content/70 uppercase tracking-wider block mb-2">
+                            {{ __('Foto Profil') }}
+                        </label>
+                        <div class="flex items-center gap-4">
+                            <div class="relative shrink-0">
+                                <template x-if="avatarPreview && !removeAvatar">
+                                    <img :src="avatarPreview" class="w-14 h-14 rounded-full object-cover border-2 border-primary/30 shadow-xs">
+                                </template>
+                                <template x-if="!avatarPreview || removeAvatar">
+                                    <div class="w-14 h-14 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-lg border border-base-300">
+                                        {{ strtoupper(substr($user->name, 0, 2)) }}
+                                    </div>
+                                </template>
+                            </div>
+                            <div class="flex-1 space-y-1.5">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <input type="file" name="profile_picture" id="profile_picture" accept="image/png,image/jpeg,image/jpg,image/webp" class="file-input file-input-bordered file-input-sm w-full max-w-xs" @change="if($event.target.files[0]) { avatarPreview = URL.createObjectURL($event.target.files[0]); removeAvatar = false; }">
+                                    <input type="hidden" name="remove_profile_picture" :value="removeAvatar ? '1' : '0'">
+                                    @if($user->profile_picture)
+                                        <button type="button" x-show="!removeAvatar" @click="removeAvatar = true" class="btn btn-ghost btn-sm text-error text-xs gap-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                            {{ __('Hapus Foto') }}
+                                        </button>
+                                        <button type="button" x-show="removeAvatar" @click="removeAvatar = false" class="btn btn-ghost btn-sm text-warning text-xs">
+                                            {{ __('Batalkan Hapus') }}
+                                        </button>
+                                    @endif
+                                </div>
+                                <p class="text-[11px] text-base-content/50">{{ __('Format: JPG, PNG, WEBP. Maks 2MB.') }}</p>
+                            </div>
+                        </div>
+                    </div>
 
                     @if($user->isPendingVerification())
                         <div class="alert alert-warning/15 border border-warning/40 rounded-xl mb-5 text-sm flex items-start gap-3 shadow-sm bg-warning/10">

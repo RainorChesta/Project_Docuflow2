@@ -26,7 +26,15 @@ class User extends Authenticatable
      */
     public function getAvatarUrlAttribute(): ?string
     {
-        return $this->profile_picture ? asset('storage/' . $this->profile_picture) : null;
+        if (!$this->profile_picture) {
+            return null;
+        }
+
+        if (str_starts_with($this->profile_picture, 'http://') || str_starts_with($this->profile_picture, 'https://')) {
+            return $this->profile_picture;
+        }
+
+        return asset('storage/' . ltrim($this->profile_picture, '/'));
     }
 
     protected function casts(): array

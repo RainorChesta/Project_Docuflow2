@@ -13,7 +13,10 @@
 @endphp
 
 @if($resolvedAvatar)
-    <img src="{{ $resolvedAvatar }}" alt="{{ $resolvedName }}" {{ $attributes->merge(['class' => "$size rounded-full object-cover shrink-0 ring-1 ring-base-content/10"]) }}>
+    <img src="{{ $resolvedAvatar }}" alt="{{ $resolvedName }}" onerror="this.onerror=null; this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" {{ $attributes->merge(['class' => "$size rounded-full object-cover shrink-0 ring-1 ring-base-content/10"]) }}>
+    <div {{ $attributes->merge(['class' => "$size rounded-full bg-primary/15 text-primary items-center justify-center font-bold $textSize shrink-0 select-none"]) }} style="display: none;">
+        {{ $initial }}
+    </div>
 @else
     <div {{ $attributes->merge(['class' => "$size rounded-full bg-primary/15 text-primary flex items-center justify-center font-bold $textSize shrink-0 select-none"]) }}>
         {{ $initial }}

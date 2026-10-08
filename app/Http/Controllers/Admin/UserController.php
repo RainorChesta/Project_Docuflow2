@@ -120,6 +120,7 @@ class UserController extends Controller
             'company_ids.*' => 'exists:companies,id',
             'branch_ids' => 'nullable|array',
             'branch_ids.*' => 'exists:branches,id',
+            'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
         ]);
 
         unset($validated['password_confirmation']);
@@ -128,6 +129,12 @@ class UserController extends Controller
         $unitKerjaIds = $validated['unit_kerja_ids'] ?? [];
         $branchUnitKerjas = $request->input('branch_unit_kerjas', []);
         unset($validated['company_ids'], $validated['branch_ids'], $validated['unit_kerja_ids'], $validated['branch_unit_kerjas']);
+
+        if ($request->hasFile('profile_picture')) {
+            $validated['profile_picture'] = $request->file('profile_picture')->store('avatars', 'public');
+        } else {
+            unset($validated['profile_picture']);
+        }
 
         $validated['nip'] = filled($validated['nip'] ?? null) ? trim($validated['nip']) : null;
         $validated['phone_number'] = filled($validated['phone_number'] ?? null) ? trim($validated['phone_number']) : null;
@@ -227,6 +234,7 @@ class UserController extends Controller
             'company_ids.*' => 'exists:companies,id',
             'branch_ids' => 'nullable|array',
             'branch_ids.*' => 'exists:branches,id',
+            'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
         ]);
 
         unset($validated['password_confirmation']);
@@ -240,6 +248,20 @@ class UserController extends Controller
         $unitKerjaIds = $validated['unit_kerja_ids'] ?? [];
         $branchUnitKerjas = $request->input('branch_unit_kerjas', []);
         unset($validated['company_ids'], $validated['branch_ids'], $validated['unit_kerja_ids'], $validated['branch_unit_kerjas']);
+
+        if ($request->hasFile('profile_picture')) {
+            if ($user->profile_picture && \Illuminate\Support\Facades\Storage::disk('public')->exists($user->profile_picture)) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($user->profile_picture);
+            }
+            $validated['profile_picture'] = $request->file('profile_picture')->store('avatars', 'public');
+        } elseif ($request->boolean('remove_profile_picture')) {
+            if ($user->profile_picture && \Illuminate\Support\Facades\Storage::disk('public')->exists($user->profile_picture)) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($user->profile_picture);
+            }
+            $validated['profile_picture'] = null;
+        } else {
+            unset($validated['profile_picture']);
+        }
 
         $validated['nip'] = filled($validated['nip'] ?? null) ? trim($validated['nip']) : null;
         $validated['phone_number'] = filled($validated['phone_number'] ?? null) ? trim($validated['phone_number']) : null;

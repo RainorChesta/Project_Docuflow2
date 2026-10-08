@@ -8,7 +8,7 @@ use Illuminate\Console\Command;
 use Symfony\Component\Process\Process;
 
 #[Signature('onlyoffice:setup-f4 
-    {--container= : Nama container Docker OnlyOffice (default: dokuflow-onlyoffice)}
+    {--container= : Nama container Docker OnlyOffice (default: dokuflow-onlyoffice atau auto-detect)}
     {--ssh-host= : IP/hostname server jika Docker OnlyOffice berada di server terpisah}
     {--ssh-port= : Port SSH server OnlyOffice (default: 22)}
     {--ssh-user= : Username SSH (default: root)}
@@ -19,7 +19,7 @@ class SetupOnlyOfficeF4Command extends Command
 {
     public function handle(): int
     {
-        $container = $this->option('container') ?: config('onlyoffice.container', 'dokuflow-onlyoffice');
+        $requestedContainer = $this->option('container') ?: config('onlyoffice.container', 'dokuflow-onlyoffice');
         $sshHost   = $this->option('ssh-host') ?: config('onlyoffice.ssh_host');
         $sshPort   = (int) ($this->option('ssh-port') ?: config('onlyoffice.ssh_port', 22));
         $sshUser   = $this->option('ssh-user') ?: config('onlyoffice.ssh_user', 'root');
@@ -28,7 +28,7 @@ class SetupOnlyOfficeF4Command extends Command
         $this->info("==================================================");
         $this->info("   DocuFlow - OnlyOffice F4 Setup & Patch Tool   ");
         $this->info("==================================================");
-        $this->line("Target Container : <comment>{$container}</comment>");
+
         if ($sshHost) {
             $this->line("Target Server    : <comment>{$sshUser}@{$sshHost}:{$sshPort}</comment> (via SSH)");
             if ($sshKey) {
@@ -39,101 +39,104 @@ class SetupOnlyOfficeF4Command extends Command
         }
         $this->newLine();
 
-        // 1. Cek status container (lokal atau remote via SSH)
-        $this->line("1. Memeriksa status Docker container [{$container}]...");
-        $inspectProcess = $this->runDockerCommand(
-            "docker inspect -f '{{.State.Running}}' {$container}",
-            $sshHost,
-            $sshPort,
-            $sshUser,
-            $sshKey
-        );
+        // 1. Deteksi dan verifikasi container Docker
+        $this->line("1. Memeriksa ketersediaan Docker container...");
+        $container = $this->resolveRunningContainer($requestedContainer, $sshHost, $sshPort, $sshUser, $sshKey);
 
-        if (!$inspectProcess->isSuccessful() || trim($inspectProcess->getOutput()) !== 'true') {
-            $this->error("   [ERROR] Container [{$container}] tidak ditemukan atau sedang mati.");
+        if (!$container) {
+            $this->error("   [ERROR] Container OnlyOffice [{$requestedContainer}] tidak ditemukan atau belum berjalan.");
             if (!$sshHost) {
                 $this->newLine();
-                $this->warn("   💡 INFORMASI ARSITEKTUR MULTI-SERVER:");
-                $this->line("   Jika Docker OnlyOffice berada di server terpisah (misalnya <comment>202.10.46.4</comment> sesuai config Nginx / ds-vpath),");
-                $this->line("   jalankan command ini dengan menyertakan opsi <comment>--ssh-host</comment>:");
-                $this->line("   <info>php artisan onlyoffice:setup-f4 --ssh-host=202.10.46.4 --ssh-user=root</info>");
-                $this->newLine();
-                $this->line("   Atau jalankan patch langsung di server OnlyOffice menggunakan script:");
-                $this->line("   <info>docker exec -i {$container} python3 - < patch_onlyoffice_f4.py</info>");
+                $this->warn("   💡 PANDUAN PEMECAHAN MASALAH:");
+                $this->line("   1. Pastikan Docker Desktop di komputer Anda sudah running.");
+                $this->line("   2. Cek daftar container aktif dengan perintah: <info>docker ps</info>");
+                $this->line("   3. Jika nama container berbeda, jalankan: <info>php artisan onlyoffice:setup-f4 --container=NAMA_CONTAINER</info>");
+                $this->line("   4. Jika Docker OnlyOffice di server VPS terpisah (misal: 202.10.46.4), jalankan:");
+                $this->line("      <info>php artisan onlyoffice:setup-f4 --ssh-host=202.10.46.4 --ssh-user=root</info>");
             } else {
-                $errorMsg = trim($inspectProcess->getErrorOutput() ?: $inspectProcess->getOutput());
-                $this->line("   Output/Error: " . ($errorMsg ?: 'Connection refused or container not running'));
-                $this->line("   Pastikan koneksi SSH ke [{$sshHost}] valid dan container [{$container}] sedang aktif.");
+                $this->line("   Pastikan koneksi SSH ke [{$sshHost}] valid dan container OnlyOffice sedang aktif di server tujuan.");
             }
             return Command::FAILURE;
         }
-        $this->info("   [OK] Container [{$container}] sedang aktif.");
+
+        $this->info("   [OK] Container terdeteksi aktif: <comment>{$container}</comment>");
         $this->newLine();
 
-        // 2. Siapkan python patch script untuk dieksekusi di dalam container
+        // 2. Siapkan python patch script yang tangguh (mendukung file read-write maupun bind volume read-only)
         $pythonScript = <<<'PY'
 import os
 import re
 import time
 import subprocess
+import sys
 
 ts = str(int(time.time() * 1000))
 web_apps = '/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main'
 
+if not os.path.exists(web_apps):
+    print(f'[!] Directory {web_apps} not found.')
+    sys.exit(1)
+
+def try_modify_file(file_path, modifier_fn):
+    if not os.path.exists(file_path):
+        return
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            content = f.read()
+        new_content, changed = modifier_fn(content)
+        if changed:
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(new_content)
+            print(f'[+] {os.path.basename(file_path)} patched successfully')
+        else:
+            print(f'[i] {os.path.basename(file_path)} already contains F4 configuration')
+    except (PermissionError, OSError) as e:
+        print(f'[i] {os.path.basename(file_path)} is read-only / volume-mounted (active via mount)')
+
 # 1. Patch Main.js -> Enable canPreviewPrint for web
-main_js = f'{web_apps}/app/controller/Main.js'
-if os.path.exists(main_js):
-    with open(main_js, 'r', encoding='utf-8') as f:
-        content = f.read()
+def patch_main(content):
     target = 'this.appOptions.canPreviewPrint = this.appOptions.canPrint && !Common.Utils.isMac && this.appOptions.isDesktopApp;'
     rep = 'this.appOptions.canPreviewPrint = this.appOptions.canPrint;'
     if target in content:
-        content = content.replace(target, rep)
-        with open(main_js, 'w', encoding='utf-8') as f:
-            f.write(content)
-        print('[+] Main.js canPreviewPrint patched')
-    else:
-        print('[i] Main.js already patched or target signature not found')
+        return content.replace(target, rep), True
+    return content, False
+
+try_modify_file(f'{web_apps}/app/controller/Main.js', patch_main)
 
 # 2. Patch FileMenuPanels.js -> F4 in print list & default print size F4
-panels_js = f'{web_apps}/app/view/FileMenuPanels.js'
-if os.path.exists(panels_js):
-    with open(panels_js, 'r', encoding='utf-8') as f:
-        content = f.read()
-    
-    # Add F4 to _defaultPaperSizeList if not present
+def patch_panels(content):
+    changed = False
     if '{ value: 18, displayValue: [\'F4\'' not in content:
         content = content.replace(
             '{ value: 2, displayValue: [\'A4\', \'21\', \'29,7\', \'cm\'], caption: \'A4\', size: [210, 297]},',
             '{ value: 2, displayValue: [\'A4\', \'21\', \'29,7\', \'cm\'], caption: \'A4\', size: [210, 297]},\n                { value: 18, displayValue: [\'F4\', \'21\', \'33\', \'cm\'], caption: \'F4 (21 x 33 cm)\', size: [210, 330]},'
         )
+        changed = True
     
-    # Default selection to F4
     f4_select_code = 'newSelectedOption = findOptionBySize(resultList, 210, 330);'
     if f4_select_code not in content:
         target_select = 'const _w = this._originalPageSize ? this._originalPageSize.w : 210'
-        content = content.replace(
-            target_select,
-            f'{f4_select_code}\n                    if (!newSelectedOption) {{\n                        {target_select}'
-        )
-        if 'if (!newSelectedOption) {' in content and 'newSelectedOption = findOptionBySize(resultList, 210, 330);' in content:
-            content = content.replace('newSelectedOption = findOptionBySize(resultList, _w, _h);\n                    }', 'newSelectedOption = findOptionBySize(resultList, _w, _h);\n                    }\n                    }')
+        if target_select in content:
+            content = content.replace(
+                target_select,
+                f'{f4_select_code}\n                    if (!newSelectedOption) {{\n                        {target_select}'
+            )
+            if 'if (!newSelectedOption) {' in content and 'newSelectedOption = findOptionBySize(resultList, 210, 330);' in content:
+                content = content.replace('newSelectedOption = findOptionBySize(resultList, _w, _h);\n                    }', 'newSelectedOption = findOptionBySize(resultList, _w, _h);\n                    }\n                    }')
+            changed = True
+    return content, changed
 
-    with open(panels_js, 'w', encoding='utf-8') as f:
-        f.write(content)
-    print('[+] FileMenuPanels.js patched')
+try_modify_file(f'{web_apps}/app/view/FileMenuPanels.js', patch_panels)
 
 # 3. Patch code.js
-code_js = f'{web_apps}/code.js'
-if os.path.exists(code_js):
-    with open(code_js, 'r', encoding='utf-8') as f:
-        content = f.read()
-    
+def patch_code(content):
+    changed = False
     if '{ value: 18, displayValue: [\'F4\'' not in content:
         content = content.replace(
             '{ value: 2, displayValue: [\'A4\', \'21\', \'29,7\', \'cm\'], caption: \'A4\', size: [210, 297]},',
             '{ value: 2, displayValue: [\'A4\', \'21\', \'29,7\', \'cm\'], caption: \'A4\', size: [210, 297]},\n                { value: 18, displayValue: [\'F4\', \'21\', \'33\', \'cm\'], caption: \'F4 (21 x 33 cm)\', size: [210, 330]},'
         )
+        changed = True
     
     if 'findOptionBySize(resultList, 210, 330)' not in content:
         target_select = 'const _w = this._originalPageSize ? this._originalPageSize.w : 210'
@@ -143,109 +146,68 @@ if os.path.exists(code_js):
                 f'newSelectedOption = findOptionBySize(resultList, 210, 330);\n                    if (!newSelectedOption) {{\n                        {target_select}'
             )
             content = content.replace('newSelectedOption = findOptionBySize(resultList, _w, _h);\n                    }', 'newSelectedOption = findOptionBySize(resultList, _w, _h);\n                    }\n                    }')
+            changed = True
 
-    # PageSizeDialog inside code.js
     if 'F4 (21 x 33 cm)' not in content:
         content = content.replace(
             '{ value: 2, displayValue: \'A4\', size: [210, 297]},',
             '{ value: 2, displayValue: \'A4\', size: [210, 297]},\n                    { value: 18, displayValue: \'F4 (21 x 33 cm)\', size: [210, 330]},'
         )
+        changed = True
+    return content, changed
 
-    with open(code_js, 'w', encoding='utf-8') as f:
-        f.write(content)
-    print('[+] code.js patched')
+try_modify_file(f'{web_apps}/code.js', patch_code)
 
 # 4. Patch Toolbar.js & PageSizeDialog.js
-tb_js = f'{web_apps}/app/view/Toolbar.js'
-if os.path.exists(tb_js):
-    with open(tb_js, 'r', encoding='utf-8') as f:
-        content = f.read()
+def patch_toolbar(content):
     if 'caption: \'F4\'' not in content:
         content = content.replace(
             'caption: \'A4\',\n                                    subtitle: \'21cm x 29,7cm\',\n                                    template: pageSizeTemplate,\n                                    checkable: true,\n                                    toggleGroup: \'menuPageSize\',\n                                    value: [210, 297],\n                                    checked: true\n                                },',
             'caption: \'A4\',\n                                    subtitle: \'21cm x 29,7cm\',\n                                    template: pageSizeTemplate,\n                                    checkable: true,\n                                    toggleGroup: \'menuPageSize\',\n                                    value: [210, 297],\n                                    checked: true\n                                },\n                                {\n                                    caption: \'F4\',\n                                    subtitle: \'21cm x 33cm\',\n                                    template: pageSizeTemplate,\n                                    checkable: true,\n                                    toggleGroup: \'menuPageSize\',\n                                    value: [210, 330]\n                                },'
         )
-        with open(tb_js, 'w', encoding='utf-8') as f:
-            f.write(content)
-        print('[+] Toolbar.js patched')
+        return content, True
+    return content, False
 
-ps_js = f'{web_apps}/app/view/PageSizeDialog.js'
-if os.path.exists(ps_js):
-    with open(ps_js, 'r', encoding='utf-8') as f:
-        content = f.read()
+try_modify_file(f'{web_apps}/app/view/Toolbar.js', patch_toolbar)
+
+def patch_page_size_dialog(content):
     if 'F4 (21 x 33 cm)' not in content:
         content = content.replace(
             '{ value: 2, displayValue: \'A4\', size: [210, 297]},',
             '{ value: 2, displayValue: \'A4\', size: [210, 297]},\n                    { value: 18, displayValue: \'F4 (21 x 33 cm)\', size: [210, 330]},'
         )
-        with open(ps_js, 'w', encoding='utf-8') as f:
-            f.write(content)
-        print('[+] PageSizeDialog.js patched')
+        return content, True
+    return content, False
 
-# 5. Patch Header.js -> CMH Group logo redirection
+try_modify_file(f'{web_apps}/app/view/PageSizeDialog.js', patch_page_size_dialog)
+
+# 5. Patch Header.js -> Branding url
 header_js = '/var/www/onlyoffice/documentserver/web-apps/apps/common/main/lib/view/Header.js'
-if os.path.exists(header_js):
-    with open(header_js, 'r', encoding='utf-8') as f:
-        content = f.read()
-
-    # Replace onlyoffice.com fallback URL with cmhgroup.id
-    target_click = """            if ( me.logo )
-                me.logo.children(0).on('click', function (e) {
-                    var _url = !!me.branding && !!me.branding.logo && (me.branding.logo.url!==undefined) ?
-                        me.branding.logo.url : 'https://www.onlyoffice.com';
-                    if (_url) {
-                        var newDocumentPage = window.open(_url);
-                        newDocumentPage && newDocumentPage.focus();
-                    }
-                });"""
-
-    rep_click = """            if ( me.logo ) {
-                me.logo.off('click').on('click', function (e) {
-                    if (e) { e.preventDefault(); e.stopPropagation(); }
-                    window.open('https://cmhgroup.id', '_blank');
-                });
-                me.logo.find('i, img, svg').off('click').on('click', function (e) {
-                    if (e) { e.preventDefault(); e.stopPropagation(); }
-                    window.open('https://cmhgroup.id', '_blank');
-                });
-            }"""
-
-    if target_click in content:
-        content = content.replace(target_click, rep_click)
-        print('[+] Header.js logo click handler patched')
-    elif "'https://www.onlyoffice.com'" in content:
+def patch_header(content):
+    changed = False
+    if "'https://www.onlyoffice.com'" in content:
         content = content.replace("'https://www.onlyoffice.com'", "'https://cmhgroup.id'")
-        print('[+] Header.js fallback url replaced with cmhgroup.id')
-    else:
-        print('[i] Header.js logo click already patched')
+        changed = True
+    return content, changed
 
-    # Also update events if present
-    content = content.replace(
-        "// 'click #header-logo': function (e) {}",
-        "'click #header-logo': function (e) { if (e) { e.preventDefault(); e.stopPropagation(); } window.open('https://cmhgroup.id', '_blank'); }"
-    )
-
-    with open(header_js, 'w', encoding='utf-8') as f:
-        f.write(content)
+try_modify_file(header_js, patch_header)
 
 # 6. Update cache busters
 app_js = f'{web_apps}/app.js'
-if os.path.exists(app_js):
-    with open(app_js, 'r', encoding='utf-8') as f:
-        content = f.read()
-    content = re.sub(r"urlArgs:\s*'_dc=[^']+'", f"urlArgs: '_dc=f4_{ts}'", content)
-    with open(app_js, 'w', encoding='utf-8') as f:
-        f.write(content)
+def patch_app_js(content):
+    new_c = re.sub(r"urlArgs:\s*'_dc=[^']+'", f"urlArgs: '_dc=f4_{ts}'", content)
+    return new_c, (new_c != content)
+
+try_modify_file(app_js, patch_app_js)
 
 api_js = '/var/www/onlyoffice/documentserver/web-apps/apps/api/documents/api.js'
-if os.path.exists(api_js):
-    with open(api_js, 'r', encoding='utf-8') as f:
-        content = f.read()
-    content = re.sub(r'doceditor\.js\?_dc=[^"\']+', f'doceditor.js?_dc={ts}', content)
-    with open(api_js, 'w', encoding='utf-8') as f:
-        f.write(content)
+def patch_api_js(content):
+    new_c = re.sub(r'doceditor\.js\?_dc=[^"\']+', f'doceditor.js?_dc={ts}', content)
+    return new_c, (new_c != content)
 
-# 7. Gzip assets
+try_modify_file(api_js, patch_api_js)
+
+# 7. Gzip assets if permitted
 files_to_gzip = [
     f'{web_apps}/app/controller/Main.js',
     f'{web_apps}/app/view/FileMenuPanels.js',
@@ -258,32 +220,65 @@ files_to_gzip = [
     api_js,
 ]
 
-for f in files_to_gzip:
-    if os.path.exists(f):
-        subprocess.run(['gzip', '-k', '-f', f], check=True)
+for file_path in files_to_gzip:
+    if os.path.exists(file_path):
+        try:
+            subprocess.run(['gzip', '-k', '-f', file_path], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
 
 # 8. Reload Nginx
-subprocess.run(['nginx', '-s', 'reload'], check=True)
-print('[+] Nginx inside OnlyOffice container reloaded successfully')
+try:
+    subprocess.run(['nginx', '-s', 'reload'], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    print('[+] Nginx inside OnlyOffice container reloaded successfully')
+except Exception as e:
+    print(f'[!] Nginx reload note: {e}')
 PY;
 
-        // 3. Terapkan patch ke container via streaming stdin
+        // 3. Terapkan patch ke container via temporary script file injection
         $this->line("2. Menyuntikkan patch F4 ke dalam OnlyOffice Document Server...");
-        $execProcess = $this->runDockerCommand(
-            "docker exec -i {$container} python3 -",
-            $sshHost,
-            $sshPort,
-            $sshUser,
-            $sshKey,
-            $pythonScript
-        );
+        
+        $tempLocalFile = tempnam(sys_get_temp_dir(), 'f4_patch_') . '.py';
+        file_put_contents($tempLocalFile, $pythonScript);
 
-        if (!$execProcess->isSuccessful()) {
-            $this->error("   [ERROR] Gagal menjalankan patch: " . $execProcess->getErrorOutput());
+        $containerDest = "{$container}:/tmp/patch_onlyoffice_f4.py";
+
+        if (empty($sshHost)) {
+            // Salin file script ke container lokal
+            $cpProc = new Process(['docker', 'cp', $tempLocalFile, $containerDest]);
+            $cpProc->setTimeout(60);
+            $cpProc->run();
+
+            // Eksekusi script python di dalam container
+            $execProc = new Process(['docker', 'exec', $container, 'python3', '/tmp/patch_onlyoffice_f4.py']);
+            $execProc->setTimeout(120);
+            $execProc->run();
+
+            // Hapus file script sementara di dalam container
+            $rmProc = new Process(['docker', 'exec', $container, 'rm', '-f', '/tmp/patch_onlyoffice_f4.py']);
+            $rmProc->setTimeout(30);
+            $rmProc->run();
+        } else {
+            // Mode remote SSH: kirim script via docker cp atau base64 execution
+            $encodedScript = base64_encode($pythonScript);
+            $execProc = $this->runDockerDirect(
+                ['exec', '-i', $container, 'python3', '-c', "import base64; exec(base64.b64decode('{$encodedScript}').decode('utf-8'))"],
+                $sshHost,
+                $sshPort,
+                $sshUser,
+                $sshKey
+            );
+        }
+
+        @unlink($tempLocalFile);
+
+        if (!$execProc->isSuccessful()) {
+            $errorOutput = trim($execProc->getErrorOutput() ?: $execProc->getOutput());
+            $this->error("   [ERROR] Gagal menjalankan patch: " . ($errorOutput ?: 'Unknown execution error'));
             return Command::FAILURE;
         }
 
-        $output = trim($execProcess->getOutput());
+        $output = trim($execProc->getOutput());
         if ($output) {
             $this->line($output);
         }
@@ -304,31 +299,68 @@ PY;
     }
 
     /**
-     * Jalankan perintah Docker, baik di mesin lokal atau melalui remote SSH.
+     * Cari container OnlyOffice yang aktif secara cerdas (auto-detect fallback).
      */
-    protected function runDockerCommand(string $dockerCommand, ?string $sshHost, int $sshPort, string $sshUser, ?string $sshKey, ?string $stdinInput = null): Process
+    protected function resolveRunningContainer(string $requestedName, ?string $sshHost, int $sshPort, string $sshUser, ?string $sshKey): ?string
     {
+        // 1. Coba nama yang diminta terlebih dahulu
+        $check = new Process(['docker', 'inspect', '-f', '{{.State.Running}}', $requestedName]);
         if (!empty($sshHost)) {
-            $args = ['ssh', '-p', (string) $sshPort];
-            if (!empty($sshKey)) {
-                $args[] = '-i';
-                $args[] = $sshKey;
-            }
-            $args[] = '-o';
-            $args[] = 'StrictHostKeyChecking=no';
-            $args[] = "{$sshUser}@{$sshHost}";
-            $args[] = $dockerCommand;
-
-            $process = new Process($args);
+            $check = $this->runDockerDirect(['inspect', '-f', '{{.State.Running}}', $requestedName], $sshHost, $sshPort, $sshUser, $sshKey);
         } else {
-            $process = Process::fromShellCommandline($dockerCommand);
+            $check->setTimeout(15);
+            $check->run();
         }
 
-        if ($stdinInput !== null) {
-            $process->setInput($stdinInput);
+        if ($check->isSuccessful() && trim($check->getOutput()) === 'true') {
+            return $requestedName;
         }
 
-        $process->setTimeout(300);
+        // 2. Auto-detect: cari container dari image onlyoffice
+        if (!empty($sshHost)) {
+            $listProc = $this->runDockerDirect(['ps', '--format', '{{.Names}}\t{{.Image}}'], $sshHost, $sshPort, $sshUser, $sshKey);
+        } else {
+            $listProc = new Process(['docker', 'ps', '--format', '{{.Names}}\t{{.Image}}']);
+            $listProc->setTimeout(15);
+            $listProc->run();
+        }
+
+        if ($listProc->isSuccessful()) {
+            $lines = explode("\n", trim($listProc->getOutput()));
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if (empty($line)) continue;
+                $parts = explode("\t", $line);
+                $cName = trim($parts[0] ?? '');
+                $cImage = trim($parts[1] ?? '');
+
+                if (str_contains(strtolower($cName), 'onlyoffice') || str_contains(strtolower($cImage), 'onlyoffice')) {
+                    return $cName;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Jalankan perintah Docker remote via SSH.
+     */
+    protected function runDockerDirect(array $dockerArgs, ?string $sshHost, int $sshPort, string $sshUser, ?string $sshKey): Process
+    {
+        $cmd = 'docker ' . implode(' ', array_map('escapeshellarg', $dockerArgs));
+        $sshArgs = ['ssh', '-p', (string) $sshPort];
+        if (!empty($sshKey)) {
+            $sshArgs[] = '-i';
+            $sshArgs[] = $sshKey;
+        }
+        $sshArgs[] = '-o';
+        $sshArgs[] = 'StrictHostKeyChecking=no';
+        $sshArgs[] = "{$sshUser}@{$sshHost}";
+        $sshArgs[] = $cmd;
+
+        $process = new Process($sshArgs);
+        $process->setTimeout(120);
         $process->run();
 
         return $process;

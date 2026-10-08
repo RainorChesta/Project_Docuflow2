@@ -183,14 +183,17 @@
 
                 <div class="bg-base-100 p-3.5 rounded-xl border border-base-200">
                     <span class="text-base-content/50 block mb-1">{{ __('Unit Kerja') }}</span>
-                    @if($user->unitKerjas->isNotEmpty())
+                    @php
+                        $profileUks = $user->unitKerjas->isNotEmpty()
+                            ? $user->unitKerjas->unique(fn($uk) => trim($uk->kode_unit_kerja ?: $uk->nama_unit_kerja))
+                            : ($user->unitKerja ? collect([$user->unitKerja]) : collect());
+                    @endphp
+                    @if($profileUks->isNotEmpty())
                         <div class="flex flex-wrap gap-1">
-                            @foreach($user->unitKerjas as $uk)
+                            @foreach($profileUks as $uk)
                                 <span class="font-semibold text-base-content bg-base-200 px-1.5 py-0.5 rounded">{{ $uk->kode_unit_kerja ?: $uk->nama_unit_kerja }}</span>
                             @endforeach
                         </div>
-                    @elseif($user->unitKerja)
-                        <span class="font-semibold text-base-content">{{ $user->unitKerja->nama_unit_kerja }}</span>
                     @else
                         <span class="text-base-content/40 italic">-</span>
                     @endif

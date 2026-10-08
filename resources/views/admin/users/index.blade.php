@@ -92,24 +92,71 @@
                                             <span class="text-xs text-base-content/40 italic font-mono">{{ __('(N/A)') }}</span>
                                         @elseif($user->system_role === 'pic_klinik')
                                             <span class="text-xs text-primary font-medium italic">{{ __('(Seluruh Unit Kerja)') }}</span>
-                                        @elseif($user->unitKerjas->isNotEmpty() || $user->unitKerja)
-                                            <div class="flex flex-wrap items-center gap-1.5 max-w-[220px]">
-                                                @foreach($user->unitKerjas as $uk)
-                                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-primary/10 text-primary border border-primary/20" title="Unit Kerja: {{ $uk->nama_unit_kerja }} ({{ $uk->cabang?->name }})">
-                                                        UK: {{ $uk->kode_unit_kerja }}
-                                                    </span>
-                                                @endforeach
-                                                @if($user->unitKerjas->isEmpty() && $user->unitKerja)
-                                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-primary/10 text-primary border border-primary/20" title="Unit Kerja: {{ $user->unitKerja->nama_unit_kerja }} ({{ $user->unitKerja->cabang?->name }})">
-                                                        UK: {{ $user->unitKerja->kode_unit_kerja }}
-                                                    </span>
-                                                @endif
-                                            </div>
                                         @else
-                                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30 whitespace-nowrap">
-                                                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                                                {{ __('Belum ditugaskan') }}
-                                            </span>
+                                            @php
+                                                $allUks = $user->unitKerjas->isNotEmpty()
+                                                    ? $user->unitKerjas
+                                                    : ($user->unitKerja ? collect([$user->unitKerja]) : collect());
+                                                
+                                                // Deduplikasi berdasarkan kode atau nama unit kerja agar tidak muncul berulang untuk cabang berbeda
+                                                $uniqueUks = $allUks->unique(function ($uk) {
+                                                    return trim($uk->kode_unit_kerja ?: $uk->nama_unit_kerja);
+                                                });
+                                            @endphp
+
+                                            @if($uniqueUks->isNotEmpty())
+                                                @php
+                                                    $limit = 2;
+                                                    $hasMore = $uniqueUks->count() > $limit;
+                                                @endphp
+                                                <div x-data="{ expanded: false }" class="space-y-1 max-w-[220px]">
+                                                    <div class="flex flex-wrap items-center gap-1.5">
+                                                        @foreach($uniqueUks->take($limit) as $uk)
+                                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-primary/10 text-primary border border-primary/20" title="{{ $uk->nama_unit_kerja ? $uk->nama_unit_kerja . ' (' . $uk->kode_unit_kerja . ')' : $uk->kode_unit_kerja }}">
+                                                                UK: {{ $uk->kode_unit_kerja ?: $uk->nama_unit_kerja }}
+                                                            </span>
+                                                        @endforeach
+
+                                                        @if($hasMore)
+                                                            <button type="button" 
+                                                                    x-show="!expanded"
+                                                                    @click="expanded = true" 
+                                                                    class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold bg-base-200 hover:bg-primary/10 hover:text-primary hover:border-primary/30 border border-base-300 text-base-content/70 transition-all cursor-pointer" 
+                                                                    title="{{ __('Tampilkan semua :count unit kerja', ['count' => $uniqueUks->count()]) }}">
+                                                                <span>+{{ $uniqueUks->count() - $limit }}</span>
+                                                                <span class="text-[10px] text-primary underline">{{ __('Lihat') }}</span>
+                                                            </button>
+                                                        @endif
+                                                    </div>
+
+                                                    @if($hasMore)
+                                                        <div x-show="expanded" x-cloak class="pt-0.5 space-y-1">
+                                                            <div class="flex flex-wrap items-center gap-1.5">
+                                                                @foreach($uniqueUks->slice($limit) as $uk)
+                                                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-primary/10 text-primary border border-primary/20" title="{{ $uk->nama_unit_kerja ? $uk->nama_unit_kerja . ' (' . $uk->kode_unit_kerja . ')' : $uk->kode_unit_kerja }}">
+                                                                        UK: {{ $uk->kode_unit_kerja ?: $uk->nama_unit_kerja }}
+                                                                    </span>
+                                                                @endforeach
+                                                            </div>
+                                                            <div>
+                                                                <button type="button" 
+                                                                        @click="expanded = false" 
+                                                                        class="inline-flex items-center gap-1 text-[11px] font-medium text-base-content/60 hover:text-primary transition-colors cursor-pointer">
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                                                                    </svg>
+                                                                    <span class="underline">{{ __('Tutup') }}</span>
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            @else
+                                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30 whitespace-nowrap">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                                    {{ __('Belum ditugaskan') }}
+                                                </span>
+                                            @endif
                                         @endif
                                     </td>
                                     <td class="align-middle">

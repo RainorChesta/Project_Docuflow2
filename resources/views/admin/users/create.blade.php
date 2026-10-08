@@ -7,9 +7,10 @@
                  x-data="{
                      role: '{{ old('system_role', 'user') }}',
                      selectedCompanies: ({{ json_encode(old('company_ids', [])) }} || []).map(String),
-                     selectedBranches: ({{ json_encode(old('branch_ids', [])) }} || []).map(String)
+                     selectedBranches: ({{ json_encode(old('branch_ids', [])) }} || []).map(String),
+                     avatarPreview: null
                  }">
-                <form method="POST" action="{{ route('admin.users.store') }}" autocomplete="off">
+                <form method="POST" action="{{ route('admin.users.store') }}" enctype="multipart/form-data" autocomplete="off">
                     @csrf
                     @if($errors->any())
                         <div class="alert alert-error mb-4">
@@ -20,6 +21,31 @@
                             </ul>
                         </div>
                     @endif
+
+                    {{-- Foto Profil --}}
+                    <div class="rounded-xl border border-base-200 bg-base-200/30 p-4 mb-4">
+                        <label class="text-xs font-semibold text-base-content/70 uppercase tracking-wider block mb-2">
+                            {{ __('Foto Profil (Opsional)') }}
+                        </label>
+                        <div class="flex items-center gap-4">
+                            <div class="relative shrink-0">
+                                <template x-if="avatarPreview">
+                                    <img :src="avatarPreview" class="w-14 h-14 rounded-full object-cover border-2 border-primary/30 shadow-xs">
+                                </template>
+                                <template x-if="!avatarPreview">
+                                    <div class="w-14 h-14 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-lg border border-base-300">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                        </svg>
+                                    </div>
+                                </template>
+                            </div>
+                            <div class="flex-1 space-y-1">
+                                <input type="file" name="profile_picture" id="profile_picture" accept="image/png,image/jpeg,image/jpg,image/webp" class="file-input file-input-bordered file-input-sm w-full max-w-xs" @change="avatarPreview = $event.target.files[0] ? URL.createObjectURL($event.target.files[0]) : null">
+                                <p class="text-[11px] text-base-content/50">{{ __('Format: JPG, PNG, WEBP. Maks 2MB.') }}</p>
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                         <div class="form-control w-full">
