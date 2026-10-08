@@ -2232,12 +2232,12 @@ class OnlyOfficeService
             $headerTempFile = $tempImagePath;
             $headerHeightPx = $h;
         } else {
-            // Portrait / Full Page scan: detect Top Kop and Bottom Footer (fully dynamic without limits)
+            // Portrait / Full Page scan: detect Top Kop and Bottom Footer (fully dynamic without any artificial limits)
             $topEnd = 0;
             $emptyStreak = 0;
             $foundAnyTop = false;
 
-            $scanLimitY = (int)($h * 0.75);
+            $scanLimitY = (int)($h * 0.95);
             for ($y = 0; $y < $scanLimitY; $y++) {
                 $rowDark = 0;
                 for ($x = 0; $x < $w; $x += 4) {
@@ -2256,7 +2256,7 @@ class OnlyOfficeService
                 } else {
                     if ($foundAnyTop) {
                         $emptyStreak++;
-                        if ($emptyStreak > 30) {
+                        if ($emptyStreak > 25) {
                             break;
                         }
                     }
@@ -2264,11 +2264,11 @@ class OnlyOfficeService
             }
             $topEnd = min($h, $topEnd + 15);
 
-            // Detect Footer if any (fully dynamic without artificial height limits)
+            // Detect Footer if any (fully dynamic up to bottom edge)
             $bottomStart = $h;
             $emptyStreak = 0;
             $foundAnyBottom = false;
-            $scanBottomLimitY = max(0, $topEnd + 20);
+            $scanBottomLimitY = max(0, $topEnd + 10);
 
             for ($y = $h - 1; $y > $scanBottomLimitY; $y--) {
                 $rowDark = 0;
@@ -2288,7 +2288,7 @@ class OnlyOfficeService
                 } else {
                     if ($foundAnyBottom) {
                         $emptyStreak++;
-                        if ($emptyStreak > 30) {
+                        if ($emptyStreak > 25) {
                             break;
                         }
                     }
@@ -2296,8 +2296,8 @@ class OnlyOfficeService
             }
             $bottomStart = max(0, $bottomStart - 15);
 
-            if ($foundAnyTop && $topEnd > 20 && $topEnd < $bottomStart) {
-                // Crop Header Kop
+            if ($foundAnyTop && $topEnd > 10 && $topEnd < $bottomStart) {
+                // Crop Header Kop (exact height from file)
                 $headerIm = imagecreatetruecolor($w, $topEnd);
                 imagecopy($headerIm, $im, 0, 0, 0, 0, $w, $topEnd);
                 $headerTempFile = storage_path('app/temp_crop_h_' . uniqid() . '.png');
@@ -2305,8 +2305,8 @@ class OnlyOfficeService
                 imagedestroy($headerIm);
                 $headerHeightPx = $topEnd;
 
-                // Crop Footer if present (any size)
-                if ($foundAnyBottom && ($h - $bottomStart) > 10 && $bottomStart > ($topEnd + 10)) {
+                // Crop Footer if present (exact height from file)
+                if ($foundAnyBottom && ($h - $bottomStart) > 5 && $bottomStart > ($topEnd + 5)) {
                     $footerH = $h - $bottomStart;
                     $footerIm = imagecreatetruecolor($w, $footerH);
                     imagecopy($footerIm, $im, 0, 0, 0, $bottomStart, $w, $footerH);
@@ -2316,7 +2316,7 @@ class OnlyOfficeService
                     $footerHeightPx = $footerH;
                 }
             } else {
-                // Whole image
+                // Full page background design (100% exact replica of entire page)
                 $headerTempFile = $tempImagePath;
                 $headerHeightPx = $h;
             }
@@ -2346,33 +2346,33 @@ class OnlyOfficeService
         if ($isBanner) {
             $marginLeft = 1440; // 1 inch (2.54 cm)
             $marginRight = 1134; // ~2.0 cm
-            $headerMarginTwips = 450; // ~0.8 cm from top of paper
-            $footerMarginTwips = 450;
+            $headerMarginTwips = 360; // 0.63 cm
+            $footerMarginTwips = 360;
         } else {
             $leftRatio = $minX / $w;
             $rightRatio = ($w - $maxX) / $w;
             $marginLeft = max(720, min(2500, (int)round(11906 * $leftRatio)));
             $marginRight = max(720, min(2500, (int)round(11906 * $rightRatio)));
-            $headerMarginTwips = 450;
-            $footerMarginTwips = 450;
+            $headerMarginTwips = 360;
+            $footerMarginTwips = 360;
         }
 
         imagedestroy($im);
 
         $headerH_Emu = (int)round(($headerHeightPx / $h) * $pageH_Emu);
         $headerHTwips = (int)round($headerH_Emu / 635);
-        $marginTopTwips = max(1440, $headerHTwips + 300);
+        $marginTopTwips = max(720, $headerHTwips + 200);
 
         $footerH_Emu = 0;
         $footerHTwips = 0;
         $footerTopOffset_Emu = $pageH_Emu;
-        $marginBottomTwips = 1440;
+        $marginBottomTwips = 720;
 
         if ($footerTempFile && $footerHeightPx > 0) {
             $footerH_Emu = (int)round(($footerHeightPx / $h) * $pageH_Emu);
             $footerHTwips = (int)round($footerH_Emu / 635);
             $footerTopOffset_Emu = $pageH_Emu - $footerH_Emu;
-            $marginBottomTwips = max(1440, $footerHTwips + 300);
+            $marginBottomTwips = max(720, $footerHTwips + 200);
         }
 
         $marginLeftTwips = 1440; // 2.54 cm standard
