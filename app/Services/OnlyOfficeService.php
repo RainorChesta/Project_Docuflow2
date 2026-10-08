@@ -1969,8 +1969,18 @@ class OnlyOfficeService
                 return $targetDocxBinary;
             }
 
-            // Add all header, footer, and media files to target ZIP
+            // Add all header, footer, and media files to target ZIP with strict OpenXML positioning sanitization
             foreach ($kopFiles as $name => $content) {
+                if (preg_match('#^word/footer\d*\.xml$#i', $name)) {
+                    // Fix double-offset bug: a:off inside anchor must be (0,0) relative to anchor frame
+                    $content = preg_replace('/<a:off\b[^>]*\/>/i', '<a:off x="0" y="0"/>', $content);
+                    // Ensure footer sticks to bottom of page seamlessly across all paper sizes (A4 & F4)
+                    if (str_contains($content, 'relativeFrom="page"')) {
+                        $content = preg_replace('/<wp:positionV\b[^>]*relativeFrom="page"[^>]*>.*?<\/wp:positionV>/s', '<wp:positionV relativeFrom="page"><wp:align>bottom</wp:align></wp:positionV>', $content);
+                    }
+                } elseif (preg_match('#^word/header\d*\.xml$#i', $name)) {
+                    $content = preg_replace('/<a:off\b[^>]*\/>/i', '<a:off x="0" y="0"/>', $content);
+                }
                 $zipTarget->addFromString($name, $content);
             }
 
@@ -2232,7 +2242,7 @@ class OnlyOfficeService
             $headerTempFile = $tempImagePath;
             $headerHeightPx = $h;
         } else {
-            // Portrait / Full Page scan: detect Top Kop and Bottom Footer (fully dynamic without any artificial limits)
+            // Portrait / Full Page scan: detect Top Kop and Bottom Footer with full subpixel sensitivity
             $topEnd = 0;
             $emptyStreak = 0;
             $foundAnyTop = false;
@@ -2240,16 +2250,16 @@ class OnlyOfficeService
             $scanLimitY = (int)($h * 0.95);
             for ($y = 0; $y < $scanLimitY; $y++) {
                 $rowDark = 0;
-                for ($x = 0; $x < $w; $x += 4) {
+                for ($x = 0; $x < $w; $x++) {
                     $rgb = imagecolorat($im, $x, $y);
                     $r = ($rgb >> 16) & 0xFF;
                     $g = ($rgb >> 8) & 0xFF;
                     $b = $rgb & 0xFF;
-                    if ($r < 220 || $g < 220 || $b < 220) {
+                    if ($r < 248 || $g < 248 || $b < 248) {
                         $rowDark++;
                     }
                 }
-                if ($rowDark > 3) {
+                if ($rowDark > 0) {
                     $foundAnyTop = true;
                     $emptyStreak = 0;
                     $topEnd = $y;
@@ -2262,9 +2272,9 @@ class OnlyOfficeService
                     }
                 }
             }
-            $topEnd = min($h, $topEnd + 15);
+            $topEnd = min($h, $topEnd + 10);
 
-            // Detect Footer if any (fully dynamic up to bottom edge)
+            // Detect Footer if any (accurate subpixel scan from bottom edge up)
             $bottomStart = $h;
             $emptyStreak = 0;
             $foundAnyBottom = false;
@@ -2272,16 +2282,16 @@ class OnlyOfficeService
 
             for ($y = $h - 1; $y > $scanBottomLimitY; $y--) {
                 $rowDark = 0;
-                for ($x = 0; $x < $w; $x += 4) {
+                for ($x = 0; $x < $w; $x++) {
                     $rgb = imagecolorat($im, $x, $y);
                     $r = ($rgb >> 16) & 0xFF;
                     $g = ($rgb >> 8) & 0xFF;
                     $b = $rgb & 0xFF;
-                    if ($r < 220 || $g < 220 || $b < 220) {
+                    if ($r < 248 || $g < 248 || $b < 248) {
                         $rowDark++;
                     }
                 }
-                if ($rowDark > 3) {
+                if ($rowDark > 0) {
                     $foundAnyBottom = true;
                     $emptyStreak = 0;
                     $bottomStart = $y;
@@ -2294,7 +2304,7 @@ class OnlyOfficeService
                     }
                 }
             }
-            $bottomStart = max(0, $bottomStart - 15);
+            $bottomStart = max(0, $bottomStart - 10);
 
             if ($foundAnyTop && $topEnd > 10 && $topEnd < $bottomStart) {
                 // Crop Header Kop (exact height from file)
@@ -2346,33 +2356,31 @@ class OnlyOfficeService
         if ($isBanner) {
             $marginLeft = 1440; // 1 inch (2.54 cm)
             $marginRight = 1134; // ~2.0 cm
-            $headerMarginTwips = 360; // 0.63 cm
-            $footerMarginTwips = 360;
+            $headerMarginTwips = 0;
+            $footerMarginTwips = 0;
         } else {
             $leftRatio = $minX / $w;
             $rightRatio = ($w - $maxX) / $w;
             $marginLeft = max(720, min(2500, (int)round(11906 * $leftRatio)));
             $marginRight = max(720, min(2500, (int)round(11906 * $rightRatio)));
-            $headerMarginTwips = 360;
-            $footerMarginTwips = 360;
+            $headerMarginTwips = 0;
+            $footerMarginTwips = 0;
         }
 
         imagedestroy($im);
 
         $headerH_Emu = (int)round(($headerHeightPx / $h) * $pageH_Emu);
         $headerHTwips = (int)round($headerH_Emu / 635);
-        $marginTopTwips = max(720, $headerHTwips + 200);
+        $marginTopTwips = max(1440, min(3600, $headerHTwips + 200));
 
         $footerH_Emu = 0;
         $footerHTwips = 0;
-        $footerTopOffset_Emu = $pageH_Emu;
-        $marginBottomTwips = 720;
+        $marginBottomTwips = 1134;
 
         if ($footerTempFile && $footerHeightPx > 0) {
             $footerH_Emu = (int)round(($footerHeightPx / $h) * $pageH_Emu);
             $footerHTwips = (int)round($footerH_Emu / 635);
-            $footerTopOffset_Emu = $pageH_Emu - $footerH_Emu;
-            $marginBottomTwips = max(720, $footerHTwips + 200);
+            $marginBottomTwips = max(1134, min(3600, $footerHTwips + 200));
         }
 
         $marginLeftTwips = 1440; // 2.54 cm standard
@@ -2420,7 +2428,7 @@ class OnlyOfficeService
                 '<wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="251658240" behindDoc="1" locked="1" layoutInCell="1" allowOverlap="1">' .
                 '<wp:simplePos x="0" y="0"/>' .
                 '<wp:positionH relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionH>' .
-                '<wp:positionV relativeFrom="page"><wp:posOffset>' . $footerTopOffset_Emu . '</wp:posOffset></wp:positionV>' .
+                '<wp:positionV relativeFrom="page"><wp:align>bottom</wp:align></wp:positionV>' .
                 '<wp:extent cx="' . $pageW_Emu . '" cy="' . $footerH_Emu . '"/>' .
                 '<wp:effectExtent l="0" t="0" r="0" b="0"/>' .
                 '<wp:wrapNone/>' .
@@ -2429,7 +2437,7 @@ class OnlyOfficeService
                 '<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">' .
                 '<pic:pic><pic:nvPicPr><pic:cNvPr id="2" name="Footer Picture"/><pic:cNvPicPr/></pic:nvPicPr>' .
                 '<pic:blipFill><a:blip r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>' .
-                '<pic:spPr><a:xfrm><a:off x="0" y="' . $footerTopOffset_Emu . '"/><a:ext cx="' . $pageW_Emu . '" cy="' . $footerH_Emu . '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>' .
+                '<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' . $pageW_Emu . '" cy="' . $footerH_Emu . '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>' .
                 '</pic:pic></a:graphicData></a:graphic>' .
                 '</wp:anchor></w:drawing></w:r></w:p></w:ftr>';
 
