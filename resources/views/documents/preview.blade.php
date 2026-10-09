@@ -332,48 +332,37 @@
                             </button>
 
                             <dialog id="export-pdf-modal" class="modal" x-data="{
-                                withKop: '1',
+                                withKop: '{{ $document->hasKop() ? '1' : '0' }}',
+                                hasKopDoc: {{ $document->hasKop() ? 'true' : 'false' }},
                                 paperSize: '{{ $document->paper_size ?? 'A4' }}',
                                 customWidth: '',
                                 customHeight: '',
                                 customUnit: 'cm',
-                                isPrinting: false,
                                 downloadDocx() {
                                     const url = '{{ route('documents.download', $document) }}?with_kop=' + this.withKop;
                                     window.location.href = url;
                                     document.getElementById('export-pdf-modal').close();
                                 },
-                                printToPrinter() {
-                                    this.isPrinting = true;
-                                    const form = document.getElementById('form-export-pdf-preview');
-                                    const formData = new FormData(form);
-
-                                    fetch('{{ route('documents.export-pdf', $document) }}', {
-                                        method: 'POST',
-                                        headers: {
-                                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                                            'Accept': 'application/json'
-                                        },
-                                        body: formData
-                                    })
-                                    .then(r => r.json())
-                                    .then(data => {
-                                        if (data.success && data.url) {
-                                            const printWin = window.open(data.url, '_blank');
-                                            if (printWin) {
-                                                printWin.focus();
+                                applyPrintOnlyOffice() {
+                                    document.getElementById('export-pdf-modal').close();
+                                    const previewContainer = document.getElementById('docx-preview-{{ $document->latestVersion?->id ?? $document->id }}') || document.querySelector('iframe');
+                                    if (previewContainer) {
+                                        previewContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    }
+                                    if (window.docEditorPreview) {
+                                        try {
+                                            if (typeof window.docEditorPreview.print === 'function') {
+                                                window.docEditorPreview.print();
+                                            } else {
+                                                const iframe = previewContainer ? (previewContainer.querySelector('iframe') || previewContainer) : null;
+                                                if (iframe && iframe.contentWindow) {
+                                                    iframe.contentWindow.postMessage(JSON.stringify({ type: 'onExternalPluginMessage', subType: 'print' }), '*');
+                                                }
                                             }
-                                            document.getElementById('export-pdf-modal').close();
-                                        } else {
-                                            form.submit();
+                                        } catch(e) {
+                                            console.warn('ONLYOFFICE print error:', e);
                                         }
-                                    })
-                                    .catch(() => {
-                                        form.submit();
-                                    })
-                                    .finally(() => {
-                                        this.isPrinting = false;
-                                    });
+                                    }
                                 }
                             }">
                                 <div class="modal-box max-w-lg max-h-[85vh] overflow-y-auto text-left">
@@ -387,13 +376,7 @@
                                             </div>
                                             <div>
                                                 <h3 class="font-bold text-base text-base-content leading-tight">{{ __('Cetak & Unduh Dokumen') }}</h3>
-                                                <p class="text-xs text-base-content/60">
-                                                    @if($document->hasKop())
-                                                        {{ __('Pilih preferensi kop surat dan format cetak dokumen') }}
-                                                    @else
-                                                        {{ __('Pilih format dan ukuran kertas untuk mencetak atau mengunduh') }}
-                                                    @endif
-                                                </p>
+                                                <p class="text-xs text-base-content/60" x-text="hasKopDoc && withKop === '1' ? '{{ __('Mencetak dokumen resmi dengan kop surat langsung di editor ONLYOFFICE') }}' : '{{ __('Pilih format dan ukuran kertas untuk mengunduh dokumen') }}'"></p>
                                             </div>
                                         </div>
                                         <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('export-pdf-modal').close()">
@@ -419,10 +402,10 @@
                                                             <span class="text-xs sm:text-sm font-bold text-base-content flex items-center gap-1.5">
                                                                 {{ __('Dengan Kop Surat Resmi') }}
                                                             </span>
-                                                            <span class="badge badge-primary badge-xs font-semibold shrink-0">{{ __('Kertas Polos') }}</span>
+                                                            <span class="badge badge-primary badge-xs font-semibold shrink-0">{{ __('Cetak Editor') }}</span>
                                                         </div>
                                                         <p class="text-[11px] text-base-content/60 mt-1 leading-normal">
-                                                            {{ __('Menyertakan kop surat resmi korporat/cabang di bagian atas dokumen. Cocok untuk arsip digital atau dicetak di atas kertas kosong/polos.') }}
+                                                            {{ __('Menyertakan kop surat resmi. Mengarahkan otomatis ke tampilan print editor ONLYOFFICE untuk dicetak di atas kertas polos.') }}
                                                         </p>
                                                     </div>
                                                 </label>
@@ -436,10 +419,10 @@
                                                             <span class="text-xs sm:text-sm font-bold text-base-content flex items-center gap-1.5">
                                                                 {{ __('Tanpa Kop Surat (Kertas Kop Fisik)') }}
                                                             </span>
-                                                            <span class="badge badge-ghost badge-xs font-semibold shrink-0 border-base-300">{{ __('Pre-printed') }}</span>
+                                                            <span class="badge badge-ghost badge-xs font-semibold shrink-0 border-base-300">{{ __('Unduh Word / PDF') }}</span>
                                                         </div>
                                                         <p class="text-[11px] text-base-content/60 mt-1 leading-normal">
-                                                            {{ __('Header kop surat dilepas otomatis. Cocok jika Anda mencetak langsung pada printer dengan kertas fisik yang sudah tercetak kop resminya.') }}
+                                                            {{ __('Header kop surat dilepas otomatis. Anda dapat mengunduh format Word (.docx) atau PDF untuk dicetak pada kertas fisik yang sudah tercetak kopnya.') }}
                                                         </p>
                                                     </div>
                                                 </label>
@@ -452,8 +435,8 @@
                                         @csrf
                                         <input type="hidden" name="with_kop" :value="withKop">
 
-                                        {{-- Format Kertas Cetak PDF --}}
-                                        <div class="form-control w-full mb-4 bg-base-200/40 p-3 rounded-2xl border border-base-200">
+                                        {{-- Format Kertas Cetak PDF (Hanya tampil saat tanpa kop atau dokumen tanpa kop) --}}
+                                        <div x-show="!hasKopDoc || withKop === '0'" x-transition class="form-control w-full mb-4 bg-base-200/40 p-3 rounded-2xl border border-base-200">
                                             <label class="label py-0 pb-1.5">
                                                 <span class="label-text font-bold text-xs text-base-content/80">{{ __('Ukuran Kertas Cetak PDF') }}</span>
                                                 <span class="label-text-alt text-[11px] text-primary font-semibold">{{ __('Default Dokumen: :size', ['size' => $document->paper_size ?? 'A4']) }}</span>
@@ -497,19 +480,24 @@
                                         {{-- Action Buttons --}}
                                         <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-3 border-t border-base-200">
                                             <button type="button" class="btn btn-ghost btn-sm order-last sm:order-first" onclick="document.getElementById('export-pdf-modal').close()">{{ __('Batal') }}</button>
-                                            <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 justify-end">
-                                                <button type="button" @click="downloadDocx()" class="btn btn-outline btn-sm gap-1.5 font-medium shadow-xs">
+                                            
+                                            {{-- Jika Dengan Kop Surat: Tombol Buka Cetak ONLYOFFICE --}}
+                                            <div x-show="hasKopDoc && withKop === '1'" class="flex items-center justify-end gap-2">
+                                                <button type="button" @click="applyPrintOnlyOffice()" class="btn btn-primary btn-sm gap-1.5 font-medium shadow-xs" title="{{ __('Buka Tampilan Print Editor ONLYOFFICE') }}">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                                                    {{ __('Terapkan & Cetak Dokumen') }}
+                                                </button>
+                                            </div>
+
+                                            {{-- Jika Tanpa Kop Surat atau dokumen tidak ada kop: Tombol Unduh Word & Unduh PDF --}}
+                                            <div x-show="!hasKopDoc || withKop === '0'" class="flex flex-wrap sm:flex-nowrap items-center gap-2 justify-end">
+                                                <button type="button" @click="downloadDocx()" class="btn btn-outline btn-sm gap-1.5 font-medium shadow-xs" title="{{ __('Unduh file Word DOCX tanpa kop') }}">
                                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                                                     {{ __('Unduh Word') }}
                                                 </button>
-                                                <button type="submit" class="btn btn-outline btn-primary btn-sm gap-1.5 font-medium shadow-xs" title="{{ __('Unduh file PDF') }}">
+                                                <button type="submit" class="btn btn-primary btn-sm gap-1.5 font-medium shadow-xs" title="{{ __('Unduh file PDF tanpa kop') }}">
                                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                                                     {{ __('Unduh PDF') }}
-                                                </button>
-                                                <button type="button" @click="printToPrinter()" :disabled="isPrinting" class="btn btn-primary btn-sm gap-1.5 font-medium shadow-xs">
-                                                    <span x-show="isPrinting" class="loading loading-spinner loading-xs"></span>
-                                                    <svg x-show="!isPrinting" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                                                    <span x-text="isPrinting ? '{{ __('Memproses...') }}' : '{{ __('Cetak ke Printer') }}'"></span>
                                                 </button>
                                             </div>
                                         </div>

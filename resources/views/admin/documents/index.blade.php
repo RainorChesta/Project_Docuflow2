@@ -204,103 +204,149 @@
                         </div>
 
                         {{-- Company Filter --}}
+                        @php
+                            $companyOptions = $companies->map(fn($c) => [
+                                'value' => (string) $c->id,
+                                'label' => $c->name . ($c->code ? ' ('.$c->code.')' : ''),
+                            ])->values()->all();
+                        @endphp
                         <div>
                             <label class="label py-1">
                                 <span class="label-text text-xs font-bold text-base-content/70">{{ __('Perusahaan') }}</span>
                             </label>
-                            <select name="company_id" class="select select-bordered select-sm w-full text-xs bg-base-100 shadow-2xs">
-                                <option value="">{{ __('Semua Perusahaan') }}</option>
-                                @foreach($companies as $company)
-                                    <option value="{{ $company->id }}" {{ ($selectedCompanyId == $company->id) ? 'selected' : '' }}>
-                                        {{ $company->name }} {{ $company->code ? '('.$company->code.')' : '' }}
-                                    </option>
-                                @endforeach
-                            </select>
+                            <x-searchable-select 
+                                name="company_id" 
+                                :options="$companyOptions" 
+                                :selected="$selectedCompanyId" 
+                                placeholder="{{ __('Semua Perusahaan') }}" 
+                                searchPlaceholder="{{ __('Cari perusahaan...') }}" 
+                            />
                         </div>
 
                         {{-- Branch Filter --}}
+                        @php
+                            $branchOptions = $branches->map(fn($b) => [
+                                'value' => (string) $b->id,
+                                'label' => $b->name . ($b->code ? ' ('.$b->code.')' : ''),
+                            ])->values()->all();
+                        @endphp
                         <div>
                             <label class="label py-1">
                                 <span class="label-text text-xs font-bold text-base-content/70">{{ __('Cabang') }}</span>
                             </label>
-                            <select name="branch_id" class="select select-bordered select-sm w-full text-xs bg-base-100 shadow-2xs">
-                                <option value="">{{ __('Semua Cabang') }}</option>
-                                @foreach($branches as $branch)
-                                    <option value="{{ $branch->id }}" {{ ($selectedBranchId == $branch->id) ? 'selected' : '' }}>
-                                        {{ $branch->name }} {{ $branch->code ? '('.$branch->code.')' : '' }}
-                                    </option>
-                                @endforeach
-                            </select>
+                            <x-searchable-select 
+                                name="branch_id" 
+                                :options="$branchOptions" 
+                                :selected="$selectedBranchId" 
+                                placeholder="{{ __('Semua Cabang') }}" 
+                                searchPlaceholder="{{ __('Cari cabang...') }}" 
+                            />
                         </div>
 
                         {{-- Unit Kerja Filter --}}
+                        @php
+                            $unitKerjaOptions = $unitKerjas->map(fn($uk) => [
+                                'value' => (string) $uk->id,
+                                'label' => $uk->name . ($uk->code ? ' ('.$uk->code.')' : ''),
+                            ])->values()->all();
+                        @endphp
                         <div>
                             <label class="label py-1">
                                 <span class="label-text text-xs font-bold text-base-content/70">{{ __('Unit Kerja') }}</span>
                             </label>
-                            <select name="unit_kerja_id" class="select select-bordered select-sm w-full text-xs bg-base-100 shadow-2xs">
-                                <option value="">{{ __('Semua Unit Kerja') }}</option>
-                                @foreach($unitKerjas as $uk)
-                                    <option value="{{ $uk->id }}" {{ ($selectedUnitKerjaId == $uk->id) ? 'selected' : '' }}>
-                                        {{ $uk->name }} {{ $uk->code ? '('.$uk->code.')' : '' }}
-                                    </option>
-                                @endforeach
-                            </select>
+                            <x-searchable-select 
+                                name="unit_kerja_id" 
+                                :options="$unitKerjaOptions" 
+                                :selected="$selectedUnitKerjaId" 
+                                placeholder="{{ __('Semua Unit Kerja') }}" 
+                                searchPlaceholder="{{ __('Cari unit kerja...') }}" 
+                            />
                         </div>
 
                         {{-- Document Type Filter --}}
+                        @php
+                            $docTypeOptions = $documentTypes->map(fn($dt) => [
+                                'value' => (string) $dt->id,
+                                'label' => ($dt->code ? '[' . $dt->code . '] ' : '') . $dt->name,
+                            ])->values()->all();
+                        @endphp
                         <div>
                             <label class="label py-1">
                                 <span class="label-text text-xs font-bold text-base-content/70">{{ __('Jenis Dokumen') }}</span>
                             </label>
-                            <select name="document_type_id" class="select select-bordered select-sm w-full text-xs bg-base-100 shadow-2xs">
-                                <option value="">{{ __('Semua Jenis') }}</option>
-                                @foreach($documentTypes as $dt)
-                                    <option value="{{ $dt->id }}" {{ ($selectedDocTypeId == $dt->id) ? 'selected' : '' }}>
-                                        {{ $dt->code ? '[' . $dt->code . '] ' : '' }}{{ $dt->name }}
-                                    </option>
-                                @endforeach
-                            </select>
+                            <x-searchable-select 
+                                name="document_type_id" 
+                                :options="$docTypeOptions" 
+                                :selected="$selectedDocTypeId" 
+                                placeholder="{{ __('Semua Jenis') }}" 
+                                searchPlaceholder="{{ __('Cari jenis dokumen...') }}" 
+                            />
                         </div>
 
                         {{-- Status Filter --}}
+                        @php
+                            $statusOptions = [
+                                ['value' => 'active', 'label' => __('Aktif')],
+                                ['value' => 'pending', 'label' => __('Menunggu Review')],
+                                ['value' => 'draft', 'label' => __('Draf')],
+                                ['value' => 'rejected', 'label' => __('Ditolak')],
+                                ['value' => 'expired', 'label' => __('Kedaluwarsa')],
+                            ];
+                        @endphp
                         <div>
                             <label class="label py-1">
                                 <span class="label-text text-xs font-bold text-base-content/70">{{ __('Status Dokumen') }}</span>
                             </label>
-                            <select name="status" class="select select-bordered select-sm w-full text-xs bg-base-100 shadow-2xs">
-                                <option value="">{{ __('Semua Status') }}</option>
-                                <option value="active" {{ ($selectedStatus === 'active') ? 'selected' : '' }}>{{ __('Aktif') }}</option>
-                                <option value="pending" {{ ($selectedStatus === 'pending') ? 'selected' : '' }}>{{ __('Menunggu Review') }}</option>
-                                <option value="draft" {{ ($selectedStatus === 'draft') ? 'selected' : '' }}>{{ __('Draf') }}</option>
-                                <option value="rejected" {{ ($selectedStatus === 'rejected') ? 'selected' : '' }}>{{ __('Ditolak') }}</option>
-                                <option value="expired" {{ ($selectedStatus === 'expired') ? 'selected' : '' }}>{{ __('Kedaluwarsa') }}</option>
-                            </select>
+                            <x-searchable-select 
+                                name="status" 
+                                :options="$statusOptions" 
+                                :selected="$selectedStatus" 
+                                placeholder="{{ __('Semua Status') }}" 
+                                searchPlaceholder="{{ __('Cari status...') }}" 
+                            />
                         </div>
 
                         {{-- Format Choice Filter --}}
+                        @php
+                            $formatOptions = [
+                                ['value' => 'baru', 'label' => __('Format Baru')],
+                                ['value' => 'lama', 'label' => __('Format Lama')],
+                            ];
+                        @endphp
                         <div>
                             <label class="label py-1">
                                 <span class="label-text text-xs font-bold text-base-content/70">{{ __('Format Dokumen') }}</span>
                             </label>
-                            <select name="format_choice" class="select select-bordered select-sm w-full text-xs bg-base-100 shadow-2xs">
-                                <option value="">{{ __('Semua Format') }}</option>
-                                <option value="baru" {{ ($selectedFormatChoice === 'baru') ? 'selected' : '' }}>{{ __('Format Baru') }}</option>
-                                <option value="lama" {{ ($selectedFormatChoice === 'lama') ? 'selected' : '' }}>{{ __('Format Lama') }}</option>
-                            </select>
+                            <x-searchable-select 
+                                name="format_choice" 
+                                :options="$formatOptions" 
+                                :selected="$selectedFormatChoice" 
+                                placeholder="{{ __('Semua Format') }}" 
+                                searchPlaceholder="{{ __('Cari format...') }}" 
+                            />
                         </div>
 
                         {{-- Per Page --}}
+                        @php
+                            $perPageOptions = [
+                                ['value' => '10', 'label' => '10 / hal'],
+                                ['value' => '20', 'label' => '20 / hal'],
+                                ['value' => '50', 'label' => '50 / hal'],
+                                ['value' => '100', 'label' => '100 / hal'],
+                            ];
+                        @endphp
                         <div>
                             <label class="label py-1">
                                 <span class="label-text text-xs font-bold text-base-content/70">{{ __('Tampilkan') }}</span>
                             </label>
-                            <select name="per_page" class="select select-bordered select-sm w-full text-xs bg-base-100 shadow-2xs">
-                                <option value="10" {{ ($perPage == 10) ? 'selected' : '' }}>10 / hal</option>
-                                <option value="20" {{ ($perPage == 20) ? 'selected' : '' }}>20 / hal</option>
-                                <option value="50" {{ ($perPage == 50) ? 'selected' : '' }}>50 / hal</option>
-                                <option value="100" {{ ($perPage == 100) ? 'selected' : '' }}>100 / hal</option>
-                            </select>
+                            <x-searchable-select 
+                                name="per_page" 
+                                :options="$perPageOptions" 
+                                :selected="$perPage" 
+                                placeholder="{{ __('20 / hal') }}" 
+                                searchPlaceholder="{{ __('Cari jumlah...') }}" 
+                                :allowEmpty="false" 
+                            />
                         </div>
 
                         {{-- Submit and Reset Button --}}

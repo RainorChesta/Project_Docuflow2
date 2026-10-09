@@ -32,194 +32,7 @@
         />
     @endif
 
-    {{-- Modal Cetak & Unduh Dokumen (Dengan / Tanpa Kop Surat) --}}
-    <dialog id="export-pdf-modal" class="modal" x-data="{
-        withKop: '1',
-        paperSize: '{{ $document->paper_size ?? 'A4' }}',
-        customWidth: '',
-        customHeight: '',
-        customUnit: 'cm',
-        isPrinting: false,
-        downloadDocx() {
-            const url = '{{ route('documents.download', [$document, 'version_id' => $version->id]) }}' + (this.withKop !== undefined ? '?with_kop=' + this.withKop : '');
-            window.location.href = url;
-            document.getElementById('export-pdf-modal').close();
-        },
-        printToPrinter() {
-            this.isPrinting = true;
-            const form = document.getElementById('form-export-pdf-modal');
-            const formData = new FormData(form);
 
-            fetch('{{ route('documents.export-pdf', $document) }}', {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                    'Accept': 'application/json'
-                },
-                body: formData
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success && data.url) {
-                    const printWin = window.open(data.url, '_blank');
-                    if (printWin) {
-                        printWin.focus();
-                    }
-                    document.getElementById('export-pdf-modal').close();
-                } else {
-                    form.submit();
-                }
-            })
-            .catch(() => {
-                form.submit();
-            })
-            .finally(() => {
-                this.isPrinting = false;
-            });
-        }
-    }">
-        <div class="modal-box max-w-lg max-h-[85vh] overflow-y-auto">
-            {{-- Header Modal --}}
-            <div class="flex items-center justify-between pb-3 border-b border-base-200 mb-4">
-                <div class="flex items-center gap-2.5">
-                    <div class="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-base shadow-xs shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 class="font-bold text-base text-base-content leading-tight">{{ __('Cetak & Unduh Dokumen') }}</h3>
-                        <p class="text-xs text-base-content/60">
-                            @if($document->hasKop())
-                                {{ __('Pilih preferensi kop surat dan format cetak dokumen') }}
-                            @else
-                                {{ __('Pilih format dan ukuran kertas untuk mencetak atau mengunduh') }}
-                            @endif
-                        </p>
-                    </div>
-                </div>
-                <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('export-pdf-modal').close()">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-
-            {{-- Pilihan Kop Surat (Kop Options) - Hanya tampil jika dokumen memiliki Kop Surat --}}
-            @if($document->hasKop())
-                <div class="mb-4">
-                    <label class="label pt-0 pb-1.5">
-                        <span class="label-text font-bold text-xs uppercase tracking-wider text-base-content/70">{{ __('Pilihan Kop Surat') }}</span>
-                    </label>
-                    <div class="grid grid-cols-1 gap-2.5">
-                        {{-- Opsi 1: Dengan Kop Surat Resmi --}}
-                        <label class="flex items-start gap-3 p-3.5 rounded-2xl border transition-all cursor-pointer select-none"
-                               :class="withKop === '1' ? 'bg-primary/10 border-primary shadow-xs ring-1 ring-primary/30' : 'bg-base-100 border-base-300 hover:bg-base-200/50'">
-                            <input type="radio" name="with_kop_choice" value="1" x-model="withKop" class="radio radio-primary radio-sm mt-0.5 shrink-0">
-                            <div class="min-w-0 flex-1">
-                                <div class="flex items-center justify-between gap-1">
-                                    <span class="text-xs sm:text-sm font-bold text-base-content flex items-center gap-1.5">
-                                        {{ __('Dengan Kop Surat Resmi') }}
-                                    </span>
-                                    <span class="badge badge-primary badge-xs font-semibold shrink-0">{{ __('Kertas Polos') }}</span>
-                                </div>
-                                <p class="text-[11px] text-base-content/60 mt-1 leading-normal">
-                                    {{ __('Menyertakan kop surat resmi korporat/cabang di bagian atas dokumen. Cocok untuk arsip digital atau dicetak di atas kertas kosong/polos.') }}
-                                </p>
-                            </div>
-                        </label>
-
-                        {{-- Opsi 2: Tanpa Kop Surat --}}
-                        <label class="flex items-start gap-3 p-3.5 rounded-2xl border transition-all cursor-pointer select-none"
-                               :class="withKop === '0' ? 'bg-secondary/10 border-secondary shadow-xs ring-1 ring-secondary/30' : 'bg-base-100 border-base-300 hover:bg-base-200/50'">
-                            <input type="radio" name="with_kop_choice" value="0" x-model="withKop" class="radio radio-secondary radio-sm mt-0.5 shrink-0">
-                            <div class="min-w-0 flex-1">
-                                <div class="flex items-center justify-between gap-1">
-                                    <span class="text-xs sm:text-sm font-bold text-base-content flex items-center gap-1.5">
-                                        {{ __('Tanpa Kop Surat (Kertas Kop Fisik)') }}
-                                    </span>
-                                    <span class="badge badge-ghost badge-xs font-semibold shrink-0 border-base-300">{{ __('Pre-printed') }}</span>
-                                </div>
-                                <p class="text-[11px] text-base-content/60 mt-1 leading-normal">
-                                    {{ __('Header kop surat dilepas otomatis. Cocok jika Anda mencetak langsung pada printer dengan kertas fisik yang sudah tercetak kop resminya.') }}
-                                </p>
-                            </div>
-                        </label>
-                    </div>
-                </div>
-            @endif
-
-            {{-- Form Ekspor PDF & Download Actions --}}
-            <form id="form-export-pdf-modal" method="POST" action="{{ route('documents.export-pdf', $document) }}">
-                @csrf
-                <input type="hidden" name="with_kop" :value="withKop">
-
-                {{-- Format Kertas Cetak PDF --}}
-                <div class="form-control w-full mb-4 bg-base-200/40 p-3 rounded-2xl border border-base-200">
-                    <label class="label py-0 pb-1.5">
-                        <span class="label-text font-bold text-xs text-base-content/80">{{ __('Ukuran Kertas Cetak PDF') }}</span>
-                        <span class="label-text-alt text-[11px] text-primary font-semibold">{{ __('Default: :size', ['size' => $document->paper_size ?? 'A4']) }}</span>
-                    </label>
-                    <select name="paper_size" x-model="paperSize" class="select select-bordered select-sm w-full bg-base-100">
-                        <option value="A4">A4 (21 x 29.7 cm)</option>
-                        <option value="F4">F4 (21 x 33 cm) — {{ __('Folio / Standar') }}</option>
-                        <option value="Letter">Letter (8.5" x 11" / 21.59 x 27.94 cm)</option>
-                        <option value="Legal">Legal (8.5" x 14" / 21.59 x 35.56 cm)</option>
-                        <option value="A5">A5 (14.8 x 21 cm)</option>
-                        <option value="A3">A3 (29.7 x 42 cm)</option>
-                        <option value="Custom">{{ __('Custom Size (Ukuran Khusus)') }}</option>
-                    </select>
-
-                    {{-- Custom Size Inputs --}}
-                    <div x-show="paperSize === 'Custom'" x-transition class="mt-2.5 p-2.5 bg-base-100 rounded-xl border border-base-300 space-y-2">
-                        <div class="text-[11px] font-semibold text-base-content/80 flex items-center justify-between">
-                            <span>{{ __('Dimensi Ukuran Kustom') }}</span>
-                            <div class="flex items-center gap-2">
-                                <label class="text-xs font-normal cursor-pointer flex items-center gap-1">
-                                    <input type="radio" name="custom_unit" value="cm" x-model="customUnit" class="radio radio-primary radio-xs"> cm
-                                </label>
-                                <label class="text-xs font-normal cursor-pointer flex items-center gap-1">
-                                    <input type="radio" name="custom_unit" value="mm" x-model="customUnit" class="radio radio-primary radio-xs"> mm
-                                </label>
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-2 gap-2">
-                            <div class="form-control">
-                                <label class="label py-0.5"><span class="label-text text-[10px]">{{ __('Lebar') }} (<span x-text="customUnit"></span>)</span></label>
-                                <input type="number" step="0.1" min="0.1" name="custom_width" x-model="customWidth" :required="paperSize === 'Custom'" placeholder="Contoh: 21" class="input input-bordered input-xs w-full">
-                            </div>
-                            <div class="form-control">
-                                <label class="label py-0.5"><span class="label-text text-[10px]">{{ __('Tinggi') }} (<span x-text="customUnit"></span>)</span></label>
-                                <input type="number" step="0.1" min="0.1" name="custom_height" x-model="customHeight" :required="paperSize === 'Custom'" placeholder="Contoh: 33" class="input input-bordered input-xs w-full">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Action Buttons --}}
-                <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-3 border-t border-base-200">
-                    <button type="button" class="btn btn-ghost btn-sm order-last sm:order-first" onclick="document.getElementById('export-pdf-modal').close()">{{ __('Batal') }}</button>
-                    <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 justify-end">
-                        <button type="button" @click="downloadDocx()" class="btn btn-outline btn-sm gap-1.5 font-medium shadow-xs">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                            {{ __('Unduh Word') }}
-                        </button>
-                        <button type="submit" class="btn btn-outline btn-primary btn-sm gap-1.5 font-medium shadow-xs" title="{{ __('Unduh file PDF') }}">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                            {{ __('Unduh PDF') }}
-                        </button>
-                        <button type="button" @click="printToPrinter()" :disabled="isPrinting" class="btn btn-primary btn-sm gap-1.5 font-medium shadow-xs">
-                            <span x-show="isPrinting" class="loading loading-spinner loading-xs"></span>
-                            <svg x-show="!isPrinting" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                            <span x-text="isPrinting ? '{{ __('Memproses...') }}' : '{{ __('Cetak ke Printer') }}'"></span>
-                        </button>
-                    </div>
-                </div>
-            </form>
-        <form method="dialog" class="modal-backdrop">
-            <button>close</button>
-        </form>
-    </dialog>
 
     <div class="pb-6">
         <div class="max-w-7xl mx-auto w-full">
@@ -259,17 +72,7 @@
 
                             {{-- Action Buttons: Responsive Wrap with Unclipped Dropdown --}}
                             <div class="flex items-center gap-1.5 flex-wrap overflow-visible shrink-0">
-                                {{-- Cetak / Unduh Dokumen --}}
-                                <button type="button"
-                                        onclick="document.getElementById('export-pdf-modal').showModal()"
-                                        class="btn btn-primary btn-xs gap-1 shrink-0"
-                                        title="{{ __('Cetak & Unduh Dokumen') }}">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                                    </svg>
-                                    <span class="hidden sm:inline">{{ __('Cetak / Unduh') }}</span>
-                                    <span class="sm:hidden">{{ __('Cetak') }}</span>
-                                </button>
+
 
                                 {{-- Discard --}}
                                 @can('update', $document)
@@ -338,11 +141,11 @@
                                 {{-- Quick Actions: Corporate Soft File Dropdown (Accessible to privileged users & admins) --}}
                                 @if(!empty($canAccessSoftFiles))
                                     <div class="relative inline-block z-30" x-data="{ open: false }" @click.outside="open = false" id="corporate-soft-file-dropdown-container">
-                                        <button type="button" @click="open = !open" class="btn btn-xs {{ $document->corporateSoftFile ? 'btn-accent text-accent-content font-bold shadow-xs' : 'btn-outline btn-accent font-medium' }} gap-1.5 shrink-0 cursor-pointer" title="{{ __('Pilih Soft File Korporat / Kop Surat') }}" id="corporate-softfile-btn">
+                                        <button type="button" @click="open = !open" class="btn btn-xs {{ $document->corporateSoftFile ? 'btn-accent text-accent-content font-bold shadow-xs' : 'btn-outline btn-accent font-medium' }} gap-1.5 shrink-0 cursor-pointer" title="{{ __('Pilih Soft File Kop Surat') }}" id="corporate-softfile-btn">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                                             </svg>
-                                            <span class="hidden sm:inline" id="corporate-softfile-btn-text">{{ $document->corporateSoftFile ? 'Kop: ' . \Illuminate\Support\Str::limit($document->corporateSoftFile->title, 14) : __('Soft File Korporat') }}</span>
+                                            <span class="hidden sm:inline" id="corporate-softfile-btn-text">{{ $document->corporateSoftFile ? 'Kop: ' . \Illuminate\Support\Str::limit($document->corporateSoftFile->title, 14) : __('Soft File Kop') }}</span>
                                             <span class="sm:hidden" id="corporate-softfile-btn-mobile-text">{{ $document->corporateSoftFile ? 'Kop: ' . \Illuminate\Support\Str::limit($document->corporateSoftFile->title, 8) : __('Kop') }}</span>
                                             @if($document->corporateSoftFile)
                                                 <span class="badge badge-xs bg-white text-accent font-extrabold px-1.5 py-0 shadow-2xs" id="corporate-softfile-btn-badge">✓ Terpilih</span>
@@ -356,7 +159,7 @@
                                         <div x-show="open" x-cloak x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" class="absolute right-0 top-full z-40 p-3 shadow-2xl bg-base-100/98 backdrop-blur-md border border-base-300 rounded-2xl w-80 sm:w-[420px] max-h-[480px] flex flex-col gap-2 mt-2">
                                             <div class="px-1 py-1 border-b border-base-200/80 flex items-center justify-between shrink-0">
                                                 <div>
-                                                    <span class="text-xs font-bold text-base-content uppercase tracking-wider block">{{ __('Pilih Soft File Korporat') }}</span>
+                                                    <span class="text-xs font-bold text-base-content uppercase tracking-wider block">{{ __('Pilih Soft File Kop') }}</span>
                                                     <span class="text-[11px] text-base-content/50 block">{{ __('Pilih kop surat resmi untuk dokumen ini') }}</span>
                                                 </div>
                                                 <div class="flex items-center gap-1.5 shrink-0">
@@ -479,7 +282,7 @@
                                                 @endcan
                                             @else
                                                 <div class="py-4 text-center text-xs text-base-content/60 space-y-2">
-                                                    <p>{{ __('Belum ada soft file korporat yang tersedia.') }}</p>
+                                                    <p>{{ __('Belum ada soft file kop yang tersedia.') }}</p>
                                                     @can('admin')
                                                         <a href="{{ route('admin.corporate-soft-files.create') }}" target="_blank" class="btn btn-accent btn-xs rounded-lg gap-1">
                                                             <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
@@ -746,7 +549,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
             </div>
-            <h3 id="corporate-sf-modal-title" class="font-bold text-lg text-base-content uppercase leading-tight mb-2">{{ __('TERAPKAN SOFT FILE KORPORAT') }}</h3>
+            <h3 id="corporate-sf-modal-title" class="font-bold text-lg text-base-content uppercase leading-tight mb-2">{{ __('TERAPKAN SOFT FILE KOP') }}</h3>
             <p id="corporate-sf-modal-message" class="text-xs sm:text-sm text-base-content/70 leading-relaxed break-words mb-4"></p>
             
             <div class="flex flex-col gap-2 pt-3 border-t border-base-200">
@@ -895,53 +698,6 @@
                         config.editorConfig.customization.toolbarHideFileName = false;
                         config.editorConfig.customization.zoom = 100;
                     }
-                    
-                    const hasDocumentKop = {{ $document->hasKop() ? 'true' : 'false' }};
-
-                    const openExportPdfModal = function() {
-                        const modal = document.getElementById('export-pdf-modal');
-                        if (modal) {
-                            if (typeof modal.showModal === 'function') {
-                                modal.showModal();
-                            } else {
-                                modal.setAttribute('open', '');
-                            }
-                        }
-                    };
-
-                    const directPrintDocument = function() {
-                        const formData = new FormData();
-                        formData.append('_token', '{{ csrf_token() }}');
-                        formData.append('paper_size', '{{ $document->paper_size ?? 'A4' }}');
-                        formData.append('with_kop', '1');
-
-                        fetch('{{ route('documents.export-pdf', $document) }}', {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                                'Accept': 'application/json'
-                            },
-                            body: formData
-                        })
-                        .then(r => r.json())
-                        .then(data => {
-                            if (data.success && data.url) {
-                                const printWin = window.open(data.url, '_blank');
-                                if (printWin) {
-                                    printWin.focus();
-                                }
-                            }
-                        })
-                        .catch(err => {
-                            console.error('Direct print failed:', err);
-                        });
-                    };
-
-                    window.addEventListener('message', function(event) {
-                        if (event.data && event.data.type === 'onlyoffice-request-export') {
-                            openExportPdfModal();
-                        }
-                    });
 
                     config.events = config.events || {};
                     config.events.onAppReady = function() {
@@ -953,22 +709,6 @@
                         setTimeout(() => {
                             if (mainScrollContainer) mainScrollContainer.scrollTop = 0;
                         }, 50);
-                    };
-
-                    config.events.onRequestPrint = function() {
-                        if (hasDocumentKop) {
-                            openExportPdfModal();
-                        } else {
-                            directPrintDocument();
-                        }
-                    };
-
-                    config.events.onRequestSaveAs = function() {
-                        openExportPdfModal();
-                    };
-
-                    config.events.onRequestDownloadAs = function() {
-                        openExportPdfModal();
                     };
 
                     window._hasSessionChanges = false;
@@ -1176,7 +916,7 @@
                 const isSwitching = currentAppliedSoftFileId && currentAppliedSoftFileId != id;
 
                 if (titleEl) {
-                    titleEl.textContent = isSwitching ? 'GANTI KOP SURAT' : 'TERAPKAN SOFT FILE KORPORAT';
+                    titleEl.textContent = isSwitching ? 'GANTI KOP SURAT' : 'TERAPKAN SOFT FILE KOP';
                 }
                 if (msgEl) {
                     if (isSwitching) {
@@ -1266,7 +1006,7 @@
                     btn.className = "btn btn-xs btn-outline btn-accent font-medium gap-1.5 shrink-0 cursor-pointer";
                 }
                 if (btnText) {
-                    btnText.innerText = "{{ __('Soft File Korporat') }}";
+                    btnText.innerText = "{{ __('Soft File Kop') }}";
                 }
                 if (btnMobileText) {
                     btnMobileText.innerText = "{{ __('Kop') }}";
