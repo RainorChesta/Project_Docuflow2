@@ -318,23 +318,23 @@ docker run -d -p 8884:80 \
   -v /app/onlyoffice/DocumentServer/data:/var/www/onlyoffice/Data \
   -v /app/onlyoffice/DocumentServer/lib:/var/lib/onlyoffice \
   -v /app/onlyoffice/DocumentServer/db:/var/lib/postgresql \
-  -v /opt/onlyoffice/custom_assets/app/view/PageSizeDialog.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/PageSizeDialog.js:ro \
-  -v /opt/onlyoffice/custom_assets/app/view/PageSizeDialog.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/PageSizeDialog.js.gz:ro \
-  -v /opt/onlyoffice/custom_assets/app/view/FileMenuPanels.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/FileMenuPanels.js:ro \
-  -v /opt/onlyoffice/custom_assets/app/view/FileMenuPanels.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/FileMenuPanels.js.gz:ro \
-  -v /opt/onlyoffice/custom_assets/app/view/Toolbar.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/Toolbar.js:ro \
-  -v /opt/onlyoffice/custom_assets/app/view/Toolbar.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/Toolbar.js.gz:ro \
-  -v /opt/onlyoffice/custom_assets/app/controller/Main.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/controller/Main.js:ro \
-  -v /opt/onlyoffice/custom_assets/app/controller/Main.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/controller/Main.js.gz:ro \
-  -v /opt/onlyoffice/custom_assets/code.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/code.js:ro \
-  -v /opt/onlyoffice/custom_assets/code.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/code.js.gz:ro \
-  -v /opt/onlyoffice/custom_assets/common/img/dokuflow-logo.webp:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/dokuflow-logo.webp:ro \
-  -v /opt/onlyoffice/custom_assets/common/img/header/header-logo_s.svg:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/header/header-logo_s.svg:ro \
-  -v /opt/onlyoffice/custom_assets/common/img/header/header-logo_s.svg.gz:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/header/header-logo_s.svg.gz:ro \
-  -v /opt/onlyoffice/custom_assets/common/lib/view/Header.js:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/lib/view/Header.js:ro \
-  -v /opt/onlyoffice/custom_assets/common/lib/view/Header.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/lib/view/Header.js.gz:ro \
-  -v /opt/onlyoffice/custom_assets/documenteditor/main/index_loader.html:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/index_loader.html:ro \
-  -v /opt/onlyoffice/custom_assets/documenteditor/main/index_loader.html.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/index_loader.html.gz:ro \
+  -v /opt/onlyoffice/custom_assets/app/view/PageSizeDialog.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/PageSizeDialog.js:rw \
+  -v /opt/onlyoffice/custom_assets/app/view/PageSizeDialog.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/PageSizeDialog.js.gz:rw \
+  -v /opt/onlyoffice/custom_assets/app/view/FileMenuPanels.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/FileMenuPanels.js:rw \
+  -v /opt/onlyoffice/custom_assets/app/view/FileMenuPanels.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/FileMenuPanels.js.gz:rw \
+  -v /opt/onlyoffice/custom_assets/app/view/Toolbar.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/Toolbar.js:rw \
+  -v /opt/onlyoffice/custom_assets/app/view/Toolbar.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/Toolbar.js.gz:rw \
+  -v /opt/onlyoffice/custom_assets/app/controller/Main.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/controller/Main.js:rw \
+  -v /opt/onlyoffice/custom_assets/app/controller/Main.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/controller/Main.js.gz:rw \
+  -v /opt/onlyoffice/custom_assets/code.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/code.js:rw \
+  -v /opt/onlyoffice/custom_assets/code.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/code.js.gz:rw \
+  -v /opt/onlyoffice/custom_assets/common/img/dokuflow-logo.webp:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/dokuflow-logo.webp:rw \
+  -v /opt/onlyoffice/custom_assets/common/img/header/header-logo_s.svg:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/header/header-logo_s.svg:rw \
+  -v /opt/onlyoffice/custom_assets/common/img/header/header-logo_s.svg.gz:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/header/header-logo_s.svg.gz:rw \
+  -v /opt/onlyoffice/custom_assets/common/lib/view/Header.js:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/lib/view/Header.js:rw \
+  -v /opt/onlyoffice/custom_assets/common/lib/view/Header.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/lib/view/Header.js.gz:rw \
+  -v /opt/onlyoffice/custom_assets/documenteditor/main/index_loader.html:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/index_loader.html:rw \
+  -v /opt/onlyoffice/custom_assets/documenteditor/main/index_loader.html.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/index_loader.html.gz:rw \
   onlyoffice/documentserver:latest
 
 # 3. Allow Private IP addresses for downloading docs from DokuFlow:
@@ -382,23 +382,23 @@ services:
       - /app/onlyoffice/DocumentServer/data:/var/www/onlyoffice/Data
       - /app/onlyoffice/DocumentServer/lib:/var/lib/onlyoffice
       - /app/onlyoffice/DocumentServer/db:/var/lib/postgresql
-      - /opt/onlyoffice/custom_assets/app/view/PageSizeDialog.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/PageSizeDialog.js:ro
-      - /opt/onlyoffice/custom_assets/app/view/PageSizeDialog.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/PageSizeDialog.js.gz:ro
-      - /opt/onlyoffice/custom_assets/app/view/FileMenuPanels.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/FileMenuPanels.js:ro
-      - /opt/onlyoffice/custom_assets/app/view/FileMenuPanels.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/FileMenuPanels.js.gz:ro
-      - /opt/onlyoffice/custom_assets/app/view/Toolbar.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/Toolbar.js:ro
-      - /opt/onlyoffice/custom_assets/app/view/Toolbar.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/Toolbar.js.gz:ro
-      - /opt/onlyoffice/custom_assets/app/controller/Main.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/controller/Main.js:ro
-      - /opt/onlyoffice/custom_assets/app/controller/Main.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/controller/Main.js.gz:ro
-      - /opt/onlyoffice/custom_assets/code.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/code.js:ro
-      - /opt/onlyoffice/custom_assets/code.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/code.js.gz:ro
-      - /opt/onlyoffice/custom_assets/common/img/dokuflow-logo.webp:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/dokuflow-logo.webp:ro
-      - /opt/onlyoffice/custom_assets/common/img/header/header-logo_s.svg:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/header/header-logo_s.svg:ro
-      - /opt/onlyoffice/custom_assets/common/img/header/header-logo_s.svg.gz:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/header/header-logo_s.svg.gz:ro
-      - /opt/onlyoffice/custom_assets/common/lib/view/Header.js:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/lib/view/Header.js:ro
-      - /opt/onlyoffice/custom_assets/common/lib/view/Header.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/lib/view/Header.js.gz:ro
-      - /opt/onlyoffice/custom_assets/documenteditor/main/index_loader.html:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/index_loader.html:ro
-      - /opt/onlyoffice/custom_assets/documenteditor/main/index_loader.html.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/index_loader.html.gz:ro
+      - /opt/onlyoffice/custom_assets/app/view/PageSizeDialog.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/PageSizeDialog.js:rw
+      - /opt/onlyoffice/custom_assets/app/view/PageSizeDialog.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/PageSizeDialog.js.gz:rw
+      - /opt/onlyoffice/custom_assets/app/view/FileMenuPanels.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/FileMenuPanels.js:rw
+      - /opt/onlyoffice/custom_assets/app/view/FileMenuPanels.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/FileMenuPanels.js.gz:rw
+      - /opt/onlyoffice/custom_assets/app/view/Toolbar.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/Toolbar.js:rw
+      - /opt/onlyoffice/custom_assets/app/view/Toolbar.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/view/Toolbar.js.gz:rw
+      - /opt/onlyoffice/custom_assets/app/controller/Main.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/controller/Main.js:rw
+      - /opt/onlyoffice/custom_assets/app/controller/Main.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/app/controller/Main.js.gz:rw
+      - /opt/onlyoffice/custom_assets/code.js:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/code.js:rw
+      - /opt/onlyoffice/custom_assets/code.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/code.js.gz:rw
+      - /opt/onlyoffice/custom_assets/common/img/dokuflow-logo.webp:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/dokuflow-logo.webp:rw
+      - /opt/onlyoffice/custom_assets/common/img/header/header-logo_s.svg:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/header/header-logo_s.svg:rw
+      - /opt/onlyoffice/custom_assets/common/img/header/header-logo_s.svg.gz:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/header/header-logo_s.svg.gz:rw
+      - /opt/onlyoffice/custom_assets/common/lib/view/Header.js:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/lib/view/Header.js:rw
+      - /opt/onlyoffice/custom_assets/common/lib/view/Header.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/lib/view/Header.js.gz:rw
+      - /opt/onlyoffice/custom_assets/documenteditor/main/index_loader.html:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/index_loader.html:rw
+      - /opt/onlyoffice/custom_assets/documenteditor/main/index_loader.html.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/index_loader.html.gz:rw
 ```
 
 Launch the service:

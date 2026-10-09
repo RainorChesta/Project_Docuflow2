@@ -3,6 +3,10 @@ import laravel from 'laravel-vite-plugin';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
+    server: {
+        cors: true,
+        host: '0.0.0.0',
+    },
     plugins: [
         tailwindcss(),
         laravel({

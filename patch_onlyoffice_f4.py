@@ -2,6 +2,7 @@ import os
 import re
 import time
 import subprocess
+import gzip
 
 ts = str(int(time.time() * 1000))
 web_apps = '/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main'
@@ -241,7 +242,15 @@ files_to_gzip = [
 
 for f in files_to_gzip:
     if os.path.exists(f):
-        subprocess.run(['gzip', '-k', '-f', f], check=True)
+        try:
+            with open(f, 'rb') as f_in:
+                data = f_in.read()
+            gz_path = f + '.gz'
+            with open(gz_path, 'wb') as f_out:
+                f_out.write(gzip.compress(data, compresslevel=9))
+            print(f'[+] Gzipped: {os.path.basename(gz_path)}')
+        except Exception as e:
+            print(f'[!] Warning: Failed to gzip {os.path.basename(f)}: {e}')
 
 # 9. Reload Nginx
 subprocess.run(['nginx', '-s', 'reload'], check=True)
