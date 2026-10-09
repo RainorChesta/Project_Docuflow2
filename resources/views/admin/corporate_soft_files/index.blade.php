@@ -1,12 +1,12 @@
 <x-app-layout>
-    <x-slot name="header">{{ __('Soft File Korporat') }}</x-slot>
+    <x-slot name="header">{{ __('Soft File Kop') }}</x-slot>
 
     <div class="py-6">
         <div class="max-w-6xl mx-auto w-full px-4 sm:px-6">
             {{-- Header Actions --}}
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <div>
-                    <h1 class="text-xl font-bold text-base-content">{{ __('Daftar Soft File Korporat') }}</h1>
+                    <h1 class="text-xl font-bold text-base-content">{{ __('Daftar Soft File Kop') }}</h1>
                     <p class="text-xs text-base-content/60 mt-0.5">{{ __('Kelola master soft file, kop surat, dan template resmi perusahaan beserta hak akses per cabang.') }}</p>
                 </div>
                 <div class="flex items-center gap-2">

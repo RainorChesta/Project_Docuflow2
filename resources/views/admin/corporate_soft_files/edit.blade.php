@@ -1,18 +1,18 @@
 <x-app-layout>
-    <x-slot name="header">{{ __('Edit Soft File Korporat') }}</x-slot>
+    <x-slot name="header">{{ __('Edit Soft File Kop') }}</x-slot>
 
     <div class="py-6">
         <div class="max-w-4xl mx-auto w-full px-4 sm:px-6">
             {{-- Breadcrumb --}}
             <div class="flex items-center gap-2 mb-4 text-xs sm:text-sm text-base-content/60">
-                <a href="{{ route('admin.corporate-soft-files.index') }}" class="hover:text-primary transition-colors">{{ __('Soft File Korporat') }}</a>
+                <a href="{{ route('admin.corporate-soft-files.index') }}" class="hover:text-primary transition-colors">{{ __('Soft File Kop') }}</a>
                 <span>/</span>
                 <span class="text-base-content font-semibold">{{ __('Edit Soft File') }}</span>
             </div>
 
             <div class="card bg-base-100 border border-base-300 shadow-sm rounded-2xl overflow-hidden">
                 <div class="card-body p-6">
-                    <h2 class="text-lg font-bold text-base-content mb-1">{{ __('Edit Soft File Korporat') }}</h2>
+                    <h2 class="text-lg font-bold text-base-content mb-1">{{ __('Edit Soft File Kop') }}</h2>
                     <p class="text-xs text-base-content/60 mb-6">{{ __('Perbarui informasi, berkas pengganti, dan pengaturan hak akses perusahaan/cabang.') }}</p>
 
                     @if($errors->any())
