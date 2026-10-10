@@ -520,8 +520,8 @@
                                         <tbody>
                                             @foreach($documents as $doc)
                                                 @php
-                                                    $hasDraft = $doc->versions->contains('status', 'draft');
-                                                    $hasPending = $doc->versions->contains('status', 'pending');
+                                                    $hasDraft = $doc->hasDraft();
+                                                    $hasPending = $doc->hasPending();
                                                 @endphp
                                                 <tr class="hover">
                                                     <td>
@@ -577,12 +577,14 @@
                                                         </div>
                                                     </td>
                                                     <td>
-                                                        @if($doc->currentVersion)
+                                                        @if($doc->isExpired() || $doc->is_expired)
+                                                            <span class="badge badge-error badge-xs font-semibold text-white">{{ __('Kedaluwarsa') }}</span>
+                                                        @elseif($doc->currentVersion)
                                                             <span class="badge badge-success badge-xs font-semibold">v{{ $doc->currentVersion->version_number }}</span>
                                                         @elseif($hasPending)
                                                             <span class="badge badge-warning badge-xs font-semibold">{{ __('Tertunda') }}</span>
                                                         @elseif($hasDraft)
-                                                            <span class="badge badge-info badge-xs font-semibold">{{ __('Draf') }}</span>
+                                                            <span class="badge badge-warning badge-xs font-semibold">{{ __('Draf') }}</span>
                                                         @endif
                                                         @if($doc->isDirectorRead())
                                                             <span class="badge badge-success badge-xs text-white font-medium block mt-1" title="{{ __('Ditinjau oleh Direktur') }}">

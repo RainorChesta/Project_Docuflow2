@@ -479,9 +479,9 @@
                             @forelse($documents as $doc)
                                 @php
                                     $displayVer = $doc->displayVersion();
-                                    $hasDraft = $doc->versions->contains('status', 'draft');
-                                    $hasPending = $doc->versions->contains('status', 'pending');
-                                    $hasRejected = $doc->versions->contains('status', 'rejected');
+                                    $hasDraft = $doc->hasDraft();
+                                    $hasPending = $doc->hasPending();
+                                    $hasRejected = $doc->hasRejected();
                                     $isActive = $displayVer && $displayVer->status === 'active' && !$doc->is_expired;
                                 @endphp
                                 <tr class="hover:bg-base-200/40 transition-colors" id="doc-row-{{ $doc->id }}">

@@ -390,8 +390,65 @@ class Document extends Model
      */
     public function isLockedForEditing(): bool
     {
+        if ($this->relationLoaded('versions')) {
+            return $this->versions
+                ->filter(fn($v) => !$v->discarded_at)
+                ->contains('status', 'pending');
+        }
+
         return $this->versions()
             ->where('status', 'pending')
+            ->whereNull('discarded_at')
+            ->exists();
+    }
+
+    /**
+     * Determine if the document currently has an active non-discarded draft version.
+     */
+    public function hasDraft(): bool
+    {
+        if ($this->relationLoaded('versions')) {
+            return $this->versions
+                ->filter(fn($v) => !$v->discarded_at)
+                ->contains('status', 'draft');
+        }
+
+        return $this->versions()
+            ->where('status', 'draft')
+            ->whereNull('discarded_at')
+            ->exists();
+    }
+
+    /**
+     * Determine if the document currently has an active non-discarded pending version.
+     */
+    public function hasPending(): bool
+    {
+        if ($this->relationLoaded('versions')) {
+            return $this->versions
+                ->filter(fn($v) => !$v->discarded_at)
+                ->contains('status', 'pending');
+        }
+
+        return $this->versions()
+            ->where('status', 'pending')
+            ->whereNull('discarded_at')
+            ->exists();
+    }
+
+    /**
+     * Determine if the document currently has an active non-discarded rejected version.
+     */
+    public function hasRejected(): bool
+    {
+        if ($this->relationLoaded('versions')) {
+            return $this->versions
+                ->filter(fn($v) => !$v->discarded_at)
+                ->contains('status', 'rejected');
+        }
+
+        return $this->versions()
+            ->where('status', 'rejected')
             ->whereNull('discarded_at')
             ->exists();
     }
@@ -411,6 +468,13 @@ class Document extends Model
      */
     public function pendingVersion(): ?DocumentVersion
     {
+        if ($this->relationLoaded('versions')) {
+            return $this->versions
+                ->filter(fn($v) => !$v->discarded_at && $v->status === 'pending')
+                ->sortByDesc('id')
+                ->first();
+        }
+
         return $this->versions()
             ->where('status', 'pending')
             ->whereNull('discarded_at')

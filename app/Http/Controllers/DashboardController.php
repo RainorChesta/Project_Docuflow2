@@ -23,7 +23,7 @@ class DashboardController extends Controller
         // Search across every document the user may see.
         $results = null;
         if ($request->filled('search') || $request->filled('document_type_id')) {
-            $searchQuery = Document::with('owner', 'unitKerja', 'currentVersion')
+            $searchQuery = Document::with(['owner', 'unitKerja', 'currentVersion', 'versions'])
                 ->visibleTo($user);
 
             if (!$user->isAdmin()) {
@@ -207,7 +207,7 @@ class DashboardController extends Controller
 
             // Recent Documents
             $recentDocuments = (clone $scopedDocQuery)
-                ->with(['owner', 'unitKerja', 'currentVersion', 'documentType', 'branch.company', 'company'])
+                ->with(['owner', 'unitKerja', 'currentVersion', 'versions', 'documentType', 'branch.company', 'company'])
                 ->latest()
                 ->take(6)
                 ->get();
@@ -319,7 +319,7 @@ class DashboardController extends Controller
         $activeDocsCount = (clone $baseDocQuery)->whereHas('currentVersion', fn($q) => $q->where('status', 'active'))->count();
         $pendingDocsCount = (clone $baseDocQuery)->whereHas('versions', fn($q) => $q->where('status', 'pending'))->count();
 
-        $recent = (clone $baseDocQuery)->with('unitKerja', 'currentVersion')->latest()->take(5)->get();
+        $recent = (clone $baseDocQuery)->with(['owner', 'unitKerja', 'currentVersion', 'versions'])->latest()->take(5)->get();
 
         // Expiration recaps for Staff / General User
         $ownerDocQuery = Document::withoutTrashed()

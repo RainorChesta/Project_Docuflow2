@@ -117,13 +117,15 @@ class VersionService
                 $storedPath = 'documents/' . $document->id . '/v' . $draft->version_number . '.docx';
                 Storage::disk($disk)->put($storedPath, $docxBinaryContent);
 
+                $targetStatus = \Illuminate\Support\Facades\Cache::has('onlyoffice_save_as_draft_' . $document->id) ? 'draft' : 'pending';
+
                 $draft->update([
                     'file_path' => $storedPath,
                     'file_original_name' => $document->title . '.docx',
                     'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                     'author_id' => $author->id,
                     'author_name' => $author->name,
-                    'status' => 'pending',
+                    'status' => $targetStatus,
                     'updated_at' => now(),
                 ]);
 

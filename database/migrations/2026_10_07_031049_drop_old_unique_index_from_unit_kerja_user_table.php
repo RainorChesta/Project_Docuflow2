@@ -11,11 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('unit_kerja_user', function (Blueprint $table) {
-            // Drop old (user_id, unit_kerja_id) unique index to allow the same user
-            // and unit kerja across different branches, while keeping uk_user_branch_unique intact.
-            $table->dropUnique('unit_kerja_user_user_id_unit_kerja_id_unique');
-        });
+        try {
+            Schema::table('unit_kerja_user', function (Blueprint $table) {
+                // Drop old (user_id, unit_kerja_id) unique index to allow the same user
+                // and unit kerja across different branches, while keeping uk_user_branch_unique intact.
+                $table->dropUnique('unit_kerja_user_user_id_unit_kerja_id_unique');
+            });
+        } catch (\Throwable $e) {
+            // Already dropped or doesn't exist in SQLite
+        }
     }
 
     /**

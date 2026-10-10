@@ -1,6 +1,6 @@
 @php
-    $hasDraft = $doc->versions->contains('status', 'draft');
-    $hasPending = $doc->versions->contains('status', 'pending');
+    $hasDraft = $doc->hasDraft();
+    $hasPending = $doc->hasPending();
     $isEditorShare = isset($type) && $type === 'shared' && $doc->shares->first()?->role === 'editor';
 @endphp
 <a href="{{ route('documents.show', ['document' => $doc, 'type' => request('type')]) }}" class="group flex flex-col items-center gap-1 p-3 rounded-lg hover:bg-primary/5 transition-colors cursor-pointer relative" title="{{ $doc->title }}">
@@ -82,7 +82,9 @@
             @if($doc->hasPendingRename())
                 <span class="badge badge-warning badge-xs text-[9px] px-1" title="{{ __('Menunggu Persetujuan Ubah Nama') }}">✎</span>
             @endif
-            @if($hasPending && $doc->currentVersion)
+            @if($doc->isExpired() || $doc->is_expired)
+                <span class="badge badge-error badge-xs text-[10px] text-white px-1 font-medium">{{ __('Kedaluwarsa') }}</span>
+            @elseif($hasPending && $doc->currentVersion)
                 <span class="badge badge-warning badge-xs text-[9px] px-1 font-medium" title="{{ __('Versi aktif v:active, menunggu persetujuan v:pending', ['active' => $doc->currentVersion->version_number, 'pending' => $doc->displayVersion()?->version_number]) }}">v{{ $doc->currentVersion->version_number }} (v{{ $doc->displayVersion()?->version_number }}P)</span>
             @elseif($doc->currentVersion)
                 <span class="badge badge-success badge-xs text-[10px] px-1">v{{ $doc->currentVersion->version_number }}</span>

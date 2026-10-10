@@ -397,7 +397,13 @@ class OnlyOfficeController extends Controller
 
                 // Trigger approval routing and notifications if the version is pending or was draft
                 // ONLY when status is 2 (final save on close / finish editing) - NOT on status 6 (intermediate save / forcesave while editing)
-                if ($status === 2) {
+                $isSaveAsDraft = \Illuminate\Support\Facades\Cache::get('onlyoffice_save_as_draft_' . $document->id);
+
+                if ($isSaveAsDraft) {
+                    $version->update(['status' => 'draft']);
+                    \Illuminate\Support\Facades\Cache::forget('onlyoffice_pending_notif_' . $document->id);
+                    Log::info("Document {$document->id} saved as draft via ONLYOFFICE callback.");
+                } elseif ($status === 2) {
                     if ($version->status === 'draft') {
                         $version->update(['status' => 'pending']);
                     }
@@ -423,6 +429,10 @@ class OnlyOfficeController extends Controller
         } elseif ($status === 4) {
             // Document closed without changes (or closed after previous forcesave status 6).
             // Check if there is a pending notification from status 6 that needs to be fired upon closing
+            if (\Illuminate\Support\Facades\Cache::has('onlyoffice_save_as_draft_' . $document->id)) {
+                \Illuminate\Support\Facades\Cache::forget('onlyoffice_pending_notif_' . $document->id);
+            }
+
             $pendingNotif = \Illuminate\Support\Facades\Cache::pull('onlyoffice_pending_notif_' . $document->id);
             if ($pendingNotif) {
                 $version = \App\Models\DocumentVersion::find($pendingNotif['version_id']);

@@ -28,6 +28,10 @@
             pendingUrl: null,
             isIntentionalLeave: false,
             initGuard() {
+                if (window._hasCustomEditorGuard) {
+                    return;
+                }
+
                 // Aggressive capture-phase beforeunload to silence third-party scripts (like ONLYOFFICE)
                 // from showing the native browser prompt when we already confirmed via custom modal.
                 window.addEventListener('beforeunload', (e) => {

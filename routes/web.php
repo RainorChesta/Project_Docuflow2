@@ -81,6 +81,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/documents/{document}/qrcode', [DocumentController::class, 'qrCode'])->name('documents.qrcode');
     Route::put('/documents/{document}/save', [DocumentController::class, 'save'])->name('documents.save');
     Route::put('/documents/{document}/save-draft', [DocumentController::class, 'saveDraft'])->name('documents.save-draft');
+    Route::post('/documents/{document}/save-draft-editor', [DocumentController::class, 'saveDraftEditor'])->name('documents.save-draft-editor');
     Route::post('/documents/{document}/versions/upload', [DocumentController::class, 'uploadVersion'])->name('documents.upload-version');
     Route::post('/documents/{document}/upload-edit', [DocumentController::class, 'uploadAndEdit'])->name('documents.upload-edit');
     Route::patch('/documents/{document}/visibility', [DocumentController::class, 'updateVisibility'])->name('documents.update-visibility');

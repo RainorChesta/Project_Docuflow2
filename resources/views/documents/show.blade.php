@@ -891,7 +891,7 @@
 
             <!-- Unified Document Detail & Editor Container -->
             @php
-                $hasDraft = $document->versions->contains('status', 'draft');
+                $hasDraft = $document->hasDraft();
                 $hasSummary = !empty($document->summary) && $document->summary_status === \App\Models\Document::SUMMARY_COMPLETED;
                 $isProcessing = $document->summary_status === \App\Models\Document::SUMMARY_PROCESSING;
                 $isFailed = $document->summary_status === \App\Models\Document::SUMMARY_FAILED;
@@ -1434,7 +1434,7 @@
                 },
                 applyPrintOnlyOffice() {
                     document.getElementById('export-pdf-modal').close();
-                    const previewContainer = document.getElementById('docx-preview-{{ $version->id }}') || document.querySelector('iframe');
+                    const previewContainer = document.getElementById('docx-preview-{{ $version?->id }}') || document.querySelector('iframe');
                     if (previewContainer) {
                         previewContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }

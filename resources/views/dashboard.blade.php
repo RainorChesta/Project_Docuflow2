@@ -416,9 +416,9 @@
                                     @forelse($recentDocuments as $doc)
                                         @php
                                             $displayVer = $doc->displayVersion();
-                                            $hasDraft = $doc->versions->contains('status', 'draft');
-                                            $hasPending = $doc->versions->contains('status', 'pending');
-                                            $hasRejected = $doc->versions->contains('status', 'rejected');
+                                            $hasDraft = $doc->hasDraft();
+                                            $hasPending = $doc->hasPending();
+                                            $hasRejected = $doc->hasRejected();
                                             $isActive = $displayVer && $displayVer->status === 'active' && !$doc->is_expired;
                                             $branch = $doc->branch;
                                             $isPusat = $branch && ($branch->is_pusat || strcasecmp(trim($branch->name), 'pusat') === 0);
@@ -976,13 +976,38 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                             </svg>
                                         </a>
-                                        @if($doc->currentVersion)
-                                            <span class="badge badge-success badge-sm gap-1">
+                                        @php
+                                            $displayVer = $doc->displayVersion();
+                                            $hasDraft = $doc->hasDraft();
+                                            $hasPending = $doc->hasPending();
+                                            $hasRejected = $doc->hasRejected();
+                                            $isActive = $displayVer && $displayVer->status === 'active' && !$doc->is_expired;
+                                        @endphp
+                                        @if($doc->isExpired() || $doc->is_expired)
+                                            <span class="badge badge-error badge-sm text-white font-medium gap-1.5 shadow-2xs leading-none">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                                                {{ __('Kedaluwarsa') }}
+                                            </span>
+                                        @elseif($hasPending && $doc->currentVersion)
+                                            <span class="badge badge-warning badge-sm w-auto px-2 justify-center font-medium" title="{{ __('Versi aktif v:active, menunggu persetujuan v:pending', ['active' => $doc->currentVersion->version_number, 'pending' => $displayVer?->version_number]) }}">
+                                                v{{ $doc->currentVersion->version_number }} (v{{ $displayVer?->version_number }} {{ __('Pending') }})
+                                            </span>
+                                        @elseif($isActive || $doc->currentVersion)
+                                            <span class="badge badge-success badge-sm gap-1 text-white font-semibold">
                                                 <span class="w-1 h-1 rounded-full bg-white"></span>
                                                 {{ __('Aktif') }}
                                             </span>
+                                        @elseif($hasPending)
+                                            <span class="badge badge-warning badge-sm px-2 justify-center">{{ __('Tertunda') }}</span>
+                                        @elseif($hasRejected)
+                                            <span class="badge badge-error/15 text-error border border-error/30 badge-sm font-medium gap-1.5 leading-none">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-error"></span>
+                                                {{ __('Ditolak') }}
+                                            </span>
+                                        @elseif($hasDraft)
+                                            <span class="badge badge-warning badge-sm px-2 justify-center">{{ __('Draf') }}</span>
                                         @else
-                                            <span class="badge badge-warning badge-sm">{{ __('Tertunda') }}</span>
+                                            <span class="badge badge-ghost badge-sm px-2 justify-center">{{ ucfirst($displayVer->status ?? __('Tanpa versi')) }}</span>
                                         @endif
                                         <span class="text-xs text-base-content/30">{{ $doc->created_at->diffForHumans() }}</span>
                                     </div>

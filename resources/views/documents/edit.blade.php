@@ -1,6 +1,13 @@
 <x-app-layout>
     <x-slot name="header">{{ __('ONLYOFFICE Document Editor') }}</x-slot>
 
+    <script>
+        window._hasCustomEditorGuard = true;
+        window._allowIntentionalLeave = false;
+        window._pendingLeaveUrl = null;
+        window._pendingLeaveForm = null;
+    </script>
+
     @php
         $pending = $document->versions->first(fn($v) => $v->status === 'pending' && !$v->discarded_at);
         $isPendingV1 = (!$document->currentVersion) && (!$pending || $pending->version_number === 1);
@@ -32,7 +39,76 @@
         />
     @endif
 
+    {{-- ONLYOFFICE Editor Exit Confirmation Modal --}}
+    <dialog id="editor-leave-modal" class="modal modal-bottom sm:modal-middle backdrop-blur-md z-[9999]">
+        <div class="modal-box p-6 sm:p-7 rounded-3xl border border-[#0F6DB7]/20 dark:border-[#0F6DB7]/30 shadow-2xl bg-base-100 max-w-lg w-full relative overflow-hidden">
+            {{-- Top Accent Bar (Application Logo Blue to Green) --}}
+            <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#0F6DB7] to-[#147D6A]"></div>
 
+            {{-- Header --}}
+            <div class="flex items-start justify-between gap-3 mb-4">
+                <div class="flex items-center gap-3 min-w-0">
+                    <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#0F6DB7]/10 to-[#147D6A]/15 text-[#0F6DB7] dark:text-[#4AA9F0] flex items-center justify-center shrink-0 shadow-xs border border-[#147D6A]/25 relative">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-[#0F6DB7] dark:text-[#4AA9F0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span class="absolute -top-1 -right-1 flex h-3 w-3">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#147D6A] opacity-60"></span>
+                            <span class="relative inline-flex rounded-full h-3 w-3 bg-[#147D6A]"></span>
+                        </span>
+                    </div>
+                    <div class="min-w-0">
+                        <h3 class="font-bold text-lg text-base-content leading-tight">{{ __('Tinggalkan Editor Dokumen?') }}</h3>
+                        <p class="text-xs text-base-content/60 mt-0.5 truncate">{{ $document->title ?: ($version->file_original_name ?? __('Dokumen')) }}</p>
+                    </div>
+                </div>
+                {{-- X (Close) Button --}}
+                <button type="button" 
+                        id="btn-modal-close-x"
+                        onclick="closeEditorLeaveModal()" 
+                        class="btn btn-ghost btn-sm btn-circle text-base-content/50 hover:text-[#0F6DB7] hover:bg-[#EAF5FC] dark:hover:bg-[#12324A] transition-colors shrink-0" 
+                        title="{{ __('Tutup & Tetap di Editor') }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            {{-- Message --}}
+            <p class="text-sm text-base-content/80 leading-relaxed mb-6">
+                {{ __('Anda sedang berada di dalam editor dokumen. Apakah Anda ingin menyimpan dokumen ini sebagai draf sebelum keluar, atau membuang perubahannya?') }}
+            </p>
+
+            {{-- Action Buttons --}}
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2.5 pt-2 border-t border-base-200/80">
+                {{-- Discard (Distinct error color) --}}
+                <button type="button"
+                        id="btn-modal-discard"
+                        onclick="executeEditorDiscard()"
+                        class="btn btn-outline btn-error btn-sm sm:btn-md rounded-xl font-bold gap-2 order-2 sm:order-1 transition-all"
+                        title="{{ __('Buang dokumen / perubahan tanpa menyimpan') }}">
+                    <svg id="icon-modal-discard" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    <span id="spinner-modal-discard" class="loading loading-spinner loading-xs hidden"></span>
+                    <span id="text-modal-discard">{{ __('Buang (Discard)') }}</span>
+                </button>
+
+                {{-- Save as Draft (Logo Primary Blue to Green Gradient) --}}
+                <button type="button"
+                        id="btn-modal-save-draft"
+                        onclick="executeEditorSaveDraft()"
+                        class="btn bg-gradient-to-r from-[#0F6DB7] to-[#147D6A] hover:from-[#0B5F9F] hover:to-[#0F6E5D] text-white border-0 btn-sm sm:btn-md rounded-xl font-bold shadow-sm hover:shadow-md gap-2 order-1 sm:order-2 transition-all"
+                        title="{{ __('Simpan sebagai draf sebelum meninggalkan editor') }}">
+                    <svg id="icon-modal-save-draft" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                    </svg>
+                    <span id="spinner-modal-save-draft" class="loading loading-spinner loading-xs hidden"></span>
+                    <span id="text-modal-save-draft">{{ __('Simpan Draf (Save as Draft)') }}</span>
+                </button>
+            </div>
+        </div>
+    </dialog>
 
     <div class="pb-6">
         <div class="max-w-7xl mx-auto w-full">
@@ -709,6 +785,11 @@
                         setTimeout(() => {
                             if (mainScrollContainer) mainScrollContainer.scrollTop = 0;
                         }, 50);
+                    };
+                    config.events.onRequestClose = function() {
+                        window._pendingLeaveUrl = "{{ route('documents.show', $document) }}";
+                        window._pendingLeaveForm = null;
+                        openEditorLeaveModal();
                     };
 
                     window._hasSessionChanges = false;
@@ -2267,45 +2348,371 @@
             }
 
             /**
-             * Navigation Guard Custom Leave Handler:
-             * If user leaves the page without clicking "Selesai Edit", discard any changes made in this session.
+             * ONLYOFFICE Custom Navigation Guard & Exit Interception
              */
-            window.onNavigationGuardLeave = function(pendingUrl) {
-                if (window._hasSessionChanges) {
-                    const discardUrl = "{{ route('documents.discard', $document) }}";
-                    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            window._hasCustomEditorGuard = true;
+            window._allowIntentionalLeave = false;
+            window._pendingLeaveUrl = null;
+            window._pendingLeaveForm = null;
 
-                    fetch(discardUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': csrfToken,
-                            'Accept': 'application/json'
-                        },
-                        keepalive: true
-                    }).catch((e) => {
-                        console.warn('Discard request error:', e);
-                    }).finally(() => {
-                        if (pendingUrl === 'history_back') {
-                            history.go(-2);
-                        } else if (pendingUrl) {
-                            window.location.href = pendingUrl;
+            window.setNavigationDirty = function(state) {
+                // Kept for backward compatibility
+            };
+            window.allowIntentionalLeave = function() {
+                window._allowIntentionalLeave = true;
+            };
+
+            function openEditorLeaveModal() {
+                const modal = document.getElementById('editor-leave-modal');
+                if (modal) {
+                    const btnSave = document.getElementById('btn-modal-save-draft');
+                    const spinnerSave = document.getElementById('spinner-modal-save-draft');
+                    const iconSave = document.getElementById('icon-modal-save-draft');
+                    const textSave = document.getElementById('text-modal-save-draft');
+                    const btnDiscard = document.getElementById('btn-modal-discard');
+                    const spinnerDiscard = document.getElementById('spinner-modal-discard');
+                    const iconDiscard = document.getElementById('icon-modal-discard');
+                    const textDiscard = document.getElementById('text-modal-discard');
+                    const btnCloseX = document.getElementById('btn-modal-close-x');
+
+                    if (btnSave) btnSave.disabled = false;
+                    if (btnDiscard) btnDiscard.disabled = false;
+                    if (btnCloseX) btnCloseX.disabled = false;
+                    if (iconSave) iconSave.classList.remove('hidden');
+                    if (spinnerSave) spinnerSave.classList.add('hidden');
+                    if (textSave) textSave.textContent = "{{ __('Simpan Draf (Save as Draft)') }}";
+                    if (iconDiscard) iconDiscard.classList.remove('hidden');
+                    if (spinnerDiscard) spinnerDiscard.classList.add('hidden');
+                    if (textDiscard) textDiscard.textContent = "{{ __('Buang (Discard)') }}";
+
+                    modal.classList.add('modal-open');
+                    modal.setAttribute('open', '');
+                    try {
+                        if (typeof modal.showModal === 'function' && !modal.open) {
+                            modal.showModal();
+                        }
+                    } catch (e) {}
+                }
+            }
+
+            function closeEditorLeaveModal(isLeaving = false) {
+                const modal = document.getElementById('editor-leave-modal');
+                if (modal) {
+                    modal.classList.remove('modal-open');
+                    modal.removeAttribute('open');
+                    try {
+                        if (typeof modal.close === 'function') {
+                            modal.close();
+                        }
+                    } catch (e) {}
+                }
+                if (!isLeaving) {
+                    window._pendingLeaveUrl = null;
+                    window._pendingLeaveForm = null;
+                }
+            }
+
+            function executeEditorSaveDraft() {
+                const btnSave = document.getElementById('btn-modal-save-draft');
+                const spinnerSave = document.getElementById('spinner-modal-save-draft');
+                const iconSave = document.getElementById('icon-modal-save-draft');
+                const textSave = document.getElementById('text-modal-save-draft');
+                const btnDiscard = document.getElementById('btn-modal-discard');
+                const btnCloseX = document.getElementById('btn-modal-close-x');
+
+                if (btnSave) btnSave.disabled = true;
+                if (btnDiscard) btnDiscard.disabled = true;
+                if (btnCloseX) btnCloseX.disabled = true;
+                if (iconSave) iconSave.classList.add('hidden');
+                if (spinnerSave) spinnerSave.classList.remove('hidden');
+                if (textSave) textSave.textContent = "{{ __('Menyimpan Draf...') }}";
+
+                if (window.docEditor) {
+                    try { window.docEditor.destroyEditor(); } catch (e) {}
+                }
+
+                const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
+
+                fetch("{{ route('documents.save-draft-editor', $document) }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json'
+                    }
+                })
+                .then(res => res.json())
+                .catch(err => {
+                    console.warn('saveDraftEditor error:', err);
+                })
+                .finally(() => {
+                    window._allowIntentionalLeave = true;
+                    if (typeof window.allowIntentionalLeave === 'function') {
+                        window.allowIntentionalLeave();
+                    }
+
+                    closeEditorLeaveModal(true);
+
+                    if (typeof window.showLoadingBlur === 'function') {
+                        window.showLoadingBlur(
+                            @json(__('Menyimpan Draf Dokumen...')),
+                            @json(__('Menyimpan draf dan berpindah halaman...'))
+                        );
+                    }
+
+                    if (window._pendingLeaveForm) {
+                        window._pendingLeaveForm.submit();
+                    } else if (window._pendingLeaveUrl === 'page_refresh') {
+                        window.location.reload();
+                    } else if (window._pendingLeaveUrl === 'history_back') {
+                        history.go(-2);
+                    } else if (window._pendingLeaveUrl) {
+                        window.location.href = window._pendingLeaveUrl;
+                    } else {
+                        window.location.href = "{{ route('documents.show', $document) }}";
+                    }
+                });
+            }
+
+            function executeEditorDiscard() {
+                const btnDiscard = document.getElementById('btn-modal-discard');
+                const spinnerDiscard = document.getElementById('spinner-modal-discard');
+                const iconDiscard = document.getElementById('icon-modal-discard');
+                const textDiscard = document.getElementById('text-modal-discard');
+                const btnSave = document.getElementById('btn-modal-save-draft');
+                const btnCloseX = document.getElementById('btn-modal-close-x');
+
+                if (btnDiscard) btnDiscard.disabled = true;
+                if (btnSave) btnSave.disabled = true;
+                if (btnCloseX) btnCloseX.disabled = true;
+                if (iconDiscard) iconDiscard.classList.add('hidden');
+                if (spinnerDiscard) spinnerDiscard.classList.remove('hidden');
+                if (textDiscard) textDiscard.textContent = "{{ __('Membuang...') }}";
+
+                if (window.docEditor) {
+                    try { window.docEditor.destroyEditor(); } catch (e) {}
+                }
+
+                const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
+
+                fetch("{{ route('documents.discard', $document) }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json'
+                    }
+                })
+                .then(res => res.json())
+                .then(data => {
+                    window._allowIntentionalLeave = true;
+                    if (typeof window.allowIntentionalLeave === 'function') {
+                        window.allowIntentionalLeave();
+                    }
+
+                    closeEditorLeaveModal(true);
+
+                    if (typeof window.showLoadingBlur === 'function') {
+                        window.showLoadingBlur(
+                            @json(__('Membuang Dokumen / Perubahan...')),
+                            @json(__('Mengalihkan halaman...'))
+                        );
+                    }
+
+                    if (window._pendingLeaveForm) {
+                        window._pendingLeaveForm.submit();
+                    } else if (data && data.trashed) {
+                        if (window._pendingLeaveUrl === 'page_refresh' || window._pendingLeaveUrl === 'history_back' || !window._pendingLeaveUrl || window._pendingLeaveUrl.includes('/edit')) {
+                            window.location.href = "{{ route('documents.index', ['type' => 'mine']) }}";
+                        } else {
+                            window.location.href = window._pendingLeaveUrl;
+                        }
+                    } else if (window._pendingLeaveUrl === 'page_refresh') {
+                        window.location.reload();
+                    } else if (window._pendingLeaveUrl === 'history_back') {
+                        history.go(-2);
+                    } else if (window._pendingLeaveUrl) {
+                        window.location.href = window._pendingLeaveUrl;
+                    } else {
+                        window.location.href = "{{ route('documents.show', $document) }}";
+                    }
+                })
+                .catch(err => {
+                    console.warn('discard error:', err);
+                    window._allowIntentionalLeave = true;
+                    if (typeof window.allowIntentionalLeave === 'function') {
+                        window.allowIntentionalLeave();
+                    }
+                    closeEditorLeaveModal(true);
+                    if (window._pendingLeaveForm) {
+                        window._pendingLeaveForm.submit();
+                    } else if (window._pendingLeaveUrl && window._pendingLeaveUrl !== 'page_refresh' && window._pendingLeaveUrl !== 'history_back') {
+                        window.location.href = window._pendingLeaveUrl;
+                    } else {
+                        window.location.href = "{{ route('documents.show', $document) }}";
+                    }
+                });
+            }
+
+            // Intercept internal links
+            window.addEventListener('click', function(e) {
+                if (window._allowIntentionalLeave) return;
+
+                const link = e.target.closest('a[href]');
+                if (!link) return;
+
+                if (link.closest('#editor-leave-modal') || link.closest('#signature-users-modal') || link.closest('#signature-alert-modal') || link.closest('#pdf-visual-signature-modal')) return;
+
+                const href = link.getAttribute('href');
+                if (!href) return;
+
+                if (href.startsWith('#') || href.startsWith('javascript:') || link.hasAttribute('download') || link.getAttribute('target') === '_blank' || href.includes('/download')) {
+                    return;
+                }
+
+                if (href === window.location.href || href === window.location.pathname) {
+                    return;
+                }
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                window._pendingLeaveUrl = href;
+                window._pendingLeaveForm = null;
+                openEditorLeaveModal();
+            }, true);
+
+            // Intercept forms (e.g. Logout)
+            window.addEventListener('submit', function(e) {
+                if (window._allowIntentionalLeave) return;
+
+                const form = e.target;
+                if (form.closest('#editor-leave-modal') || form.closest('#signature-users-modal') || form.closest('#signature-alert-modal')) return;
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                window._pendingLeaveUrl = null;
+                window._pendingLeaveForm = form;
+                openEditorLeaveModal();
+            }, true);
+
+            // Intercept refresh keys (F5, Ctrl+R, Cmd+R) across window and document
+            function handleRefreshKeydown(e) {
+                if (window._allowIntentionalLeave) return;
+
+                const isF5 = (e.key === 'F5' || e.keyCode === 116 || e.code === 'F5');
+                const isCtrlR = (e.ctrlKey || e.metaKey) && (e.key === 'r' || e.key === 'R' || e.keyCode === 82 || e.code === 'KeyR');
+
+                if (isF5 || isCtrlR) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    window._pendingLeaveUrl = 'page_refresh';
+                    window._pendingLeaveForm = null;
+                    openEditorLeaveModal();
+                }
+            }
+
+            window.addEventListener('keydown', handleRefreshKeydown, true);
+            document.addEventListener('keydown', handleRefreshKeydown, true);
+
+            // Re-focus main window when moving cursor out of ONLYOFFICE iframe,
+            // and attach listener to iframe if accessible
+            function setupEditorIframeInterception() {
+                const editorContainer = document.getElementById('onlyoffice-editor-container');
+                if (!editorContainer) return;
+
+                editorContainer.addEventListener('mouseleave', function() {
+                    window.focus();
+                });
+
+                function tryBindIframe() {
+                    const iframes = editorContainer.querySelectorAll('iframe');
+                    iframes.forEach(iframe => {
+                        try {
+                            if (iframe.contentWindow && !iframe._hasRefreshInterceptor) {
+                                iframe._hasRefreshInterceptor = true;
+                                iframe.contentWindow.addEventListener('keydown', handleRefreshKeydown, true);
+                            }
+                        } catch (err) {}
+                    });
+                }
+
+                tryBindIframe();
+                const observer = new MutationObserver(tryBindIframe);
+                observer.observe(editorContainer, { childList: true, subtree: true });
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', setupEditorIframeInterception);
+            } else {
+                setupEditorIframeInterception();
+            }
+
+            // Intercept browser back/forward (popstate)
+            history.pushState({ editorGuard: true }, "");
+            window.addEventListener('popstate', function(e) {
+                if (window._allowIntentionalLeave) return;
+
+                history.pushState({ editorGuard: true }, "");
+
+                window._pendingLeaveUrl = 'history_back';
+                window._pendingLeaveForm = null;
+                openEditorLeaveModal();
+            });
+
+            // Native browser beforeunload safety net (closing tab / window / browser reload)
+            window.addEventListener('beforeunload', function(e) {
+                if (window._allowIntentionalLeave) return;
+
+                window._pendingLeaveUrl = 'page_refresh';
+                window._pendingLeaveForm = null;
+
+                // Open custom modal immediately so it is visible if reload is paused or cancelled
+                openEditorLeaveModal();
+
+                if (typeof window.hideLoadingBlur === 'function') {
+                    window.hideLoadingBlur();
+                }
+                const globalBlur = document.getElementById('global-loading-blur') || document.getElementById('loading-blur');
+                if (globalBlur) {
+                    globalBlur.style.opacity = '0';
+                    globalBlur.style.pointerEvents = 'none';
+                    globalBlur.style.visibility = 'hidden';
+                }
+                document.documentElement.classList.remove('is-page-loading');
+                sessionStorage.removeItem('dokuflow:page-loading');
+
+                e.preventDefault();
+                e.returnValue = '';
+                return '';
+            }, true);
+
+            // Dialog backdrop click & escape handling
+            document.addEventListener('DOMContentLoaded', function() {
+                const leaveModal = document.getElementById('editor-leave-modal');
+                if (leaveModal) {
+                    leaveModal.addEventListener('close', function() {
+                        if (!window._allowIntentionalLeave) {
+                            window._pendingLeaveUrl = null;
+                            window._pendingLeaveForm = null;
                         }
                     });
-                } else {
-                    if (pendingUrl === 'history_back') {
-                        history.go(-2);
-                    } else if (pendingUrl) {
-                        window.location.href = pendingUrl;
-                    }
+                    leaveModal.addEventListener('click', function(e) {
+                        if (e.target === leaveModal) {
+                            closeEditorLeaveModal();
+                        }
+                    });
                 }
-            };
+            });
 
             /**
              * "Selesai Edit" action: saves document changes, notifies approver/requester, and redirects to show page.
              */
             function finishEditingDocument() {
                 window._hasSessionChanges = false;
+                window._allowIntentionalLeave = true;
                 if (typeof window.allowIntentionalLeave === 'function') {
                     window.allowIntentionalLeave();
                 }

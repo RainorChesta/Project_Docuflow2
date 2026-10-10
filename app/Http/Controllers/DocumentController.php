@@ -1184,6 +1184,17 @@ class DocumentController extends Controller
 
         $discarded = $this->versionService->discardPending($document);
 
+        // Also clean up any uncommitted draft revisions (v2, v3, etc.)
+        $draftRevision = $document->versions()->where('status', 'draft')->where('version_number', '>', 1)->first();
+        if ($draftRevision) {
+            $disk = config('onlyoffice.storage_disk', 'local');
+            if ($draftRevision->file_path && Storage::disk($disk)->exists($draftRevision->file_path)) {
+                Storage::disk($disk)->delete($draftRevision->file_path);
+            }
+            $draftRevision->delete();
+            $discarded = $discarded ?? $draftRevision;
+        }
+
         $this->onlyOfficeService->rotateDocumentKey($document);
         $document->currentVersion?->touch();
         $document->touch();
@@ -1279,6 +1290,54 @@ class DocumentController extends Controller
         $this->versionService->saveDraft($document, $validated['content'], auth()->user());
 
         return redirect()->route('documents.show', $document)->with('success', __('Draf berhasil disimpan.'));
+    }
+
+    /**
+     * Save current document changes from ONLYOFFICE editor as draft without submitting for approval.
+     */
+    public function saveDraftEditor(Request $request, Document $document): JsonResponse
+    {
+        $this->authorize('update', $document);
+
+        $user = auth()->user();
+
+        // Flag ONLYOFFICE callback to save and keep version status as draft (do NOT submit for approval)
+        Cache::put('onlyoffice_save_as_draft_' . $document->id, true, now()->addMinutes(2));
+
+        $latestWorkingVersion = $document->versions()
+            ->whereIn('status', ['draft', 'pending'])
+            ->whereNull('discarded_at')
+            ->orderBy('version_number', 'desc')
+            ->first();
+
+        $version = $latestWorkingVersion ?? $document->displayVersion();
+
+        if ($version) {
+            // Trigger forcesave to flush active in-memory ONLYOFFICE content to server storage
+            $this->onlyOfficeService->forceSaveDocument($document, $version);
+
+            // Explicitly ensure status is 'draft'
+            if ($version->status !== 'draft') {
+                $version->update(['status' => 'draft']);
+            }
+            $version->touch();
+        }
+
+        // Forget any pending notification so approvers won't be alerted
+        Cache::forget('onlyoffice_pending_notif_' . $document->id);
+
+        $document->touch();
+
+        $this->auditService->log($user, 'document.draft_saved', 'document', $document->id, [
+            'document_id' => $document->id,
+            'version_number' => $version?->version_number,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => __('Dokumen berhasil disimpan sebagai draf.'),
+            'redirect_url' => route('documents.show', $document),
+        ]);
     }
 
     public function destroy(Document $document): RedirectResponse

@@ -647,6 +647,115 @@ class OnlyOfficeIntegrationTest extends TestCase
         
         $this->assertEquals('SOP Pelayanan Radiologi 2026.docx', $config['document']['title']);
     }
+
+    public function test_editor_save_draft_endpoint_saves_as_draft_and_sets_cache_flag()
+    {
+        $document = \App\Models\Document::create([
+            'title' => 'Draft Doc Test',
+            'document_number' => '777/TEST/PST/X/2026',
+            'owner_id' => $this->user->id,
+            'unit_kerja_id' => $this->unitKerja->id,
+            'document_type_id' => $this->docType->id,
+        ]);
+
+        $v1 = $document->versions()->create([
+            'version_number' => 1,
+            'content' => '',
+            'file_path' => 'documents/' . $document->id . '/v1.docx',
+            'file_original_name' => 'Draft Doc Test.docx',
+            'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'author_id' => $this->user->id,
+            'author_name' => $this->user->name,
+            'status' => 'pending',
+        ]);
+
+        $response = $this->actingAs($this->user)->postJson(route('documents.save-draft-editor', $document));
+
+        $response->assertOk();
+        $response->assertJson([
+            'success' => true,
+        ]);
+
+        $this->assertEquals('draft', $v1->fresh()->status);
+        $this->assertTrue(\Illuminate\Support\Facades\Cache::has('onlyoffice_save_as_draft_' . $document->id));
+    }
+
+    public function test_onlyoffice_callback_with_save_as_draft_cache_preserves_draft_status()
+    {
+        \Illuminate\Support\Facades\Http::fake([
+            'http://onlyoffice-server/download/draft.docx' => \Illuminate\Support\Facades\Http::response('draft-file-content', 200),
+        ]);
+
+        $document = \App\Models\Document::create([
+            'title' => 'Callback Draft Test',
+            'document_number' => '778/TEST/PST/X/2026',
+            'owner_id' => $this->user->id,
+            'unit_kerja_id' => $this->unitKerja->id,
+            'document_type_id' => $this->docType->id,
+        ]);
+
+        $v1 = $document->versions()->create([
+            'version_number' => 1,
+            'content' => '',
+            'file_path' => 'documents/' . $document->id . '/v1.docx',
+            'file_original_name' => 'Callback Draft Test.docx',
+            'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'author_id' => $this->user->id,
+            'author_name' => $this->user->name,
+            'status' => 'draft',
+        ]);
+
+        // Put flag indicating user exited via Save as Draft
+        \Illuminate\Support\Facades\Cache::put('onlyoffice_save_as_draft_' . $document->id, true, now()->addMinutes(2));
+
+        $payload = [
+            'status' => 2,
+            'url' => 'http://onlyoffice-server/download/draft.docx',
+            'users' => [(string) $this->user->id],
+            'key' => 'doc_' . $document->id . '_v1_test',
+        ];
+
+        $response = $this->postJson(route('onlyoffice.callback', $document), $payload);
+        $response->assertOk();
+
+        // Must remain in 'draft' status and NOT be promoted to 'pending'
+        $this->assertEquals('draft', $v1->fresh()->status);
+        $this->assertFalse(\Illuminate\Support\Facades\Cache::has('onlyoffice_pending_notif_' . $document->id));
+    }
+
+    public function test_editor_blade_renders_leave_confirmation_modal_with_all_options()
+    {
+        $document = \App\Models\Document::create([
+            'title' => 'Modal UI Test Document',
+            'document_number' => '779/TEST/PST/X/2026',
+            'owner_id' => $this->user->id,
+            'unit_kerja_id' => $this->unitKerja->id,
+            'document_type_id' => $this->docType->id,
+        ]);
+
+        $document->versions()->create([
+            'version_number' => 1,
+            'content' => '',
+            'file_path' => 'documents/' . $document->id . '/v1.docx',
+            'file_original_name' => 'Modal UI Test Document.docx',
+            'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'author_id' => $this->user->id,
+            'author_name' => $this->user->name,
+            'status' => 'draft',
+        ]);
+
+        $response = $this->actingAs($this->user)->get(route('documents.edit', $document));
+        $response->assertOk();
+
+        // Check for modal elements
+        $response->assertSee('id="editor-leave-modal"', false);
+        $response->assertSee('id="btn-modal-save-draft"', false);
+        $response->assertSee('id="btn-modal-discard"', false);
+        $response->assertSee('id="btn-modal-close-x"', false);
+        $response->assertSee('executeEditorSaveDraft');
+        $response->assertSee('executeEditorDiscard');
+        $response->assertSee('closeEditorLeaveModal');
+    }
 }
 
 

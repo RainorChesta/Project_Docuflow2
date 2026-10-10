@@ -157,6 +157,9 @@
     // ─── Page Lifecycle & Browser Refresh / bfcache ─────────────────
     // Fired on browser refresh, tab close, or navigating away via address bar / reload button
     window.addEventListener('beforeunload', function() {
+        if (window._hasCustomEditorGuard && !window._allowIntentionalLeave) {
+            return;
+        }
         window.showLoadingBlur();
     });
 

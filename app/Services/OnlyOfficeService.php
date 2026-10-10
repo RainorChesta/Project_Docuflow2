@@ -673,6 +673,7 @@ class OnlyOfficeService
                     'goback' => [
                         'url' => route('documents.show', $document),
                         'text' => __('Kembali ke Detail Dokumen'),
+                        'requestClose' => true,
                     ],
                 ],
             ],

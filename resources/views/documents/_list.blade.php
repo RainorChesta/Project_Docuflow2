@@ -1,6 +1,6 @@
 @php
-    $hasDraft = $doc->versions->contains('status', 'draft');
-    $hasPending = $doc->versions->contains('status', 'pending');
+    $hasDraft = $doc->hasDraft();
+    $hasPending = $doc->hasPending();
 @endphp
 <div class="px-4 sm:px-6 py-3.5 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-base-200/40 transition-colors">
     <div class="min-w-0 w-full sm:w-auto sm:flex-1">
@@ -61,7 +61,12 @@
             </a>
         </div>
         <div class="text-sm text-base-content/60 flex items-center gap-1.5 flex-wrap justify-end">
-            @if($hasPending && $doc->currentVersion)
+            @if($doc->isExpired() || $doc->is_expired)
+                <span class="badge badge-error badge-sm text-white font-medium gap-1.5 shadow-2xs leading-none">
+                    <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                    {{ __('Kedaluwarsa') }}
+                </span>
+            @elseif($hasPending && $doc->currentVersion)
                 <span class="badge badge-warning badge-sm w-auto px-2 justify-center font-medium" title="{{ __('Versi aktif v:active, menunggu persetujuan v:pending', ['active' => $doc->currentVersion->version_number, 'pending' => $doc->displayVersion()?->version_number]) }}">
                     v{{ $doc->currentVersion->version_number }} (v{{ $doc->displayVersion()?->version_number }} {{ __('Pending') }})
                 </span>
