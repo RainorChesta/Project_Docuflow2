@@ -70,6 +70,25 @@
                         // Release guard after 4s max so it never interferes with user scrolling
                         setTimeout(releaseGuard, 4000);
 
+                        let isPrintBypassActive = false;
+                        window.setPrintBypassActive = function(val) {
+                            isPrintBypassActive = !!val;
+                        };
+
+                        const openOnlyOfficePrintModal = function() {
+                            if (isPrintBypassActive) {
+                                return;
+                            }
+                            const modal = document.getElementById('onlyoffice-print-modal') || document.getElementById('export-pdf-modal');
+                            if (modal) {
+                                if (typeof modal.showModal === 'function') {
+                                    modal.showModal();
+                                } else {
+                                    modal.setAttribute('open', '');
+                                }
+                            }
+                        };
+
                         const openExportPdfModal = function() {
                             const modal = document.getElementById('export-pdf-modal');
                             if (modal) {
@@ -82,8 +101,16 @@
                         };
 
                         window.addEventListener('message', function(event) {
-                            if (event.data && event.data.type === 'onlyoffice-request-export') {
-                                openExportPdfModal();
+                            let data = event.data;
+                            if (typeof data === 'string') {
+                                try { data = JSON.parse(data); } catch(e) {}
+                            }
+                            if (data && (data.type === 'onlyoffice-request-export' || data.type === 'onRequestPrint' || data.event === 'onRequestPrint')) {
+                                if (data.action === 'print' || !data.action || data.type === 'onRequestPrint' || data.event === 'onRequestPrint') {
+                                    openOnlyOfficePrintModal();
+                                } else {
+                                    openExportPdfModal();
+                                }
                             }
                         });
 
@@ -105,7 +132,7 @@
                         };
 
                         config.events.onRequestPrint = function() {
-                            openExportPdfModal();
+                            openOnlyOfficePrintModal();
                         };
 
                         config.events.onRequestSaveAs = function() {

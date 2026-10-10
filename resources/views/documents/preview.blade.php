@@ -349,20 +349,28 @@
                                     if (previewContainer) {
                                         previewContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                     }
-                                    if (window.docEditorPreview) {
-                                        try {
-                                            if (typeof window.docEditorPreview.print === 'function') {
-                                                window.docEditorPreview.print();
-                                            } else {
-                                                const iframe = previewContainer ? (previewContainer.querySelector('iframe') || previewContainer) : null;
-                                                if (iframe && iframe.contentWindow) {
-                                                    iframe.contentWindow.postMessage(JSON.stringify({ type: 'onExternalPluginMessage', subType: 'print' }), '*');
+                                    setTimeout(() => {
+                                        if (window.docEditorPreview) {
+                                            try {
+                                                if (typeof window.docEditorPreview.print === 'function') {
+                                                    window.docEditorPreview.print();
+                                                } else if (typeof window.docEditorPreview.serviceCommand === 'function') {
+                                                    window.docEditorPreview.serviceCommand('print');
+                                                } else if (typeof window.docEditorPreview.executeMethod === 'function') {
+                                                    window.docEditorPreview.executeMethod('Print');
                                                 }
+                                            } catch(e) {
+                                                console.warn('ONLYOFFICE print error:', e);
                                             }
-                                        } catch(e) {
-                                            console.warn('ONLYOFFICE print error:', e);
                                         }
-                                    }
+                                        const iframe = previewContainer ? (previewContainer.querySelector('iframe') || previewContainer) : null;
+                                        if (iframe && iframe.contentWindow) {
+                                            try {
+                                                iframe.contentWindow.postMessage(JSON.stringify({ type: 'onExternalPluginMessage', subType: 'print' }), '*');
+                                                iframe.contentWindow.postMessage(JSON.stringify({ type: 'print' }), '*');
+                                            } catch(e) {}
+                                        }
+                                    }, 120);
                                 }
                             }">
                                 <div class="modal-box max-w-lg max-h-[85vh] overflow-y-auto text-left">
@@ -481,9 +489,9 @@
                                         <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-3 border-t border-base-200">
                                             <button type="button" class="btn btn-ghost btn-sm order-last sm:order-first" onclick="document.getElementById('export-pdf-modal').close()">{{ __('Batal') }}</button>
                                             
-                                            {{-- Jika Dengan Kop Surat: Tombol Buka Cetak ONLYOFFICE --}}
+                                            {{-- Jika Dengan Kop Surat: Tombol Terapkan & Cetak Dokumen ke Editor ONLYOFFICE --}}
                                             <div x-show="hasKopDoc && withKop === '1'" class="flex items-center justify-end gap-2">
-                                                <button type="button" @click="applyPrintOnlyOffice()" class="btn btn-primary btn-sm gap-1.5 font-medium shadow-xs" title="{{ __('Buka Tampilan Print Editor ONLYOFFICE') }}">
+                                                <button type="button" @click="applyPrintOnlyOffice()" class="btn btn-primary btn-sm gap-1.5 font-medium shadow-xs" title="{{ __('Lanjut ke tampilan print editor ONLYOFFICE') }}">
                                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
                                                     {{ __('Terapkan & Cetak Dokumen') }}
                                                 </button>

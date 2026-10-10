@@ -110,6 +110,204 @@
         </div>
     </dialog>
 
+    {{-- Modal Cetak & Print Editor ONLYOFFICE (Dengan / Tanpa Kop Surat) --}}
+    <dialog id="onlyoffice-print-modal" class="modal text-left" x-data="{
+        withKop: '{{ $document->hasKop() ? '1' : '0' }}',
+        hasKopDoc: {{ $document->hasKop() ? 'true' : 'false' }},
+        paperSize: '{{ $document->paper_size ?? 'A4' }}',
+        customWidth: '',
+        customHeight: '',
+        customUnit: 'cm',
+        downloadDocx() {
+            const url = '{{ route('documents.download', [$document, 'version_id' => $version->id]) }}' + (this.withKop !== undefined ? '?with_kop=' + this.withKop : '');
+            window.location.href = url;
+            document.getElementById('onlyoffice-print-modal').close();
+        },
+        applyPrintOnlyOffice() {
+            const modal = document.getElementById('onlyoffice-print-modal');
+            if (modal) {
+                if (typeof modal.close === 'function') modal.close();
+                else modal.removeAttribute('open');
+            }
+            const editorContainer = document.getElementById('onlyoffice-editor-container');
+            if (editorContainer) {
+                editorContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            if (typeof window.setPrintBypassActive === 'function') {
+                window.setPrintBypassActive(true);
+            }
+            setTimeout(() => {
+                if (window.docEditor) {
+                    try {
+                        if (typeof window.docEditor.serviceCommand === 'function') {
+                            window.docEditor.serviceCommand('print');
+                        } else if (typeof window.docEditor.executeMethod === 'function') {
+                            window.docEditor.executeMethod('Print');
+                        } else if (typeof window.docEditor.print === 'function') {
+                            window.docEditor.print();
+                        }
+                    } catch(e) {
+                        console.warn('ONLYOFFICE print error:', e);
+                    }
+                }
+                const iframe = editorContainer ? editorContainer.querySelector('iframe') : null;
+                if (iframe && iframe.contentWindow) {
+                    try {
+                        iframe.contentWindow.postMessage(JSON.stringify({ type: 'onExternalPluginMessage', subType: 'print' }), '*');
+                        iframe.contentWindow.postMessage(JSON.stringify({ type: 'print' }), '*');
+                    } catch(e) {}
+                }
+                setTimeout(() => {
+                    if (typeof window.setPrintBypassActive === 'function') {
+                        window.setPrintBypassActive(false);
+                    }
+                }, 1000);
+            }, 100);
+        }
+    }">
+        <div class="modal-box max-w-lg max-h-[85vh] overflow-y-auto">
+            {{-- Header Modal --}}
+            <div class="flex items-center justify-between pb-3 border-b border-base-200 mb-4">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-base shadow-xs shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-base text-base-content leading-tight">{{ __('Cetak Dokumen') }}</h3>
+                        <p class="text-xs text-base-content/60" x-text="hasKopDoc && withKop === '1' ? '{{ __('Mencetak dokumen resmi dengan kop surat langsung di editor ONLYOFFICE') }}' : '{{ __('Pilih format dan ukuran kertas untuk mengunduh dokumen') }}'"></p>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('onlyoffice-print-modal').close()">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            {{-- Pilihan Kop Surat (Kop Options) - Hanya tampil jika dokumen memiliki Kop Surat --}}
+            @if($document->hasKop())
+                <div class="mb-4">
+                    <label class="label pt-0 pb-1.5">
+                        <span class="label-text font-bold text-xs uppercase tracking-wider text-base-content/70">{{ __('Pilihan Kop Surat') }}</span>
+                    </label>
+                    <div class="grid grid-cols-1 gap-2.5">
+                        {{-- Opsi 1: Dengan Kop Surat Resmi --}}
+                        <label class="flex items-start gap-3 p-3.5 rounded-2xl border transition-all cursor-pointer select-none"
+                               :class="withKop === '1' ? 'bg-primary/10 border-primary shadow-xs ring-1 ring-primary/30' : 'bg-base-100 border-base-300 hover:bg-base-200/50'">
+                            <input type="radio" name="with_kop_choice_editor" value="1" x-model="withKop" class="radio radio-primary radio-sm mt-0.5 shrink-0">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center justify-between gap-1">
+                                    <span class="text-xs sm:text-sm font-bold text-base-content flex items-center gap-1.5">
+                                        {{ __('Dengan Kop Surat Resmi') }}
+                                    </span>
+                                    <span class="badge badge-primary badge-xs font-semibold shrink-0">{{ __('PDF / DOCX Resmi') }}</span>
+                                </div>
+                                <p class="text-[11px] text-base-content/60 mt-1 leading-normal">
+                                    {{ __('Menyertakan kop surat resmi dan tanda tangan lengkap. File Word (.docx) atau PDF siap diunduh sebagai arsip resmi atau dicetak di atas kertas polos.') }}
+                                </p>
+                            </div>
+                        </label>
+
+                        {{-- Opsi 2: Tanpa Kop Surat --}}
+                        <label class="flex items-start gap-3 p-3.5 rounded-2xl border transition-all cursor-pointer select-none"
+                               :class="withKop === '0' ? 'bg-secondary/10 border-secondary shadow-xs ring-1 ring-secondary/30' : 'bg-base-100 border-base-300 hover:bg-base-200/50'">
+                            <input type="radio" name="with_kop_choice_editor" value="0" x-model="withKop" class="radio radio-secondary radio-sm mt-0.5 shrink-0">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center justify-between gap-1">
+                                    <span class="text-xs sm:text-sm font-bold text-base-content flex items-center gap-1.5">
+                                        {{ __('Tanpa Kop Surat (Kertas Kop Fisik)') }}
+                                    </span>
+                                    <span class="badge badge-ghost badge-xs font-semibold shrink-0 border-base-300">{{ __('Pre-printed') }}</span>
+                                </div>
+                                <p class="text-[11px] text-base-content/60 mt-1 leading-normal">
+                                    {{ __('Header kop surat dilepas otomatis. Anda dapat mengunduh format Word (.docx) atau PDF untuk dicetak pada kertas fisik yang sudah tercetak kopnya.') }}
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            @endif
+
+            {{-- Form Ekspor PDF & Download Actions --}}
+            <form id="form-export-pdf-editor" method="POST" action="{{ route('documents.export-pdf', $document) }}">
+                @csrf
+                <input type="hidden" name="with_kop" :value="withKop">
+
+                {{-- Format Kertas Cetak PDF (Hanya relevan jika tanpa kop atau cetak PDF) --}}
+                <div x-show="!hasKopDoc || withKop === '0'" class="form-control w-full mb-4 bg-base-200/40 p-3 rounded-2xl border border-base-200">
+                    <label class="label py-0 pb-1.5">
+                        <span class="label-text font-bold text-xs text-base-content/80">{{ __('Ukuran Kertas Dokumen (PDF)') }}</span>
+                        <span class="label-text-alt text-[11px] text-primary font-semibold">{{ __('Default: :size', ['size' => $document->paper_size ?? 'A4']) }}</span>
+                    </label>
+                    <select name="paper_size" x-model="paperSize" class="select select-bordered select-sm w-full bg-base-100">
+                        <option value="A4">A4 (21 x 29.7 cm)</option>
+                        <option value="F4">F4 (21 x 33 cm) — {{ __('Folio / Standar') }}</option>
+                        <option value="Letter">Letter (8.5" x 11" / 21.59 x 27.94 cm)</option>
+                        <option value="Legal">Legal (8.5" x 14" / 21.59 x 35.56 cm)</option>
+                        <option value="A5">A5 (14.8 x 21 cm)</option>
+                        <option value="A3">A3 (29.7 x 42 cm)</option>
+                        <option value="Custom">{{ __('Custom Size (Ukuran Khusus)') }}</option>
+                    </select>
+
+                    {{-- Custom Size Inputs --}}
+                    <div x-show="paperSize === 'Custom'" x-transition class="mt-2.5 p-2.5 bg-base-100 rounded-xl border border-base-300 space-y-2">
+                        <div class="text-[11px] font-semibold text-base-content/80 flex items-center justify-between">
+                            <span>{{ __('Dimensi Ukuran Kustom') }}</span>
+                            <div class="flex items-center gap-2">
+                                <label class="text-xs font-normal cursor-pointer flex items-center gap-1">
+                                    <input type="radio" name="custom_unit" value="cm" x-model="customUnit" class="radio radio-primary radio-xs"> cm
+                                </label>
+                                <label class="text-xs font-normal cursor-pointer flex items-center gap-1">
+                                    <input type="radio" name="custom_unit" value="mm" x-model="customUnit" class="radio radio-primary radio-xs"> mm
+                                </label>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div class="form-control">
+                                <label class="label py-0.5"><span class="label-text text-[10px]">{{ __('Lebar') }} (<span x-text="customUnit"></span>)</span></label>
+                                <input type="number" step="0.1" min="0.1" name="custom_width" x-model="customWidth" :required="paperSize === 'Custom'" placeholder="Contoh: 21" class="input input-bordered input-xs w-full">
+                            </div>
+                            <div class="form-control">
+                                <label class="label py-0.5"><span class="label-text text-[10px]">{{ __('Tinggi') }} (<span x-text="customUnit"></span>)</span></label>
+                                <input type="number" step="0.1" min="0.1" name="custom_height" x-model="customHeight" :required="paperSize === 'Custom'" placeholder="Contoh: 33" class="input input-bordered input-xs w-full">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Action Buttons --}}
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-3 border-t border-base-200">
+                    <button type="button" class="btn btn-ghost btn-sm order-last sm:order-first" onclick="document.getElementById('onlyoffice-print-modal').close()">{{ __('Batal') }}</button>
+                    
+                    {{-- Jika Dengan Kop Surat: Tombol Terapkan ke Tampilan Print Editor ONLYOFFICE --}}
+                    <div x-show="hasKopDoc && withKop === '1'" class="flex items-center justify-end gap-2">
+                        <button type="button" @click="applyPrintOnlyOffice()" class="btn btn-primary btn-sm gap-1.5 font-medium shadow-xs" title="{{ __('Terapkan dan lanjut ke tampilan print editor ONLYOFFICE') }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                            {{ __('Terapkan') }}
+                        </button>
+                    </div>
+
+                    {{-- Jika Tanpa Kop Surat atau dokumen tidak ada kop: Tombol Unduh DOCX & Unduh PDF --}}
+                    <div x-show="!hasKopDoc || withKop === '0'" class="flex flex-wrap sm:flex-nowrap items-center gap-2 justify-end">
+                        <button type="button" @click="downloadDocx()" class="btn btn-outline btn-primary btn-sm gap-1.5 font-medium shadow-xs" title="{{ __('Unduh file Word (.docx) tanpa kop') }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                            {{ __('Unduh DOCX') }}
+                        </button>
+                        <button type="submit" class="btn btn-primary btn-sm gap-1.5 font-medium shadow-xs" title="{{ __('Unduh file PDF tanpa kop') }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                            {{ __('Unduh PDF') }}
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
+
     <div class="pb-6">
         <div class="max-w-7xl mx-auto w-full">
             {{-- Pending Alert if exists --}}
@@ -775,7 +973,41 @@
                         config.editorConfig.customization.zoom = 100;
                     }
 
+                    let isPrintBypassActive = false;
+                    window.setPrintBypassActive = function(val) {
+                        isPrintBypassActive = !!val;
+                    };
+
+                    const openOnlyOfficePrintModal = function() {
+                        if (isPrintBypassActive) {
+                            return;
+                        }
+                        const modal = document.getElementById('onlyoffice-print-modal');
+                        if (modal) {
+                            if (typeof modal.showModal === 'function') {
+                                modal.showModal();
+                            } else {
+                                modal.setAttribute('open', '');
+                            }
+                        }
+                    };
+
+                    window.addEventListener('message', function(event) {
+                        let data = event.data;
+                        if (typeof data === 'string') {
+                            try { data = JSON.parse(data); } catch(e) {}
+                        }
+                        if (data && (data.type === 'onlyoffice-request-export' || data.type === 'onRequestPrint' || data.event === 'onRequestPrint')) {
+                            if (data.action === 'print' || !data.action || data.type === 'onRequestPrint' || data.event === 'onRequestPrint') {
+                                openOnlyOfficePrintModal();
+                            }
+                        }
+                    });
+
                     config.events = config.events || {};
+                    config.events.onRequestPrint = function() {
+                        openOnlyOfficePrintModal();
+                    };
                     config.events.onAppReady = function() {
                         console.log('ONLYOFFICE editor ready');
                         if (mainScrollContainer) mainScrollContainer.scrollTop = 0;

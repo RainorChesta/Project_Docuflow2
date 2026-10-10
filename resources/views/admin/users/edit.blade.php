@@ -352,6 +352,30 @@
                                                 <span>{{ __('Belum ada cabang dipilih. Cari dan pilih cabang dari dropdown di atas.') }}</span>
                                             </div>
 
+                                            {{-- Bulk Unit Kerja Toolbar for Company --}}
+                                            <div x-show="assignedCount > 1 && role !== 'direktur' && role !== 'pic_klinik'" 
+                                                 class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-base-100/90 rounded-lg border border-base-200 text-xs shadow-2xs">
+                                                <span class="text-base-content/70 font-medium flex items-center gap-1.5">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                                    <span>{{ __('Aksi Massal (:count Cabang Terpilih):', ['count' => '']) }}<span x-text="assignedCount"></span> Cabang):</span>
+                                                </span>
+                                                <div class="flex items-center gap-2">
+                                                    <button type="button" 
+                                                            @click="$dispatch('sync-unit-kerja-{{ $company->id }}', { unitKerjaIds: {{ json_encode($unitKerjas->pluck('id')->map(fn($id)=>(string)$id)->toArray()) }} })" 
+                                                            class="btn btn-xs btn-ghost text-primary hover:bg-primary/10 text-[11px] h-6 min-h-0 font-medium gap-1">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                                                        <span>{{ __('Pilih Semua Unit Kerja') }}</span>
+                                                    </button>
+                                                    <span class="text-base-content/30">|</span>
+                                                    <button type="button" 
+                                                            @click="$dispatch('sync-unit-kerja-{{ $company->id }}', { unitKerjaIds: [] })" 
+                                                            class="btn btn-xs btn-ghost text-error/80 hover:bg-error/10 text-[11px] h-6 min-h-0 font-medium gap-1">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                                        <span>{{ __('Kosongkan Semua') }}</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+
                                             @foreach($company->branches as $branch)
                                                 @php
                                                     $isPusat = (bool) $branch->is_pusat;
@@ -362,9 +386,11 @@
                                                      x-show="selectedBranches.includes('{{ $branch->id }}')"
                                                      x-data="{
                                                         branchId: '{{ $branch->id }}',
+                                                        companyId: '{{ $company->id }}',
                                                         isPusat: {{ $isPusat ? 'true' : 'false' }},
                                                         subOpen: false,
                                                         subSearch: '',
+                                                        copiedSuccess: false,
                                                         selectedItems: {{ $defaultSelectedJson }},
                                                         itemsList: [
                                                             @foreach($unitKerjas as $uk)
@@ -382,8 +408,21 @@
                                                             } else {
                                                                 this.selectedItems.push(id);
                                                             }
+                                                        },
+                                                        selectAll() {
+                                                            this.selectedItems = this.itemsList.map(i => String(i.id));
+                                                        },
+                                                        clearAll() {
+                                                            this.selectedItems = [];
+                                                        },
+                                                        copyToAllCompanyBranches() {
+                                                            if (this.selectedItems.length === 0) return;
+                                                            $dispatch('sync-unit-kerja-' + this.companyId, { unitKerjaIds: [...this.selectedItems] });
+                                                            this.copiedSuccess = true;
+                                                            setTimeout(() => this.copiedSuccess = false, 2500);
                                                         }
-                                                     }">
+                                                     }"
+                                                     @sync-unit-kerja-{{ $company->id }}.window="if (selectedBranches.includes(branchId)) { selectedItems = [...$event.detail.unitKerjaIds]; }">
 
                                                     {{-- Branch Checkbox Row --}}
                                                     <div class="flex items-center justify-between">
@@ -428,12 +467,36 @@
                                                          x-transition:enter-end="opacity-100 translate-y-0"
                                                          class="mt-3 pt-3 border-t border-base-200">
 
-                                                        <div class="flex items-center justify-between mb-1.5">
+                                                        <div class="flex flex-wrap items-center justify-between gap-2 mb-1.5">
                                                             <label class="text-xs font-semibold text-primary flex items-center gap-1.5">
                                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                                                                 <span>{{ __('Unit Kerja di') }} {{ $branch->name }} <span class="text-error">*</span></span>
                                                             </label>
-                                                            <span class="text-[11px] text-base-content/50" x-text="selectedItems.length + ' {{ __('terpilih') }}'"></span>
+                                                            <div class="flex items-center gap-2">
+                                                                <span class="text-[11px] text-base-content/50" x-text="selectedItems.length + ' {{ __('terpilih') }}'"></span>
+                                                                
+                                                                {{-- Quick Copy to all branches button --}}
+                                                                <button type="button" 
+                                                                        x-show="assignedCount > 1"
+                                                                        @click="copyToAllCompanyBranches()"
+                                                                        :disabled="selectedItems.length === 0"
+                                                                        class="btn btn-ghost btn-xs text-primary hover:bg-primary/10 gap-1 px-1.5 h-6 min-h-0 text-[11px] font-medium"
+                                                                        :class="copiedSuccess ? 'text-success font-semibold' : ''"
+                                                                        title="{{ __('Salin unit kerja yang dipilih di cabang ini ke seluruh cabang terpilih lainnya di perusahaan ini') }}">
+                                                                    <template x-if="!copiedSuccess">
+                                                                        <span class="flex items-center gap-1">
+                                                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>
+                                                                            <span>{{ __('Terapkan ke Semua Cabang') }}</span>
+                                                                        </span>
+                                                                    </template>
+                                                                    <template x-if="copiedSuccess">
+                                                                        <span class="flex items-center gap-1 text-success">
+                                                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                                                                            <span>{{ __('Tersalin!') }}</span>
+                                                                        </span>
+                                                                    </template>
+                                                                </button>
+                                                            </div>
                                                         </div>
 
                                                         {{-- Hidden Inputs for form submission --}}
@@ -449,12 +512,16 @@
                                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 opacity-50 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                                                             </div>
 
-                                                            {{-- Searchable Dropdown Menu --}}
+                                                            {{-- Searchable Dropdown Menu with Quick Actions --}}
                                                             <div x-show="subOpen" 
                                                                  x-transition
                                                                  class="absolute z-30 mt-1 w-full bg-base-100 border border-base-300 rounded-lg shadow-xl flex flex-col">
-                                                                <div class="p-2 border-b border-base-200">
+                                                                <div class="p-2 border-b border-base-200 space-y-1.5">
                                                                     <input type="text" x-model="subSearch" class="input input-xs input-bordered w-full" placeholder="{{ __('Cari unit kerja...') }}">
+                                                                    <div class="flex items-center justify-between px-1 text-[11px]">
+                                                                        <button type="button" @click="selectAll()" class="text-primary hover:underline font-medium">{{ __('Pilih Semua') }}</button>
+                                                                        <button type="button" @click="clearAll()" class="text-error hover:underline font-medium" x-show="selectedItems.length > 0">{{ __('Hapus Pilihan') }}</button>
+                                                                    </div>
                                                                 </div>
                                                                 <div class="max-h-48 overflow-y-auto p-1">
                                                                     <template x-if="filteredItems.length === 0">
