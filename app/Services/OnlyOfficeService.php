@@ -950,6 +950,168 @@ class OnlyOfficeService
      * Uses ONLYOFFICE's native x2t engine (via Docker container if available),
      * falling back to ConvertService.ashx HTTP API, and then PhpWord/PdfParser.
      */
+    /**
+     * Render the first page of a PDF file to a high-resolution PNG binary (300 DPI)
+     * using server-native tools (Ghostscript / pdftoppm) or local Docker x2t container.
+     */
+    public function renderPdfToPng(string $localPdfPath): ?string
+    {
+        if (!file_exists($localPdfPath) || filesize($localPdfPath) === 0) {
+            return null;
+        }
+
+        $tempPng = storage_path('app/temp_render_' . uniqid() . '.png');
+
+        // 1. Try Ghostscript (gs)
+        $gsCmd = sprintf(
+            'gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=png16m -r300 -dFirstPage=1 -dLastPage=1 -sOutputFile=%s %s 2>&1',
+            escapeshellarg($tempPng),
+            escapeshellarg($localPdfPath)
+        );
+        @exec($gsCmd, $outGs, $codeGs);
+        if ($codeGs === 0 && file_exists($tempPng) && filesize($tempPng) > 500) {
+            $pngBytes = file_get_contents($tempPng);
+            @unlink($tempPng);
+            return $pngBytes;
+        }
+
+        // 2. Try pdftoppm
+        $prefix = storage_path('app/temp_ppm_' . uniqid());
+        $ppmCmd = sprintf(
+            'pdftoppm -png -r 300 -f 1 -l 1 -singlefile %s %s 2>&1',
+            escapeshellarg($localPdfPath),
+            escapeshellarg($prefix)
+        );
+        @exec($ppmCmd, $outPpm, $codePpm);
+        $ppmOut = $prefix . '.png';
+        if ($codePpm === 0 && file_exists($ppmOut) && filesize($ppmOut) > 500) {
+            $pngBytes = file_get_contents($ppmOut);
+            @unlink($ppmOut);
+            if (file_exists($tempPng)) @unlink($tempPng);
+            return $pngBytes;
+        }
+        if (file_exists($ppmOut)) @unlink($ppmOut);
+
+        // 3. Try local Docker x2t (if running on same machine)
+        try {
+            $container = env('ONLYOFFICE_DOCKER_CONTAINER', 'dokuflow-onlyoffice');
+            $uid = uniqid('conv_png_', true);
+            $containerIn = "/var/www/onlyoffice/Data/in_{$uid}.pdf";
+            $containerPngOut = "/var/www/onlyoffice/Data/out_{$uid}.png";
+            $tempLocalPng = storage_path("app/temp_png_{$uid}.png");
+
+            $cpInCmd = sprintf('docker cp %s %s:%s 2>&1', escapeshellarg($localPdfPath), escapeshellarg($container), escapeshellarg($containerIn));
+            @exec($cpInCmd, $outIn, $codeIn);
+            if ($codeIn === 0) {
+                $x2tPngCmd = sprintf(
+                    'docker exec %s /var/www/onlyoffice/documentserver/server/FileConverter/bin/x2t %s %s 2>&1',
+                    escapeshellarg($container),
+                    escapeshellarg($containerIn),
+                    escapeshellarg($containerPngOut)
+                );
+                @exec($x2tPngCmd, $outPng, $codePng);
+                if ($codePng === 0) {
+                    $cpPngCmd = sprintf('docker cp %s:%s %s 2>&1', escapeshellarg($container), escapeshellarg($containerPngOut), escapeshellarg($tempLocalPng));
+                    @exec($cpPngCmd, $outCpPng, $codeCpPng);
+                    @exec(sprintf('docker exec %s rm -f %s %s 2>&1', escapeshellarg($container), escapeshellarg($containerIn), escapeshellarg($containerPngOut)));
+
+                    if ($codeCpPng === 0 && file_exists($tempLocalPng) && filesize($tempLocalPng) > 500) {
+                        $pngBytes = file_get_contents($tempLocalPng);
+                        @unlink($tempLocalPng);
+                        if (file_exists($tempPng)) @unlink($tempPng);
+                        return $pngBytes;
+                    }
+                }
+                @exec(sprintf('docker exec %s rm -f %s %s 2>&1', escapeshellarg($container), escapeshellarg($containerIn), escapeshellarg($containerPngOut)));
+            }
+            if (file_exists($tempLocalPng)) @unlink($tempLocalPng);
+        } catch (\Throwable $e) {
+            // Docker unavailable
+        }
+
+        if (file_exists($tempPng)) @unlink($tempPng);
+        return null;
+    }
+
+    /**
+     * Render the first page of a DOCX file to a high-resolution PNG binary (300 DPI)
+     * using LibreOffice / Ghostscript or local Docker x2t.
+     */
+    public function renderDocxToPng(string $localDocxPath): ?string
+    {
+        if (!file_exists($localDocxPath) || filesize($localDocxPath) === 0) {
+            return null;
+        }
+
+        $tempDir = storage_path('app');
+        $uid = uniqid('lo_conv_');
+        $tempDocx = storage_path("app/{$uid}.docx");
+        @copy($localDocxPath, $tempDocx);
+
+        // 1. Try native LibreOffice conversion to PDF, then render PDF to PNG via Ghostscript
+        $loCmd = sprintf(
+            'libreoffice --headless --convert-to pdf %s --outdir %s 2>&1',
+            escapeshellarg($tempDocx),
+            escapeshellarg($tempDir)
+        );
+        @exec($loCmd, $outLo, $codeLo);
+        $tempPdf = storage_path("app/{$uid}.pdf");
+
+        if (file_exists($tempPdf) && filesize($tempPdf) > 500) {
+            $pngBytes = $this->renderPdfToPng($tempPdf);
+            @unlink($tempPdf);
+            @unlink($tempDocx);
+            if ($pngBytes) {
+                return $pngBytes;
+            }
+        }
+        if (file_exists($tempPdf)) @unlink($tempPdf);
+        if (file_exists($tempDocx)) @unlink($tempDocx);
+
+        // 2. Fallback: local Docker x2t
+        try {
+            $container = env('ONLYOFFICE_DOCKER_CONTAINER', 'dokuflow-onlyoffice');
+            $uid = uniqid('conv_docx_', true);
+            $containerIn = "/var/www/onlyoffice/Data/in_{$uid}.docx";
+            $containerPngOut = "/var/www/onlyoffice/Data/out_{$uid}.png";
+            $tempLocalPng = storage_path("app/temp_png_{$uid}.png");
+
+            $cpInCmd = sprintf('docker cp %s %s:%s 2>&1', escapeshellarg($localDocxPath), escapeshellarg($container), escapeshellarg($containerIn));
+            @exec($cpInCmd, $outIn, $codeIn);
+            if ($codeIn === 0) {
+                $x2tPngCmd = sprintf(
+                    'docker exec %s /var/www/onlyoffice/documentserver/server/FileConverter/bin/x2t %s %s 2>&1',
+                    escapeshellarg($container),
+                    escapeshellarg($containerIn),
+                    escapeshellarg($containerPngOut)
+                );
+                @exec($x2tPngCmd, $outPng, $codePng);
+                if ($codePng === 0) {
+                    $cpPngCmd = sprintf('docker cp %s:%s %s 2>&1', escapeshellarg($container), escapeshellarg($containerPngOut), escapeshellarg($tempLocalPng));
+                    @exec($cpPngCmd, $outCpPng, $codeCpPng);
+                    @exec(sprintf('docker exec %s rm -f %s %s 2>&1', escapeshellarg($container), escapeshellarg($containerIn), escapeshellarg($containerPngOut)));
+
+                    if ($codeCpPng === 0 && file_exists($tempLocalPng) && filesize($tempLocalPng) > 500) {
+                        $pngBytes = file_get_contents($tempLocalPng);
+                        @unlink($tempLocalPng);
+                        return $pngBytes;
+                    }
+                }
+                @exec(sprintf('docker exec %s rm -f %s %s 2>&1', escapeshellarg($container), escapeshellarg($containerIn), escapeshellarg($containerPngOut)));
+            }
+            if (file_exists($tempLocalPng)) @unlink($tempLocalPng);
+        } catch (\Throwable $e) {
+            // Docker unavailable
+        }
+
+        return null;
+    }
+
+    /**
+     * Convert a PDF file to DOCX with native header/footer layout.
+     * Uses server-native Ghostscript / pdftoppm / Docker x2t first,
+     * falling back to ConvertService.ashx HTTP API, and then PhpWord/PdfParser.
+     */
     public function convertPdfToDocx($fileOrPath, ?string $fileUrl = null, string $targetPaperSize = 'f4'): ?string
     {
         // 1. Resolve local absolute file path
@@ -967,11 +1129,11 @@ class OnlyOfficeService
             $localPath = $fileOrPath;
         }
 
-        // 2. Try native x2t conversion via ONLYOFFICE Docker container (instant & offline)
+        // 2. Try server-native high-res rendering (Ghostscript / pdftoppm / Docker x2t) -> Smart DOCX with header & footer
         if ($localPath && file_exists($localPath)) {
-            $convertedDocx = $this->convertPdfUsingDockerX2t($localPath, $targetPaperSize);
-            if ($convertedDocx && substr($convertedDocx, 0, 2) === "PK") {
-                return $targetPaperSize === 'a4' ? $this->enforceA4PageSize($convertedDocx) : $this->enforceF4PageSize($convertedDocx);
+            $pngBytes = $this->renderPdfToPng($localPath);
+            if ($pngBytes && strlen($pngBytes) > 500) {
+                return $this->createDocxFromImageBytes($pngBytes, 'png', $targetPaperSize);
             }
         }
 
@@ -1001,126 +1163,23 @@ class OnlyOfficeService
      */
     protected function convertPdfUsingDockerX2t(string $localPdfPath, string $targetPaperSize = 'f4'): ?string
     {
-        try {
-            $container = env('ONLYOFFICE_DOCKER_CONTAINER', 'dokuflow-onlyoffice');
-            $uid = uniqid('conv_', true);
-            $containerIn = "/var/www/onlyoffice/Data/in_{$uid}.pdf";
-            $containerPngOut = "/var/www/onlyoffice/Data/out_{$uid}.png";
-            $containerDocxOut = "/var/www/onlyoffice/Data/out_{$uid}.docx";
-            $tempLocalPng = storage_path("app/temp_png_{$uid}.png");
-            $tempLocalDocx = storage_path("app/temp_docx_{$uid}.docx");
-
-            // 1. Copy PDF into container
-            $cpInCmd = sprintf('docker cp %s %s:%s 2>&1', escapeshellarg($localPdfPath), escapeshellarg($container), escapeshellarg($containerIn));
-            @exec($cpInCmd, $outIn, $codeIn);
-            if ($codeIn !== 0) {
-                return null;
-            }
-
-            // 2. Render to high-res PNG for header extraction into word/header1.xml
-            $x2tPngCmd = sprintf(
-                'docker exec %s /var/www/onlyoffice/documentserver/server/FileConverter/bin/x2t %s %s 2>&1',
-                escapeshellarg($container),
-                escapeshellarg($containerIn),
-                escapeshellarg($containerPngOut)
-            );
-            @exec($x2tPngCmd, $outPng, $codePng);
-
-            if ($codePng === 0) {
-                $cpPngCmd = sprintf('docker cp %s:%s %s 2>&1', escapeshellarg($container), escapeshellarg($containerPngOut), escapeshellarg($tempLocalPng));
-                @exec($cpPngCmd, $outCpPng, $codeCpPng);
-
-                if ($codeCpPng === 0 && file_exists($tempLocalPng) && filesize($tempLocalPng) > 0) {
-                    $pngBytes = file_get_contents($tempLocalPng);
-                    @unlink($tempLocalPng);
-                    @exec(sprintf('docker exec %s rm -f %s %s 2>&1', escapeshellarg($container), escapeshellarg($containerIn), escapeshellarg($containerPngOut)));
-
-                    return $this->createDocxFromImageBytes($pngBytes, 'png', $targetPaperSize);
-                }
-            }
-            if (file_exists($tempLocalPng)) {
-                @unlink($tempLocalPng);
-            }
-
-            // 3. Fallback: direct x2t DOCX conversion
-            $x2tDocxCmd = sprintf(
-                'docker exec %s /var/www/onlyoffice/documentserver/server/FileConverter/bin/x2t %s %s 2>&1',
-                escapeshellarg($container),
-                escapeshellarg($containerIn),
-                escapeshellarg($containerDocxOut)
-            );
-            @exec($x2tDocxCmd, $outDocx, $codeDocx);
-
-            $cpDocxCmd = sprintf('docker cp %s:%s %s 2>&1', escapeshellarg($container), escapeshellarg($containerDocxOut), escapeshellarg($tempLocalDocx));
-            @exec($cpDocxCmd, $outCpDocx, $codeCpDocx);
-
-            // Cleanup container files
-            @exec(sprintf('docker exec %s rm -f %s %s %s 2>&1', escapeshellarg($container), escapeshellarg($containerIn), escapeshellarg($containerPngOut), escapeshellarg($containerDocxOut)));
-
-            if ($codeCpDocx === 0 && file_exists($tempLocalDocx) && filesize($tempLocalDocx) > 1000) {
-                $content = file_get_contents($tempLocalDocx);
-                @unlink($tempLocalDocx);
-                return $targetPaperSize === 'a4' ? $this->enforceA4PageSize($content) : $this->enforceF4PageSize($content);
-            }
-            if (file_exists($tempLocalDocx)) {
-                @unlink($tempLocalDocx);
-            }
-        } catch (\Throwable $e) {
-            Log::warning('convertPdfUsingDockerX2t failed: ' . $e->getMessage());
+        $pngBytes = $this->renderPdfToPng($localPdfPath);
+        if ($pngBytes) {
+            return $this->createDocxFromImageBytes($pngBytes, 'png', $targetPaperSize);
         }
-
         return null;
     }
 
     /**
      * Convert a DOCX corporate soft file with body-level design to smart header/footer DOCX
-     * using ONLYOFFICE's native x2t binary inside Docker container.
+     * using server-native tools or ONLYOFFICE's native x2t binary.
      */
     public function convertDocxUsingDockerX2t(string $localDocxPath, string $targetPaperSize = 'f4'): ?string
     {
-        try {
-            $container = env('ONLYOFFICE_DOCKER_CONTAINER', 'dokuflow-onlyoffice');
-            $uid = uniqid('conv_docx_', true);
-            $containerIn = "/var/www/onlyoffice/Data/in_{$uid}.docx";
-            $containerPngOut = "/var/www/onlyoffice/Data/out_{$uid}.png";
-            $tempLocalPng = storage_path("app/temp_png_{$uid}.png");
-
-            // 1. Copy DOCX into container
-            $cpInCmd = sprintf('docker cp %s %s:%s 2>&1', escapeshellarg($localDocxPath), escapeshellarg($container), escapeshellarg($containerIn));
-            @exec($cpInCmd, $outIn, $codeIn);
-            if ($codeIn !== 0) {
-                return null;
-            }
-
-            // 2. Render to high-res PNG for header & footer extraction
-            $x2tPngCmd = sprintf(
-                'docker exec %s /var/www/onlyoffice/documentserver/server/FileConverter/bin/x2t %s %s 2>&1',
-                escapeshellarg($container),
-                escapeshellarg($containerIn),
-                escapeshellarg($containerPngOut)
-            );
-            @exec($x2tPngCmd, $outPng, $codePng);
-
-            if ($codePng === 0) {
-                $cpPngCmd = sprintf('docker cp %s:%s %s 2>&1', escapeshellarg($container), escapeshellarg($containerPngOut), escapeshellarg($tempLocalPng));
-                @exec($cpPngCmd, $outCpPng, $codeCpPng);
-
-                if ($codeCpPng === 0 && file_exists($tempLocalPng) && filesize($tempLocalPng) > 0) {
-                    $pngBytes = file_get_contents($tempLocalPng);
-                    @unlink($tempLocalPng);
-                    @exec(sprintf('docker exec %s rm -f %s %s 2>&1', escapeshellarg($container), escapeshellarg($containerIn), escapeshellarg($containerPngOut)));
-
-                    return $this->createDocxFromImageBytes($pngBytes, 'png', $targetPaperSize);
-                }
-            }
-            if (file_exists($tempLocalPng)) {
-                @unlink($tempLocalPng);
-            }
-            @exec(sprintf('docker exec %s rm -f %s %s 2>&1', escapeshellarg($container), escapeshellarg($containerIn), escapeshellarg($containerPngOut)));
-        } catch (\Throwable $e) {
-            Log::warning('convertDocxUsingDockerX2t failed: ' . $e->getMessage());
+        $pngBytes = $this->renderDocxToPng($localDocxPath);
+        if ($pngBytes) {
+            return $this->createDocxFromImageBytes($pngBytes, 'png', $targetPaperSize);
         }
-
         return null;
     }
 
@@ -1134,16 +1193,37 @@ class OnlyOfficeService
                 $docxBinary = $this->removeHeaderAndFooterFromDocx($docxBinary);
             }
 
-            $container = env('ONLYOFFICE_DOCKER_CONTAINER', 'dokuflow-onlyoffice');
             $uid = uniqid('docx_pdf_', true);
             $tempLocalDocx = storage_path("app/temp_{$uid}.docx");
             $tempLocalPdf = storage_path("app/temp_{$uid}.pdf");
+            file_put_contents($tempLocalDocx, $docxBinary);
+
+            // 1. Try server-native LibreOffice
+            $loCmd = sprintf(
+                'libreoffice --headless --convert-to pdf %s --outdir %s 2>&1',
+                escapeshellarg($tempLocalDocx),
+                escapeshellarg(storage_path('app'))
+            );
+            @exec($loCmd, $outLo, $codeLo);
+            if ($codeLo === 0 && file_exists($tempLocalPdf) && filesize($tempLocalPdf) > 500) {
+                $pdfBytes = file_get_contents($tempLocalPdf);
+                @unlink($tempLocalDocx);
+                @unlink($tempLocalPdf);
+
+                if ($paperSize && strtolower($paperSize) === 'f4') {
+                    return $this->convertPdfToF4($pdfBytes);
+                } elseif ($paperSize && strtolower($paperSize) === 'a4') {
+                    return $this->convertPdfToA4($pdfBytes);
+                }
+
+                return $pdfBytes;
+            }
+
+            // 2. Try Docker x2t (if local docker container running)
+            $container = env('ONLYOFFICE_DOCKER_CONTAINER', 'dokuflow-onlyoffice');
             $containerIn = "/var/www/onlyoffice/Data/in_{$uid}.docx";
             $containerPdfOut = "/var/www/onlyoffice/Data/out_{$uid}.pdf";
 
-            file_put_contents($tempLocalDocx, $docxBinary);
-
-            // 1. Copy DOCX into container
             $cpInCmd = sprintf('docker cp %s %s:%s 2>&1', escapeshellarg($tempLocalDocx), escapeshellarg($container), escapeshellarg($containerIn));
             @exec($cpInCmd, $outIn, $codeIn);
 
@@ -1648,6 +1728,15 @@ class OnlyOfficeService
                 $docXml = preg_replace('/<w:headerReference\b[^>]*\/?>/', '', $docXml);
                 $docXml = preg_replace('/<w:footerReference\b[^>]*\/?>/', '', $docXml);
 
+                // Sanitize any invalid zero-margin artifacts (e.g. from PDF conversions)
+                if (preg_match('/<w:pgMar\b([^>]*)/i', $docXml, $m)) {
+                    $marAttr = $m[1];
+                    if (preg_match('/w:(top|bottom|left|right)="0"/i', $marAttr)) {
+                        $defaultPgMar = '<w:pgMar w:top="1440" w:bottom="1440" w:left="1440" w:right="1134" w:header="720" w:footer="720"/>';
+                        $docXml = preg_replace('/<w:pgMar\b[^>]*\/?>/', $defaultPgMar, $docXml);
+                    }
+                }
+
                 $zip->addFromString('word/document.xml', $docXml);
             }
 
@@ -2072,10 +2161,11 @@ class OnlyOfficeService
                     $headerFooterRefs .= '<w:footerReference w:type="first" r:id="rId_letterhead_footer1"/>';
                 }
 
-                // Extract exact original margins directly from uploaded Kop Soft File ($kopDocXml)
-                $extractMarAttr = function (string $attrName, string $str, ?int $default = null): ?int {
+                // Extract margin attribute with minimum threshold validation to prevent zero-margin PDF conversion artifacts
+                $extractMarAttr = function (string $attrName, string $str, ?int $default = null, int $minVal = 500): ?int {
                     if (preg_match('/(?:\bw:)?' . preg_quote($attrName, '/') . '="(\d+)"/i', $str, $m)) {
-                        return (int) $m[1];
+                        $val = (int) $m[1];
+                        return ($val >= $minVal) ? $val : null;
                     }
                     return $default;
                 };
@@ -2088,34 +2178,38 @@ class OnlyOfficeService
                 $footerMargin = null;
                 $gutterMargin = null;
 
-                // Priority 1: Exact margins directly from uploaded Kop Soft File
+                // Priority 1: Exact margins directly from uploaded Kop Soft File (only if non-zero and valid)
                 if (!empty($kopDocXml) && preg_match_all('/<w:pgMar\b([^>]*)/i', $kopDocXml, $allKm)) {
                     $lastKopAttr = end($allKm[1]);
-                    $topMargin = $extractMarAttr('top', $lastKopAttr);
-                    $bottomMargin = $extractMarAttr('bottom', $lastKopAttr);
-                    $leftMargin = $extractMarAttr('left', $lastKopAttr);
-                    $rightMargin = $extractMarAttr('right', $lastKopAttr);
-                    $headerMargin = $extractMarAttr('header', $lastKopAttr);
-                    $footerMargin = $extractMarAttr('footer', $lastKopAttr);
-                    $gutterMargin = $extractMarAttr('gutter', $lastKopAttr);
+                    $topMargin = $extractMarAttr('top', $lastKopAttr, null, 1000);
+                    $bottomMargin = $extractMarAttr('bottom', $lastKopAttr, null, 720);
+                    $leftMargin = $extractMarAttr('left', $lastKopAttr, null, 720);
+                    $rightMargin = $extractMarAttr('right', $lastKopAttr, null, 720);
+                    $headerMargin = $extractMarAttr('header', $lastKopAttr, null, 360);
+                    $footerMargin = $extractMarAttr('footer', $lastKopAttr, null, 360);
+                    $gutterMargin = $extractMarAttr('gutter', $lastKopAttr, null, 0);
                 }
 
-                // Priority 2: Target document existing margins fallback if softfile has no pgMar
+                // Priority 2: Target document existing margins fallback if softfile has 0/invalid pgMar
                 if (preg_match('/<w:pgMar\b([^>]*)/i', $targetDocXml, $tm)) {
                     $tgtAttr = $tm[1];
-                    if ($topMargin === null) $topMargin = $extractMarAttr('top', $tgtAttr);
-                    if ($bottomMargin === null) $bottomMargin = $extractMarAttr('bottom', $tgtAttr);
-                    if ($leftMargin === null) $leftMargin = $extractMarAttr('left', $tgtAttr);
-                    if ($rightMargin === null) $rightMargin = $extractMarAttr('right', $tgtAttr);
-                    if ($headerMargin === null) $headerMargin = $extractMarAttr('header', $tgtAttr);
-                    if ($footerMargin === null) $footerMargin = $extractMarAttr('footer', $tgtAttr);
-                    if ($gutterMargin === null) $gutterMargin = $extractMarAttr('gutter', $tgtAttr);
+                    if ($topMargin === null) $topMargin = $extractMarAttr('top', $tgtAttr, null, 720);
+                    if ($bottomMargin === null) $bottomMargin = $extractMarAttr('bottom', $tgtAttr, null, 720);
+                    if ($leftMargin === null) $leftMargin = $extractMarAttr('left', $tgtAttr, null, 720);
+                    if ($rightMargin === null) $rightMargin = $extractMarAttr('right', $tgtAttr, null, 720);
+                    if ($headerMargin === null) $headerMargin = $extractMarAttr('header', $tgtAttr, null, 360);
+                    if ($footerMargin === null) $footerMargin = $extractMarAttr('footer', $tgtAttr, null, 360);
+                    if ($gutterMargin === null) $gutterMargin = $extractMarAttr('gutter', $tgtAttr, null, 0);
                 }
 
-                $topMargin = $topMargin ?? 1440;
+                // Safe fallback margins (1440 twips = 1 inch / 2.54 cm standard)
+                // If a header is present, top margin must provide enough room for letterhead (~1800 twips min)
+                $hasHeader = isset($kopFiles['word/header1.xml']);
+                $minTopMargin = $hasHeader ? 1800 : 1440;
+                $topMargin = max($topMargin ?? $minTopMargin, $minTopMargin);
                 $bottomMargin = $bottomMargin ?? 1440;
                 $leftMargin = $leftMargin ?? 1440;
-                $rightMargin = $rightMargin ?? 1440;
+                $rightMargin = $rightMargin ?? 1134;
                 $headerMargin = $headerMargin ?? 720;
                 $footerMargin = $footerMargin ?? 720;
 
