@@ -15,6 +15,7 @@ class DocumentTypeController extends Controller
         $this->authorize('admin');
 
         $search = trim((string) $request->query('search', ''));
+        $category = trim((string) $request->query('category', ''));
         $perPage = (int) $request->query('per_page', 10);
         if (!in_array($perPage, [10, 25, 50, 100], true)) {
             $perPage = 10;
@@ -29,11 +30,16 @@ class DocumentTypeController extends Controller
             });
         }
 
-        $documentTypes = $query->orderBy('name')
+        if ($category !== '' && in_array($category, [DocumentType::CATEGORY_NASKAH_DINAS, DocumentType::CATEGORY_AKREDITASI], true)) {
+            $query->where('category', $category);
+        }
+
+        $documentTypes = $query->orderBy('category')
+            ->orderBy('name')
             ->paginate($perPage)
             ->withQueryString();
 
-        return view('admin.document-types.index', compact('documentTypes', 'search', 'perPage'));
+        return view('admin.document-types.index', compact('documentTypes', 'search', 'category', 'perPage'));
     }
 
     public function create(): View
@@ -50,6 +56,8 @@ class DocumentTypeController extends Controller
             'name' => 'required|string|max:255',
             'category' => 'required|in:naskah_dinas,akreditasi',
         ]);
+
+        $validated['code'] = strtoupper(trim($validated['code']));
 
         DocumentType::create($validated);
 
@@ -70,6 +78,8 @@ class DocumentTypeController extends Controller
             'name' => 'required|string|max:255',
             'category' => 'required|in:naskah_dinas,akreditasi',
         ]);
+
+        $validated['code'] = strtoupper(trim($validated['code']));
 
         $documentType->update($validated);
 

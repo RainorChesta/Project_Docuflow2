@@ -13,6 +13,17 @@
                 </div>
 
                 <form method="GET" action="{{ route('admin.document-types.index') }}" class="flex flex-wrap items-center gap-2">
+                    {{-- Category Filter --}}
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <select name="category"
+                                class="select select-bordered select-sm text-xs"
+                                onchange="this.form.submit()">
+                            <option value="">{{ __('Semua Kategori') }}</option>
+                            <option value="naskah_dinas" {{ ($category ?? '') === 'naskah_dinas' ? 'selected' : '' }}>{{ __('Naskah Dinas') }}</option>
+                            <option value="akreditasi" {{ ($category ?? '') === 'akreditasi' ? 'selected' : '' }}>{{ __('Dokumen Akreditasi') }}</option>
+                        </select>
+                    </div>
+
                     {{-- Search Input --}}
                     <div class="join flex-1 sm:flex-initial min-w-[220px]">
                         <div class="relative w-full">
@@ -27,7 +38,7 @@
                                 </svg>
                             </div>
                             @if($search !== '')
-                                <a href="{{ route('admin.document-types.index', ['per_page' => $perPage]) }}"
+                                <a href="{{ route('admin.document-types.index', array_filter(['per_page' => $perPage, 'category' => $category])) }}"
                                    class="absolute inset-y-0 right-0 pr-2 flex items-center text-base-content/40 hover:text-base-content"
                                    title="{{ __('Bersihkan pencarian') }}">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -66,11 +77,12 @@
             <div class="card bg-base-100 border border-base-300 shadow-sm">
                 <div class="card-body p-0">
                     <div class="overflow-x-auto">
-                        <table class="table min-w-[560px]">
+                        <table class="table min-w-[640px]">
                             <thead>
                                 <tr class="border-b border-base-200">
                                     <th class="w-32">{{ __('Kode') }}</th>
                                     <th>{{ __('Keterangan') }}</th>
+                                    <th class="w-44 text-center">{{ __('Kategori') }}</th>
                                     <th class="w-36 text-center">{{ __('Total Dokumen') }}</th>
                                     <th class="w-24 text-right">{{ __('Aksi') }}</th>
                                 </tr>
@@ -83,6 +95,17 @@
                                         </td>
                                         <td class="font-medium text-base-content">
                                             {{ $type->name }}
+                                        </td>
+                                        <td class="text-center">
+                                            @if($type->isAkreditasi())
+                                                <span class="badge badge-secondary badge-sm font-medium">
+                                                    {{ __('Dokumen Akreditasi') }}
+                                                </span>
+                                            @else
+                                                <span class="badge badge-primary badge-sm font-medium">
+                                                    {{ __('Naskah Dinas') }}
+                                                </span>
+                                            @endif
                                         </td>
                                         <td class="text-center">
                                             <span class="badge badge-ghost badge-sm text-xs font-medium">
@@ -106,15 +129,15 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="4" class="text-center py-10 text-base-content/60">
-                                            @if($search !== '')
+                                        <td colspan="5" class="text-center py-10 text-base-content/60">
+                                            @if($search !== '' || !empty($category))
                                                 <div class="flex flex-col items-center justify-center gap-2">
                                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-base-content/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                                     </svg>
-                                                    <p class="text-sm font-medium">{{ __('Tidak ada tipe dokumen yang cocok dengan pencarian ":search"', ['search' => $search]) }}</p>
+                                                    <p class="text-sm font-medium">{{ __('Tidak ada tipe dokumen yang cocok dengan filter yang dipilih.') }}</p>
                                                     <a href="{{ route('admin.document-types.index', ['per_page' => $perPage]) }}" class="btn btn-ghost btn-xs text-primary mt-1">
-                                                        {{ __('Reset Pencarian') }}
+                                                        {{ __('Reset Filter') }}
                                                     </a>
                                                 </div>
                                             @else
@@ -129,7 +152,7 @@
                         </table>
                     </div>
 
-                    {{-- Footer with Pagination & Result Count --}}
+                    {{-- Pagination --}}
                     <div class="p-4 border-t border-base-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-base-content/70">
                         <div>
                             @if($documentTypes->total() > 0)
@@ -138,11 +161,9 @@
                                     'last' => $documentTypes->lastItem(),
                                     'total' => $documentTypes->total()
                                 ]) }}
-                            @else
-                                {{ __('Total :total tipe dokumen', ['total' => 0]) }}
                             @endif
                         </div>
-                        <div class="shrink-0">
+                        <div>
                             {{ $documentTypes->links('vendor.pagination.dokuflow') }}
                         </div>
                     </div>

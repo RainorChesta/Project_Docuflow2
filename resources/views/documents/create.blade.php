@@ -33,14 +33,20 @@
                             </label>
                             @if($selectedTemplate)
                                 {{-- Auto-filled from template — disabled display + hidden input --}}
-                                <input type="text"
-                                       value="{{ $selectedTemplate->documentType->code }} - {{ $selectedTemplate->documentType->name }}"
-                                       class="input input-bordered w-full bg-base-200 cursor-not-allowed" disabled>
+                                <div class="flex items-center gap-2">
+                                    <input type="text"
+                                           value="{{ $selectedTemplate->documentType->code }} - {{ $selectedTemplate->documentType->name }}"
+                                           class="input input-bordered w-full bg-base-200 cursor-not-allowed" disabled>
+                                    <span class="badge badge-sm shrink-0 font-medium {{ $selectedTemplate->documentType->isAkreditasi() ? 'badge-secondary' : 'badge-primary' }}">
+                                        {{ $selectedTemplate->documentType->isAkreditasi() ? __('Dokumen Akreditasi') : __('Naskah Dinas') }}
+                                    </span>
+                                </div>
                                 <input type="hidden" name="document_type_id" id="document_type_id" value="{{ $selectedTemplate->document_type_id }}">
                                 <p class="text-xs text-info mt-1">{{ __('Tipe dokumen ditentukan oleh template.') }}</p>
                             @else
                             <div x-data="{
                                     search: '',
+                                    categoryFilter: 'all',
                                     open: false,
                                     selectedId: '{{ old('document_type_id') }}',
                                     options: [
@@ -55,14 +61,35 @@
                                             @endforeach
                                         };
                                     },
-                                    get filteredOptions() {
-                                        if (this.search === '') return this.options;
-                                        const searchLower = this.search.toLowerCase();
-                                        return this.options.filter(opt => opt.label.toLowerCase().includes(searchLower) || opt.category_label.toLowerCase().includes(searchLower));
+                                    get selectedOption() {
+                                        return this.options.find(opt => opt.id == this.selectedId) || null;
                                     },
                                     get selectedLabel() {
-                                        let selected = this.options.find(opt => opt.id == this.selectedId);
-                                        return selected ? selected.label : '{{ __('Pilih tipe dokumen...') }}';
+                                        return this.selectedOption ? this.selectedOption.label : '{{ __('Pilih tipe dokumen...') }}';
+                                    },
+                                    get filteredOptions() {
+                                        let list = this.options;
+                                        if (this.categoryFilter !== 'all') {
+                                            list = list.filter(opt => opt.category === this.categoryFilter);
+                                        }
+                                        if (this.search === '') return list;
+                                        const searchLower = this.search.toLowerCase();
+                                        return list.filter(opt => opt.label.toLowerCase().includes(searchLower) || opt.category_label.toLowerCase().includes(searchLower));
+                                    },
+                                    get groupedFilteredOptions() {
+                                        const groups = {};
+                                        this.filteredOptions.forEach(opt => {
+                                            const catKey = opt.category;
+                                            if (!groups[catKey]) {
+                                                groups[catKey] = {
+                                                    category: catKey,
+                                                    label: opt.category_label,
+                                                    items: []
+                                                };
+                                            }
+                                            groups[catKey].items.push(opt);
+                                        });
+                                        return Object.values(groups);
                                     },
                                     selectOption(id) {
                                         this.selectedId = id;
@@ -81,30 +108,76 @@
 
                                 <!-- Trigger button -->
                                 <button type="button" @click="open = !open; if(open) $nextTick(() => $refs.searchInput.focus())" class="select select-bordered w-full flex items-center justify-between font-normal" :class="{'!outline-none !ring-2 !ring-primary/20 !border-primary': open}">
-                                    <span x-text="selectedLabel" :class="{'text-base-content/50': !selectedId}"></span>
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <div class="flex items-center gap-2 min-w-0">
+                                        <span x-text="selectedLabel" class="truncate" :class="{'text-base-content/50': !selectedId}"></span>
+                                        <template x-if="selectedOption">
+                                            <span class="badge badge-xs shrink-0 font-medium"
+                                                  :class="selectedOption.category === 'naskah_dinas' ? 'badge-primary' : 'badge-secondary'"
+                                                  x-text="selectedOption.category_label"></span>
+                                        </template>
+                                    </div>
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-50 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                                     </svg>
                                 </button>
 
                                 <!-- Dropdown menu -->
                                 <div x-show="open" style="display: none;" class="absolute z-10 w-full mt-1 bg-base-100 border border-base-300 rounded-box shadow-lg">
+                                    {{-- Search input --}}
                                     <div class="p-2 border-b border-base-300">
                                         <input x-ref="searchInput" type="text" x-model="search" class="input input-sm input-bordered w-full" placeholder="{{ __('Cari tipe dokumen...') }}" @keydown.enter.prevent="">
                                     </div>
-                                    <ul class="max-h-60 overflow-y-auto p-1">
-                                        <template x-for="option in filteredOptions" :key="option.id">
-                                            <li>
-                                                <button type="button" @click="selectOption(option.id)" class="w-full text-left px-3 py-2 rounded-lg hover:bg-base-200 transition-colors flex items-center justify-between gap-2" :class="{'bg-base-200 font-medium': selectedId == option.id}">
-                                                    <span x-text="option.label"></span>
-                                                    <span class="badge badge-xs" :class="option.category === 'naskah_dinas' ? 'badge-primary' : 'badge-secondary'" x-text="option.category_label"></span>
-                                                </button>
-                                            </li>
+
+                                    {{-- Category Filter Tabs --}}
+                                    <div class="p-2 border-b border-base-200 bg-base-200/40 flex items-center gap-1">
+                                        <button type="button"
+                                                @click="categoryFilter = 'all'"
+                                                class="btn btn-xs rounded-lg transition-all"
+                                                :class="categoryFilter === 'all' ? 'btn-primary font-semibold' : 'btn-ghost text-base-content/70 hover:bg-base-200'">
+                                            {{ __('Semua') }}
+                                        </button>
+                                        <button type="button"
+                                                @click="categoryFilter = 'naskah_dinas'"
+                                                class="btn btn-xs rounded-lg transition-all"
+                                                :class="categoryFilter === 'naskah_dinas' ? 'btn-primary font-semibold' : 'btn-ghost text-base-content/70 hover:bg-base-200'">
+                                            {{ __('Naskah Dinas') }}
+                                        </button>
+                                        <button type="button"
+                                                @click="categoryFilter = 'akreditasi'"
+                                                class="btn btn-xs rounded-lg transition-all"
+                                                :class="categoryFilter === 'akreditasi' ? 'btn-secondary font-semibold' : 'btn-ghost text-base-content/70 hover:bg-base-200'">
+                                            {{ __('Dokumen Akreditasi') }}
+                                        </button>
+                                    </div>
+
+                                    {{-- Options List (Grouped with category headers) --}}
+                                    <div class="max-h-60 overflow-y-auto p-1">
+                                        <template x-for="group in groupedFilteredOptions" :key="group.category">
+                                            <div class="mb-2 last:mb-0">
+                                                <div class="px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-base-content/50 flex items-center justify-between">
+                                                    <span x-text="group.label"></span>
+                                                    <span class="badge badge-ghost badge-xs" x-text="group.items.length"></span>
+                                                </div>
+                                                <ul class="space-y-0.5">
+                                                    <template x-for="option in group.items" :key="option.id">
+                                                        <li>
+                                                            <button type="button" @click="selectOption(option.id)"
+                                                                    class="w-full text-left px-3 py-2 rounded-lg hover:bg-base-200 transition-colors flex items-center justify-between gap-2 text-sm"
+                                                                    :class="{'bg-base-200 font-medium': selectedId == option.id}">
+                                                                <span x-text="option.label"></span>
+                                                                <span class="badge badge-xs shrink-0"
+                                                                      :class="option.category === 'naskah_dinas' ? 'badge-primary' : 'badge-secondary'"
+                                                                      x-text="option.category_label"></span>
+                                                            </button>
+                                                        </li>
+                                                    </template>
+                                                </ul>
+                                            </div>
                                         </template>
-                                        <li x-show="filteredOptions.length === 0" class="text-center py-3 text-base-content/50 text-sm">
+                                        <div x-show="groupedFilteredOptions.length === 0" class="text-center py-4 text-base-content/50 text-sm">
                                             {{ __('Tipe dokumen tidak ditemukan.') }}
-                                        </li>
-                                    </ul>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             @endif

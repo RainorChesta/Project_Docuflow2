@@ -26,4 +26,11 @@ class DocumentType extends Model
     {
         return $this->category === self::CATEGORY_AKREDITASI;
     }
+
+    public function getCategoryLabelAttribute(): string
+    {
+        return $this->isAkreditasi()
+            ? __('Dokumen Akreditasi')
+            : __('Naskah Dinas');
+    }
 }

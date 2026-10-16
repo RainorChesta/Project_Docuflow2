@@ -20,7 +20,7 @@
                 'document_type_label' => ($t->documentType?->code ?? 'DOC') . ' - ' . ($t->documentType?->name ?? 'Dokumen'),
                 'file_name' => $t->file_original_name,
             ])),
-            documentTypes: @js($documentTypes->map(fn($dt) => ['id' => $dt->id, 'label' => $dt->code . ' - ' . $dt->name])),
+            documentTypes: @js($documentTypes->map(fn($dt) => ['id' => $dt->id, 'label' => $dt->code . ' - ' . $dt->name . ' (' . ($dt->category === 'naskah_dinas' ? __('Naskah Dinas') : __('Dokumen Akreditasi')) . ')'])),
             get filteredTemplates() {
                 return this.templates.filter(t => {
                     const matchSearch = !this.search || t.title.toLowerCase().includes(this.search.toLowerCase()) || (t.description && t.description.toLowerCase().includes(this.search.toLowerCase()));
