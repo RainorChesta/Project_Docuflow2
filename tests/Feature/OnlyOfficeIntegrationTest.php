@@ -756,6 +756,69 @@ class OnlyOfficeIntegrationTest extends TestCase
         $response->assertSee('executeEditorDiscard');
         $response->assertSee('closeEditorLeaveModal');
     }
+
+    public function test_revising_v1_active_document_with_file_upload_and_save_as_draft_keeps_draft_status()
+    {
+        \Illuminate\Support\Facades\Notification::fake();
+
+        // 1. Setup document as v1 active
+        $this->version->update(['status' => 'active']);
+        $this->document->update(['current_version_id' => $this->version->id]);
+
+        $this->assertEquals(1, $this->document->currentVersion->version_number);
+        $this->assertEquals('active', $this->document->currentVersion->status);
+
+        // 2. User uploads file for revision (uploadAndEdit)
+        $fakeDocx = \Illuminate\Http\UploadedFile::fake()->create('revisi.docx', 50, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        $uploadResponse = $this->actingAs($this->user)->post(route('documents.upload-edit', $this->document), [
+            'file' => $fakeDocx,
+        ]);
+
+        $uploadResponse->assertRedirect(route('documents.edit', $this->document));
+
+        $v2 = $this->document->fresh()->versions()->where('version_number', 2)->first();
+        $this->assertNotNull($v2);
+        $this->assertEquals('draft', $v2->status);
+
+        // 3. User edits and ONLYOFFICE sends status 6 forcesave
+        \Illuminate\Support\Facades\Http::fake([
+            'http://onlyoffice-server/download/v2_status6.docx' => \Illuminate\Support\Facades\Http::response('v2-forcesaved-content', 200),
+        ]);
+
+        $key = 'doc_' . $this->document->id . '_v2_testkey';
+        $this->postJson(route('onlyoffice.callback', ['document' => $this->document, 'version_id' => $v2->id]), [
+            'status' => 6,
+            'url' => 'http://onlyoffice-server/download/v2_status6.docx',
+            'users' => [(string) $this->user->id],
+            'key' => $key,
+        ]);
+
+        // 4. User clicks "Save as Draft" in the leave modal
+        $draftResponse = $this->actingAs($this->user)->postJson(route('documents.save-draft-editor', $this->document));
+        $draftResponse->assertOk();
+        $draftResponse->assertJson(['success' => true]);
+
+        // 5. Editor closes and triggers status 4
+        $this->postJson(route('onlyoffice.callback', ['document' => $this->document, 'version_id' => $v2->id]), [
+            'status' => 4,
+            'users' => [(string) $this->user->id],
+            'key' => $key,
+        ]);
+
+        // 6. Assertions: v2 must be 'draft', no approval steps, no notifications
+        $this->assertEquals('draft', $v2->fresh()->status);
+        $this->assertDatabaseMissing('document_approval_steps', [
+            'version_id' => $v2->id,
+        ]);
+        \Illuminate\Support\Facades\Notification::assertNothingSent();
+
+        // 7. Check documents.show page renders draft indicators
+        $showResponse = $this->actingAs($this->user)->get(route('documents.show', $this->document));
+        $showResponse->assertOk();
+        $showResponse->assertSee('Draf Dokumen');
+        $showResponse->assertSee('(v2)');
+        $showResponse->assertSee('Lanjutkan Edit');
+    }
 }
 
 

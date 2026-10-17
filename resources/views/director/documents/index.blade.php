@@ -579,6 +579,15 @@
                                                     <td>
                                                         @if($doc->isExpired() || $doc->is_expired)
                                                             <span class="badge badge-error badge-xs font-semibold text-white">{{ __('Kedaluwarsa') }}</span>
+                                                        @elseif($hasPending && $doc->currentVersion)
+                                                            <span class="badge badge-warning badge-xs font-semibold" title="{{ __('Versi aktif v:active, menunggu persetujuan v:pending', ['active' => $doc->currentVersion->version_number, 'pending' => $doc->displayVersion()?->version_number]) }}">
+                                                                v{{ $doc->currentVersion->version_number }} (v{{ $doc->displayVersion()?->version_number }} {{ __('Pending') }})
+                                                            </span>
+                                                        @elseif($hasDraft && $doc->currentVersion)
+                                                            @php $dVer = $doc->draftVersion(); @endphp
+                                                            <span class="badge badge-warning badge-xs font-semibold" title="{{ __('Versi aktif v:active, draf revisi v:draft', ['active' => $doc->currentVersion->version_number, 'draft' => $dVer?->version_number]) }}">
+                                                                v{{ $doc->currentVersion->version_number }} (v{{ $dVer?->version_number }} {{ __('Draf') }})
+                                                            </span>
                                                         @elseif($doc->currentVersion)
                                                             <span class="badge badge-success badge-xs font-semibold">v{{ $doc->currentVersion->version_number }}</span>
                                                         @elseif($hasPending)

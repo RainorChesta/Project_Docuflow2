@@ -82,6 +82,30 @@ class VersionService
         return DB::transaction(function () use ($document, $docxBinaryContent, $author, $targetVersion) {
             $disk = config('onlyoffice.storage_disk', 'local');
 
+            // 0. Cek jika targetVersion spesifik diberikan dan merupakan versi draft/pending aktif
+            if ($targetVersion && $targetVersion->document_id === $document->id && in_array($targetVersion->status, ['draft', 'pending'], true)) {
+                $storedPath = 'documents/' . $document->id . '/v' . $targetVersion->version_number . '.docx';
+                Storage::disk($disk)->put($storedPath, $docxBinaryContent);
+
+                $targetStatus = \Illuminate\Support\Facades\Cache::has('onlyoffice_save_as_draft_' . $document->id)
+                    ? 'draft'
+                    : 'pending';
+
+                $targetVersion->update([
+                    'file_path' => $storedPath,
+                    'file_original_name' => $document->title . '.docx',
+                    'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'author_id' => $author->id,
+                    'author_name' => $author->name,
+                    'status' => $targetStatus,
+                    'updated_at' => now(),
+                ]);
+
+                $document->touch();
+
+                return $targetVersion;
+            }
+
             // 1. Cek apakah ada versi pending aktif
             $pending = $document->versions()->pending()
                 ->whereNull('discarded_at')
@@ -89,7 +113,12 @@ class VersionService
                 ->first();
 
             if ($pending) {
-                $document->versions()->where('status', 'draft')->delete();
+                $isSaveAsDraft = \Illuminate\Support\Facades\Cache::has('onlyoffice_save_as_draft_' . $document->id);
+                $targetStatus = $isSaveAsDraft ? 'draft' : 'pending';
+
+                if ($targetStatus !== 'draft') {
+                    $document->versions()->where('status', 'draft')->delete();
+                }
 
                 $storedPath = 'documents/' . $document->id . '/v' . $pending->version_number . '.docx';
                 Storage::disk($disk)->put($storedPath, $docxBinaryContent);
@@ -100,6 +129,7 @@ class VersionService
                     'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                     'author_id' => $author->id,
                     'author_name' => $author->name,
+                    'status' => $targetStatus,
                     'updated_at' => now(),
                 ]);
 
