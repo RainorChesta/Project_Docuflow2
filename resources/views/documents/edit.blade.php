@@ -2668,10 +2668,6 @@
                 if (spinnerSave) spinnerSave.classList.remove('hidden');
                 if (textSave) textSave.textContent = "{{ __('Menyimpan Draf...') }}";
 
-                if (window.docEditor) {
-                    try { window.docEditor.destroyEditor(); } catch (e) {}
-                }
-
                 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
 
                 fetch("{{ route('documents.save-draft-editor', $document) }}", {
@@ -2687,6 +2683,10 @@
                     console.warn('saveDraftEditor error:', err);
                 })
                 .finally(() => {
+                    if (window.docEditor) {
+                        try { window.docEditor.destroyEditor(); } catch (e) {}
+                    }
+
                     window._allowIntentionalLeave = true;
                     if (typeof window.allowIntentionalLeave === 'function') {
                         window.allowIntentionalLeave();

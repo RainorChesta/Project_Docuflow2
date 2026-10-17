@@ -401,6 +401,7 @@ class OnlyOfficeController extends Controller
 
                 if ($isSaveAsDraft) {
                     $version->update(['status' => 'draft']);
+                    \App\Models\DocumentApprovalStep::where('version_id', $version->id)->delete();
                     \Illuminate\Support\Facades\Cache::forget('onlyoffice_pending_notif_' . $document->id);
                     Log::info("Document {$document->id} saved as draft via ONLYOFFICE callback.");
                 } elseif ($status === 2) {
@@ -411,7 +412,7 @@ class OnlyOfficeController extends Controller
                         \Illuminate\Support\Facades\Cache::forget('onlyoffice_pending_notif_' . $document->id);
                         $this->approvalRoutingService->compileWorkflowFromSignatures($document, $version, $author);
                     }
-                } elseif ($status === 6 && in_array($version->status, ['draft', 'pending'], true)) {
+                } elseif ($status === 6 && $version->status === 'pending') {
                     // Mark that version was saved/modified in this session and will need notification when edit finishes
                     \Illuminate\Support\Facades\Cache::put('onlyoffice_pending_notif_' . $document->id, [
                         'version_id' => $version->id,
@@ -429,12 +430,13 @@ class OnlyOfficeController extends Controller
         } elseif ($status === 4) {
             // Document closed without changes (or closed after previous forcesave status 6).
             // Check if there is a pending notification from status 6 that needs to be fired upon closing
-            if (\Illuminate\Support\Facades\Cache::has('onlyoffice_save_as_draft_' . $document->id)) {
+            $isSaveAsDraft = \Illuminate\Support\Facades\Cache::has('onlyoffice_save_as_draft_' . $document->id);
+            if ($isSaveAsDraft) {
                 \Illuminate\Support\Facades\Cache::forget('onlyoffice_pending_notif_' . $document->id);
             }
 
             $pendingNotif = \Illuminate\Support\Facades\Cache::pull('onlyoffice_pending_notif_' . $document->id);
-            if ($pendingNotif) {
+            if ($pendingNotif && !$isSaveAsDraft) {
                 $version = \App\Models\DocumentVersion::find($pendingNotif['version_id']);
                 $author = \App\Models\User::find($pendingNotif['author_id']) ?? $document->owner;
                 if ($version) {

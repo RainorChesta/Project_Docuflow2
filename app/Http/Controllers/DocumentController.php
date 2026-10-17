@@ -1302,7 +1302,7 @@ class DocumentController extends Controller
         $user = auth()->user();
 
         // Flag ONLYOFFICE callback to save and keep version status as draft (do NOT submit for approval)
-        Cache::put('onlyoffice_save_as_draft_' . $document->id, true, now()->addMinutes(2));
+        Cache::put('onlyoffice_save_as_draft_' . $document->id, true, now()->addMinutes(5));
 
         $latestWorkingVersion = $document->versions()
             ->whereIn('status', ['draft', 'pending'])
@@ -1313,13 +1313,16 @@ class DocumentController extends Controller
         $version = $latestWorkingVersion ?? $document->displayVersion();
 
         if ($version) {
-            // Trigger forcesave to flush active in-memory ONLYOFFICE content to server storage
-            $this->onlyOfficeService->forceSaveDocument($document, $version);
-
             // Explicitly ensure status is 'draft'
             if ($version->status !== 'draft') {
                 $version->update(['status' => 'draft']);
             }
+            // Clear any approval steps that were generated so this version is purely a draft
+            \App\Models\DocumentApprovalStep::where('version_id', $version->id)->delete();
+
+            // Trigger forcesave to flush active in-memory ONLYOFFICE content to server storage
+            $this->onlyOfficeService->forceSaveDocument($document, $version);
+
             $version->touch();
         }
 

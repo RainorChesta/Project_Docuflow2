@@ -16,6 +16,7 @@
         $approvedSignatures = $approvedSignatures ?? [];
         $version = $version ?? $document->displayVersion();
         $pendingVersion = $document->versions->firstWhere('status', 'pending');
+        $draftVersion = $document->draftVersion();
         $isPendingV1 = (!$document->current_version_id && !$document->currentVersion)
             && ($document->versions->where('status', 'pending')->where('version_number', 1)->isNotEmpty()
                 || $document->versions->count() <= 1);
@@ -272,6 +273,38 @@
                         </form>
                     </dialog>
                 @endcan
+            @endif
+
+            <!-- Draft Banner -->
+            @if($draftVersion && !$pendingVersion)
+                <div id="draft-notice-banner" class="mb-3 sm:mb-4 rounded-2xl border border-warning/30 bg-warning/10 p-4 sm:p-5 shadow-xs print:hidden">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+                        <div class="flex items-start gap-3 min-w-0 flex-1">
+                            <div class="p-2 rounded-xl bg-warning/20 text-warning-content shrink-0 mt-0.5">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <h4 class="font-bold text-sm text-base-content uppercase tracking-wide">{{ __('Draf Dokumen') }} (v{{ $draftVersion->version_number }})</h4>
+                                    <span class="text-xs text-base-content/50 font-medium">&bull; {{ $draftVersion->updated_at?->diffForHumans() }}</span>
+                                </div>
+                                <p class="text-xs text-base-content/70 mt-0.5">
+                                    {{ __('Dokumen ini memiliki draf perubahan yang belum diajukan untuk persetujuan.') }}
+                                </p>
+                            </div>
+                        </div>
+                        @can('update', $document)
+                            <div class="shrink-0 flex items-center gap-2 pl-10 sm:pl-0">
+                                <a href="{{ route('documents.edit', $document) }}" class="btn btn-warning btn-sm text-neutral font-semibold gap-1.5 shadow-xs rounded-xl whitespace-nowrap">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                    <span>{{ __('Lanjutkan Edit') }}</span>
+                                </a>
+                            </div>
+                        @endcan
+                    </div>
+                </div>
             @endif
 
             <!-- Pending Banner (paling atas) -->
@@ -1014,15 +1047,23 @@
                                     @if($document->is_expired)
                                         <span class="badge badge-error badge-sm mb-1">{{ __('Kedaluwarsa') }}</span><br>
                                     @endif
-                                    @if($document->currentVersion)
+                                    @if($pendingVersion && $document->currentVersion)
+                                        <div class="text-xs text-base-content/70">{{ __('Aktif') }} (v{{ $document->currentVersion->version_number }})</div>
+                                        <span class="badge badge-warning badge-sm font-semibold">{{ __('Menunggu Persetujuan') }} (v{{ $pendingVersion->version_number }})</span>
+                                    @elseif($draftVersion && $document->currentVersion)
+                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                            <span class="badge badge-warning badge-sm px-2 justify-center font-semibold">{{ __('Draf') }} (v{{ $draftVersion->version_number }})</span>
+                                            <span class="badge badge-ghost badge-sm text-[11px] text-base-content/70">{{ __('Aktif') }}: v{{ $document->currentVersion->version_number }}</span>
+                                        </div>
+                                    @elseif($document->currentVersion)
                                         <div>{{ __('Aktif') }} (v{{ $document->currentVersion->version_number }})</div>
-                                        <div class="text-[11px] text-base-content/60 font-normal" title="{{ __('Waktu Aktif:') }} {{ $document->activated_at->format('d/m/Y H:i') }} WIB">
-                                            {{ $document->activated_at->translatedFormat('d M Y, H:i') }} WIB
+                                        <div class="text-[11px] text-base-content/60 font-normal" title="{{ __('Waktu Aktif:') }} {{ $document->activated_at?->format('d/m/Y H:i') }} WIB">
+                                            {{ $document->activated_at?->translatedFormat('d M Y, H:i') }} WIB
                                         </div>
                                     @elseif($pendingVersion)
                                         <span class="text-primary font-semibold">{{ __('Menunggu Persetujuan') }} (v{{ $pendingVersion->version_number }})</span>
                                     @elseif($hasDraft)
-                                        <span class="text-base-content/70 font-medium">{{ __('Draf') }}</span>
+                                        <span class="badge badge-warning badge-sm px-2 justify-center font-semibold">{{ __('Draf') }} (v{{ $draftVersion?->version_number ?? 1 }})</span>
                                     @else
                                         <span class="text-primary font-semibold">{{ __('Menunggu Persetujuan Pertama') }}</span>
                                     @endif
@@ -2383,6 +2424,8 @@
                                     @endif
                                     @if($version->id === $document->current_version_id)
                                         <span class="badge badge-secondary text-white badge-sm font-semibold">Active</span>
+                                    @elseif($version->status === 'draft')
+                                        <span class="badge badge-warning badge-sm font-medium">Draft</span>
                                     @elseif($version->status === 'inactive')
                                         <span class="badge badge-ghost border border-base-300 badge-sm">Inactive</span>
                                     @elseif($version->status === 'pending')

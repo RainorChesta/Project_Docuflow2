@@ -483,6 +483,25 @@ class Document extends Model
     }
 
     /**
+     * Get the newest draft version.
+     */
+    public function draftVersion(): ?DocumentVersion
+    {
+        if ($this->relationLoaded('versions')) {
+            return $this->versions
+                ->filter(fn($v) => !$v->discarded_at && $v->status === 'draft')
+                ->sortByDesc('version_number')
+                ->first();
+        }
+
+        return $this->versions()
+            ->where('status', 'draft')
+            ->whereNull('discarded_at')
+            ->orderBy('version_number', 'desc')
+            ->first();
+    }
+
+    /**
      * Get the active pending approval step for this document's latest pending version.
      */
     public function currentApprovalStep(): ?DocumentApprovalStep

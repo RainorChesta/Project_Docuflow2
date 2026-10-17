@@ -623,6 +623,17 @@
                                                 <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
                                                 {{ __('Kedaluwarsa') }}
                                             </span>
+                                        @elseif($hasPending && $doc->currentVersion)
+                                            <span class="badge badge-warning badge-sm text-neutral font-medium gap-1.5 shadow-2xs leading-none" title="{{ __('Versi aktif v:active, menunggu persetujuan v:pending', ['active' => $doc->currentVersion->version_number, 'pending' => $doc->displayVersion()?->version_number]) }}">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-neutral/80"></span>
+                                                v{{ $doc->currentVersion->version_number }} (v{{ $doc->displayVersion()?->version_number }} {{ __('Pending') }})
+                                            </span>
+                                        @elseif($hasDraft && $doc->currentVersion)
+                                            @php $dVer = $doc->draftVersion(); @endphp
+                                            <span class="badge badge-warning badge-sm text-neutral font-medium gap-1.5 shadow-2xs leading-none" title="{{ __('Versi aktif v:active, draf revisi v:draft', ['active' => $doc->currentVersion->version_number, 'draft' => $dVer?->version_number]) }}">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-neutral/80"></span>
+                                                v{{ $doc->currentVersion->version_number }} (v{{ $dVer?->version_number }} {{ __('Draf') }})
+                                            </span>
                                         @elseif($hasPending)
                                             <span class="badge badge-warning badge-sm text-neutral font-medium gap-1.5 shadow-2xs leading-none">
                                                 <span class="w-1.5 h-1.5 rounded-full bg-neutral/80"></span>

@@ -86,6 +86,9 @@
                 <span class="badge badge-error badge-xs text-[10px] text-white px-1 font-medium">{{ __('Kedaluwarsa') }}</span>
             @elseif($hasPending && $doc->currentVersion)
                 <span class="badge badge-warning badge-xs text-[9px] px-1 font-medium" title="{{ __('Versi aktif v:active, menunggu persetujuan v:pending', ['active' => $doc->currentVersion->version_number, 'pending' => $doc->displayVersion()?->version_number]) }}">v{{ $doc->currentVersion->version_number }} (v{{ $doc->displayVersion()?->version_number }}P)</span>
+            @elseif($hasDraft && $doc->currentVersion)
+                @php $dVer = $doc->draftVersion(); @endphp
+                <span class="badge badge-warning badge-xs text-[9px] px-1 font-medium" title="{{ __('Versi aktif v:active, draf revisi v:draft', ['active' => $doc->currentVersion->version_number, 'draft' => $dVer?->version_number]) }}">v{{ $doc->currentVersion->version_number }} (v{{ $dVer?->version_number }}D)</span>
             @elseif($doc->currentVersion)
                 <span class="badge badge-success badge-xs text-[10px] px-1">v{{ $doc->currentVersion->version_number }}</span>
             @elseif($hasPending)
