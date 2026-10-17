@@ -242,13 +242,73 @@
                                                         @endif
                                                     </button>
                                                 </form>
-                                                <form method="POST" action="{{ route('admin.corporate-soft-files.destroy', $softFile) }}" class="inline" onsubmit="return confirm('{{ __('Apakah Anda yakin ingin menghapus soft file korporat ini?') }}')">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="btn btn-ghost btn-xs btn-square text-error" title="{{ __('Hapus') }}">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                    </button>
-                                                </form>
+                                                <button type="button" 
+                                                        onclick="document.getElementById('delete-softfile-modal-{{ $softFile->id }}').showModal()" 
+                                                        class="btn btn-ghost btn-xs btn-square text-error" 
+                                                        title="{{ __('Hapus Soft File Kop') }}">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                </button>
+
+                                                {{-- Modal Konfirmasi Hapus Soft File Kop --}}
+                                                <dialog id="delete-softfile-modal-{{ $softFile->id }}" class="modal modal-bottom sm:modal-middle text-left whitespace-normal backdrop-blur-xs">
+                                                    <div class="modal-box rounded-3xl p-6 bg-base-100 border border-base-300 shadow-2xl max-w-md w-full relative">
+                                                        <div class="flex items-start gap-3.5 mb-3">
+                                                            <div class="w-12 h-12 rounded-2xl bg-error/10 text-error flex items-center justify-center shrink-0 border border-error/20">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                </svg>
+                                                            </div>
+                                                            <div class="min-w-0 flex-1">
+                                                                <h3 class="font-bold text-lg text-base-content leading-snug">
+                                                                    {{ __('Yakin Mau Hapus?') }}
+                                                                </h3>
+                                                                <p class="text-xs text-base-content/60 mt-0.5">
+                                                                    {{ __('Konfirmasi penghapusan soft file kop.') }}
+                                                                </p>
+                                                            </div>
+                                                            <button type="button" 
+                                                                    onclick="document.getElementById('delete-softfile-modal-{{ $softFile->id }}').close()" 
+                                                                    class="btn btn-ghost btn-xs btn-circle text-base-content/50 hover:text-base-content" 
+                                                                    title="{{ __('Tutup') }}">✕</button>
+                                                        </div>
+
+                                                        <div class="p-3.5 bg-base-200/60 rounded-2xl border border-base-300/80 text-xs text-base-content/80 leading-relaxed my-4 space-y-1.5">
+                                                            <p>
+                                                                {{ __('Apakah Anda yakin ingin menghapus soft file kop') }} <strong class="font-bold text-base-content">"{{ $softFile->title }}"</strong>?
+                                                            </p>
+                                                            <div class="flex items-center gap-2 text-[11px] text-base-content/60">
+                                                                <span class="truncate max-w-[200px]">{{ $softFile->file_original_name }}</span>
+                                                                <span>•</span>
+                                                                <span class="badge {{ $softFile->isPdf() ? 'badge-error' : 'badge-primary' }} badge-xs font-mono font-bold">{{ $softFile->file_type }}</span>
+                                                                <span class="badge {{ $softFile->isA4() ? 'badge-secondary' : 'badge-neutral' }} badge-xs font-mono">{{ $softFile->isA4() ? 'A4' : 'F4' }}</span>
+                                                            </div>
+                                                            <p class="text-[11px] text-error font-medium pt-1.5 border-t border-base-300/60">
+                                                                {{ __('Berkas ini akan dihapus permanen dari server dan tidak dapat dikembalikan.') }}
+                                                            </p>
+                                                        </div>
+
+                                                        <div class="modal-action flex justify-end gap-2 mt-4 pt-3 border-t border-base-200">
+                                                            <button type="button" 
+                                                                    onclick="document.getElementById('delete-softfile-modal-{{ $softFile->id }}').close()" 
+                                                                    class="btn btn-ghost btn-sm rounded-xl font-medium">
+                                                                {{ __('Batal') }}
+                                                            </button>
+                                                            <form method="POST" action="{{ route('admin.corporate-soft-files.destroy', $softFile) }}" class="inline">
+                                                                @csrf
+                                                                @method('DELETE')
+                                                                <button type="submit" class="btn btn-error btn-sm rounded-xl text-white gap-1.5 font-bold shadow-xs">
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                    </svg>
+                                                                    {{ __('Ya, Hapus') }}
+                                                                </button>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                    <form method="dialog" class="modal-backdrop">
+                                                        <button>{{ __('close') }}</button>
+                                                    </form>
+                                                </dialog>
                                             </div>
                                         </td>
                                     </tr>

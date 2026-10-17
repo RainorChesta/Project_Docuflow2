@@ -1055,6 +1055,56 @@ class CorporateSoftFileTest extends TestCase
         // Original v1 MUST remain intact as the current released active version
         $this->assertEquals($v1->id, $doc->current_version_id);
     }
+
+    public function test_admin_index_displays_delete_confirmation_modal_for_soft_file(): void
+    {
+        $softFile = CorporateSoftFile::create([
+            'title' => 'Kop Surat Hapus Test',
+            'file_path' => 'corporate_soft_files/hapus.pdf',
+            'file_original_name' => 'hapus.pdf',
+            'file_mime' => 'application/pdf',
+            'status' => 'active',
+            'is_all_companies' => true,
+            'is_all_branches' => true,
+            'allowed_roles' => ['staff'],
+            'created_by' => $this->admin->id,
+        ]);
+
+        $response = $this->actingAs($this->admin)->get(route('admin.corporate-soft-files.index'));
+        $response->assertOk();
+        $response->assertSee('id="delete-softfile-modal-' . $softFile->id . '"', false);
+        $response->assertSee('Yakin Mau Hapus?');
+        $response->assertSee('Ya, Hapus');
+        $response->assertSee(route('admin.corporate-soft-files.destroy', $softFile));
+    }
+
+    public function test_admin_can_delete_corporate_soft_file(): void
+    {
+        $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
+        $filePath = 'corporate_soft_files/delete_me.pdf';
+        $disk->put($filePath, 'fake-pdf-content');
+
+        $softFile = CorporateSoftFile::create([
+            'title' => 'Kop Surat Akan Dihapus',
+            'file_path' => $filePath,
+            'file_original_name' => 'delete_me.pdf',
+            'file_mime' => 'application/pdf',
+            'status' => 'active',
+            'is_all_companies' => true,
+            'is_all_branches' => true,
+            'created_by' => $this->admin->id,
+        ]);
+
+        $response = $this->actingAs($this->admin)->delete(route('admin.corporate-soft-files.destroy', $softFile));
+
+        $response->assertRedirect(route('admin.corporate-soft-files.index'));
+        $response->assertSessionHas('success');
+
+        $this->assertDatabaseMissing('corporate_soft_files', [
+            'id' => $softFile->id,
+        ]);
+        $this->assertFalse($disk->exists($filePath));
+    }
 }
 
 
