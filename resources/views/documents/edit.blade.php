@@ -375,6 +375,19 @@
                                     @endif
                                 @endcan
 
+                                {{-- Simpan Draf --}}
+                                <button type="button"
+                                        id="btn-toolbar-save-draft"
+                                        onclick="executeEditorSaveDraft()"
+                                        class="btn bg-gradient-to-r from-[#0F6DB7] to-[#147D6A] hover:from-[#0B5F9F] hover:to-[#0F6E5D] text-white border-0 btn-xs gap-1 font-semibold shadow-xs shrink-0"
+                                        title="{{ __('Simpan sebagai draf (Save as Draft)') }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                                    </svg>
+                                    <span class="hidden sm:inline">{{ __('Simpan Draf') }}</span>
+                                    <span class="sm:hidden">{{ __('Draf') }}</span>
+                                </button>
+
                                 {{-- Selesai Edit --}}
                                 <button type="button"
                                         id="btn-selesai-edit"

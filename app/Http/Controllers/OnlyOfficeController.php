@@ -412,7 +412,7 @@ class OnlyOfficeController extends Controller
                         \Illuminate\Support\Facades\Cache::forget('onlyoffice_pending_notif_' . $document->id);
                         $this->approvalRoutingService->compileWorkflowFromSignatures($document, $version, $author);
                     }
-                } elseif ($status === 6 && $version->status === 'pending') {
+                } elseif ($status === 6 && in_array($version->status, ['draft', 'pending'], true)) {
                     // Mark that version was saved/modified in this session and will need notification when edit finishes
                     \Illuminate\Support\Facades\Cache::put('onlyoffice_pending_notif_' . $document->id, [
                         'version_id' => $version->id,

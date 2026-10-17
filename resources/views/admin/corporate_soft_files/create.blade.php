@@ -80,23 +80,22 @@
                             @enderror
                         </div>
 
-                        {{-- Upload File DOCX / PDF with Drag & Drop --}}
+                        {{-- Upload File PDF with Drag & Drop --}}
                         <div class="form-control" x-data="{
                             fileName: '',
                             fileSize: '',
                             fileExt: '',
                             isDragging: false,
-                            showImageRejectionModal: false,
+                            showFormatRejectionModal: false,
                             rejectedFileName: '',
                             handleFiles(files) {
                                 if (files && files.length > 0) {
                                     const f = files[0];
                                     const ext = f.name.split('.').pop().toLowerCase();
-                                    const isImage = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg', 'tif', 'tiff'].includes(ext) || (f.type && f.type.startsWith('image/'));
 
-                                    if (isImage) {
+                                    if (ext !== 'pdf') {
                                         this.rejectedFileName = f.name;
-                                        this.showImageRejectionModal = true;
+                                        this.showFormatRejectionModal = true;
                                         this.clearFile();
                                         return;
                                     }
@@ -105,7 +104,7 @@
                                     this.fileSize = (f.size / (1024 * 1024) >= 1) 
                                         ? (f.size / (1024 * 1024)).toFixed(2) + ' MB' 
                                         : (f.size / 1024).toFixed(1) + ' KB';
-                                    this.fileExt = ext.toUpperCase();
+                                    this.fileExt = 'PDF';
                                     $refs.fileInput.files = files;
                                 }
                             },
@@ -119,7 +118,7 @@
                             }
                         }">
                             <label class="label font-medium text-xs sm:text-sm">
-                                <span class="label-text font-bold">{{ __('File Dokumen / Kop (.docx, .pdf)') }} <span class="text-error">*</span></span>
+                                <span class="label-text font-bold">{{ __('File Dokumen Kop Surat (.pdf)') }} <span class="text-error">*</span></span>
                             </label>
 
                             <div class="relative border-2 border-dashed rounded-2xl p-4 sm:p-6 transition-all text-center cursor-pointer"
@@ -132,7 +131,7 @@
                                 <input type="file" 
                                        name="file" 
                                        x-ref="fileInput" 
-                                       accept=".docx,.doc,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword"
+                                       accept=".pdf,application/pdf"
                                        @change="handleFiles($event.target.files)"
                                        required 
                                        class="hidden @error('file') is-invalid @enderror">
@@ -149,10 +148,10 @@
                                                 <span class="text-primary hover:underline">{{ __('Klik untuk memilih file') }}</span> {{ __('atau seret (drag & drop) ke sini') }}
                                             </p>
                                             <p class="text-xs text-base-content/50 mt-1">
-                                                {{ __('Hanya mendukung: Dokumen Word (.docx) atau Berkas PDF (.pdf) — Maks 15 MB') }}
+                                                {{ __('Hanya mendukung: Berkas PDF (.pdf) — Maks 15 MB') }}
                                             </p>
                                             <p class="text-[11px] text-error font-medium mt-0.5">
-                                                {{ __('⚠️ Format gambar (JPEG/PNG) tidak diizinkan') }}
+                                                {{ __('⚠️ Format Word (.docx, .doc) dan gambar tidak diizinkan') }}
                                             </p>
                                         </div>
                                     </div>
@@ -161,7 +160,7 @@
                                 <template x-if="fileName">
                                     <div class="flex items-center justify-between p-2 sm:p-3 bg-base-100 rounded-xl border border-base-300 shadow-xs text-left" @click.stop>
                                         <div class="flex items-center gap-3 min-w-0">
-                                            <div class="w-10 h-10 rounded-xl bg-primary/15 text-primary flex items-center justify-center font-bold text-xs shrink-0" x-text="fileExt"></div>
+                                            <div class="w-10 h-10 rounded-xl bg-error/15 text-error flex items-center justify-center font-bold text-xs shrink-0" x-text="fileExt"></div>
                                             <div class="min-w-0">
                                                 <p class="text-sm font-bold text-base-content truncate" x-text="fileName"></p>
                                                 <p class="text-xs text-base-content/50" x-text="fileSize"></p>
@@ -183,8 +182,8 @@
                                 <span class="text-xs text-error mt-1.5 font-medium block">{{ $message }}</span>
                             @enderror
 
-                            {{-- Image Format Rejection Modal --}}
-                            <div x-show="showImageRejectionModal" 
+                            {{-- Format Rejection Modal --}}
+                            <div x-show="showFormatRejectionModal" 
                                  x-cloak 
                                  class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
                                  x-transition:enter="transition ease-out duration-200"
@@ -194,7 +193,7 @@
                                  x-transition:leave-start="opacity-100"
                                  x-transition:leave-end="opacity-0">
                                 <div class="bg-base-100 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-base-300 text-center space-y-4"
-                                     @click.outside="showImageRejectionModal = false"
+                                     @click.outside="showFormatRejectionModal = false"
                                      x-transition:enter="transition ease-out duration-200"
                                      x-transition:enter-start="opacity-0 scale-95"
                                      x-transition:enter-end="opacity-100 scale-100"
@@ -207,25 +206,32 @@
                                         </svg>
                                     </div>
                                     <div class="space-y-1.5">
-                                        <h3 class="text-base sm:text-lg font-extrabold text-base-content">{{ __('Format Gambar Ditolak') }}</h3>
+                                        <h3 class="text-base sm:text-lg font-extrabold text-base-content">{{ __('Format Berkas Ditolak') }}</h3>
                                         <p class="text-xs font-semibold text-error bg-error/10 py-1 px-2.5 rounded-lg inline-block" x-text="rejectedFileName"></p>
                                         <p class="text-xs text-base-content/70 text-left pt-2 leading-relaxed">
-                                            {{ __('Sistem tidak menerima soft file kop surat dalam format gambar (JPEG, PNG, dll) demi menjaga ketajaman resolusi, presisi margin, dan penempatan header-footer resmi.') }}
+                                            {{ __('Sistem saat ini hanya mengizinkan berkas kop surat dalam format PDF (.pdf). Format dokumen Microsoft Word (.docx, .doc) dan format gambar tidak diperbolehkan demi menjaga presisi margin, ketajaman grafis, dan penempatan header-footer resmi.') }}
                                         </p>
-                                        <div class="p-3 bg-base-200/60 rounded-xl text-left border border-base-300 text-[11px] text-base-content/80 space-y-1 mt-2">
+                                        <div class="p-3 bg-base-200/60 rounded-xl text-left border border-base-300 text-[11px] text-base-content/80 space-y-1.5 mt-2">
                                             <p class="font-bold text-base-content flex items-center gap-1.5">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
                                                 {{ __('Format yang Diizinkan:') }}
                                             </p>
-                                            <ul class="list-disc list-inside space-y-0.5 text-base-content/70 pl-1">
-                                                <li><strong>Microsoft Word</strong> (.docx, .doc)</li>
-                                                <li><strong>Dokumen PDF</strong> (.pdf)</li>
+                                            <ul class="list-disc list-inside space-y-0.5 text-success font-medium pl-1">
+                                                <li>Dokumen PDF (.pdf)</li>
+                                            </ul>
+                                            <p class="font-bold text-error flex items-center gap-1.5 pt-1">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                                                {{ __('Format yang Tidak Diizinkan:') }}
+                                            </p>
+                                            <ul class="list-disc list-inside space-y-0.5 text-error/80 pl-1">
+                                                <li>Microsoft Word (.docx, .doc)</li>
+                                                <li>Gambar (JPEG, PNG, WEBP, dll)</li>
                                             </ul>
                                         </div>
                                     </div>
                                     <div class="pt-2">
-                                        <button type="button" @click="showImageRejectionModal = false" class="btn btn-primary btn-sm w-full rounded-xl font-bold shadow-xs">
-                                            {{ __('Saya Mengerti, Pilih Berkas Lain') }}
+                                        <button type="button" @click="showFormatRejectionModal = false" class="btn btn-primary btn-sm w-full rounded-xl font-bold shadow-xs">
+                                            {{ __('Saya Mengerti, Pilih Berkas PDF') }}
                                         </button>
                                     </div>
                                 </div>

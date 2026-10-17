@@ -311,13 +311,13 @@ class DocumentController extends Controller
 
         if ($status = $request->get('status')) {
             if ($status === 'active') {
-                $query->whereHas('currentVersion', fn($q) => $q->where('status', 'active'))
-                      ->where('is_expired', false);
+                $query->where('is_expired', false)
+                      ->whereHas('currentVersion', fn($q) => $q->where('status', 'active'))
+                      ->whereDoesntHave('versions', fn($q) => $q->whereIn('status', ['draft', 'pending'])->whereNull('discarded_at'));
             } elseif ($status === 'pending') {
-                $query->whereDoesntHave('currentVersion')
-                    ->orWhereHas('versions', fn($q) => $q->where('status', 'pending'));
+                $query->whereHas('versions', fn($q) => $q->where('status', 'pending')->whereNull('discarded_at'));
             } elseif ($status === 'draft') {
-                $query->whereDoesntHave('versions');
+                $query->whereHas('versions', fn($q) => $q->where('status', 'draft')->whereNull('discarded_at'));
             } elseif ($status === 'expired') {
                 $query->where('is_expired', true);
             }

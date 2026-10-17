@@ -632,7 +632,7 @@
                                             @php $dVer = $doc->draftVersion(); @endphp
                                             <span class="badge badge-warning badge-sm text-neutral font-medium gap-1.5 shadow-2xs leading-none" title="{{ __('Versi aktif v:active, draf revisi v:draft', ['active' => $doc->currentVersion->version_number, 'draft' => $dVer?->version_number]) }}">
                                                 <span class="w-1.5 h-1.5 rounded-full bg-neutral/80"></span>
-                                                v{{ $doc->currentVersion->version_number }} (v{{ $dVer?->version_number }} {{ __('Draf') }})
+                                                {{ __('Draf') }} (v{{ $dVer?->version_number }})
                                             </span>
                                         @elseif($hasPending)
                                             <span class="badge badge-warning badge-sm text-neutral font-medium gap-1.5 shadow-2xs leading-none">
@@ -650,9 +650,9 @@
                                                 {{ __('Ditolak') }}
                                             </span>
                                         @elseif($hasDraft)
-                                            <span class="badge badge-ghost badge-sm font-medium border border-base-300 gap-1.5 text-base-content/80 leading-none">
-                                                <span class="w-1.5 h-1.5 rounded-full bg-base-content/40"></span>
-                                                {{ __('Draf') }}
+                                            <span class="badge badge-warning badge-sm text-neutral font-medium gap-1.5 shadow-2xs leading-none">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-neutral/80"></span>
+                                                {{ __('Draf') }} (v{{ $doc->draftVersion()?->version_number ?? 1 }})
                                             </span>
                                         @else
                                             <span class="badge badge-ghost badge-sm border border-base-300 font-medium leading-none">{{ ucfirst($displayVer->status ?? 'Draft') }}</span>

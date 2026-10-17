@@ -96,13 +96,14 @@ class DocumentController extends Controller
                 $docQuery->where('is_expired', true);
             } elseif ($selectedStatus === 'active') {
                 $docQuery->where('is_expired', false)
-                    ->whereHas('currentVersion', fn($vq) => $vq->where('status', 'active'));
+                    ->whereHas('currentVersion', fn($vq) => $vq->where('status', 'active'))
+                    ->whereDoesntHave('versions', fn($vq) => $vq->whereIn('status', ['draft', 'pending'])->whereNull('discarded_at'));
             } elseif ($selectedStatus === 'pending') {
-                $docQuery->whereHas('versions', fn($vq) => $vq->where('status', 'pending'));
+                $docQuery->whereHas('versions', fn($vq) => $vq->where('status', 'pending')->whereNull('discarded_at'));
             } elseif ($selectedStatus === 'draft') {
-                $docQuery->whereHas('versions', fn($vq) => $vq->where('status', 'draft'));
+                $docQuery->whereHas('versions', fn($vq) => $vq->where('status', 'draft')->whereNull('discarded_at'));
             } elseif ($selectedStatus === 'rejected') {
-                $docQuery->whereHas('versions', fn($vq) => $vq->where('status', 'rejected'));
+                $docQuery->whereHas('versions', fn($vq) => $vq->where('status', 'rejected')->whereNull('discarded_at'));
             }
         }
 
@@ -111,9 +112,10 @@ class DocumentController extends Controller
             'total' => Document::count(),
             'active' => Document::where('is_expired', false)
                 ->whereHas('currentVersion', fn($q) => $q->where('status', 'active'))
+                ->whereDoesntHave('versions', fn($q) => $q->whereIn('status', ['draft', 'pending'])->whereNull('discarded_at'))
                 ->count(),
-            'pending' => Document::whereHas('versions', fn($q) => $q->where('status', 'pending'))->count(),
-            'draft' => Document::whereHas('versions', fn($q) => $q->where('status', 'draft'))->count(),
+            'pending' => Document::whereHas('versions', fn($q) => $q->where('status', 'pending')->whereNull('discarded_at'))->count(),
+            'draft' => Document::whereHas('versions', fn($q) => $q->where('status', 'draft')->whereNull('discarded_at'))->count(),
             'expired' => Document::where('is_expired', true)->count(),
         ];
 

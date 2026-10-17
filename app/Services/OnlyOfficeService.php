@@ -8,6 +8,7 @@ use App\Models\User;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 use Illuminate\Support\Facades\Log;
+use setasign\Fpdi\Fpdi;
 
 class OnlyOfficeService
 {

@@ -88,13 +88,13 @@
                 <span class="badge badge-warning badge-xs text-[9px] px-1 font-medium" title="{{ __('Versi aktif v:active, menunggu persetujuan v:pending', ['active' => $doc->currentVersion->version_number, 'pending' => $doc->displayVersion()?->version_number]) }}">v{{ $doc->currentVersion->version_number }} (v{{ $doc->displayVersion()?->version_number }}P)</span>
             @elseif($hasDraft && $doc->currentVersion)
                 @php $dVer = $doc->draftVersion(); @endphp
-                <span class="badge badge-warning badge-xs text-[9px] px-1 font-medium" title="{{ __('Versi aktif v:active, draf revisi v:draft', ['active' => $doc->currentVersion->version_number, 'draft' => $dVer?->version_number]) }}">v{{ $doc->currentVersion->version_number }} (v{{ $dVer?->version_number }}D)</span>
+                <span class="badge badge-warning badge-xs text-[10px] px-1.5 font-semibold" title="{{ __('Versi aktif v:active, draf revisi v:draft', ['active' => $doc->currentVersion->version_number, 'draft' => $dVer?->version_number]) }}">{{ __('Draf') }} (v{{ $dVer?->version_number }})</span>
             @elseif($doc->currentVersion)
                 <span class="badge badge-success badge-xs text-[10px] px-1">v{{ $doc->currentVersion->version_number }}</span>
             @elseif($hasPending)
                 <span class="badge badge-warning badge-xs text-[10px] px-1">{{ __('Tertunda') }}</span>
             @elseif($hasDraft)
-                <span class="badge badge-warning badge-xs text-[10px] px-1">{{ __('Draf') }}</span>
+                <span class="badge badge-warning badge-xs text-[10px] px-1 font-semibold">{{ __('Draf') }} (v{{ $doc->draftVersion()?->version_number ?? 1 }})</span>
             @endif
         </div>
     </div>

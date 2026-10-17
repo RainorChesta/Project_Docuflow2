@@ -586,14 +586,14 @@
                                                         @elseif($hasDraft && $doc->currentVersion)
                                                             @php $dVer = $doc->draftVersion(); @endphp
                                                             <span class="badge badge-warning badge-xs font-semibold" title="{{ __('Versi aktif v:active, draf revisi v:draft', ['active' => $doc->currentVersion->version_number, 'draft' => $dVer?->version_number]) }}">
-                                                                v{{ $doc->currentVersion->version_number }} (v{{ $dVer?->version_number }} {{ __('Draf') }})
+                                                                {{ __('Draf') }} (v{{ $dVer?->version_number }})
                                                             </span>
                                                         @elseif($doc->currentVersion)
                                                             <span class="badge badge-success badge-xs font-semibold">v{{ $doc->currentVersion->version_number }}</span>
                                                         @elseif($hasPending)
                                                             <span class="badge badge-warning badge-xs font-semibold">{{ __('Tertunda') }}</span>
                                                         @elseif($hasDraft)
-                                                            <span class="badge badge-warning badge-xs font-semibold">{{ __('Draf') }}</span>
+                                                            <span class="badge badge-warning badge-xs font-semibold">{{ __('Draf') }} (v{{ $doc->draftVersion()?->version_number ?? 1 }})</span>
                                                         @endif
                                                         @if($doc->isDirectorRead())
                                                             <span class="badge badge-success badge-xs text-white font-medium block mt-1" title="{{ __('Ditinjau oleh Direktur') }}">
