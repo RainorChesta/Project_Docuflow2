@@ -458,4 +458,131 @@ class DocxSignatureProcessorTest extends TestCase
         $zip->close();
         @unlink($tempVerify);
     }
+
+    public function test_revert_signatures_to_yellow_placeholder_when_version_2_submitted_for_verification(): void
+    {
+        $owner = User::factory()->create();
+        $signer = User::factory()->create(['name' => 'Dr. Budi Santoso']);
+        $docType = DocumentType::create(['name' => 'Surat Keputusan', 'code' => 'SK']);
+        $document = Document::create([
+            'document_number' => '010/SK/2026',
+            'title' => 'SK Direksi',
+            'document_type_id' => $docType->id,
+            'owner_id' => $owner->id,
+            'visibility' => 'general',
+        ]);
+
+        $tempDocx = tempnam(sys_get_temp_dir(), 'docx_v2_test_') . '.docx';
+        $zip = new \ZipArchive();
+        $zip->open($tempDocx, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+
+        $documentXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
+            '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' .
+            '<w:body>' .
+            '<w:p><w:r><w:t>Konten Dokumen Versi 1</w:t></w:r></w:p>' .
+            '<w:sectPr/>' .
+            '</w:body>' .
+            '</w:document>';
+
+        $zip->addFromString('word/document.xml', $documentXml);
+        $zip->addFromString('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
+        $zip->addFromString('word/_rels/document.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>');
+
+        // Create 400x400 placeholder PNG
+        $im = imagecreatetruecolor(400, 400);
+        $amberBg = imagecolorallocate($im, 254, 243, 199);
+        imagefilledrectangle($im, 0, 0, 400, 400, $amberBg);
+        ob_start();
+        imagepng($im);
+        $initialPlaceholderPng = ob_get_clean();
+        imagedestroy($im);
+
+        $zip->addFromString('word/media/image1.png', $initialPlaceholderPng);
+        $zip->close();
+
+        $v1Path = 'documents/' . $document->id . '/v1.docx';
+        Storage::disk('local')->put($v1Path, file_get_contents($tempDocx));
+        @unlink($tempDocx);
+
+        $v1 = DocumentVersion::create([
+            'document_id' => $document->id,
+            'version_number' => 1,
+            'content' => '<p>Konten Dokumen Versi 1</p>',
+            'author_id' => $owner->id,
+            'author_name' => $owner->name,
+            'file_path' => $v1Path,
+            'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'status' => 'active',
+        ]);
+        $document->update(['current_version_id' => $v1->id]);
+
+        $sigRequest = \App\Models\SignatureRequest::create([
+            'requester_id' => $owner->id,
+            'target_user_id' => $signer->id,
+            'document_id' => $document->id,
+            'status' => 'approved',
+            'is_used' => true,
+            'requested_at' => now(),
+            'responded_at' => now(),
+        ]);
+
+        // Stamp real signature on v1
+        $sigPng = $this->createDummySignaturePng();
+        $processor = app(DocumentProcessorService::class);
+        $stamped = $processor->processSignature($document, $v1, $sigRequest->id, $sigPng, $sigRequest);
+        @unlink($sigPng);
+        $this->assertTrue($stamped);
+
+        // Verify v1 has real signature (not placeholder)
+        $v1Bytes = Storage::disk('local')->get($v1Path);
+        $tempV1Verify = tempnam(sys_get_temp_dir(), 'verify_v1_') . '.docx';
+        file_put_contents($tempV1Verify, $v1Bytes);
+        $zipV1 = new \ZipArchive();
+        $this->assertTrue($zipV1->open($tempV1Verify));
+        $v1Media = $zipV1->getFromName('word/media/image1.png');
+        $this->assertFalse(str_contains($v1Media, 'MENUNGGU PERSETUJUAN'));
+        $zipV1->close();
+        @unlink($tempV1Verify);
+
+        // Now prepare revision v2 from active v1
+        $versionService = app(\App\Services\VersionService::class);
+        $v2 = $versionService->prepareRevisionFromActive($document, $owner);
+
+        $this->assertEquals(2, $v2->version_number);
+        $this->assertEquals('draft', $v2->status);
+
+        // Verify that v2's signature has reverted to yellow placeholder
+        $expectedPlaceholder = app(\App\Services\OnlyOfficeService::class)->generatePlaceholderPngBytes($signer->name, $sigRequest->id, false);
+        $v2Bytes = Storage::disk('local')->get($v2->file_path);
+        $tempV2Verify = tempnam(sys_get_temp_dir(), 'verify_v2_') . '.docx';
+        file_put_contents($tempV2Verify, $v2Bytes);
+        $zipV2 = new \ZipArchive();
+        $this->assertTrue($zipV2->open($tempV2Verify));
+        $v2Media = $zipV2->getFromName('word/media/image1.png');
+        $this->assertEquals($expectedPlaceholder, $v2Media);
+        $this->assertNotEquals($v1Media, $v2Media);
+        $zipV2->close();
+        @unlink($tempV2Verify);
+
+        // Verify signature request is reset to pending
+        $this->assertEquals('pending', $sigRequest->fresh()->status);
+        $this->assertFalse((bool) $sigRequest->fresh()->is_used);
+
+        // Now submit Version 2 for verification
+        $v2->update(['status' => 'pending']);
+        $routingService = app(\App\Services\ApprovalRoutingService::class);
+        $routingService->compileWorkflowFromSignatures($document, $v2, $owner);
+
+        // Re-verify that in Pending Verification state, signature is still the yellow placeholder
+        $v2BytesPending = Storage::disk('local')->get($v2->file_path);
+        $tempV2PendingVerify = tempnam(sys_get_temp_dir(), 'verify_v2_pending_') . '.docx';
+        file_put_contents($tempV2PendingVerify, $v2BytesPending);
+        $zipV2Pending = new \ZipArchive();
+        $this->assertTrue($zipV2Pending->open($tempV2PendingVerify));
+        $v2PendingMedia = $zipV2Pending->getFromName('word/media/image1.png');
+        $this->assertEquals($expectedPlaceholder, $v2PendingMedia);
+        $zipV2Pending->close();
+        @unlink($tempV2PendingVerify);
+    }
 }
+

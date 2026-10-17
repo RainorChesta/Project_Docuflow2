@@ -50,13 +50,23 @@ class ApprovalRoutingService
             }
 
             // Reset any previous signature requests on this document to pending/unused for this new approval run
+            $hasPreviousApproved = SignatureRequest::where('document_id', $document->id)
+                ->where('status', '!=', 'pending')
+                ->exists();
+
             SignatureRequest::where('document_id', $document->id)
                 ->where('status', '!=', 'pending')
                 ->update([
                     'status' => 'pending',
                     'is_used' => false,
                     'rejected_reason' => null,
+                    'responded_at' => null,
                 ]);
+
+            if ($version->version_number > 1 || $hasPreviousApproved) {
+                app(DocumentProcessorService::class)->revertSignaturesToPlaceholders($document, $version);
+                app(OnlyOfficeService::class)->rotateDocumentKey($document, $version);
+            }
 
             // Fetch signature requests attached to this document
             $signatureRequests = SignatureRequest::where('document_id', $document->id)

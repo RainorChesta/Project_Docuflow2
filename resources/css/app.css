@@ -2,6 +2,10 @@
 @plugin "daisyui";
 @plugin "@tailwindcss/typography";
 
+@source "../**/*.blade.php";
+@source "../**/*.js";
+@source "../../storage/framework/views/*.php";
+
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, .dark, .dark *));
 
 @theme {
@@ -537,6 +541,41 @@ html.is-page-loading #loading-blur-card {
     opacity: 1 !important;
     transform: scale(1) !important;
     visibility: visible !important;
+}
+
+/* ─── ONLYOFFICE Document Editor Leave Confirmation Modal ─────────── */
+#editor-leave-modal .modal-box {
+    border-color: color-mix(in srgb, var(--brand-primary) 25%, transparent);
+}
+
+#editor-leave-top-bar {
+    background: linear-gradient(to right, var(--brand-primary), var(--brand-accent)) !important;
+}
+
+#editor-leave-icon-wrapper {
+    background: linear-gradient(to bottom right, color-mix(in srgb, var(--brand-primary) 12%, transparent), color-mix(in srgb, var(--brand-accent) 16%, transparent)) !important;
+    border-color: color-mix(in srgb, var(--brand-accent) 25%, transparent) !important;
+    color: var(--brand-primary) !important;
+}
+
+#editor-leave-ping-bg,
+#editor-leave-ping-dot {
+    background-color: var(--brand-accent) !important;
+}
+
+#btn-modal-close-x:hover {
+    color: var(--brand-primary) !important;
+    background-color: var(--brand-primary-soft) !important;
+}
+
+#btn-modal-save-draft {
+    background: linear-gradient(to right, var(--brand-primary), var(--brand-accent)) !important;
+    color: #FFFFFF !important;
+    border: none !important;
+}
+
+#btn-modal-save-draft:hover {
+    background: linear-gradient(to right, var(--brand-primary-hover), var(--brand-accent-hover)) !important;
 }
 
 

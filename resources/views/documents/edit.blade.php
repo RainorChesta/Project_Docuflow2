@@ -41,20 +41,28 @@
 
     {{-- ONLYOFFICE Editor Exit Confirmation Modal --}}
     <dialog id="editor-leave-modal" class="modal modal-bottom sm:modal-middle backdrop-blur-md z-[9999]">
-        <div class="modal-box p-6 sm:p-7 rounded-3xl border border-[#0F6DB7]/20 dark:border-[#0F6DB7]/30 shadow-2xl bg-base-100 max-w-lg w-full relative overflow-hidden">
+        <div class="modal-box p-6 sm:p-7 rounded-3xl border border-[#0F6DB7]/20 dark:border-[#0F6DB7]/30 shadow-2xl bg-base-100 max-w-lg w-full relative overflow-hidden"
+             style="border-color: color-mix(in srgb, var(--brand-primary, #0F6DB7) 25%, transparent);">
             {{-- Top Accent Bar (Application Logo Blue to Green) --}}
-            <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#0F6DB7] to-[#147D6A]"></div>
+            <div id="editor-leave-top-bar"
+                 class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#0F6DB7] to-[#147D6A]"
+                 style="background: linear-gradient(to right, var(--brand-primary, #0F6DB7), var(--brand-accent, #147D6A));"></div>
 
             {{-- Header --}}
             <div class="flex items-start justify-between gap-3 mb-4">
                 <div class="flex items-center gap-3 min-w-0">
-                    <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#0F6DB7]/10 to-[#147D6A]/15 text-[#0F6DB7] dark:text-[#4AA9F0] flex items-center justify-center shrink-0 shadow-xs border border-[#147D6A]/25 relative">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-[#0F6DB7] dark:text-[#4AA9F0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div id="editor-leave-icon-wrapper"
+                         class="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#0F6DB7]/10 to-[#147D6A]/15 text-[#0F6DB7] dark:text-[#4AA9F0] flex items-center justify-center shrink-0 shadow-xs border border-[#147D6A]/25 relative"
+                         style="background: linear-gradient(to bottom right, color-mix(in srgb, var(--brand-primary, #0F6DB7) 12%, transparent), color-mix(in srgb, var(--brand-accent, #147D6A) 16%, transparent)); border-color: color-mix(in srgb, var(--brand-accent, #147D6A) 25%, transparent); color: var(--brand-primary, #0F6DB7);">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-[#0F6DB7] dark:text-[#4AA9F0]" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                             style="color: var(--brand-primary, #0F6DB7);">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                         <span class="absolute -top-1 -right-1 flex h-3 w-3">
-                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#147D6A] opacity-60"></span>
-                            <span class="relative inline-flex rounded-full h-3 w-3 bg-[#147D6A]"></span>
+                            <span id="editor-leave-ping-bg" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#147D6A] opacity-60"
+                                  style="background-color: var(--brand-accent, #147D6A);"></span>
+                            <span id="editor-leave-ping-dot" class="relative inline-flex rounded-full h-3 w-3 bg-[#147D6A]"
+                                  style="background-color: var(--brand-accent, #147D6A);"></span>
                         </span>
                     </div>
                     <div class="min-w-0">
@@ -99,6 +107,7 @@
                         id="btn-modal-save-draft"
                         onclick="executeEditorSaveDraft()"
                         class="btn bg-gradient-to-r from-[#0F6DB7] to-[#147D6A] hover:from-[#0B5F9F] hover:to-[#0F6E5D] text-white border-0 btn-sm sm:btn-md rounded-xl font-bold shadow-sm hover:shadow-md gap-2 order-1 sm:order-2 transition-all"
+                        style="background: linear-gradient(to right, var(--brand-primary, #0F6DB7), var(--brand-accent, #147D6A)) !important; color: #FFFFFF !important; border: none !important;"
                         title="{{ __('Simpan sebagai draf sebelum meninggalkan editor') }}">
                     <svg id="icon-modal-save-draft" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
