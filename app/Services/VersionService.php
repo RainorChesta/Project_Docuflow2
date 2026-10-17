@@ -188,7 +188,7 @@ class VersionService
 
             $document->touch();
 
-            return $document->versions()->create([
+            $newVersion = $document->versions()->create([
                 'version_number' => $versionNumber,
                 'content' => '',
                 'file_path' => $storedPath,
@@ -199,6 +199,17 @@ class VersionService
                 'status' => 'draft',
                 'updated_at' => now(),
             ]);
+
+            app(DocumentProcessorService::class)->revertSignaturesToPlaceholders($document, $newVersion);
+
+            \App\Models\SignatureRequest::where('document_id', $document->id)->update([
+                'status' => 'pending',
+                'is_used' => false,
+                'rejected_reason' => null,
+                'responded_at' => null,
+            ]);
+
+            return $newVersion;
         });
     }
 
@@ -881,6 +892,18 @@ class VersionService
                 'author_id' => $author->id,
                 'author_name' => $author->name,
                 'status' => 'draft',
+            ]);
+
+            // Revert any previously stamped signatures on this new version to placeholders
+            app(DocumentProcessorService::class)->revertSignaturesToPlaceholders($document, $newVersion);
+
+            // Reset all SignatureRequest records on this document to pending/unused for this new revision run
+            // (since all placeholders including previously approved and rejected are preserved in the document)
+            \App\Models\SignatureRequest::where('document_id', $document->id)->update([
+                'status' => 'pending',
+                'is_used' => false,
+                'rejected_reason' => null,
+                'responded_at' => null,
             ]);
 
             $document->touch();
