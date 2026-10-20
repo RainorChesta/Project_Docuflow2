@@ -813,11 +813,28 @@ class OnlyOfficeIntegrationTest extends TestCase
         \Illuminate\Support\Facades\Notification::assertNothingSent();
 
         // 7. Check documents.show page renders draft indicators
-        $showResponse = $this->actingAs($this->user)->get(route('documents.show', $this->document));
+        $showResponse = $this->actingAs($this->user)->withSession(['locale' => 'id'])->get(route('documents.show', $this->document));
         $showResponse->assertOk();
         $showResponse->assertSee('Draf Dokumen');
         $showResponse->assertSee('(v2)');
         $showResponse->assertSee('Lanjutkan Edit');
+        $showResponse->assertSee('Draf (v2)');
+
+        // 8. Check documents.index (Dokumen Saya) renders Draf (v2)
+        $indexResponse = $this->actingAs($this->user)->withSession(['locale' => 'id'])->get(route('documents.index', ['type' => 'mine']));
+        $indexResponse->assertOk();
+        $indexResponse->assertSee('Draf (v2)');
+
+        // 9. Check status=draft filter includes this document
+        $filterResponse = $this->actingAs($this->user)->withSession(['locale' => 'id'])->get(route('documents.index', ['type' => 'mine', 'status' => 'draft']));
+        $filterResponse->assertOk();
+        $filterResponse->assertSee($this->document->title);
+
+        // 10. Check editor renders direct Simpan Draf button
+        $editResponse = $this->actingAs($this->user)->withSession(['locale' => 'id'])->get(route('documents.edit', $this->document));
+        $editResponse->assertOk();
+        $editResponse->assertSee('btn-toolbar-save-draft');
+        $editResponse->assertSee('Simpan Draf');
     }
 }
 

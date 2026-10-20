@@ -939,6 +939,11 @@
                     <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4 border-b border-base-200 pb-2.5 sm:pb-3">
                         <div class="flex items-center flex-wrap gap-2 min-w-0 flex-1">
                             <h1 class="text-lg sm:text-xl font-bold text-base-content break-words">{{ $document->title }}</h1>
+                            @if($draftVersion && !$pendingVersion)
+                                <span class="badge badge-warning badge-sm font-bold shadow-xs px-2.5 py-1 shrink-0">
+                                    {{ __('Draf') }} (v{{ $draftVersion->version_number }})
+                                </span>
+                            @endif
                             @php
                                 $isRenamePending = $document->hasPendingRename() || ($pendingVersion && $pendingVersion->isRename());
                                 $isDocLocked = $document->isLockedForEditing();

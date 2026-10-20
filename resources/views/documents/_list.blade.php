@@ -72,15 +72,15 @@
                 </span>
             @elseif($hasDraft && $doc->currentVersion)
                 @php $dVer = $doc->draftVersion(); @endphp
-                <span class="badge badge-warning badge-sm w-auto px-2 justify-center font-medium" title="{{ __('Versi aktif v:active, draf revisi v:draft', ['active' => $doc->currentVersion->version_number, 'draft' => $dVer?->version_number]) }}">
-                    v{{ $doc->currentVersion->version_number }} (v{{ $dVer?->version_number }} {{ __('Draf') }})
+                <span class="badge badge-warning badge-sm w-auto px-2 justify-center font-semibold" title="{{ __('Versi aktif v:active, draf revisi v:draft', ['active' => $doc->currentVersion->version_number, 'draft' => $dVer?->version_number]) }}">
+                    {{ __('Draf') }} (v{{ $dVer?->version_number }})
                 </span>
             @elseif($doc->currentVersion)
                 <span class="badge badge-success badge-sm min-w-[36px] justify-center text-white font-semibold">v{{ $doc->currentVersion->version_number }}</span>
             @elseif($hasPending)
                 <span class="badge badge-warning badge-sm px-2 justify-center">{{ __('Tertunda') }}</span>
             @elseif($hasDraft)
-                <span class="badge badge-warning badge-sm px-2 justify-center">{{ __('Draf') }}</span>
+                <span class="badge badge-warning badge-sm px-2 justify-center font-semibold">{{ __('Draf') }} (v{{ $doc->draftVersion()?->version_number ?? 1 }})</span>
             @else
                 <span class="badge badge-ghost badge-sm px-2 justify-center">{{ __('Tanpa versi') }}</span>
             @endif

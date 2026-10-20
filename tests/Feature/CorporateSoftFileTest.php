@@ -70,7 +70,7 @@ class CorporateSoftFileTest extends TestCase
 
     public function test_admin_can_view_and_create_corporate_soft_file(): void
     {
-        $file = UploadedFile::fake()->create('kop_surat_alpha.docx', 100);
+        $file = UploadedFile::fake()->create('kop_surat_alpha.pdf', 100, 'application/pdf');
 
         $response = $this->actingAs($this->admin)->post(route('admin.corporate-soft-files.store'), [
             'title' => 'Kop Surat Alpha Pusat',
@@ -96,6 +96,23 @@ class CorporateSoftFileTest extends TestCase
         $softFile = CorporateSoftFile::where('title', 'Kop Surat Alpha Pusat')->first();
         $this->assertTrue($softFile->companies->contains($this->companyA->id));
         $this->assertTrue($softFile->branches->contains($this->branchA->id));
+    }
+
+    public function test_uploading_docx_format_is_rejected(): void
+    {
+        $docxFile = UploadedFile::fake()->create('kop_surat.docx', 100, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+
+        $response = $this->actingAs($this->admin)->post(route('admin.corporate-soft-files.store'), [
+            'title' => 'Kop Surat DOCX',
+            'file' => $docxFile,
+            'is_all_companies' => '1',
+            'is_all_branches' => '1',
+        ]);
+
+        $response->assertSessionHasErrors('file');
+        $this->assertDatabaseMissing('corporate_soft_files', [
+            'title' => 'Kop Surat DOCX',
+        ]);
     }
 
     public function test_uploading_image_format_is_rejected(): void
@@ -663,22 +680,16 @@ class CorporateSoftFileTest extends TestCase
         $this->assertStringContainsString('w:footerReference', $docXml);
     }
 
-    public function test_admin_can_upload_a4_docx_successfully(): void
+    public function test_admin_can_upload_a4_pdf_successfully(): void
     {
-        // Generate an A4 DOCX (11906 x 16838 twips)
-        $phpWord = new \PhpOffice\PhpWord\PhpWord();
-        $section = $phpWord->addSection([
-            'pageSizeW' => 11906,
-            'pageSizeH' => 16838,
-        ]);
-        $header = $section->addHeader();
-        $header->addText("Kop Surat A4 Cabang Jakarta");
+        $fpdf = new \setasign\Fpdi\Fpdi();
+        $fpdf->AddPage('P', [210, 297]);
+        $fpdf->SetFont('Helvetica', 'B', 14);
+        $fpdf->Cell(0, 10, 'Kop Surat A4 Cabang Jakarta', 0, 1, 'C');
+        $tmp = tempnam(sys_get_temp_dir(), 'test_a4_') . '.pdf';
+        $fpdf->Output($tmp, 'F');
 
-        $tmp = tempnam(sys_get_temp_dir(), 'test_a4_') . '.docx';
-        $writer = \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007');
-        $writer->save($tmp);
-
-        $file = new UploadedFile($tmp, 'kop_a4.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', null, true);
+        $file = new UploadedFile($tmp, 'kop_a4.pdf', 'application/pdf', null, true);
 
         $response = $this->actingAs($this->admin)->post(route('admin.corporate-soft-files.store'), [
             'title' => 'Kop Surat A4 Jakarta',
@@ -699,24 +710,20 @@ class CorporateSoftFileTest extends TestCase
         ]);
     }
 
-    public function test_admin_uploading_non_a4_docx_with_target_a4_is_accepted_and_converted_to_a4(): void
+    public function test_admin_uploading_non_a4_pdf_with_target_a4_is_accepted_and_converted_to_a4(): void
     {
         $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
 
-        // Generate an F4 DOCX (11906 x 18709 twips)
-        $phpWord = new \PhpOffice\PhpWord\PhpWord();
-        $section = $phpWord->addSection([
-            'pageSizeW' => 11906,
-            'pageSizeH' => 18709,
-        ]);
-        $header = $section->addHeader();
-        $header->addText("Kop Surat Asli F4 yang akan dikonversi ke A4");
+        // Generate an F4 PDF (210 x 330 mm)
+        $fpdf = new \setasign\Fpdi\Fpdi();
+        $fpdf->AddPage('P', [210, 330]);
+        $fpdf->SetFont('Helvetica', 'B', 14);
+        $fpdf->Cell(0, 10, 'Kop Surat Asli F4 yang akan dikonversi ke A4', 0, 1, 'C');
 
-        $tmp = tempnam(sys_get_temp_dir(), 'test_f4_as_a4_') . '.docx';
-        $writer = \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007');
-        $writer->save($tmp);
+        $tmp = tempnam(sys_get_temp_dir(), 'test_f4_as_a4_') . '.pdf';
+        $fpdf->Output($tmp, 'F');
 
-        $file = new UploadedFile($tmp, 'kop_f4.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', null, true);
+        $file = new UploadedFile($tmp, 'kop_f4.pdf', 'application/pdf', null, true);
 
         $response = $this->actingAs($this->admin)->post(route('admin.corporate-soft-files.store'), [
             'title' => 'Kop Surat Otomatis Konversi A4',
@@ -739,16 +746,18 @@ class CorporateSoftFileTest extends TestCase
         $softFile = CorporateSoftFile::where('title', 'Kop Surat Otomatis Konversi A4')->first();
         $storedContent = $disk->get($softFile->file_path);
 
-        $tmpCheck = tempnam(sys_get_temp_dir(), 'chk_conv_a4_');
+        $tmpCheck = tempnam(sys_get_temp_dir(), 'chk_conv_a4_') . '.pdf';
         file_put_contents($tmpCheck, $storedContent);
-        $zip = new \ZipArchive();
-        $zip->open($tmpCheck);
-        $docXml = $zip->getFromName('word/document.xml');
-        $zip->close();
+
+        $pdfCheck = new \setasign\Fpdi\Fpdi();
+        $pdfCheck->setSourceFile($tmpCheck);
+        $tpl = $pdfCheck->importPage(1);
+        $size = $pdfCheck->getTemplateSize($tpl);
         @unlink($tmpCheck);
 
-        // Stored DOCX must be converted to A4 (16838 twips height)
-        $this->assertMatchesRegularExpression('/<w:pgSz\b[^>]*w:h="16838"[^>]*\/>|<w:pgSz\b[^>]*w:w="11906"\s+w:h="16838"/i', $docXml);
+        // Stored PDF must be converted to A4 (210 x 297 mm)
+        $this->assertEqualsWithDelta(210.0, $size['width'], 1.0);
+        $this->assertEqualsWithDelta(297.0, $size['height'], 1.0);
     }
 
     public function test_apply_a4_corporate_soft_file_locks_document_to_a4(): void
@@ -1045,6 +1054,56 @@ class CorporateSoftFileTest extends TestCase
 
         // Original v1 MUST remain intact as the current released active version
         $this->assertEquals($v1->id, $doc->current_version_id);
+    }
+
+    public function test_admin_index_displays_delete_confirmation_modal_for_soft_file(): void
+    {
+        $softFile = CorporateSoftFile::create([
+            'title' => 'Kop Surat Hapus Test',
+            'file_path' => 'corporate_soft_files/hapus.pdf',
+            'file_original_name' => 'hapus.pdf',
+            'file_mime' => 'application/pdf',
+            'status' => 'active',
+            'is_all_companies' => true,
+            'is_all_branches' => true,
+            'allowed_roles' => ['staff'],
+            'created_by' => $this->admin->id,
+        ]);
+
+        $response = $this->actingAs($this->admin)->get(route('admin.corporate-soft-files.index'));
+        $response->assertOk();
+        $response->assertSee('id="delete-softfile-modal-' . $softFile->id . '"', false);
+        $response->assertSee('Yakin Mau Hapus?');
+        $response->assertSee('Ya, Hapus');
+        $response->assertSee(route('admin.corporate-soft-files.destroy', $softFile));
+    }
+
+    public function test_admin_can_delete_corporate_soft_file(): void
+    {
+        $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
+        $filePath = 'corporate_soft_files/delete_me.pdf';
+        $disk->put($filePath, 'fake-pdf-content');
+
+        $softFile = CorporateSoftFile::create([
+            'title' => 'Kop Surat Akan Dihapus',
+            'file_path' => $filePath,
+            'file_original_name' => 'delete_me.pdf',
+            'file_mime' => 'application/pdf',
+            'status' => 'active',
+            'is_all_companies' => true,
+            'is_all_branches' => true,
+            'created_by' => $this->admin->id,
+        ]);
+
+        $response = $this->actingAs($this->admin)->delete(route('admin.corporate-soft-files.destroy', $softFile));
+
+        $response->assertRedirect(route('admin.corporate-soft-files.index'));
+        $response->assertSessionHas('success');
+
+        $this->assertDatabaseMissing('corporate_soft_files', [
+            'id' => $softFile->id,
+        ]);
+        $this->assertFalse($disk->exists($filePath));
     }
 }
 
