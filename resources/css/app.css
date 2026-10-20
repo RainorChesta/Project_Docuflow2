@@ -568,14 +568,19 @@ html.is-page-loading #loading-blur-card {
     background-color: var(--brand-primary-soft) !important;
 }
 
-#btn-modal-save-draft {
-    background: linear-gradient(to right, var(--brand-primary), var(--brand-accent)) !important;
-    color: #FFFFFF !important;
-    border: none !important;
+#btn-modal-save-draft,
+#btn-toolbar-save-draft {
+    background-color: var(--brand-primary) !important;
+    background-image: none !important;
+    color: var(--brand-on-primary, #FFFFFF) !important;
+    border-color: var(--brand-primary) !important;
 }
 
-#btn-modal-save-draft:hover {
-    background: linear-gradient(to right, var(--brand-primary-hover), var(--brand-accent-hover)) !important;
+#btn-modal-save-draft:hover,
+#btn-toolbar-save-draft:hover {
+    background-color: var(--brand-primary-hover) !important;
+    background-image: none !important;
+    border-color: var(--brand-primary-hover) !important;
 }
 
 
