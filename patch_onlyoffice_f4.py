@@ -11,20 +11,20 @@ print('==================================================')
 print('  DocuFlow - OnlyOffice F4 Setup & Patch Tool     ')
 print('==================================================')
 
-# 1. Patch Main.js -> Enable canPreviewPrint for web
+# 1. Ensure Main.js -> Keep native web print (canPreviewPrint only for desktop)
 main_js = f'{web_apps}/app/controller/Main.js'
 if os.path.exists(main_js):
     with open(main_js, 'r', encoding='utf-8') as f:
         content = f.read()
-    target = 'this.appOptions.canPreviewPrint = this.appOptions.canPrint && !Common.Utils.isMac && this.appOptions.isDesktopApp;'
-    rep = 'this.appOptions.canPreviewPrint = this.appOptions.canPrint;'
-    if target in content:
-        content = content.replace(target, rep)
+    bad_target = 'this.appOptions.canPreviewPrint = this.appOptions.canPrint;'
+    good_rep = 'this.appOptions.canPreviewPrint = this.appOptions.canPrint && !Common.Utils.isMac && this.appOptions.isDesktopApp;'
+    if bad_target in content:
+        content = content.replace(bad_target, good_rep)
         with open(main_js, 'w', encoding='utf-8') as f:
             f.write(content)
-        print('[+] Main.js canPreviewPrint patched')
+        print('[+] Main.js native web print restored')
     else:
-        print('[i] Main.js already patched or target signature changed')
+        print('[i] Main.js native web print already active')
 
 # 2. Patch FileMenuPanels.js -> F4 in print list & default print size F4
 panels_js = f'{web_apps}/app/view/FileMenuPanels.js'

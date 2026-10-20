@@ -93,12 +93,12 @@ def try_modify_file(file_path, modifier_fn):
     except (PermissionError, OSError) as e:
         print(f'[i] {os.path.basename(file_path)} is read-only / volume-mounted (active via mount)')
 
-# 1. Patch Main.js -> Enable canPreviewPrint for web
+# 1. Ensure Main.js -> Keep native web print (canPreviewPrint only for desktop)
 def patch_main(content):
-    target = 'this.appOptions.canPreviewPrint = this.appOptions.canPrint && !Common.Utils.isMac && this.appOptions.isDesktopApp;'
-    rep = 'this.appOptions.canPreviewPrint = this.appOptions.canPrint;'
-    if target in content:
-        return content.replace(target, rep), True
+    bad_target = 'this.appOptions.canPreviewPrint = this.appOptions.canPrint;'
+    good_rep = 'this.appOptions.canPreviewPrint = this.appOptions.canPrint && !Common.Utils.isMac && this.appOptions.isDesktopApp;'
+    if bad_target in content:
+        return content.replace(bad_target, good_rep), True
     return content, False
 
 try_modify_file(f'{web_apps}/app/controller/Main.js', patch_main)
