@@ -77,49 +77,69 @@ class ApprovalRoutingService
             $order = 1;
 
             if ($signatureRequests->isNotEmpty()) {
-                // 1. Check if the document belongs to a Unit Kerja and if the Head of that Unit Kerja is already in signature requests
-                $originUnitHead = null;
-                $docUnitKerjaId = $document->unit_kerja_id ?? $creator->unit_kerja_id ?? ($creator->allUnitKerjaIds()[0] ?? null);
-                $originUnit = $document->unitKerja ?? ($docUnitKerjaId ? UnitKerja::find($docUnitKerjaId) : null);
-                if ($originUnit) {
-                    if ($originUnit->pic_user_id) {
-                        $originUnitHead = $originUnit->picUser;
-                    } else {
-                        $originUnitHead = User::where('system_role', 'head')
-                            ->where('is_active', true)
-                            ->where(function ($q) use ($originUnit) {
-                                $q->where('unit_kerja_id', $originUnit->id)
-                                  ->orWhereHas('unitKerjas', fn($uq) => $uq->where('unit_kerjas.id', $originUnit->id));
-                            })
-                            ->first();
-                    }
-                }
+                // 1. Resolve Origin Unit & Head of that Unit Kerja
+                [$originUnit, $originUnitHead] = $this->resolveOriginUnitAndHead($document, $creator);
 
                 $isOriginHeadInSignatures = $originUnitHead && $signatureRequests->contains(fn($sr) => $sr->target_user_id === $originUnitHead->id);
 
                 // Build raw step candidates
                 $rawSteps = [];
 
-                // If origin unit head exists and is NOT in signature requests, automatically add a review step for the unit head as FIRST STEP (Weight: 5)
-                if ($originUnitHead && !$isOriginHeadInSignatures) {
-                    $isCreator = ($creator->id === $originUnitHead->id);
-                    $unitName = $originUnit?->nama_unit_kerja ?? 'Unit Kerja';
+                if ($originUnitHead) {
+                    // If origin unit head exists and is NOT in signature requests, automatically add a review step for the unit head as FIRST STEP (Weight: 5)
+                    if (!$isOriginHeadInSignatures) {
+                        $isCreator = ($creator->id === $originUnitHead->id);
+                        $unitName = $originUnit?->nama_unit_kerja ?? 'Unit Kerja';
 
-                    $rawSteps[] = [
-                        'weight' => 5,
-                        'signature_request_id' => null,
-                        'step_type' => 'head_approval',
-                        'step_name' => __('Review & Persetujuan Kepala Unit :unit (:name)', [
-                            'unit' => $unitName,
-                            'name' => $originUnitHead->name,
-                        ]),
-                        'assigned_user_id' => $originUnitHead->id,
-                        'assigned_role' => 'head',
-                        'status' => $isCreator ? 'bypassed' : 'waiting',
-                        'action_by_id' => $isCreator ? $creator->id : null,
-                        'action_at' => $isCreator ? now() : null,
-                        'notes' => $isCreator ? __('Dilewati otomatis (Pembuat adalah Kepala Unit Kerja)') : null,
-                    ];
+                        $rawSteps[] = [
+                            'weight' => 5,
+                            'signature_request_id' => null,
+                            'step_type' => 'head_approval',
+                            'step_name' => __('Review & Persetujuan Kepala Unit :unit (:name)', [
+                                'unit' => $unitName,
+                                'name' => $originUnitHead->name,
+                            ]),
+                            'assigned_user_id' => $originUnitHead->id,
+                            'assigned_role' => 'head',
+                            'status' => $isCreator ? 'bypassed' : 'waiting',
+                            'action_by_id' => $isCreator ? $creator->id : null,
+                            'action_at' => $isCreator ? now() : null,
+                            'notes' => $isCreator ? __('Dilewati otomatis (Pembuat adalah Kepala Unit Kerja)') : null,
+                        ];
+                    }
+                } else {
+                    // Fallback to Admin acknowledgment only when NO Head of the Work Unit is assigned,
+                    // and document requires gatekeeper review (e.g. signature request from peer/colleague).
+                    $hasOnlyLeadershipSigners = $signatureRequests->every(function ($sr) {
+                        return $sr->targetUser && ($sr->targetUser->isPicKlinik() || $sr->targetUser->isDirector() || $sr->targetUser->isAdmin());
+                    });
+
+                    if (!$hasOnlyLeadershipSigners) {
+                        $adminFallback = $this->findActiveUsers($document, 'admin', $creator)->first()
+                            ?? User::where('system_role', 'admin')->where('is_active', true)->first();
+
+                        if ($adminFallback) {
+                            $isAdminInSignatures = $signatureRequests->contains(fn($sr) => $sr->target_user_id === $adminFallback->id);
+                            if (!$isAdminInSignatures) {
+                                $isCreator = ($creator->id === $adminFallback->id);
+
+                                $rawSteps[] = [
+                                    'weight' => 5,
+                                    'signature_request_id' => null,
+                                    'step_type' => 'admin_approval',
+                                    'step_name' => __('Review & Pengesahan Admin (:name)', [
+                                        'name' => $adminFallback->name,
+                                    ]),
+                                    'assigned_user_id' => $adminFallback->id,
+                                    'assigned_role' => 'admin',
+                                    'status' => $isCreator ? 'bypassed' : 'waiting',
+                                    'action_by_id' => $isCreator ? $creator->id : null,
+                                    'action_at' => $isCreator ? now() : null,
+                                    'notes' => $isCreator ? __('Dilewati otomatis (Pembuat dokumen adalah Admin)') : null,
+                                ];
+                            }
+                        }
+                    }
                 }
 
                 // Add all steps from signature requests
@@ -141,11 +161,11 @@ class ApprovalRoutingService
                     } elseif ($targetUser->isPicKlinik()) {
                         $weight = 35;
                     } elseif ($targetUser->isHead()) {
-                        $docUnitId = $document->unit_kerja_id;
-                        $isDocUnitHead = $docUnitId && (
+                        $docUnitId = $document->unit_kerja_id ?? $originUnit?->id;
+                        $isDocUnitHead = ($originUnitHead && $targetUser->id === $originUnitHead->id) || ($docUnitId && (
                             $targetUser->unit_kerja_id === $docUnitId ||
                             $targetUser->unitKerjas->pluck('id')->contains($docUnitId)
-                        );
+                        ));
 
                         if ($isDocUnitHead) {
                             $weight = 5; // Origin unit head reviews and signs at Step 1 (first gatekeeper)
@@ -235,27 +255,13 @@ class ApprovalRoutingService
                 // ── Fallback when NO signature boxes are in the document ──
                 // Dokumen tanpa kotak TTD hanya memerlukan Persetujuan / Review Kepala Unit Kerja (PIC Unit).
                 // Pengesahan PIC Klinik hanya dibuat apabila kotak TTD PIC Klinik disematkan ke dalam dokumen.
-                $picUnit = null;
-                $docUnitKerjaId = $document->unit_kerja_id ?? $creator->unit_kerja_id ?? ($creator->allUnitKerjaIds()[0] ?? null);
-                $originUnit = $document->unitKerja ?? ($docUnitKerjaId ? UnitKerja::find($docUnitKerjaId) : null);
-                if ($originUnit) {
-                    if ($originUnit->pic_user_id) {
-                        $picUnit = $originUnit->picUser;
-                    } else {
-                        $picUnit = User::where('system_role', 'head')
-                            ->where('is_active', true)
-                            ->where(function ($q) use ($originUnit) {
-                                $q->where('unit_kerja_id', $originUnit->id)
-                                  ->orWhereHas('unitKerjas', fn($uq) => $uq->where('unit_kerjas.id', $originUnit->id));
-                            })
-                            ->first();
-                    }
-                }
+                [$originUnit, $picUnit] = $this->resolveOriginUnitAndHead($document, $creator);
 
                 if (!$picUnit) {
                     $picUnit = $this->findActiveUsers($document, 'pic_klinik', $creator)->first()
                         ?? $this->findActiveUsers($document, 'head', $creator)->first()
-                        ?? $this->findActiveUsers($document, 'admin', $creator)->first();
+                        ?? $this->findActiveUsers($document, 'admin', $creator)->first()
+                        ?? User::where('system_role', 'admin')->where('is_active', true)->first();
                 }
 
                 if ($picUnit) {
@@ -708,6 +714,73 @@ class ApprovalRoutingService
     // ───────────────────────────────────────────────────
     // Helper Finders & Query Builders
     // ───────────────────────────────────────────────────
+
+    /**
+     * Resolve the origin UnitKerja and its Head for a document and creator.
+     * Prioritizes users with system_role === 'head' in the creator's/document's unit kerja and branch/company.
+     *
+     * @return array{0: ?UnitKerja, 1: ?User}
+     */
+    public function resolveOriginUnitAndHead(Document $document, User $creator): array
+    {
+        $docUnitKerjaId = $document->unit_kerja_id
+            ?? ($document->branch_id ? ($creator->allUnitKerjaIds($document->branch_id)[0] ?? null) : null)
+            ?? $creator->unit_kerja_id
+            ?? ($creator->allUnitKerjaIds()[0] ?? null);
+
+        $originUnit = $document->unitKerja ?? ($docUnitKerjaId ? UnitKerja::find($docUnitKerjaId) : null);
+        $originUnitHead = null;
+
+        if ($originUnit) {
+            // 1. First priority: Check for an active user with role 'head' assigned to this unit and matching document branch/company
+            $headQuery = User::where('system_role', 'head')
+                ->where('is_active', true)
+                ->where(function ($q) use ($originUnit) {
+                    $q->where('unit_kerja_id', $originUnit->id)
+                      ->orWhereHas('unitKerjas', fn($uq) => $uq->where('unit_kerjas.id', $originUnit->id));
+                });
+
+            if ($document->branch_id) {
+                $headQuery->where(function ($q) use ($document) {
+                    $q->whereHas('branches', fn($bq) => $bq->where('branches.id', $document->branch_id));
+                    if ($document->company_id) {
+                        $q->orWhere(function ($cq) use ($document) {
+                            $cq->whereHas('companies', fn($c) => $c->where('companies.id', $document->company_id))
+                               ->whereDoesntHave('branches');
+                        });
+                    }
+                });
+            } elseif ($document->company_id) {
+                $headQuery->whereHas('companies', fn($cq) => $cq->where('companies.id', $document->company_id));
+            }
+
+            $originUnitHead = $headQuery->first();
+
+            // 2. Second priority: If no branch-scoped head found, try broader search for any active head assigned to this unit
+            if (!$originUnitHead) {
+                $originUnitHead = User::where('system_role', 'head')
+                    ->where('is_active', true)
+                    ->where(function ($q) use ($originUnit) {
+                        $q->where('unit_kerja_id', $originUnit->id)
+                          ->orWhereHas('unitKerjas', fn($uq) => $uq->where('unit_kerjas.id', $originUnit->id));
+                    })
+                    ->first();
+            }
+
+            // 3. Third priority: If unit has pic_user_id and that user is active and has head / pic role (and is NOT an admin)
+            if (!$originUnitHead && $originUnit->pic_user_id) {
+                $picUser = $originUnit->picUser;
+                if ($picUser && $picUser->is_active && ($picUser->isHead() || $picUser->isPicUnitKerja()) && !$picUser->isAdmin()) {
+                    $originUnitHead = $picUser;
+                }
+            }
+        } else {
+            // Fallback if no specific origin unit could be resolved directly: check if findActiveUsers finds a head
+            $originUnitHead = $this->findActiveUsers($document, 'head', $creator)->first();
+        }
+
+        return [$originUnit, $originUnitHead];
+    }
 
     public function findHeadForDocument(Document $document, ?User $excludeUser = null): ?User
     {

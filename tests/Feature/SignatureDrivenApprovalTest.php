@@ -920,6 +920,184 @@ class SignatureDrivenApprovalTest extends TestCase
         $this->assertEquals($headPoli->id, $steps[0]->assigned_user_id);
         $this->assertEquals('pending', $steps[0]->status);
     }
+
+    public function test_signature_request_prioritizes_head_over_admin_when_unit_pic_user_id_points_to_admin(): void
+    {
+        // Setup Unit Kerja where pic_user_id was set to an Admin user (simulating production state)
+        $adminUser = User::factory()->create([
+            'name' => 'System Admin',
+            'email' => 'admin.farmasi@cmh.test',
+            'system_role' => 'admin',
+            'is_active' => true,
+        ]);
+
+        $unitKerja = UnitKerja::create([
+            'nama_unit_kerja' => 'Tim Farmasi',
+            'kode_unit_kerja' => '18',
+            'pic_user_id' => $adminUser->id,
+        ]);
+
+        // Actual Head assigned via User Management (system_role = 'head')
+        $headUser = User::factory()->create([
+            'name' => 'Apt. Dewi Head Farmasi',
+            'email' => 'dewi.head@cmh.test',
+            'system_role' => 'head',
+            'unit_kerja_id' => $unitKerja->id,
+            'is_active' => true,
+        ]);
+        $headUser->companies()->sync([$this->company->id]);
+        $headUser->branches()->sync([$this->pusatBranch->id]);
+        $headUser->unitKerjas()->sync([$unitKerja->id]);
+
+        // Staff creator
+        $staffCreator = User::factory()->create([
+            'name' => 'Bambang Staff Farmasi',
+            'email' => 'bambang.staff@cmh.test',
+            'system_role' => 'staff',
+            'unit_kerja_id' => $unitKerja->id,
+            'is_active' => true,
+        ]);
+        $staffCreator->companies()->sync([$this->company->id]);
+        $staffCreator->branches()->sync([$this->pusatBranch->id]);
+        $staffCreator->unitKerjas()->sync([$unitKerja->id]);
+
+        // Signer colleague
+        $signerColleague = User::factory()->create([
+            'name' => 'dr. Rudi Rekan',
+            'email' => 'rudi.rekan@cmh.test',
+            'system_role' => 'staff',
+            'unit_kerja_id' => $unitKerja->id,
+            'is_active' => true,
+        ]);
+        $signerColleague->companies()->sync([$this->company->id]);
+        $signerColleague->branches()->sync([$this->pusatBranch->id]);
+
+        // Document created by Staff
+        $document = Document::create([
+            'document_number' => '020/FAR/SOP/2026',
+            'title' => 'SOP Pengelolaan Obat',
+            'company_id' => $this->company->id,
+            'branch_id' => $this->pusatBranch->id,
+            'unit_kerja_id' => $unitKerja->id,
+            'document_type_id' => $this->sopType->id,
+            'owner_id' => $staffCreator->id,
+            'visibility' => 'unit_kerja',
+        ]);
+
+        $version = $document->versions()->create([
+            'version_number' => 1,
+            'content' => '<p>Konten SOP Farmasi [ttd:rudi]</p>',
+            'author_id' => $staffCreator->id,
+            'author_name' => $staffCreator->name,
+            'status' => 'pending',
+        ]);
+
+        // Signature request from Staff to Colleague
+        SignatureRequest::create([
+            'requester_id' => $staffCreator->id,
+            'target_user_id' => $signerColleague->id,
+            'document_id' => $document->id,
+            'status' => 'pending',
+        ]);
+
+        // Compile workflow
+        $result = $this->routingService->compileWorkflowFromSignatures($document, $version, $staffCreator);
+        $steps = $result['steps'];
+
+        // Step 1 MUST be Head of Unit (Dewi), NOT the Admin (System Admin) even though pic_user_id was set to Admin!
+        $this->assertCount(2, $steps);
+        $this->assertEquals($headUser->id, $steps[0]->assigned_user_id);
+        $this->assertEquals('head_approval', $steps[0]->step_type);
+        $this->assertEquals('pending', $steps[0]->status);
+        $this->assertStringContainsString('Dewi', $steps[0]->step_name);
+
+        // Step 2 is Colleague (dr. Rudi) waiting for Head review to finish
+        $this->assertEquals($signerColleague->id, $steps[1]->assigned_user_id);
+        $this->assertEquals('waiting', $steps[1]->status);
+    }
+
+    public function test_signature_request_falls_back_to_admin_acknowledgment_when_no_head_assigned(): void
+    {
+        $adminUser = User::factory()->create([
+            'name' => 'Admin Cabang',
+            'email' => 'admin.cabang@cmh.test',
+            'system_role' => 'admin',
+            'is_active' => true,
+        ]);
+        $adminUser->companies()->sync([$this->company->id]);
+        $adminUser->branches()->sync([$this->pusatBranch->id]);
+
+        // Unit Kerja without any Head or PIC assigned
+        $emptyUnit = UnitKerja::create([
+            'nama_unit_kerja' => 'Unit Baru Tanpa Head',
+            'kode_unit_kerja' => '99',
+            'pic_user_id' => null,
+        ]);
+
+        // Staff creator in this unit
+        $staffCreator = User::factory()->create([
+            'name' => 'Staff Joni',
+            'email' => 'joni.staff@cmh.test',
+            'system_role' => 'staff',
+            'unit_kerja_id' => $emptyUnit->id,
+            'is_active' => true,
+        ]);
+        $staffCreator->companies()->sync([$this->company->id]);
+        $staffCreator->branches()->sync([$this->pusatBranch->id]);
+        $staffCreator->unitKerjas()->sync([$emptyUnit->id]);
+
+        // Target signer
+        $signerColleague = User::factory()->create([
+            'name' => 'Colleague Maya',
+            'email' => 'maya.colleague@cmh.test',
+            'system_role' => 'staff',
+            'unit_kerja_id' => $emptyUnit->id,
+            'is_active' => true,
+        ]);
+        $signerColleague->companies()->sync([$this->company->id]);
+        $signerColleague->branches()->sync([$this->pusatBranch->id]);
+
+        $document = Document::create([
+            'document_number' => '099/NEW/SOP/2026',
+            'title' => 'SOP Unit Baru',
+            'company_id' => $this->company->id,
+            'branch_id' => $this->pusatBranch->id,
+            'unit_kerja_id' => $emptyUnit->id,
+            'document_type_id' => $this->sopType->id,
+            'owner_id' => $staffCreator->id,
+            'visibility' => 'unit_kerja',
+        ]);
+
+        $version = $document->versions()->create([
+            'version_number' => 1,
+            'content' => '<p>Konten Dokumen [ttd:maya]</p>',
+            'author_id' => $staffCreator->id,
+            'author_name' => $staffCreator->name,
+            'status' => 'pending',
+        ]);
+
+        SignatureRequest::create([
+            'requester_id' => $staffCreator->id,
+            'target_user_id' => $signerColleague->id,
+            'document_id' => $document->id,
+            'status' => 'pending',
+        ]);
+
+        // Compile workflow
+        $result = $this->routingService->compileWorkflowFromSignatures($document, $version, $staffCreator);
+        $steps = $result['steps'];
+
+        // Step 1 MUST fall back to Admin acknowledgment because no Head is assigned
+        $this->assertCount(2, $steps);
+        $this->assertEquals($adminUser->id, $steps[0]->assigned_user_id);
+        $this->assertEquals('admin_approval', $steps[0]->step_type);
+        $this->assertEquals('pending', $steps[0]->status);
+        $this->assertStringContainsString('Admin', $steps[0]->step_name);
+
+        // Step 2 is Signature Request for Maya (waiting for Admin acknowledgment)
+        $this->assertEquals($signerColleague->id, $steps[1]->assigned_user_id);
+        $this->assertEquals('waiting', $steps[1]->status);
+    }
 }
 
 
