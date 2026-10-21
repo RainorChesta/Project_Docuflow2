@@ -29,6 +29,11 @@
                     </svg>
                     <span class="font-medium text-sm">{{ session('success') }}</span>
                 </div>
+                <script>
+                    try {
+                        sessionStorage.removeItem('dokuflow_admin_selected_doc_ids');
+                    } catch(e) {}
+                </script>
             @endif
 
             @if(session('error'))
@@ -130,6 +135,7 @@
                 <div class="flex items-center gap-3">
                     <div id="selected-count-badge" class="w-8 h-8 rounded-xl bg-primary text-primary-content flex items-center justify-center font-bold text-sm shadow-xs">0</div>
                     <span class="font-bold text-sm tracking-tight text-white">{{ __('Dokumen Terpilih') }}</span>
+                    <span id="selected-page-hint" class="badge badge-sm bg-white/10 text-neutral-content border-0 text-xs hidden"></span>
                     <button type="button" onclick="clearAllCheckboxes()" class="btn btn-ghost btn-xs text-neutral-content/70 hover:text-white hover:bg-white/10 rounded-lg">
                         {{ __('Batalkan Pilihan') }}
                     </button>
@@ -490,7 +496,7 @@
                                         <input type="checkbox"
                                                class="doc-checkbox checkbox checkbox-sm checkbox-primary rounded-md"
                                                value="{{ $doc->id }}"
-                                               onchange="updateSelectedCount()">
+                                               onchange="handleDocCheckboxChange(this)">
                                     </td>
 
                                     {{-- Index --}}
@@ -757,7 +763,7 @@
                         <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('confirm_delete_modal_{{ $doc->id }}').close()">
                             {{ __('Batal') }}
                         </button>
-                        <form method="POST" action="{{ route('admin.documents.destroy', $doc) }}">
+                        <form method="POST" action="{{ route('admin.documents.destroy', $doc) }}" onsubmit="onSingleDelete('{{ $doc->id }}')">
                             @csrf
                             @method('DELETE')
                             <button type="submit" class="btn btn-warning btn-sm text-neutral font-semibold gap-1.5">
@@ -791,7 +797,7 @@
                 </p>
                 
                 {{-- Native Form for Bulk Trash --}}
-                <form id="bulk_trash_form" method="POST" action="{{ route('admin.documents.bulk-delete') }}">
+                <form id="bulk_trash_form" method="POST" action="{{ route('admin.documents.bulk-delete') }}" onsubmit="clearStoredSelectedIds()">
                     @csrf
                     @method('DELETE')
                     <input type="hidden" name="force" value="0">
@@ -831,7 +837,7 @@
                 </p>
 
                 {{-- Native Form for Bulk Force Delete --}}
-                <form id="bulk_force_delete_form" method="POST" action="{{ route('admin.documents.bulk-delete') }}">
+                <form id="bulk_force_delete_form" method="POST" action="{{ route('admin.documents.bulk-delete') }}" onsubmit="clearStoredSelectedIds()">
                     @csrf
                     @method('DELETE')
                     <input type="hidden" name="force" value="1">
@@ -857,65 +863,166 @@
 
     </div>
 
-    {{-- Standard, Fail-Safe JavaScript Handler for Checkbox & Bulk Actions --}}
+    {{-- Standard, Fail-Safe JavaScript Handler for Checkbox & Bulk Actions with Pagination Persistence --}}
     <script>
-        function toggleAllCheckboxes(masterCheckbox) {
-            const checkboxes = document.querySelectorAll('input.doc-checkbox');
-            checkboxes.forEach(cb => {
-                cb.checked = masterCheckbox.checked;
-            });
-            updateSelectedCount();
+        const STORAGE_KEY = 'dokuflow_admin_selected_doc_ids';
+
+        function getStoredSelectedIds() {
+            try {
+                const raw = sessionStorage.getItem(STORAGE_KEY);
+                if (!raw) return new Set();
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                    return new Set(parsed.map(String));
+                }
+            } catch (e) {
+                console.error('Failed to read selected document ids:', e);
+            }
+            return new Set();
         }
 
-        function updateSelectedCount() {
-            const checkedBoxes = document.querySelectorAll('input.doc-checkbox:checked');
-            const allBoxes = document.querySelectorAll('input.doc-checkbox');
-            const checkedCount = checkedBoxes.length;
+        function setStoredSelectedIds(idSet) {
+            try {
+                sessionStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(idSet)));
+            } catch (e) {
+                console.error('Failed to save selected document ids:', e);
+            }
+        }
 
-            const bar = document.getElementById('floating-bulk-bar');
-            const badge = document.getElementById('selected-count-badge');
-            const modalCounts = document.querySelectorAll('.modal-selected-count');
-            const master = document.getElementById('master-checkbox');
+        function clearStoredSelectedIds() {
+            try {
+                sessionStorage.removeItem(STORAGE_KEY);
+            } catch (e) {}
+        }
 
-            if (badge) badge.innerText = checkedCount;
-            modalCounts.forEach(el => el.innerText = checkedCount);
+        function handleDocCheckboxChange(checkbox) {
+            const selectedIds = getStoredSelectedIds();
+            const val = String(checkbox.value);
 
-            if (master && allBoxes.length > 0) {
-                master.checked = (checkedCount === allBoxes.length);
+            if (checkbox.checked) {
+                selectedIds.add(val);
+            } else {
+                selectedIds.delete(val);
             }
 
-            if (bar) {
-                if (checkedCount > 0) {
-                    bar.classList.remove('hidden');
+            setStoredSelectedIds(selectedIds);
+            syncUIWithState();
+        }
+
+        function toggleAllCheckboxes(masterCheckbox) {
+            const checkboxes = document.querySelectorAll('input.doc-checkbox');
+            const selectedIds = getStoredSelectedIds();
+
+            checkboxes.forEach(cb => {
+                cb.checked = masterCheckbox.checked;
+                const val = String(cb.value);
+                if (masterCheckbox.checked) {
+                    selectedIds.add(val);
                 } else {
-                    bar.classList.add('hidden');
+                    selectedIds.delete(val);
                 }
-            }
+            });
 
-            // Update row background
+            setStoredSelectedIds(selectedIds);
+            syncUIWithState();
+        }
+
+        function syncUIWithState() {
+            const selectedIds = getStoredSelectedIds();
+            const allBoxes = document.querySelectorAll('input.doc-checkbox');
+            let checkedOnThisPage = 0;
+
             allBoxes.forEach(cb => {
-                const row = document.getElementById('doc-row-' + cb.value);
+                const val = String(cb.value);
+                const isChecked = selectedIds.has(val);
+                cb.checked = isChecked;
+
+                if (isChecked) {
+                    checkedOnThisPage++;
+                }
+
+                const row = document.getElementById('doc-row-' + val);
                 if (row) {
-                    if (cb.checked) {
+                    if (isChecked) {
                         row.classList.add('bg-primary/5');
                     } else {
                         row.classList.remove('bg-primary/5');
                     }
                 }
             });
+
+            const totalCount = selectedIds.size;
+            const bar = document.getElementById('floating-bulk-bar');
+            const badge = document.getElementById('selected-count-badge');
+            const pageHint = document.getElementById('selected-page-hint');
+            const modalCounts = document.querySelectorAll('.modal-selected-count');
+            const master = document.getElementById('master-checkbox');
+
+            if (badge) badge.innerText = totalCount;
+            modalCounts.forEach(el => el.innerText = totalCount);
+
+            if (pageHint) {
+                if (totalCount > 0 && totalCount !== checkedOnThisPage) {
+                    pageHint.innerText = `${checkedOnThisPage} {{ __('di halaman ini') }}`;
+                    pageHint.classList.remove('hidden');
+                } else {
+                    pageHint.innerText = '';
+                    pageHint.classList.add('hidden');
+                }
+            }
+
+            if (master && allBoxes.length > 0) {
+                if (checkedOnThisPage === allBoxes.length) {
+                    master.checked = true;
+                    master.indeterminate = false;
+                } else if (checkedOnThisPage > 0) {
+                    master.checked = false;
+                    master.indeterminate = true;
+                } else {
+                    master.checked = false;
+                    master.indeterminate = false;
+                }
+            } else if (master) {
+                master.checked = false;
+                master.indeterminate = false;
+            }
+
+            if (bar) {
+                if (totalCount > 0) {
+                    bar.classList.remove('hidden');
+                } else {
+                    bar.classList.add('hidden');
+                }
+            }
+        }
+
+        function updateSelectedCount() {
+            syncUIWithState();
         }
 
         function clearAllCheckboxes() {
+            clearStoredSelectedIds();
             const checkboxes = document.querySelectorAll('input.doc-checkbox');
             checkboxes.forEach(cb => { cb.checked = false; });
             const master = document.getElementById('master-checkbox');
-            if (master) master.checked = false;
-            updateSelectedCount();
+            if (master) {
+                master.checked = false;
+                master.indeterminate = false;
+            }
+            syncUIWithState();
+        }
+
+        function onSingleDelete(docId) {
+            const selectedIds = getStoredSelectedIds();
+            if (selectedIds.has(String(docId))) {
+                selectedIds.delete(String(docId));
+                setStoredSelectedIds(selectedIds);
+            }
         }
 
         function submitBulkDownload() {
-            const checkedBoxes = document.querySelectorAll('input.doc-checkbox:checked');
-            if (checkedBoxes.length === 0) {
+            const selectedIds = getStoredSelectedIds();
+            if (selectedIds.size === 0) {
                 alert('{{ __('Pilih setidaknya satu dokumen terlebih dahulu.') }}');
                 return;
             }
@@ -923,11 +1030,11 @@
             const container = document.getElementById('bulk_download_inputs');
             container.innerHTML = '';
 
-            checkedBoxes.forEach(cb => {
+            selectedIds.forEach(id => {
                 const input = document.createElement('input');
                 input.type = 'hidden';
                 input.name = 'ids[]';
-                input.value = cb.value;
+                input.value = id;
                 container.appendChild(input);
             });
 
@@ -935,8 +1042,8 @@
         }
 
         function openBulkTrashModal() {
-            const checkedBoxes = document.querySelectorAll('input.doc-checkbox:checked');
-            if (checkedBoxes.length === 0) {
+            const selectedIds = getStoredSelectedIds();
+            if (selectedIds.size === 0) {
                 alert('{{ __('Pilih setidaknya satu dokumen terlebih dahulu.') }}');
                 return;
             }
@@ -944,21 +1051,21 @@
             const container = document.getElementById('bulk_trash_inputs');
             container.innerHTML = '';
 
-            checkedBoxes.forEach(cb => {
+            selectedIds.forEach(id => {
                 const input = document.createElement('input');
                 input.type = 'hidden';
                 input.name = 'ids[]';
-                input.value = cb.value;
+                input.value = id;
                 container.appendChild(input);
             });
 
-            document.querySelectorAll('.modal-selected-count').forEach(el => el.innerText = checkedBoxes.length);
+            document.querySelectorAll('.modal-selected-count').forEach(el => el.innerText = selectedIds.size);
             document.getElementById('confirm_bulk_trash_modal').showModal();
         }
 
         function openBulkForceDeleteModal() {
-            const checkedBoxes = document.querySelectorAll('input.doc-checkbox:checked');
-            if (checkedBoxes.length === 0) {
+            const selectedIds = getStoredSelectedIds();
+            if (selectedIds.size === 0) {
                 alert('{{ __('Pilih setidaknya satu dokumen terlebih dahulu.') }}');
                 return;
             }
@@ -966,16 +1073,23 @@
             const container = document.getElementById('bulk_force_delete_inputs');
             container.innerHTML = '';
 
-            checkedBoxes.forEach(cb => {
+            selectedIds.forEach(id => {
                 const input = document.createElement('input');
                 input.type = 'hidden';
                 input.name = 'ids[]';
-                input.value = cb.value;
+                input.value = id;
                 container.appendChild(input);
             });
 
-            document.querySelectorAll('.modal-selected-count').forEach(el => el.innerText = checkedBoxes.length);
+            document.querySelectorAll('.modal-selected-count').forEach(el => el.innerText = selectedIds.size);
             document.getElementById('confirm_bulk_force_delete_modal').showModal();
+        }
+
+        // Initialize state on load
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', syncUIWithState);
+        } else {
+            syncUIWithState();
         }
     </script>
 </x-app-layout>

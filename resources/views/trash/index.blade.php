@@ -2,16 +2,32 @@
     <x-slot name="header">{{ __('Tempat Sampah (Trash)') }}</x-slot>
 
     <div class="py-6" x-data="{ 
-        selected: [], 
+        selected: (function() {
+            try {
+                const s = JSON.parse(sessionStorage.getItem('dokuflow_trash_selected_ids') || '[]');
+                return Array.isArray(s) ? s.map(Number) : [];
+            } catch(e) { return []; }
+        })(), 
         allIds: {{ json_encode($trashedDocuments->pluck('id')->all()) }},
         toggleAll() {
-            if (this.selected.length === this.allIds.length) {
-                this.selected = [];
+            const pageAllSelected = this.allIds.length > 0 && this.allIds.every(id => this.selected.includes(id));
+            if (pageAllSelected) {
+                this.selected = this.selected.filter(id => !this.allIds.includes(id));
             } else {
-                this.selected = [...this.allIds];
+                this.selected = Array.from(new Set([...this.selected, ...this.allIds]));
             }
+            this.save();
+        },
+        clearAll() {
+            this.selected = [];
+            this.save();
+        },
+        save() {
+            try {
+                sessionStorage.setItem('dokuflow_trash_selected_ids', JSON.stringify(this.selected));
+            } catch(e) {}
         }
-    }">
+    }" x-init="$watch('selected', () => save())">
         <div class="max-w-7xl mx-auto w-full space-y-4">
             
             {{-- Header Actions & Auto-Delete Banner --}}
@@ -29,6 +45,9 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-5 w-5" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     <span>{{ session('success') }}</span>
                 </div>
+                <script>
+                    try { sessionStorage.removeItem('dokuflow_trash_selected_ids'); } catch(e) {}
+                </script>
             @endif
 
             @if(session('error'))
@@ -47,6 +66,9 @@
                 <div class="flex items-center gap-2 font-medium text-sm">
                     <span class="badge badge-outline bg-white/20 text-white border-0 font-bold px-2 py-1" x-text="selected.length"></span>
                     <span>{{ __('dokumen dipilih') }}</span>
+                    <button type="button" @click="clearAll()" class="btn btn-ghost btn-xs text-white/80 hover:text-white rounded-lg ml-2">
+                        {{ __('Batalkan Pilihan') }}
+                    </button>
                 </div>
                 <div class="flex items-center gap-2">
                     {{-- Bulk Restore Button --}}
@@ -102,7 +124,7 @@
                                 <th class="w-10 text-center">
                                     <input type="checkbox" 
                                            class="checkbox checkbox-sm" 
-                                           :checked="allIds.length > 0 && selected.length === allIds.length"
+                                           :checked="allIds.length > 0 && allIds.every(id => selected.includes(id))"
                                            @change="toggleAll()" 
                                            title="{{ __('Pilih Semua') }}">
                                 </th>
