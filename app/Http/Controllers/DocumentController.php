@@ -890,6 +890,10 @@ class DocumentController extends Controller
             return response()->json(['error' => __('Berkas soft file korporat tidak ditemukan di storage.')], 404);
         }
 
+        // Flag ONLYOFFICE callback to save and keep version status as draft (do NOT submit for approval)
+        Cache::put('onlyoffice_save_as_draft_' . $document->id, true, now()->addMinutes(5));
+        Cache::forget('onlyoffice_pending_notif_' . $document->id);
+
         $version = $document->displayVersion();
         if ($version) {
             // Flush any active in-memory edits from ONLYOFFICE to server storage first
@@ -910,15 +914,21 @@ class DocumentController extends Controller
             $version->refresh();
         }
 
+        $draft = $document->versions()->where('status', 'draft')->whereNull('discarded_at')->first();
         $pending = $document->versions()->pending()->whereNull('discarded_at')->first();
-        $draft = $document->versions()->where('status', 'draft')->first();
 
-        if ($pending) {
-            $workingVersion = $pending;
-        } elseif ($draft) {
+        if ($draft) {
             $workingVersion = $draft;
+        } elseif ($pending && !$document->isReleased()) {
+            // Dokumen belum dirilis: jika versinya sempat menjadi pending karena save otomatis sebelumnya,
+            // kembalikan statusnya ke draft agar tidak otomatis pending saat menerapkan kop surat.
+            $pending->update(['status' => 'draft']);
+            \App\Models\DocumentApprovalStep::where('version_id', $pending->id)->delete();
+            $workingVersion = $pending;
+        } elseif ($pending) {
+            $workingVersion = $pending;
         } else {
-            // Active/approved document is being edited -> create new pending revision version (v2, v3, etc.)
+            // Active/approved document is being edited -> create new draft revision version (v2, v3, etc.)
             $currentVersion = $version ?? $document->displayVersion();
             $newVersionNumber = ($document->versions()->max('version_number') ?? 0) + 1;
             $storedPath = 'documents/' . $document->id . '/v' . $newVersionNumber . '.docx';
@@ -937,7 +947,7 @@ class DocumentController extends Controller
                 'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                 'author_id' => $user->id,
                 'author_name' => $user->name,
-                'status' => 'pending',
+                'status' => 'draft',
             ]);
         }
 
@@ -954,6 +964,11 @@ class DocumentController extends Controller
         $originalBackup = $existingDocx;
 
         try {
+            // Tangkap old key session ONLYOFFICE SEBELUM file diubah di storage,
+            // agar callback ONLYOFFICE dari editor yang sedang terbuka diabaikan dan tidak menimpa hasil penggabungan
+            $oldKey = $this->onlyOfficeService->generateDocumentKey($document, $workingVersion);
+            Cache::put('ignore_onlyoffice_key_' . $oldKey, true, now()->addMinutes(2));
+
             $mergedDocx = $this->onlyOfficeService->applyCorporateSoftFileToDocx($existingDocx, $corporateSoftFile);
 
             if (empty($mergedDocx) || substr($mergedDocx, 0, 2) !== 'PK') {
@@ -961,6 +976,13 @@ class DocumentController extends Controller
             }
 
             $disk->put($workingVersion->file_path, $mergedDocx);
+
+            // Dokumen draf/belum dirilis tetap berstatus draf dan bebas dari alur persetujuan prematur
+            if (!$document->isReleased()) {
+                $workingVersion->update(['status' => 'draft']);
+                \App\Models\DocumentApprovalStep::where('version_id', $workingVersion->id)->delete();
+            }
+
             $workingVersion->touch();
 
             // Update document reference to indicate which corporate soft file was applied
@@ -969,13 +991,18 @@ class DocumentController extends Controller
                 'paper_size' => $corporateSoftFile->isA4() ? 'A4' : 'F4',
             ]);
 
-            // Invalidate ONLYOFFICE cached keys and ignore callbacks from the old session key so editor reloads new content safely
-            $oldKey = $this->onlyOfficeService->generateDocumentKey($document, $workingVersion);
-            Cache::put('ignore_onlyoffice_key_' . $oldKey, true, now()->addSeconds(30));
+            // Pertahankan cache save as draft agar ONLYOFFICE callback saat reload editor tidak mengubah status ke pending
+            Cache::put('onlyoffice_save_as_draft_' . $document->id, true, now()->addMinutes(5));
+            Cache::forget('onlyoffice_pending_notif_' . $document->id);
+
             $this->onlyOfficeService->rotateDocumentKey($document, $workingVersion);
         } catch (\Throwable $e) {
             if (!empty($originalBackup) && $workingVersion->file_path) {
                 $disk->put($workingVersion->file_path, $originalBackup);
+            }
+            $document->refresh();
+            if ($document->corporate_soft_file_id === $corporateSoftFile->id) {
+                $document->update(['corporate_soft_file_id' => null]);
             }
             Log::error('applyCorporateSoftFile error: ' . $e->getMessage(), ['exception' => $e]);
             return response()->json(['error' => __('Gagal menerapkan kop surat: :msg', ['msg' => $e->getMessage()])], 500);
@@ -998,6 +1025,10 @@ class DocumentController extends Controller
 
         $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
 
+        // Flag ONLYOFFICE callback to save and keep version status as draft (do NOT submit for approval)
+        Cache::put('onlyoffice_save_as_draft_' . $document->id, true, now()->addMinutes(5));
+        Cache::forget('onlyoffice_pending_notif_' . $document->id);
+
         $version = $document->displayVersion();
         if ($version) {
             // Flush any active in-memory edits from ONLYOFFICE to server storage first
@@ -1006,13 +1037,17 @@ class DocumentController extends Controller
             $version->refresh();
         }
 
+        $draft = $document->versions()->where('status', 'draft')->whereNull('discarded_at')->first();
         $pending = $document->versions()->pending()->whereNull('discarded_at')->first();
-        $draft = $document->versions()->where('status', 'draft')->first();
 
-        if ($pending) {
-            $workingVersion = $pending;
-        } elseif ($draft) {
+        if ($draft) {
             $workingVersion = $draft;
+        } elseif ($pending && !$document->isReleased()) {
+            $pending->update(['status' => 'draft']);
+            \App\Models\DocumentApprovalStep::where('version_id', $pending->id)->delete();
+            $workingVersion = $pending;
+        } elseif ($pending) {
+            $workingVersion = $pending;
         } else {
             // Active/approved document is being edited -> create new pending revision version (v2, v3, etc.)
             $currentVersion = $version ?? $document->displayVersion();
@@ -1033,7 +1068,7 @@ class DocumentController extends Controller
                 'file_mime' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                 'author_id' => $user->id,
                 'author_name' => $user->name,
-                'status' => 'pending',
+                'status' => $document->isReleased() ? 'pending' : 'draft',
             ]);
         }
 
@@ -1042,15 +1077,25 @@ class DocumentController extends Controller
             'paper_size' => 'A4',
         ]);
 
+        $oldKey = $this->onlyOfficeService->generateDocumentKey($document, $workingVersion);
+        Cache::put('ignore_onlyoffice_key_' . $oldKey, true, now()->addMinutes(2));
+
         if ($workingVersion->file_path && $disk->exists($workingVersion->file_path)) {
             $rawDocx = $disk->get($workingVersion->file_path);
             $cleanedDocx = $this->onlyOfficeService->removeHeaderAndFooterFromDocx($rawDocx);
             $disk->put($workingVersion->file_path, $cleanedDocx);
         }
+
+        if (!$document->isReleased()) {
+            $workingVersion->update(['status' => 'draft']);
+            \App\Models\DocumentApprovalStep::where('version_id', $workingVersion->id)->delete();
+        }
+
         $workingVersion->touch();
 
-        $oldKey = $this->onlyOfficeService->generateDocumentKey($document, $workingVersion);
-        Cache::put('ignore_onlyoffice_key_' . $oldKey, true, now()->addSeconds(30));
+        Cache::put('onlyoffice_save_as_draft_' . $document->id, true, now()->addMinutes(5));
+        Cache::forget('onlyoffice_pending_notif_' . $document->id);
+
         $this->onlyOfficeService->rotateDocumentKey($document, $workingVersion);
 
         return response()->json([

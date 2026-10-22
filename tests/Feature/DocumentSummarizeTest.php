@@ -133,4 +133,57 @@ class DocumentSummarizeTest extends TestCase
         $this->assertEquals(Document::SUMMARY_FAILED, $this->document->summary_status);
         $this->assertEquals('Ringkasan gagal dibuat. Silakan coba lagi.', $this->document->summary_error);
     }
+
+    #[Test]
+    public function document_summarizer_handles_empty_document_professionally(): void
+    {
+        // Update content document menjadi tag kosong / whitespace
+        $this->document->currentVersion->update([
+            'content' => '<p><br></p>',
+        ]);
+
+        $groqMock = $this->createMock(GroqClient::class);
+        $groqMock->expects($this->never())->method('chat');
+
+        $extractor = new PdfTextExtractor();
+        $summarizer = new DocumentSummarizer($groqMock, $extractor);
+
+        $summarizer->summarize($this->document);
+
+        $this->document->refresh();
+
+        $this->assertEquals(Document::SUMMARY_COMPLETED, $this->document->summary_status);
+        $this->assertStringContainsString('Dokumen ini belum memuat isi atau teks tertulis', $this->document->summary);
+        $this->assertNull($this->document->summary_error);
+    }
+
+    #[Test]
+    public function document_summarizer_sanitizes_prompt_leakage_on_short_document(): void
+    {
+        // Konten 1 kalimat
+        $this->document->currentVersion->update([
+            'content' => '<p>Rapat direksi ditunda hingga hari Senin depan.</p>',
+        ]);
+
+        $leakedResponse = "Berikut adalah ringkasan dokumen yang disusun dengan aturan-aturan berikut:\n1. Tidak menggunakan list: ...\n2. Berbagi hanya paragraf: ...\n3. Ringkasan yang mendalam dan komprehensif: ...\n4. Tidak ada filler words: ...\n5. Ringkasan tidak memiliki halusinasi: ...";
+
+        $groqMock = $this->createMock(GroqClient::class);
+        $groqMock->expects($this->once())
+            ->method('chat')
+            ->willReturn($leakedResponse);
+
+        $extractor = new PdfTextExtractor();
+        $summarizer = new DocumentSummarizer($groqMock, $extractor);
+
+        $summarizer->summarize($this->document);
+
+        $this->document->refresh();
+
+        $this->assertEquals(Document::SUMMARY_COMPLETED, $this->document->summary_status);
+        // Memastikan output bocoran prompt telah dibersihkan dan diganti dengan intisari profesional
+        $this->assertStringNotContainsString('aturan-aturan berikut', $this->document->summary);
+        $this->assertStringNotContainsString('Tidak menggunakan list', $this->document->summary);
+        $this->assertStringContainsString('Intisari Dokumen: Rapat direksi ditunda hingga hari Senin depan.', $this->document->summary);
+    }
 }
+

@@ -5,15 +5,16 @@ namespace App\Services;
 use App\AI\Contracts\AIClientInterface;
 use App\AI\Prompts\DocumentSummaryPrompt;
 use App\Models\Document;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
  * Ringkasan dokumen berbasis AI. Alur:
  *
- *   extract (PDF/DOCX) → clean → chunk → ringkas per chunk → gabung
+ *   extract (PDF/DOCX/Editor) → clean → cek kosong/singkat → chunk (bila panjang) → ringkas → sanitize
  *
  * Teks dan chunk hanya bersifat sementara — tidak pernah disimpan ke DB.
- * Dokumen dengan konten kecil langsung diringkas dalam satu panggilan.
+ * Dokumen kosong atau kurang dari 1 paragraf ditangani secara khusus dan profesional.
  */
 class DocumentSummarizer
 {
@@ -53,22 +54,42 @@ class DocumentSummarizer
         }
     }
 
+    /**
+     * Ringkas teks dokumen dengan penanganan cerdas:
+     * 1. Dokumen kosong: kembalikan pemberitahuan profesional terstruktur
+     * 2. Dokumen < 1 paragraf: ringkas secara profesional dengan prompt khusus
+     * 3. Dokumen normal/panjang: ringkas dengan chunking + density
+     */
     public function summarizeText(string $text, int $percentage = 30, string $locale = 'id'): string
     {
         $text = $this->clean($text);
 
+        // Kasus 1: Dokumen Kosong
         if ($text === '') {
-            throw new RuntimeException('Dokumen tidak memiliki konten untuk diringkas.');
+            return self::emptyDocumentMessage($locale);
         }
 
+        // Kasus 2: Dokumen Kurang Dari 1 Paragraf (1 kalimat atau teks ringkas)
+        if ($this->isShortContent($text)) {
+            $rawSummary = $this->aiClient->chat(
+                DocumentSummaryPrompt::shortContentSystem($locale),
+                DocumentSummaryPrompt::shortContentUser($text, $locale),
+            );
+
+            return $this->sanitizeSummary($rawSummary, $text, $locale);
+        }
+
+        // Kasus 3: Dokumen Normal / Panjang
         $chunkSize = (int) config('dokuflow.ai_summary.chunk_size', self::CHUNK_SIZE);
 
         // Satu chunk → satu panggilan langsung, hemat panggilan API.
         if (mb_strlen($text) <= $chunkSize) {
-            return $this->aiClient->chat(
+            $rawSummary = $this->aiClient->chat(
                 DocumentSummaryPrompt::chunkSystem($percentage, $locale),
                 DocumentSummaryPrompt::chunkContent($text, $locale),
             );
+
+            return $this->sanitizeSummary($rawSummary, $text, $locale);
         }
 
         $chunks = $this->chunk($text);
@@ -92,13 +113,116 @@ class DocumentSummarizer
 
         // Satu chunk summary → langsung jadi final, tidak perlu gabung lagi.
         if (count($summaries) === 1) {
-            return $summaries[0];
+            return $this->sanitizeSummary($summaries[0], $text, $locale);
         }
 
-        return $this->aiClient->chat(
+        $rawFinal = $this->aiClient->chat(
             DocumentSummaryPrompt::combineSystem($percentage, $locale),
             DocumentSummaryPrompt::combineContent($summaries, $locale),
         );
+
+        return $this->sanitizeSummary($rawFinal, $text, $locale);
+    }
+
+    /**
+     * Pesan ringkasan resmi & profesional bila dokumen belum memiliki isi.
+     */
+    public static function emptyDocumentMessage(string $locale = 'id'): string
+    {
+        return match ($locale) {
+            'en' => 'This document does not contain any written text content to summarize. Please ensure the document content is filled in before generating a summary.',
+            default => 'Dokumen ini belum memuat isi atau teks tertulis untuk diringkas. Silakan lengkapi isi dokumen terlebih dahulu agar ringkasan dapat dihasilkan secara optimal.',
+        };
+    }
+
+    /**
+     * Deteksi apakah teks dokumen tergolong sangat pendek (kurang dari 1 paragraf / 1-2 kalimat).
+     */
+    public function isShortContent(string $text): bool
+    {
+        $clean = trim($text);
+        if ($clean === '') {
+            return true;
+        }
+
+        $wordCount = str_word_count(strip_tags($clean));
+        $charCount = mb_strlen($clean);
+
+        // Kurang dari 45 kata atau kurang dari 250 karakter terhitung kurang dari 1 paragraf standar
+        return $wordCount < 45 || $charCount < 250;
+    }
+
+    /**
+     * Sanitasi output ringkasan dari AI:
+     * 1. Hapus pembungkus markdown block atau tanda kutip
+     * 2. Deteksi dan tangani bila terjadi kebocoran aturan prompt (prompt leakage)
+     */
+    public function sanitizeSummary(string $summary, string $sourceText, string $locale = 'id'): string
+    {
+        $summary = trim($summary);
+
+        // Hapus pembungkus markdown block ```markdown ... ``` atau ``` ... ```
+        if (preg_match('/^```(?:markdown|text)?\s*([\s\S]*?)\s*```$/i', $summary, $matches)) {
+            $summary = trim($matches[1]);
+        }
+
+        // Hapus tanda kutip pembungkus jika ada
+        if ((str_starts_with($summary, '"') && str_ends_with($summary, '"')) ||
+            (str_starts_with($summary, "'") && str_ends_with($summary, "'"))) {
+            $summary = trim(substr($summary, 1, -1));
+        }
+
+        // Pola deteksi kebocoran aturan prompt
+        $leakagePatterns = [
+            '/aturan-aturan berikut/i',
+            '/tidak menggunakan list/i',
+            '/berbagi hanya paragraf/i',
+            '/summaris akan mencakup/i',
+            '/tidak menggunakan kata-kata introver/i',
+            '/tidak ada filler words/i',
+            '/ringkasan tidak memiliki halusinasi/i',
+            '/absolute rules/i',
+            '/strictly forbidden/i',
+            '/only paragraphs/i',
+            '/no filler words/i',
+            '/no hallucination/i',
+            '/output only the summary/i',
+        ];
+
+        $hasLeakage = false;
+        foreach ($leakagePatterns as $pattern) {
+            if (preg_match($pattern, $summary)) {
+                $hasLeakage = true;
+                break;
+            }
+        }
+
+        if ($hasLeakage) {
+            Log::warning('DocumentSummarizer: AI output contained prompt leakage. Falling back to sanitized executive summary.');
+            return $this->generateFallbackProfessionalSummary($sourceText, $locale);
+        }
+
+        return $summary;
+    }
+
+    /**
+     * Ringkasan profesional darurat bila AI menghasilkan respon tidak wajar / bocoran prompt.
+     */
+    private function generateFallbackProfessionalSummary(string $sourceText, string $locale = 'id'): string
+    {
+        $clean = trim($sourceText);
+        if ($clean === '') {
+            return self::emptyDocumentMessage($locale);
+        }
+
+        // Bersihkan tanda baca di akhir
+        $clean = rtrim($clean, " \t\n\r\0\x0B.");
+
+        if ($locale === 'en') {
+            return "Executive Summary: " . ucfirst($clean) . ".";
+        }
+
+        return "Intisari Dokumen: " . ucfirst($clean) . ".";
     }
 
     /**
@@ -110,24 +234,26 @@ class DocumentSummarizer
         $version = $document->displayVersion();
 
         if (!$version) {
-            throw new RuntimeException('Dokumen belum memiliki konten.');
+            return '';
         }
 
         if ($version->file_path) {
-            return $this->pdfTextExtractor->extract($version->file_path, $version->file_mime);
+            try {
+                return $this->pdfTextExtractor->extract($version->file_path, $version->file_mime);
+            } catch (\Throwable $e) {
+                // Berkas tidak dapat diekstrak atau kosong
+                return '';
+            }
         }
 
-        $content = trim(strip_tags($version->content ?? ''));
-
-        if ($content === '') {
-            throw new RuntimeException('Dokumen tidak memiliki konten untuk diringkas.');
-        }
-
-        return $content;
+        $rawContent = $version->content ?? '';
+        return $this->clean(strip_tags($rawContent));
     }
 
     private function clean(string $text): string
     {
+        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = str_replace(["\xc2\xa0", "\u{00a0}"], ' ', $text);
         $text = preg_replace('/[ \t]+/', ' ', $text);
         $text = preg_replace("/\n{3,}/", "\n\n", $text);
 

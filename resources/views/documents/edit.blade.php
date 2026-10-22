@@ -1282,6 +1282,9 @@
                 const modal = document.getElementById('remove-corporate-softfile-modal');
                 if (modal && typeof modal.close === 'function') modal.close();
 
+                const prevAppliedId = currentAppliedSoftFileId;
+                const prevAppliedTitle = currentAppliedSoftFileTitle;
+
                 showSignatureScreenAlert('SEDANG MEMBATALKAN', 'Membatalkan pilihan kop surat...', true);
 
                 const removeUrl = "{{ route('documents.corporate-soft-files.remove', $document) }}";
@@ -1314,10 +1317,16 @@
                             window.location.href = target + (target.includes('?') ? '&' : '?') + 't=' + Date.now();
                         }, 600);
                     } else {
+                        if (prevAppliedId) {
+                            updateUsedSoftFileUI(prevAppliedId, prevAppliedTitle);
+                        }
                         showSignatureScreenAlert('GAGAL MEMBATALKAN', data.error || 'Gagal membatalkan kop surat.', false);
                     }
                 })
                 .catch(err => {
+                    if (prevAppliedId) {
+                        updateUsedSoftFileUI(prevAppliedId, prevAppliedTitle);
+                    }
                     console.error('remove soft file error:', err);
                     showSignatureScreenAlert('KESALAHAN SISTEM', 'Terjadi kesalahan saat membatalkan kop surat.', false);
                 });
@@ -1386,7 +1395,6 @@
             function executeApplySoftFileDirect(id, title) {
                 activeSelectedSoftFile = { id: id, title: title };
                 const isSwitching = currentAppliedSoftFileId && currentAppliedSoftFileId != id;
-                updateUsedSoftFileUI(id, title);
                 showSignatureScreenAlert('SEDANG MENERAPKAN', (isSwitching ? 'Mengganti ke Kop Surat "' : 'Menerapkan Kop Surat "') + title + '" ke dokumen...', true);
                 executeApplySoftFileMaster();
             }
@@ -1401,9 +1409,8 @@
 
                 const selectedId = activeSelectedSoftFile.id;
                 const selectedTitle = activeSelectedSoftFile.title;
-
-                // 1. Immediately reflect UI changes everywhere
-                updateUsedSoftFileUI(selectedId, selectedTitle);
+                const prevAppliedId = currentAppliedSoftFileId;
+                const prevAppliedTitle = currentAppliedSoftFileTitle;
 
                 const modal = document.getElementById('corporate-softfile-modal');
                 if (modal && typeof modal.close === 'function') modal.close();
@@ -1448,10 +1455,22 @@
                             window.location.href = target + (target.includes('?') ? '&' : '?') + 't=' + Date.now();
                         }, 600);
                     } else {
+                        // Bila gagal menerapkan, pastikan kop surat tidak terpilih di pojok kanan (kembalikan ke kondisi sebelumnya)
+                        if (prevAppliedId) {
+                            updateUsedSoftFileUI(prevAppliedId, prevAppliedTitle);
+                        } else {
+                            resetUsedSoftFileUI();
+                        }
                         showSignatureScreenAlert('GAGAL MENERAPKAN', data.error || 'Gagal menerapkan kop surat ke dokumen.', false);
                     }
                 })
                 .catch(err => {
+                    // Bila terjadi kesalahan sistem/jaringan, pastikan kop surat tidak terpilih
+                    if (prevAppliedId) {
+                        updateUsedSoftFileUI(prevAppliedId, prevAppliedTitle);
+                    } else {
+                        resetUsedSoftFileUI();
+                    }
                     console.error('apply soft file error:', err);
                     showSignatureScreenAlert('KESALAHAN SISTEM', 'Terjadi kesalahan saat menerapkan kop surat.', false);
                 });

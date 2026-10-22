@@ -11,6 +11,7 @@ use App\Models\UnitKerja;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -1104,6 +1105,167 @@ class CorporateSoftFileTest extends TestCase
             'id' => $softFile->id,
         ]);
         $this->assertFalse($disk->exists($filePath));
+    }
+
+    public function test_applying_kop_surat_to_saved_document_with_content_preserves_draft_status_and_does_not_become_pending(): void
+    {
+        $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
+
+        // 1. Create a DOCX corporate soft file (kop surat)
+        $phpWordKop = new \PhpOffice\PhpWord\PhpWord();
+        $sectionKop = $phpWordKop->addSection();
+        $headerKop = $sectionKop->addHeader();
+        $headerKop->addText('KOP SURAT RESMI PERUSAHAAN');
+
+        $tmpKop = tempnam(sys_get_temp_dir(), 'test_kop_') . '.docx';
+        $writerKop = \PhpOffice\PhpWord\IOFactory::createWriter($phpWordKop, 'Word2007');
+        $writerKop->save($tmpKop);
+        $kopDocx = file_get_contents($tmpKop);
+        @unlink($tmpKop);
+
+        $softFilePath = 'corporate_soft_files/kop_draft_test.docx';
+        $disk->put($softFilePath, $kopDocx);
+
+        $softFile = CorporateSoftFile::create([
+            'title' => 'Kop Surat Draft Test',
+            'file_path' => $softFilePath,
+            'file_original_name' => 'kop_draft_test.docx',
+            'status' => 'active',
+            'is_all_companies' => true,
+            'is_all_branches' => true,
+            'allowed_roles' => ['staff'],
+            'created_by' => $this->admin->id,
+        ]);
+
+        // 2. Create document with content that has been saved as draft
+        $doc = Document::create([
+            'title' => 'Dokumen Draf Berisi',
+            'document_number' => '099/SK/DRAFT/X/2026',
+            'document_type_id' => $this->docType->id,
+            'owner_id' => $this->staffA->id,
+            'company_id' => $this->companyA->id,
+            'branch_id' => $this->branchA->id,
+            'unit_kerja_id' => $this->unitKerjaA->id,
+            'status' => 'draft',
+        ]);
+        $docPath = 'documents/' . $doc->id . '/v1.docx';
+
+        $phpWordDoc = new \PhpOffice\PhpWord\PhpWord();
+        $sectionDoc = $phpWordDoc->addSection();
+        $sectionDoc->addText("Isi Dokumen yang sudah diketik dan disimpan");
+
+        $tmpDoc = tempnam(sys_get_temp_dir(), 'test_doc_') . '.docx';
+        $writerDoc = \PhpOffice\PhpWord\IOFactory::createWriter($phpWordDoc, 'Word2007');
+        $writerDoc->save($tmpDoc);
+        $userDocx = file_get_contents($tmpDoc);
+        @unlink($tmpDoc);
+
+        $disk->put($docPath, $userDocx);
+
+        $version = $doc->versions()->create([
+            'version_number' => 1,
+            'file_path' => $docPath,
+            'file_original_name' => 'Dokumen Draf Berisi.docx',
+            'content' => 'Isi Dokumen yang sudah diketik dan disimpan',
+            'author_name' => $this->staffA->name,
+            'status' => 'draft',
+            'author_id' => $this->staffA->id,
+        ]);
+        $doc->update(['current_version_id' => $version->id]);
+
+        // 3. Apply corporate soft file (Kop Surat)
+        $response = $this->actingAs($this->staffA)->postJson(
+            route('documents.corporate-soft-files.apply', [$doc, $softFile])
+        );
+
+        $response->assertOk();
+        $response->assertJson(['success' => true]);
+
+        // 4. Assert document version remains 'draft' (NOT 'pending')
+        $doc->refresh();
+        $version->refresh();
+
+        $this->assertEquals('draft', $version->status);
+        $this->assertFalse($doc->isLockedForEditing());
+        $this->assertEquals(0, \App\Models\DocumentApprovalStep::where('version_id', $version->id)->count());
+        $this->assertTrue(Cache::has('onlyoffice_save_as_draft_' . $doc->id));
+
+        // 5. Assert the author can still access the edit page without being redirected/locked
+        $editResponse = $this->actingAs($this->staffA)->get(route('documents.edit', $doc));
+        $editResponse->assertOk();
+
+        // 6. Assert content is preserved and header is added
+        $appliedDocx = $disk->get($docPath);
+        $this->assertNotEmpty($appliedDocx);
+        $tmpCheck = tempnam(sys_get_temp_dir(), 'chk_draft_');
+        file_put_contents($tmpCheck, $appliedDocx);
+        $zip = new \ZipArchive();
+        $zip->open($tmpCheck);
+        $docXml = $zip->getFromName('word/document.xml');
+        $hdrXml = $zip->getFromName('word/header1.xml');
+        $zip->close();
+        @unlink($tmpCheck);
+
+        $this->assertNotEmpty($hdrXml);
+        $this->assertStringContainsString('KOP SURAT RESMI PERUSAHAAN', $hdrXml);
+        $this->assertStringContainsString('Isi Dokumen yang sudah diketik dan disimpan', $docXml);
+    }
+
+    public function test_when_applying_kop_surat_fails_document_does_not_have_soft_file_selected(): void
+    {
+        $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
+
+        // Soft file whose file does not exist on disk
+        $softFile = CorporateSoftFile::create([
+            'title' => 'Kop Surat Corrupted',
+            'file_path' => 'corporate_soft_files/missing.docx',
+            'file_original_name' => 'missing.docx',
+            'status' => 'active',
+            'is_all_companies' => true,
+            'is_all_branches' => true,
+            'allowed_roles' => ['staff'],
+            'created_by' => $this->admin->id,
+        ]);
+
+        $doc = Document::create([
+            'title' => 'Dokumen Draf Uji Gagal',
+            'document_number' => '100/SK/FAIL/X/2026',
+            'document_type_id' => $this->docType->id,
+            'owner_id' => $this->staffA->id,
+            'company_id' => $this->companyA->id,
+            'branch_id' => $this->branchA->id,
+            'unit_kerja_id' => $this->unitKerjaA->id,
+            'status' => 'draft',
+        ]);
+        $docPath = 'documents/' . $doc->id . '/v1.docx';
+        $disk->put($docPath, 'sample docx');
+
+        $version = $doc->versions()->create([
+            'version_number' => 1,
+            'file_path' => $docPath,
+            'file_original_name' => 'Dokumen Draf Uji Gagal.docx',
+            'content' => 'Isi Dokumen',
+            'author_name' => $this->staffA->name,
+            'status' => 'draft',
+            'author_id' => $this->staffA->id,
+        ]);
+        $doc->update(['current_version_id' => $version->id]);
+
+        $response = $this->actingAs($this->staffA)->postJson(
+            route('documents.corporate-soft-files.apply', [$doc, $softFile])
+        );
+
+        $response->assertStatus(404);
+        $response->assertJson(['error' => 'Berkas soft file korporat tidak ditemukan di storage.']);
+
+        $doc->refresh();
+        $this->assertNull($doc->corporate_soft_file_id);
+        $this->assertFalse($doc->isLockedForEditing());
+
+        $editView = $this->actingAs($this->staffA)->get(route('documents.edit', $doc));
+        $editView->assertOk();
+        $editView->assertSee('id="corporate-softfile-btn-badge"', false);
+        $this->assertNull($editView->viewData('document')->corporate_soft_file_id);
     }
 }
 

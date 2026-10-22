@@ -571,7 +571,6 @@
             function executeApplyTemplateSoftFileDirect(id, title) {
                 activeTemplateSoftFile = { id: id, title: title };
                 const isSwitching = currentAppliedTemplateSoftFileId && currentAppliedTemplateSoftFileId != id;
-                updateUsedTemplateSoftFileUI(id, title);
                 showTemplateScreenAlert('SEDANG MENERAPKAN', (isSwitching ? 'Mengganti ke Kop Surat "' : 'Menerapkan Kop Surat "') + title + '" ke template...', true);
                 executeApplyTemplateSoftFileMaster();
             }
@@ -586,9 +585,8 @@
 
                 const selectedId = activeTemplateSoftFile.id;
                 const selectedTitle = activeTemplateSoftFile.title;
-
-                // 1. Immediately reflect UI changes
-                updateUsedTemplateSoftFileUI(selectedId, selectedTitle);
+                const prevAppliedId = currentAppliedTemplateSoftFileId;
+                const prevAppliedTitle = currentAppliedTemplateSoftFileTitle;
 
                 const modal = document.getElementById('template-softfile-modal');
                 if (modal && typeof modal.close === 'function') modal.close();
@@ -628,10 +626,20 @@
                             window.location.href = target + (target.includes('?') ? '&' : '?') + 't=' + Date.now();
                         }, 600);
                     } else {
+                        if (prevAppliedId) {
+                            updateUsedTemplateSoftFileUI(prevAppliedId, prevAppliedTitle);
+                        } else {
+                            resetUsedTemplateSoftFileUI();
+                        }
                         showTemplateScreenAlert('GAGAL MENERAPKAN', data.error || 'Gagal menerapkan kop surat.', false);
                     }
                 })
                 .catch(err => {
+                    if (prevAppliedId) {
+                        updateUsedTemplateSoftFileUI(prevAppliedId, prevAppliedTitle);
+                    } else {
+                        resetUsedTemplateSoftFileUI();
+                    }
                     console.error('apply template soft file error:', err);
                     showTemplateScreenAlert('KESALAHAN SISTEM', 'Terjadi kesalahan saat menerapkan kop surat.', false);
                 });

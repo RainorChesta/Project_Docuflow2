@@ -27,14 +27,45 @@ class DocumentSummaryPrompt
     {
         return match ($locale) {
             'en' => '"This document discusses...", "Summary:", or "The following is..."',
-            default => '"Dokumen ini membahas...", "Ringkasan:", or "Berikut adalah..."',
+            default => '"Dokumen ini membahas...", "Ringkasan:", atau "Berikut adalah..."',
         };
     }
 
     /**
-     * Instruksi sistem untuk meringkas SATU chunk. Satu-satunya sumber
-     * kebenaran adalah teks chunk yang dikirim — dilarang menambah
-     * pengetahuan eksternal.
+     * Instruksi sistem untuk dokumen sangat pendek (kurang dari 1 paragraf / 1-2 kalimat).
+     * Meringkas secara profesional tanpa memaksakan pembagian persentase atau mengulang aturan.
+     */
+    public static function shortContentSystem(string $locale = 'id'): string
+    {
+        $language = self::languageName($locale);
+        $fillers = self::fillerExamples($locale);
+
+        return <<<PROMPT
+You are an expert executive document assistant.
+
+Task: Provide a concise, polished, and professional executive summary of the short document in {$language}.
+
+CONTEXT & OBJECTIVE:
+The document content is brief (less than one paragraph or a single statement). Your goal is to synthesize the essence into a formal, clear, and professional executive summary (1-2 sentences) that articulates the core point, decision, or notification.
+
+GUIDELINES:
+1. FORMAT: Write strictly 1 to 2 well-formed, natural sentences as a single paragraph.
+2. PROFESSIONAL TONE: Use formal, business-appropriate language.
+3. FACTUAL FIDELITY: Strictly adhere to the stated text. Never hallucinate outside facts, assumptions, or filler.
+4. NO FILLER INTROS: Do not begin with introductory labels or meta-phrases such as {$fillers}. Start directly with the substance.
+5. NO INSTRUCTION LEAKAGE: Under NO circumstances should you explain, repeat, quote, or list any rules or instructions. Output ONLY the summary text.
+PROMPT;
+    }
+
+    public static function shortContentUser(string $text, string $locale = 'id'): string
+    {
+        $language = self::languageName($locale);
+
+        return "DOCUMENT CONTENT:\n---\n{$text}\n---\n\nWrite ONLY the concise, professional executive summary in {$language}:";
+    }
+
+    /**
+     * Instruksi sistem untuk meringkas SATU chunk dokumen normal (> 1 paragraf).
      */
     public static function chunkSystem(int $percentage = 30, string $locale = 'id'): string
     {
@@ -42,26 +73,26 @@ class DocumentSummaryPrompt
         $fillers = self::fillerExamples($locale);
 
         if ($percentage <= 30) {
-            $brevityRule = "EXTREME BREVITY: The summary MUST be very short (around {$percentage}% of the original length). MAXIMUM LENGTH: 3 to 5 sentences. The summary MUST be strictly ONE single continuous paragraph.";
+            $brevityRule = "CONCISE & FOCUSED: The summary must be brief (around {$percentage}% density). Maximum 3 to 5 sentences written as a single cohesive paragraph.";
         } elseif ($percentage <= 50) {
-            $brevityRule = "CONCISE SUMMARY: The summary MUST be concise (around {$percentage}% of the original length). MAXIMUM LENGTH: 2 short paragraphs.";
+            $brevityRule = "MODERATE LENGTH: The summary should be concise yet informative (around {$percentage}% density). Maximum 2 well-formed paragraphs.";
         } elseif ($percentage <= 70) {
-            $brevityRule = "MODERATE SUMMARY: Provide a moderately detailed summary (around {$percentage}% of the original length). It should capture main points and important details.";
+            $brevityRule = "COMPREHENSIVE: Provide a detailed summary (around {$percentage}% density), capturing main arguments, decisions, and supporting details.";
         } else {
-            $brevityRule = "DETAILED SUMMARY: Provide a highly detailed and comprehensive summary (around {$percentage}% of the original length). Capture almost all information but rephrased continuously.";
+            $brevityRule = "IN-DEPTH & DETAILED: Provide a thorough, comprehensive summary (around {$percentage}% density). Fully capture key information, decisions, and context in structured paragraphs without unnecessary repetition.";
         }
 
         return <<<PROMPT
-You are a highly disciplined document summarizer. 
+You are an expert executive document summarizer.
 
 Task: Summarize the provided document text in {$language}.
 
-ABSOLUTE RULES (YOU MUST OBEY THESE OR YOU WILL BE PENALIZED):
-1. NO LISTS: You are STRICTLY FORBIDDEN from using bullet points, numbered lists, hyphens (-), or asterisks (*).
-2. ONLY PARAGRAPHS: The entire output MUST be written as plain, continuous paragraphs.
-3. {$brevityRule}
-4. NO FILLER WORDS: Do not use introductory phrases like {$fillers}. Start immediately with the main facts.
-5. NO HALLUCINATION: Only use facts explicitly stated in the document.
+GUIDELINES:
+1. ONLY PARAGRAPHS: Write all output as clean, cohesive paragraphs. Do not use bullet points, numbered lists, or markdown list markers.
+2. DENSITY & DEPTH: {$brevityRule}
+3. NO FILLER WORDS: Do not begin with meta-commentary, introductory labels, or conversational filler such as {$fillers}. Start immediately with the core substantive facts.
+4. FACTUAL INTEGRITY: Rely solely on facts explicitly stated in the document. Do not invent facts or context.
+5. NEVER OUTPUT INSTRUCTIONS: Do not explain, repeat, list, or quote these guidelines or prompt rules. Output ONLY the summary text directly.
 PROMPT;
     }
 
@@ -69,12 +100,12 @@ PROMPT;
     {
         $language = self::languageName($locale);
 
-        return "DOCUMENT CONTENT:\n---\n{$chunk}\n---\n\nNow, generate the summary in {$language} following ALL the rules above. DO NOT include the rules or any other text. OUTPUT ONLY THE SUMMARY:";
+        return "DOCUMENT CONTENT:\n---\n{$chunk}\n---\n\nWrite ONLY the summary in {$language} without rules, labels, or preamble:";
     }
 
     /**
      * Instruksi sistem untuk menggabungkan ringkasan chunk menjadi satu
-     * ringkasan final. Hanya boleh memakai info yang ada di ringkasan chunk.
+     * ringkasan final.
      */
     public static function combineSystem(int $percentage = 30, string $locale = 'id'): string
     {
@@ -82,26 +113,26 @@ PROMPT;
         $fillers = self::fillerExamples($locale);
 
         if ($percentage <= 30) {
-            $brevityRule = "EXTREME BREVITY: The final summary MUST be very short (around {$percentage}% of the combined length). MAXIMUM LENGTH: 3 to 5 sentences. The final summary MUST be strictly ONE single continuous paragraph.";
+            $brevityRule = "CONCISE & FOCUSED: The final summary must be brief (around {$percentage}% density). Maximum 3 to 5 sentences as a single cohesive paragraph.";
         } elseif ($percentage <= 50) {
-            $brevityRule = "CONCISE SUMMARY: The final summary MUST be concise (around {$percentage}% of the combined length). MAXIMUM LENGTH: 2 short paragraphs.";
+            $brevityRule = "MODERATE LENGTH: The final summary should be concise yet informative (around {$percentage}% density). Maximum 2 well-formed paragraphs.";
         } elseif ($percentage <= 70) {
-            $brevityRule = "MODERATE SUMMARY: Provide a moderately detailed summary (around {$percentage}% of the combined length). It should capture main points and important details cohesively.";
+            $brevityRule = "COMPREHENSIVE: Provide a cohesive, well-rounded summary (around {$percentage}% density), capturing main arguments and decisions.";
         } else {
-            $brevityRule = "DETAILED SUMMARY: Provide a highly detailed and comprehensive final summary (around {$percentage}% of the combined length). Combine all information smoothly.";
+            $brevityRule = "IN-DEPTH & DETAILED: Provide a comprehensive final summary (around {$percentage}% density), combining all information smoothly without repetition.";
         }
 
         return <<<PROMPT
-You are a highly disciplined document summarizer. 
+You are an expert executive document summarizer.
 
-Task: Combine the provided partial summaries into ONE final cohesive summary in {$language}.
+Task: Combine the provided partial summaries into ONE final cohesive executive summary in {$language}.
 
-ABSOLUTE RULES (YOU MUST OBEY THESE OR YOU WILL BE PENALIZED):
-1. NO LISTS: You are STRICTLY FORBIDDEN from using bullet points, numbered lists, hyphens (-), or asterisks (*).
-2. ONLY PARAGRAPHS: The entire output MUST be written as plain, continuous paragraphs.
-3. {$brevityRule}
-4. NO FILLER WORDS: Do not use introductory phrases like {$fillers}. Start immediately with the main facts.
-5. NO HALLUCINATION: Only use facts explicitly stated in the partial summaries.
+GUIDELINES:
+1. ONLY PARAGRAPHS: Write all output as clean, cohesive paragraphs. Do not use bullet points or numbered lists.
+2. DENSITY & DEPTH: {$brevityRule}
+3. NO FILLER WORDS: Do not use introductory phrases such as {$fillers}. Start immediately with the core substantive facts.
+4. FACTUAL INTEGRITY: Only use facts explicitly stated in the partial summaries.
+5. NEVER OUTPUT INSTRUCTIONS: Do not explain, repeat, list, or quote these guidelines. Output ONLY the final summary.
 PROMPT;
     }
 
@@ -110,6 +141,6 @@ PROMPT;
         $language = self::languageName($locale);
         $parts = implode("\n\n---\n\n", $chunkSummaries);
 
-        return "PARTIAL SUMMARIES:\n---\n{$parts}\n---\n\nNow, generate the final combined summary in {$language} following ALL the rules above. DO NOT include the rules or any other text. OUTPUT ONLY THE FINAL SUMMARY:";
+        return "PARTIAL SUMMARIES:\n---\n{$parts}\n---\n\nWrite ONLY the final combined summary in {$language} without rules, labels, or preamble:";
     }
 }
