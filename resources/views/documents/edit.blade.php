@@ -2869,28 +2869,21 @@
                 openEditorLeaveModal();
             }, true);
 
-            // Intercept refresh keys (F5, Ctrl+R, Cmd+R) across window and document
+            // Allow standard page reload without showing the leave/discard modal
             function handleRefreshKeydown(e) {
-                if (window._allowIntentionalLeave) return;
-
                 const isF5 = (e.key === 'F5' || e.keyCode === 116 || e.code === 'F5');
                 const isCtrlR = (e.ctrlKey || e.metaKey) && (e.key === 'r' || e.key === 'R' || e.keyCode === 82 || e.code === 'KeyR');
 
                 if (isF5 || isCtrlR) {
-                    e.preventDefault();
-                    e.stopPropagation();
-
-                    window._pendingLeaveUrl = 'page_refresh';
-                    window._pendingLeaveForm = null;
-                    openEditorLeaveModal();
+                    // Allow normal browser refresh without intercepting or opening the leave modal
+                    window._allowIntentionalLeave = true;
                 }
             }
 
             window.addEventListener('keydown', handleRefreshKeydown, true);
             document.addEventListener('keydown', handleRefreshKeydown, true);
 
-            // Re-focus main window when moving cursor out of ONLYOFFICE iframe,
-            // and attach listener to iframe if accessible
+            // Re-focus main window when moving cursor out of ONLYOFFICE iframe
             function setupEditorIframeInterception() {
                 const editorContainer = document.getElementById('onlyoffice-editor-container');
                 if (!editorContainer) return;
@@ -2898,22 +2891,6 @@
                 editorContainer.addEventListener('mouseleave', function() {
                     window.focus();
                 });
-
-                function tryBindIframe() {
-                    const iframes = editorContainer.querySelectorAll('iframe');
-                    iframes.forEach(iframe => {
-                        try {
-                            if (iframe.contentWindow && !iframe._hasRefreshInterceptor) {
-                                iframe._hasRefreshInterceptor = true;
-                                iframe.contentWindow.addEventListener('keydown', handleRefreshKeydown, true);
-                            }
-                        } catch (err) {}
-                    });
-                }
-
-                tryBindIframe();
-                const observer = new MutationObserver(tryBindIframe);
-                observer.observe(editorContainer, { childList: true, subtree: true });
             }
 
             if (document.readyState === 'loading') {
@@ -2934,16 +2911,8 @@
                 openEditorLeaveModal();
             });
 
-            // Native browser beforeunload safety net (closing tab / window / browser reload)
+            // Native browser beforeunload: do not pop custom modal on reload/close
             window.addEventListener('beforeunload', function(e) {
-                if (window._allowIntentionalLeave) return;
-
-                window._pendingLeaveUrl = 'page_refresh';
-                window._pendingLeaveForm = null;
-
-                // Open custom modal immediately so it is visible if reload is paused or cancelled
-                openEditorLeaveModal();
-
                 if (typeof window.hideLoadingBlur === 'function') {
                     window.hideLoadingBlur();
                 }
@@ -2955,10 +2924,6 @@
                 }
                 document.documentElement.classList.remove('is-page-loading');
                 sessionStorage.removeItem('dokuflow:page-loading');
-
-                e.preventDefault();
-                e.returnValue = '';
-                return '';
             }, true);
 
             // Dialog backdrop click & escape handling

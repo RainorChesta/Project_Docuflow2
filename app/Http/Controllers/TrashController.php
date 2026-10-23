@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Document;
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -125,11 +126,24 @@ class TrashController extends Controller
             ->get();
 
         $count = 0;
+        $failedCount = 0;
         foreach ($trashedDocuments as $document) {
             if ($user->can('restore', $document)) {
                 $document->restore();
                 $count++;
+            } else {
+                $failedCount++;
             }
+        }
+
+        if ($count === 0 && count($validated['ids']) > 0) {
+            return redirect()->route('trash.index')
+                ->with('error', __('Gagal memulihkan dokumen. Anda tidak memiliki izin untuk memulihkan dokumen yang dipilih.'));
+        }
+
+        if ($failedCount > 0) {
+            return redirect()->route('trash.index')
+                ->with('success', __(':count dokumen terpilih berhasil dipulihkan, namun :failed dokumen dilewati karena keterbatasan izin.', ['count' => $count, 'failed' => $failedCount]));
         }
 
         return redirect()->route('trash.index')
@@ -144,12 +158,17 @@ class TrashController extends Controller
         $user = $request->user();
         $document = $this->getScopedTrashQuery($user)->findOrFail($id);
 
-        $this->authorize('forceDelete', $document);
+        try {
+            $this->authorize('forceDelete', $document);
+        } catch (AuthorizationException $e) {
+            return redirect()->route('trash.index')
+                ->with('error', __('Anda tidak memiliki izin untuk menghapus permanen dokumen ":title".', ['title' => $document->title]));
+        }
 
         $this->permanentlyDeleteDocument($document);
 
         return redirect()->route('trash.index')
-            ->with('success', __('Dokumen \":title\" berhasil dihapus secara permanen.', ['title' => $document->title]));
+            ->with('success', __('Dokumen ":title" berhasil dihapus secara permanen.', ['title' => $document->title]));
     }
 
     /**
@@ -168,11 +187,24 @@ class TrashController extends Controller
             ->get();
 
         $count = 0;
+        $failedCount = 0;
         foreach ($trashedDocuments as $document) {
             if ($user->can('forceDelete', $document)) {
                 $this->permanentlyDeleteDocument($document);
                 $count++;
+            } else {
+                $failedCount++;
             }
+        }
+
+        if ($count === 0 && count($validated['ids']) > 0) {
+            return redirect()->route('trash.index')
+                ->with('error', __('Gagal menghapus dokumen. Anda tidak memiliki izin untuk menghapus permanen dokumen yang dipilih.'));
+        }
+
+        if ($failedCount > 0) {
+            return redirect()->route('trash.index')
+                ->with('success', __(':count dokumen terpilih berhasil dihapus secara permanen, namun :failed dokumen dilewati karena keterbatasan izin.', ['count' => $count, 'failed' => $failedCount]));
         }
 
         return redirect()->route('trash.index')
@@ -195,6 +227,11 @@ class TrashController extends Controller
             }
         }
 
+        if ($count === 0 && $trashedDocuments->isNotEmpty()) {
+            return redirect()->route('trash.index')
+                ->with('error', __('Gagal mengosongkan tempat sampah. Anda tidak memiliki izin untuk menghapus permanen dokumen tersebut.'));
+        }
+
         return redirect()->route('trash.index')
             ->with('success', __(':count dokumen di tempat sampah berhasil dihapus secara permanen.', ['count' => $count]));
     }
@@ -204,9 +241,10 @@ class TrashController extends Controller
      */
     private function permanentlyDeleteDocument(Document $document): void
     {
+        $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
         foreach ($document->versions as $version) {
             if ($version->file_path) {
-                Storage::disk('local')->delete($version->file_path);
+                $disk->delete($version->file_path);
             }
         }
         $document->versions()->delete();

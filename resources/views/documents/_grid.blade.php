@@ -18,8 +18,8 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
             </span>
         @endif
-        @if(auth()->user()->isAdmin())
-            <button type="button" onclick="event.preventDefault(); event.stopPropagation(); document.getElementById('delete-doc-modal-{{ $doc->id }}').showModal()" class="btn btn-ghost btn-xs btn-square text-error" title="{{ __('Hapus') }}">
+        @can('delete', $doc)
+            <button type="button" onclick="event.preventDefault(); event.stopPropagation(); document.getElementById('delete-doc-modal-{{ $doc->id }}').showModal()" class="btn btn-ghost btn-xs btn-square text-error" title="{{ __('Hapus Dokumen') }}">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
             </button>
 
@@ -35,7 +35,7 @@
                                 </div>
                                 <div>
                                     <h3 class="font-bold text-lg text-base-content leading-snug">{{ __('Hapus Dokumen') }}</h3>
-                                    <p class="text-xs text-base-content/60 mt-0.5">{{ __('Tindakan ini tidak bisa dibatalkan.') }}</p>
+                                    <p class="text-xs text-base-content/60 mt-0.5">{{ __('Dokumen akan dipindahkan ke tempat sampah.') }}</p>
                                 </div>
                             </div>
                             <button type="button" onclick="document.getElementById('delete-doc-modal-{{ $doc->id }}').close()" class="btn btn-ghost btn-sm btn-circle text-base-content/50 hover:text-base-content hover:bg-base-200">
@@ -43,10 +43,10 @@
                             </button>
                         </div>
                         <p class="text-sm text-base-content/70 mt-3">
-                            {{ __('Hapus dokumen :title beserta semua versinya?', ['title' => $doc->title]) }}
+                            {{ __('Pindahkan dokumen \":title\" ke tempat sampah?', ['title' => $doc->title]) }}
                         </p>
                     </div>
-                    <form method="POST" action="{{ route('admin.documents.destroy', $doc) }}">
+                    <form method="POST" action="{{ route('documents.destroy', $doc) }}">
                         @csrf @method('DELETE')
                         <div class="bg-base-200/40 px-6 py-4 border-t border-base-200 flex items-center justify-end gap-2.5">
                             <button type="button" onclick="document.getElementById('delete-doc-modal-{{ $doc->id }}').close()" class="btn btn-ghost btn-sm rounded-xl font-medium text-base-content/70 hover:text-base-content px-4">
@@ -65,7 +65,7 @@
                     <button>{{ __('Batal') }}</button>
                 </form>
             </dialog>
-        @endif
+        @endcan
     </div>
 
     {{-- Document icon --}}

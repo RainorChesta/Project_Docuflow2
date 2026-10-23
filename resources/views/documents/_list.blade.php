@@ -59,6 +59,61 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                 </svg>
             </a>
+            @can('delete', $doc)
+                <button
+                    type="button"
+                    onclick="event.preventDefault(); event.stopPropagation(); document.getElementById('delete-doc-modal-list-{{ $doc->id }}').showModal()"
+                    class="inline-flex items-center justify-center w-7 h-7 rounded-full shrink-0 text-error/70 hover:text-error hover:bg-error/10 transition-colors"
+                    title="{{ __('Hapus Dokumen') }}"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </button>
+
+                <dialog id="delete-doc-modal-list-{{ $doc->id }}" onclick="event.stopPropagation();" class="modal modal-bottom sm:modal-middle text-left whitespace-normal backdrop-blur-xs">
+                    <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-sm">
+                        <div class="p-6 pb-4">
+                            <div class="flex items-start justify-between gap-4">
+                                <div class="flex items-center gap-3.5">
+                                    <div class="w-11 h-11 rounded-2xl bg-error/10 text-error flex items-center justify-center shrink-0 ring-4 ring-error/5 shadow-xs">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-bold text-lg text-base-content leading-snug">{{ __('Hapus Dokumen') }}</h3>
+                                        <p class="text-xs text-base-content/60 mt-0.5">{{ __('Dokumen akan dipindahkan ke tempat sampah.') }}</p>
+                                    </div>
+                                </div>
+                                <button type="button" onclick="document.getElementById('delete-doc-modal-list-{{ $doc->id }}').close()" class="btn btn-ghost btn-sm btn-circle text-base-content/50 hover:text-base-content hover:bg-base-200">
+                                    ✕
+                                </button>
+                            </div>
+                            <p class="text-sm text-base-content/70 mt-3">
+                                {{ __('Pindahkan dokumen \":title\" ke tempat sampah?', ['title' => $doc->title]) }}
+                            </p>
+                        </div>
+                        <form method="POST" action="{{ route('documents.destroy', $doc) }}">
+                            @csrf @method('DELETE')
+                            <div class="bg-base-200/40 px-6 py-4 border-t border-base-200 flex items-center justify-end gap-2.5">
+                                <button type="button" onclick="document.getElementById('delete-doc-modal-list-{{ $doc->id }}').close()" class="btn btn-ghost btn-sm rounded-xl font-medium text-base-content/70 hover:text-base-content px-4">
+                                    {{ __('Batal') }}
+                                </button>
+                                <button type="submit" class="btn btn-error btn-sm text-white font-semibold rounded-xl px-5 shadow-xs hover:shadow-md hover:shadow-error/20 transition-all flex items-center gap-1.5">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    {{ __('Hapus') }}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    <form method="dialog" class="modal-backdrop">
+                        <button>{{ __('Batal') }}</button>
+                    </form>
+                </dialog>
+            @endcan
         </div>
         <div class="text-sm text-base-content/60 flex items-center gap-1.5 flex-wrap justify-end">
             @if($doc->isExpired() || $doc->is_expired)

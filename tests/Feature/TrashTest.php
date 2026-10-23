@@ -303,11 +303,11 @@ class TrashTest extends TestCase
         $this->assertDatabaseMissing('documents', ['id' => $doc->id]);
     }
 
-    public function test_staff_cannot_force_delete_approved_document(): void
+    public function test_staff_cannot_soft_delete_active_document(): void
     {
         $user = User::factory()->create(['system_role' => 'user']);
         $doc = $this->createDocument([
-            'title' => 'Approved Document Deleted by Admin',
+            'title' => 'Active Document',
             'owner_id' => $user->id,
         ]);
         \App\Models\DocumentVersion::create([
@@ -318,12 +318,60 @@ class TrashTest extends TestCase
             'author_name' => $user->name,
             'content' => '<p>Official approved content</p>',
         ]);
-        $doc->delete();
 
-        $response = $this->actingAs($user)->delete(route('trash.force-delete', $doc->id));
+        $response = $this->actingAs($user)->delete(route('documents.destroy', $doc->id));
         $response->assertForbidden();
 
-        $this->assertDatabaseHas('documents', ['id' => $doc->id]);
+        $this->assertNull($doc->fresh()->deleted_at);
+    }
+
+    public function test_admin_can_soft_delete_active_document(): void
+    {
+        $admin = User::factory()->create(['system_role' => 'admin']);
+        $owner = User::factory()->create(['system_role' => 'user']);
+        $doc = $this->createDocument([
+            'title' => 'Active Document By Owner',
+            'owner_id' => $owner->id,
+        ]);
+        \App\Models\DocumentVersion::create([
+            'document_id' => $doc->id,
+            'version_number' => '1.0',
+            'status' => 'active',
+            'author_id' => $owner->id,
+            'author_name' => $owner->name,
+            'content' => '<p>Official approved content</p>',
+        ]);
+
+        $response = $this->actingAs($admin)->delete(route('documents.destroy', $doc->id));
+        $response->assertRedirect();
+
+        $this->assertNotNull($doc->fresh()->deleted_at);
+        // Document owner_id tetap milik owner, sehingga muncul di sampah owner
+        $this->assertEquals($owner->id, $doc->fresh()->owner_id);
+    }
+
+    public function test_owner_can_force_delete_approved_document_from_trash(): void
+    {
+        $user = User::factory()->create(['system_role' => 'user']);
+        $doc = $this->createDocument([
+            'title' => 'Approved Document In Trash',
+            'owner_id' => $user->id,
+        ]);
+        \App\Models\DocumentVersion::create([
+            'document_id' => $doc->id,
+            'version_number' => '1.0',
+            'status' => 'active',
+            'author_id' => $user->id,
+            'author_name' => $user->name,
+            'content' => '<p>Official approved content</p>',
+        ]);
+        $doc->delete(); // Simulate admin already soft-deleted it
+
+        $response = $this->actingAs($user)->delete(route('trash.force-delete', $doc->id));
+        $response->assertRedirect(route('trash.index'));
+        $response->assertSessionHas('success');
+
+        $this->assertDatabaseMissing('documents', ['id' => $doc->id]);
     }
 
     public function test_trash_sidebar_navigation_link_is_rendered(): void
@@ -371,6 +419,111 @@ class TrashTest extends TestCase
         // Confirmation modals for bulk actions should be rendered
         $response->assertSee('confirm-bulk-restore');
         $response->assertSee('confirm-bulk-force-delete');
+    }
+
+    public function test_unit_kerja_head_can_force_delete_unit_kerja_trashed_document(): void
+    {
+        $unitKerja = UnitKerja::create(['nama_unit_kerja' => 'Mutu', 'kode_unit_kerja' => '08']);
+        $head = User::factory()->create([
+            'system_role' => 'head',
+            'unit_kerja_id' => $unitKerja->id,
+        ]);
+        $staff = User::factory()->create([
+            'system_role' => 'user',
+            'unit_kerja_id' => $unitKerja->id,
+        ]);
+
+        $doc = $this->createDocument([
+            'title' => 'Mutu Trashed Doc',
+            'owner_id' => $staff->id,
+            'unit_kerja_id' => $unitKerja->id,
+            'visibility' => Document::VISIBILITY_UNIT_KERJA,
+        ]);
+        $doc->delete();
+
+        $response = $this->actingAs($head)->delete(route('trash.force-delete', $doc->id));
+        $response->assertRedirect(route('trash.index'));
+        $response->assertSessionHas('success');
+
+        $this->assertDatabaseMissing('documents', ['id' => $doc->id]);
+    }
+
+    public function test_unit_kerja_head_can_bulk_force_delete_trashed_documents(): void
+    {
+        $unitKerja = UnitKerja::create(['nama_unit_kerja' => 'Mutu', 'kode_unit_kerja' => '09']);
+        $head = User::factory()->create([
+            'system_role' => 'head',
+            'unit_kerja_id' => $unitKerja->id,
+        ]);
+
+        $doc1 = $this->createDocument([
+            'title' => 'Doc Head 1',
+            'owner_id' => $head->id,
+            'unit_kerja_id' => $unitKerja->id,
+            'visibility' => Document::VISIBILITY_UNIT_KERJA,
+        ]);
+        $doc1->delete();
+
+        $doc2 = $this->createDocument([
+            'title' => 'Doc Head 2',
+            'owner_id' => $head->id,
+            'unit_kerja_id' => $unitKerja->id,
+            'visibility' => Document::VISIBILITY_UNIT_KERJA,
+        ]);
+        $doc2->delete();
+
+        $response = $this->actingAs($head)->delete(route('trash.bulk-force-delete'), [
+            'ids' => [$doc1->id, $doc2->id],
+        ]);
+
+        $response->assertRedirect(route('trash.index'));
+        $response->assertSessionHas('success');
+
+        $this->assertDatabaseMissing('documents', ['id' => $doc1->id]);
+        $this->assertDatabaseMissing('documents', ['id' => $doc2->id]);
+    }
+
+    public function test_owner_can_soft_delete_own_document_to_trash(): void
+    {
+        $user = User::factory()->create(['system_role' => 'user']);
+        $doc = $this->createDocument([
+            'title' => 'Soft Delete Me',
+            'owner_id' => $user->id,
+        ]);
+
+        $response = $this->actingAs($user)->delete(route('documents.destroy', $doc));
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        $this->assertSoftDeleted('documents', ['id' => $doc->id]);
+    }
+
+    public function test_bulk_force_delete_with_no_permission_returns_error_feedback(): void
+    {
+        $user1 = User::factory()->create(['system_role' => 'user']);
+        $user2 = User::factory()->create(['system_role' => 'user']);
+
+        $doc = $this->createDocument([
+            'title' => 'Other User Approved Doc',
+            'owner_id' => $user2->id,
+        ]);
+        \App\Models\DocumentVersion::create([
+            'document_id' => $doc->id,
+            'version_number' => '1.0',
+            'status' => 'active',
+            'author_id' => $user2->id,
+            'author_name' => $user2->name,
+            'content' => '<p>Active</p>',
+        ]);
+        $doc->delete();
+
+        $response = $this->actingAs($user1)->delete(route('trash.bulk-force-delete'), [
+            'ids' => [$doc->id],
+        ]);
+
+        $response->assertRedirect(route('trash.index'));
+        $response->assertSessionHas('error');
+        $this->assertDatabaseHas('documents', ['id' => $doc->id]);
     }
 }
 

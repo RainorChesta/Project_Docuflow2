@@ -297,11 +297,22 @@ class DocumentPolicy
     public function delete(User $user, Document $document): bool
     {
         if (!$this->view($user, $document)) return false;
+
+        // Dokumen dengan versi active hanya bisa dihapus (soft delete) oleh admin.
+        $hasActiveVersion = $document->versions()->where('status', 'active')->exists();
+        if ($hasActiveVersion) {
+            return $user->isAdmin();
+        }
+
         if ($user->isAdmin() || $user->isDirector()) return true;
 
-        // Owner boleh hapus dokumen selama belum punya versi approved (active).
-        return $user->id === $document->owner_id
-            && !$document->versions()->where('status', 'active')->exists();
+        if ($user->isHead()) {
+            if ($document->owner_id === $user->id) return true;
+            return $document->isUnitKerja() && in_array($document->unit_kerja_id, $user->allUnitKerjaIds(), true);
+        }
+
+        // Owner boleh menghapus dokumen miliknya ke tempat sampah (trash)
+        return $user->id === $document->owner_id;
     }
 
     public function restore(User $user, Document $document): bool
@@ -342,8 +353,14 @@ class DocumentPolicy
             return false;
         }
 
-        // Owner boleh hapus permanen dokumen selama belum pernah punya versi approved (active).
-        return $user->id === $document->owner_id
-            && !$document->versions()->where('status', 'active')->exists();
+        if ($user->isHead()) {
+            if ($document->owner_id === $user->id) return true;
+            return $document->isUnitKerja() && in_array($document->unit_kerja_id, $user->allUnitKerjaIds(), true);
+        }
+
+        // Owner boleh hapus permanen dokumen miliknya sendiri dari sampah.
+        // (Dokumen active yang sudah dihapus oleh admin akan masuk ke sampah owner,
+        // dan owner bisa menghapus permanennya.)
+        return $user->id === $document->owner_id;
     }
 }

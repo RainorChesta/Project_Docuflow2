@@ -364,6 +364,7 @@
                                 </label>
                                 <input type="text" value="{{ $activeBranch ? $activeBranch->company?->name . ' — ' . $activeBranch->name . ' (' . $activeBranch->effective_code . ')' : '—' }}" class="input input-bordered w-full bg-base-200" disabled>
                                 <input type="hidden" name="branch_id" id="branch_id" value="{{ $activeBranch?->id }}">
+                                <input type="hidden" name="company_id" id="company_id" value="{{ $activeBranch?->company_id ?? ($activeCompanyId ?? '') }}">
                                 <p class="text-xs text-base-content/50 mt-1">{{ __('Sesuai cabang aktif yang dipilih di switcher atas.') }}</p>
                                 @error('branch_id') <p class="text-sm text-error mt-1">{{ $message }}</p> @enderror
                             </div>

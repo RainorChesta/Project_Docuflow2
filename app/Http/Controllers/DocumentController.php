@@ -162,7 +162,46 @@ class DocumentController extends Controller
         $breadcrumbs = [];
 
         if (!$user->isAdmin()) {
-            if ($type !== 'general' && $type !== 'shared') {
+            if ($type === 'mine') {
+                if ($activeBranchId && !$user->isDirector()) {
+                    $query->where(function ($q) use ($activeBranchId, $activeCompanyId) {
+                        $q->where('branch_id', $activeBranchId)
+                          ->orWhereNull('branch_id');
+                        if ($activeCompanyId) {
+                            $q->orWhere('company_id', $activeCompanyId);
+                        }
+                    });
+                } elseif ($activeCompanyId && !$user->isDirector()) {
+                    $query->where(function ($q) use ($activeCompanyId) {
+                        $q->where('company_id', $activeCompanyId)
+                          ->orWhereHas('branch', fn($b) => $b->where('company_id', $activeCompanyId))
+                          ->orWhere(function ($sub) {
+                              $sub->whereNull('company_id')
+                                  ->whereNull('branch_id');
+                          });
+                    });
+                } elseif (!empty($userBranchIds)) {
+                    $query->where(function ($q) use ($userBranchIds, $userCompanyIds) {
+                        $q->whereIn('branch_id', $userBranchIds)
+                          ->orWhere(function ($sub) use ($userCompanyIds) {
+                              $sub->whereNull('branch_id')
+                                  ->whereIn('company_id', $userCompanyIds);
+                          })
+                          ->orWhere(function ($sub) {
+                              $sub->whereNull('company_id')
+                                  ->whereNull('branch_id');
+                          });
+                    });
+                } elseif (!empty($userCompanyIds)) {
+                    $query->where(function ($q) use ($userCompanyIds) {
+                        $q->whereIn('company_id', $userCompanyIds)
+                          ->orWhere(function ($sub) {
+                              $sub->whereNull('company_id')
+                                  ->whereNull('branch_id');
+                          });
+                    });
+                }
+            } elseif ($type !== 'general' && $type !== 'shared') {
                 if ($activeBranchId && !$user->isDirector()) {
                     $query->where('branch_id', $activeBranchId);
                 } elseif ($activeCompanyId && !$user->isDirector()) {
@@ -403,8 +442,14 @@ class DocumentController extends Controller
             }
         }
 
+        $activeCompanyId = $contextService->getActiveCompanyId($user);
+        if (!$activeBranch && $activeCompanyId) {
+            $activeBranch = Branch::where('company_id', $activeCompanyId)->where('is_pusat', true)->first()
+                ?? Branch::where('company_id', $activeCompanyId)->first();
+        }
+
         return view('documents.create', compact(
-            'unitKerjas', 'documentTypes', 'activeBranch', 'availableBranches', 'companies', 'selectedTemplate', 'initialDocumentNumber', 'activeUnitKerja', 'activeUnitKerjaId', 'userUnitKerjaId'
+            'unitKerjas', 'documentTypes', 'activeBranch', 'availableBranches', 'companies', 'selectedTemplate', 'initialDocumentNumber', 'activeUnitKerja', 'activeUnitKerjaId', 'userUnitKerjaId', 'activeCompanyId'
         ));
     }
 
@@ -422,6 +467,12 @@ class DocumentController extends Controller
         $user = auth()->user();
         $contextService = app(CompanyContextService::class);
         $branchId = $validated['branch_id'] ?? $contextService->getActiveBranchId($user);
+        $activeCompanyId = $contextService->getActiveCompanyId($user);
+        if (!$branchId && $activeCompanyId) {
+            $defaultBranch = Branch::where('company_id', $activeCompanyId)->where('is_pusat', true)->first()
+                ?? Branch::where('company_id', $activeCompanyId)->first();
+            $branchId = $defaultBranch?->id;
+        }
         $branch = $branchId ? Branch::with('company')->find($branchId) : null;
 
         $unitKerjaId = $validated['unit_kerja_id'] ?? $contextService->getActiveUnitKerjaId($user) ?? $user->unit_kerja_id;
@@ -502,12 +553,22 @@ class DocumentController extends Controller
         $templateId = $request->input('template_id');
 
         $contextService = app(CompanyContextService::class);
+        $activeCompanyId = $contextService->getActiveCompanyId($user);
         $branchIds = (array) $request->input('branch_ids', []);
         $branchId = $request->input('branch_id')
             ?? (!empty($branchIds) ? $branchIds[0] : null)
             ?? $contextService->getActiveBranchId($user);
 
+        $companyId = $request->input('company_id') ?? $activeCompanyId;
+
+        if (empty($branchId) && $companyId) {
+            $defaultBranch = Branch::where('company_id', $companyId)->where('is_pusat', true)->first()
+                ?? Branch::where('company_id', $companyId)->first();
+            $branchId = $defaultBranch?->id;
+        }
+
         $targetBranch = $branchId ? Branch::find($branchId) : null;
+        $companyId = $targetBranch?->company_id ?? $companyId ?? $user->allCompanyIds()[0] ?? null;
         $documentType = DocumentType::findOrFail($request->input('document_type_id'));
 
         $rules = [
@@ -552,7 +613,9 @@ class DocumentController extends Controller
 
         if ($branchId) {
             $validated['branch_id'] = $branchId;
-            $validated['company_id'] = $targetBranch?->company_id;
+        }
+        if ($companyId) {
+            $validated['company_id'] = $companyId;
         }
 
         if (($user->isAdmin() || $user->isDirector()) && empty($validated['branch_id'])) {
@@ -1388,13 +1451,35 @@ class DocumentController extends Controller
         ]);
     }
 
-    public function destroy(Document $document): RedirectResponse
+    public function destroy(Request $request, Document $document): RedirectResponse|JsonResponse
     {
         $this->authorize('delete', $document);
 
+        Cache::put('ignore_onlyoffice_save_' . $document->id, true, now()->addSeconds(30));
+
+        $title = $document->title;
         $document->delete();
 
-        return redirect()->route('documents.index')->with('success', __('Dokumen telah dipindahkan ke trash.'));
+        $this->auditService->log(auth()->user(), 'document.trashed', 'document', $document->id, [
+            'document_id' => $document->id,
+            'title' => $title,
+        ]);
+
+        $message = __('Dokumen \":title\" berhasil dipindahkan ke tempat sampah.', ['title' => $title]);
+
+        if ($request->expectsJson() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+            ]);
+        }
+
+        $referer = $request->header('referer');
+        if ($referer && !str_contains($referer, '/documents/' . $document->id)) {
+            return redirect()->back()->with('success', $message);
+        }
+
+        return redirect()->route('documents.index', ['type' => 'mine'])->with('success', $message);
     }
 
     public function uploadVersion(Request $request, Document $document): RedirectResponse

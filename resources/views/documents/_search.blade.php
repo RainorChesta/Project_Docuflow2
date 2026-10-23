@@ -33,6 +33,14 @@
     </select>
     @endif
     
+    <select name="status" class="select select-bordered select-sm w-full sm:w-auto" onchange="this.form.submit()">
+        <option value="">{{ __('Semua Status') }}</option>
+        <option value="draft" {{ request('status') == 'draft' ? 'selected' : '' }}>{{ __('Draf') }}</option>
+        <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>{{ __('Pending') }}</option>
+        <option value="active" {{ request('status') == 'active' ? 'selected' : '' }}>{{ __('Aktif') }}</option>
+        <option value="expired" {{ request('status') == 'expired' ? 'selected' : '' }}>{{ __('Kedaluwarsa') }}</option>
+    </select>
+    
     <select name="format_choice" class="select select-bordered select-sm w-full sm:w-auto" onchange="this.form.submit()">
         <option value="">{{ __('Semua Format') }}</option>
         <option value="baru" {{ request('format_choice') == 'baru' ? 'selected' : '' }}>{{ __('Format Baru') }}</option>
