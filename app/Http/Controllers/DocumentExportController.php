@@ -62,14 +62,14 @@ class DocumentExportController extends Controller
                     : $paperSize,
             ]);
 
-            $previewUrl = route('documents.export-preview', [
+            $previewUrl = route('documents.export-preview', array_filter([
                 'document' => $document->id,
                 'paper_size' => $paperSize,
                 'with_kop' => $withKop ? 1 : 0,
                 'custom_width' => $request->input('custom_width'),
                 'custom_height' => $request->input('custom_height'),
-                'custom_unit' => $request->input('custom_unit'),
-            ]);
+                'custom_unit' => $paperSize === 'Custom' ? $request->input('custom_unit') : null,
+            ], fn ($v) => !is_null($v) && $v !== ''), false);
 
             if ($request->wantsJson() || $request->ajax()) {
                 return response()->json([
@@ -131,9 +131,15 @@ class DocumentExportController extends Controller
 
             abort_unless(file_exists($fullPath), 404, 'PDF file not found');
 
-            return response()->file($fullPath, [
+            $pdfContent = file_get_contents($fullPath);
+            $disposition = $request->boolean('inline') ? 'inline' : 'attachment';
+
+            return response($pdfContent, 200, [
                 'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'inline; filename="' . $result['filename'] . '"',
+                'Content-Length' => strlen($pdfContent),
+                'Content-Disposition' => $disposition . '; filename="' . $result['filename'] . '"',
+                'Accept-Ranges' => 'none',
+                'Cache-Control' => 'private, no-transform, no-store, must-revalidate',
             ]);
         } catch (\Throwable $e) {
             report($e);

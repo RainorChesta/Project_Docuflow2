@@ -66,6 +66,8 @@ class ApprovalRoutingService
             if ($version->version_number > 1 || $hasPreviousApproved) {
                 app(DocumentProcessorService::class)->revertSignaturesToPlaceholders($document, $version);
                 app(OnlyOfficeService::class)->rotateDocumentKey($document, $version);
+            } elseif ($version->file_path && (str_ends_with(strtolower($version->file_path), '.pdf') || ($version->file_mime && str_contains(strtolower($version->file_mime), 'pdf')))) {
+                app(PdfSignatureProcessorService::class)->syncPdfSignatureRequests($document, $version);
             }
 
             // Fetch signature requests attached to this document
@@ -677,6 +679,7 @@ class ApprovalRoutingService
                 ]);
 
                 if ($document && $version) {
+                    app(DocumentProcessorService::class)->removeSignaturePlaceholder($document, $version, $sigReq->id);
                     app(OnlyOfficeService::class)->rotateDocumentKey($document, $version);
                 }
 

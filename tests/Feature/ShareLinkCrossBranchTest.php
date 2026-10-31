@@ -88,6 +88,21 @@ class ShareLinkCrossBranchTest extends TestCase
         $response->assertSee('Dokumen Share Link Alfa');
     }
 
+    public function test_unauthenticated_guest_can_open_anyone_with_link_document_and_restricted_redirects_to_login(): void
+    {
+        $doc = $this->createDocInCompanyA('Dokumen Publik Tanpa Login');
+        $token = $this->shareService->regenerateShareToken($doc);
+
+        // When restricted, guest is redirected to login
+        $this->get(route('documents.shared', $token))->assertRedirect(route('login'));
+
+        // When anyone_with_link, guest can view without logging in
+        $this->shareService->updateGeneralAccess($doc, 'anyone_with_link', 'viewer');
+        $guestResp = $this->get(route('documents.shared', $token));
+        $guestResp->assertOk();
+        $guestResp->assertSee('Dokumen Publik Tanpa Login');
+    }
+
     public function test_user_from_different_company_with_editor_sharelink_can_edit_document(): void
     {
         $doc = $this->createDocInCompanyA('Dokumen Edit Alfa');

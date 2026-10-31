@@ -108,7 +108,7 @@ class PdfExportService
             throw new BusinessLogicException('No content available to export.');
         }
 
-        // Handle file-based (ONLYOFFICE / DOCX) documents
+        // Handle file-based (ONLYOFFICE / DOCX / PDF) documents
         if (!empty($display->file_path)) {
             $disk = \Illuminate\Support\Facades\Storage::disk(config('onlyoffice.storage_disk', 'local'));
             if ($disk->exists($display->file_path)) {
@@ -128,6 +128,22 @@ class PdfExportService
                             'path' => $path,
                         ];
                     }
+                } elseif ($ext === 'pdf' || ($display->file_mime && str_contains(strtolower($display->file_mime), 'pdf'))) {
+                    $pdfBytes = $fileBytes;
+                    if ($paperSizeOverride && strtolower($paperSizeOverride) === 'f4') {
+                        $pdfBytes = app(OnlyOfficeService::class)->convertPdfToF4($pdfBytes);
+                    } elseif ($paperSizeOverride && strtolower($paperSizeOverride) === 'a4') {
+                        $pdfBytes = app(OnlyOfficeService::class)->convertPdfToA4($pdfBytes);
+                    }
+
+                    $filename = $this->filename($document);
+                    $path = 'exports/' . $filename;
+                    \Illuminate\Support\Facades\Storage::disk('local')->put($path, $pdfBytes);
+
+                    return [
+                        'filename' => $filename,
+                        'path' => $path,
+                    ];
                 }
             }
         }

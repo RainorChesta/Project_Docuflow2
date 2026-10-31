@@ -264,9 +264,31 @@ class DocumentShareController extends Controller
     {
         $document = Document::where('share_token', $token)->firstOrFail();
 
-        $this->authorize('view', $document);
-
         $currentUser = auth()->user();
+
+        if (!$currentUser) {
+            if ($document->general_access !== DocumentShareService::GENERAL_ACCESS_ANYONE_WITH_LINK) {
+                return redirect()->guest(route('login'));
+            }
+
+            $document->load('owner', 'unitKerja', 'documentType', 'currentVersion', 'versions.author');
+            $version = $document->displayVersion();
+            $onlyOfficeConfig = null;
+            $ext = strtolower(pathinfo($version?->file_path ?? '', PATHINFO_EXTENSION));
+            if ($version && $version->file_path && in_array($ext, ['doc', 'docx'], true)) {
+                $mode = ($document->link_role === 'editor') ? 'edit' : 'view';
+                $onlyOfficeConfig = $onlyOfficeService->generateEditorConfig(
+                    $document,
+                    $version,
+                    null,
+                    $mode
+                );
+            }
+
+            return view('documents.shared_public', compact('document', 'version', 'onlyOfficeConfig', 'token'));
+        }
+
+        $this->authorize('view', $document);
 
         if ($currentUser) {
             $currentUser->unreadNotifications()
@@ -290,7 +312,8 @@ class DocumentShareController extends Controller
 
         $version = $document->displayVersion();
         $onlyOfficeConfig = null;
-        if ($version) {
+        $ext = strtolower(pathinfo($version?->file_path ?? '', PATHINFO_EXTENSION));
+        if ($version && $version->file_path && in_array($ext, ['doc', 'docx'], true)) {
             $onlyOfficeConfig = $onlyOfficeService->generateEditorConfig(
                 $document,
                 $version,
@@ -329,5 +352,135 @@ class DocumentShareController extends Controller
             ->toArray();
 
         return view('documents.show', compact('document', 'unitKerjas', 'onlyOfficeConfig', 'version', 'approvedSignatures', 'companies'));
+    }
+
+    /**
+     * Serve raw document file via public share token (for fallback iframe/mammoth preview).
+     */
+    public function fileByToken(string $token)
+    {
+        $document = Document::where('share_token', $token)->firstOrFail();
+
+        if (!auth()->check() && $document->general_access !== DocumentShareService::GENERAL_ACCESS_ANYONE_WITH_LINK) {
+            abort(403);
+        }
+        if (auth()->check()) {
+            $this->authorize('view', $document);
+        }
+
+        $version = $document->displayVersion();
+        abort_unless($version && $version->file_path, 404);
+
+        $disk = \Illuminate\Support\Facades\Storage::disk(config('onlyoffice.storage_disk', 'local'));
+        abort_unless($disk->exists($version->file_path), 404);
+
+        $ext = strtolower(pathinfo($version->file_path, PATHINFO_EXTENSION) ?: 'docx');
+        $effectiveName = ($document->title ?: 'document') . '.' . $ext;
+        $bytes = $disk->get($version->file_path);
+
+        return response($bytes, 200, [
+            'Content-Type' => $ext === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'Content-Length' => strlen($bytes),
+            'Content-Disposition' => 'inline; filename="' . $effectiveName . '"',
+            'Accept-Ranges' => 'none',
+        ]);
+    }
+
+    /**
+     * Download DOCX/PDF file via public share token.
+     */
+    public function downloadByToken(Request $request, string $token)
+    {
+        $document = Document::where('share_token', $token)->firstOrFail();
+
+        if (!auth()->check() && $document->general_access !== DocumentShareService::GENERAL_ACCESS_ANYONE_WITH_LINK) {
+            return redirect()->guest(route('login'));
+        }
+        if (auth()->check()) {
+            $this->authorize('view', $document);
+        }
+
+        $version = $document->displayVersion();
+        abort_unless($version && $version->file_path, 404, 'File not found');
+
+        $disk = \Illuminate\Support\Facades\Storage::disk(config('onlyoffice.storage_disk', 'local'));
+        abort_unless($disk->exists($version->file_path), 404, 'Physical file not found');
+
+        $withKop = $request->boolean('with_kop', true);
+        $fileBytes = $disk->get($version->file_path);
+
+        $downloadName = $version->file_original_name ?? $document->title;
+        $ext = strtolower(pathinfo($downloadName, PATHINFO_EXTENSION) ?: (pathinfo($version->file_path, PATHINFO_EXTENSION) ?: 'docx'));
+        $baseName = pathinfo($downloadName, PATHINFO_FILENAME);
+
+        if (!$withKop && $ext === 'docx') {
+            $onlyOfficeService = app(\App\Services\OnlyOfficeService::class);
+            $fileBytes = $onlyOfficeService->removeHeaderAndFooterFromDocx($fileBytes);
+            $downloadName = $baseName . ' (Tanpa Kop).' . $ext;
+        } else {
+            if (!str_ends_with(strtolower($downloadName), '.docx') && !str_ends_with(strtolower($downloadName), '.pdf')) {
+                $downloadName .= '.' . $ext;
+            }
+        }
+
+        return response($fileBytes, 200, [
+            'Content-Type' => $ext === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'Content-Length' => strlen($fileBytes),
+            'Content-Disposition' => 'attachment; filename="' . $downloadName . '"',
+            'Accept-Ranges' => 'none',
+        ]);
+    }
+
+    /**
+     * Export & download PDF via public share token.
+     */
+    public function exportPdfByToken(Request $request, string $token, \App\Services\PdfExportService $pdfService)
+    {
+        $document = Document::where('share_token', $token)->firstOrFail();
+
+        if (!auth()->check() && $document->general_access !== DocumentShareService::GENERAL_ACCESS_ANYONE_WITH_LINK) {
+            return redirect()->guest(route('login'));
+        }
+        if (auth()->check()) {
+            $this->authorize('view', $document);
+        }
+
+        $validated = $request->validate([
+            'paper_size' => 'nullable|string|in:F4,A4,A5,A3,Letter,Legal,Custom',
+            'custom_width' => 'nullable|numeric|gt:0|required_if:paper_size,Custom',
+            'custom_height' => 'nullable|numeric|gt:0|required_if:paper_size,Custom',
+            'custom_unit' => 'nullable|string|in:cm,mm',
+            'with_kop' => 'nullable|boolean',
+        ]);
+
+        $paperSize = $validated['paper_size'] ?? $document->paper_size ?? 'A4';
+        $withKop = $request->boolean('with_kop', true);
+        $customDimensions = null;
+        if ($paperSize === 'Custom') {
+            $customDimensions = [
+                'width' => (float) $validated['custom_width'],
+                'height' => (float) $validated['custom_height'],
+                'unit' => $validated['custom_unit'] ?? 'cm',
+            ];
+        }
+
+        $result = $pdfService->export($document, auth()->user(), $paperSize, $customDimensions, $withKop);
+
+        $fullPath = storage_path('app/private/' . $result['path']);
+        if (!file_exists($fullPath)) {
+            $fullPath = storage_path('app/' . $result['path']);
+        }
+
+        abort_unless(file_exists($fullPath), 404, 'PDF file not found');
+
+        $pdfContent = file_get_contents($fullPath);
+
+        return response($pdfContent, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Length' => strlen($pdfContent),
+            'Content-Disposition' => 'attachment; filename="' . $result['filename'] . '"',
+            'Accept-Ranges' => 'none',
+            'Cache-Control' => 'private, no-transform, no-store, must-revalidate',
+        ]);
     }
 }

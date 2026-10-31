@@ -5,7 +5,9 @@
     "scripts": {
         "build": "vite build",
         "dev": "vite",
-        "dev:all": "concurrently -k -p \"[{name}]\" -n \"PHP,VITE\" -c \"blue.bold,magenta.bold\" \"php artisan serve --host=0.0.0.0 --port=8000\" \"vite\""
+        "dev:all": "docker compose up -d && concurrently -k -p \"[{name}]\" -n \"PHP,VITE,QUEUE,REVERB\" -c \"blue.bold,magenta.bold,yellow.bold,green.bold\" \"PHP_CLI_SERVER_WORKERS=4 php artisan serve --host=0.0.0.0 --port=8000\" \"vite\" \"php artisan queue:listen --tries=1 --timeout=0\" \"php artisan reverb:start --port=8085\"",
+        "onlyoffice:start": "docker compose up -d && docker exec dokuflow-onlyoffice sed -i 's/\"allowPrivateIPAddress\": false/\"allowPrivateIPAddress\": true/g' /etc/onlyoffice/documentserver/default.json && docker exec dokuflow-onlyoffice supervisorctl restart all",
+        "onlyoffice:stop": "docker compose down"
     },
     "devDependencies": {
         "@tailwindcss/typography": "^0.5.20",

@@ -51,24 +51,7 @@ class DocumentProcessorService
             }
 
             if ($isPdf) {
-                $pageNumber = $signatureRequest?->page_number ?? 1;
-                $posX = $signatureRequest?->pos_x;
-                $posY = $signatureRequest?->pos_y;
-                $width = $signatureRequest?->width ?? 24.0;
-                $height = $signatureRequest?->height ?? 24.0;
-                $preset = $signatureRequest?->preset_position ?? PdfSignatureProcessorService::PRESET_BOTTOM_RIGHT;
-
-                return $this->pdfProcessor->processPdfSignature(
-                    $document,
-                    $version,
-                    $signaturePath,
-                    $pageNumber,
-                    $posX,
-                    $posY,
-                    $width,
-                    $height,
-                    $preset
-                );
+                return $this->pdfProcessor->syncPdfSignatureRequests($document, $version);
             }
 
             // Handle DOCX via PHPWord TemplateProcessor
@@ -150,11 +133,7 @@ class DocumentProcessorService
             }
 
             if ($isPdf) {
-                // PDFs are not stamped with placeholders during request creation, so we only rotate keys
-                $version->touch();
-                $document->touch();
-                $this->onlyOfficeService?->rotateDocumentKey($document, $version);
-                return true;
+                return $this->pdfProcessor->syncPdfSignatureRequests($document, $version);
             }
 
             // Handle DOCX removal
@@ -219,7 +198,7 @@ class DocumentProcessorService
 
             // Determine if the file is PDF or DOCX
             if (str_ends_with(strtolower($filePath), '.pdf') || ($version->file_mime && str_contains(strtolower($version->file_mime), 'pdf'))) {
-                return true;
+                return $this->pdfProcessor->syncPdfSignatureRequests($document, $version);
             }
 
             // 2. Handle DOCX

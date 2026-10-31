@@ -218,7 +218,10 @@ Route::match(['get', 'post'], '/onlyoffice/templates/{template}/callback', [\App
 Route::get('/onlyoffice/corporate-soft-files/{corporateSoftFile}/file', [\App\Http\Controllers\OnlyOfficeController::class, 'corporateSoftFile'])->name('onlyoffice.corporate-soft-files.file');
 
 // Share-token link access (Google Docs model)
-Route::get('/shared/{token}', [DocumentShareController::class, 'accessByToken'])->name('documents.shared')->middleware(['auth', 'account.verified', 'signature.required']);
+Route::get('/shared/{token}', [DocumentShareController::class, 'accessByToken'])->name('documents.shared');
+Route::get('/shared/{token}/download', [DocumentShareController::class, 'downloadByToken'])->name('documents.shared.download');
+Route::post('/shared/{token}/export-pdf', [DocumentShareController::class, 'exportPdfByToken'])->name('documents.shared.export-pdf');
+Route::get('/shared/{token}/file', [DocumentShareController::class, 'fileByToken'])->name('documents.shared.file');
 
 require __DIR__.'/auth.php';
 

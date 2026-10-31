@@ -1,181 +1,179 @@
 @php
-    $isPdf = str_contains($version->file_mime ?? '', 'pdf');
-    $fileUrl = route('documents.file', [$document, $version]) . '?t=' . ($version->updated_at?->timestamp ?? time());
+    $isPdf = str_contains(strtolower($version->file_mime ?? ''), 'pdf') || str_ends_with(strtolower($version->file_path ?? ''), '.pdf');
+    $fileUrl = $customFileUrl ?? (route('documents.file', [$document, $version]) . '?t=' . ($version->updated_at?->timestamp ?? time()));
 @endphp
 
 <div class="w-full">
     @if($isPdf)
         <iframe src="{{ $fileUrl }}" class="w-full border-0 h-[80vh] sm:h-[88vh] lg:h-[92vh] min-h-[620px] sm:min-h-[750px] lg:min-h-[820px] block rounded-2xl shadow-xs" title="{{ __('Pratinjau dokumen') }}"></iframe>
+    @elseif(isset($onlyOfficeConfig))
+        <div class="w-full bg-base-100 h-[80vh] sm:h-[88vh] lg:h-[92vh] min-h-[620px] sm:min-h-[750px] lg:min-h-[820px] rounded-2xl overflow-hidden border border-base-300/80 shadow-xs">
+            <div id="docx-preview-{{ $version->id }}" class="w-full h-full"></div>
+        </div>
+
+        <script src="{{ rtrim(config('onlyoffice.url'), '/') }}/web-apps/apps/api/documents/api.js?v=9.4.0-cmh-v2"></script>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                if (typeof DocsAPI === 'undefined') {
+                    document.getElementById('docx-preview-{{ $version->id }}').innerHTML =
+                        '<p class="text-error text-sm p-4">' + @json(__('Gagal memuat editor ONLYOFFICE.')) + '</p>';
+                    return;
+                }
+                try {
+                    const config = @json($onlyOfficeConfig);
+                    const isMobileOrTablet = window.innerWidth < 1024;
+
+                    // Always use desktop type to bypass ONLYOFFICE Community Edition mobile license restriction
+                    config.type = 'desktop';
+                    config.editorConfig = config.editorConfig || {};
+                    config.editorConfig.customization = config.editorConfig.customization || {};
+                    config.editorConfig.customization.compactHeader = true;
+                    config.editorConfig.customization.autoFocus = false;
+                    config.editorConfig.customization.mobile = { force: false };
+
+                    if (isMobileOrTablet) {
+                        // Responsive mode for small/shrinking viewports:
+                        config.editorConfig.customization.compactToolbar = true;
+                        config.editorConfig.customization.leftMenu = false;
+                        config.editorConfig.customization.rightMenu = false;
+                        config.editorConfig.customization.ruler = false;
+                        config.editorConfig.customization.toolbarHideFileName = true;
+                        config.editorConfig.customization.zoom = -2; // Fit to Width
+                    } else {
+                        // Desktop screen - preserve standard layout intact
+                        config.editorConfig.customization.compactToolbar = false;
+                        config.editorConfig.customization.leftMenu = true;
+                        config.editorConfig.customization.rightMenu = true;
+                        config.editorConfig.customization.ruler = true;
+                        config.editorConfig.customization.toolbarHideFileName = false;
+                        config.editorConfig.customization.zoom = 100;
+                    }
+
+                    const mainEl = document.querySelector('main') || document.documentElement;
+                    const initialScrollTop = mainEl ? mainEl.scrollTop : 0;
+                    let guardActive = true;
+
+                    // Only actual wheel/touch gestures release the autofocus guard (not button clicks)
+                    const releaseGuard = function() {
+                        guardActive = false;
+                    };
+                    window.addEventListener('wheel', releaseGuard, { passive: true, capture: true });
+                    window.addEventListener('touchmove', releaseGuard, { passive: true, capture: true });
+
+                    function restoreScrollIfAutofocused() {
+                        if (guardActive && mainEl && mainEl.scrollTop !== initialScrollTop) {
+                            mainEl.scrollTop = initialScrollTop;
+                        }
+                    }
+
+                    // Release guard after 4s max so it never interferes with user scrolling
+                    setTimeout(releaseGuard, 4000);
+
+                    let isPrintBypassActive = false;
+                    window.setPrintBypassActive = function(val) {
+                        isPrintBypassActive = !!val;
+                    };
+
+                    const openOnlyOfficePrintModal = function() {
+                        if (isPrintBypassActive) {
+                            return;
+                        }
+                        const modal = document.getElementById('onlyoffice-print-modal') || document.getElementById('export-pdf-modal');
+                        if (modal) {
+                            if (typeof modal.showModal === 'function') {
+                                modal.showModal();
+                            } else {
+                                modal.setAttribute('open', '');
+                            }
+                        }
+                    };
+
+                    const openExportPdfModal = function() {
+                        const modal = document.getElementById('export-pdf-modal');
+                        if (modal) {
+                            if (typeof modal.showModal === 'function') {
+                                modal.showModal();
+                            } else {
+                                modal.setAttribute('open', '');
+                            }
+                        }
+                    };
+
+                    window.addEventListener('message', function(event) {
+                        let data = event.data;
+                        if (typeof data === 'string') {
+                            try { data = JSON.parse(data); } catch(e) {}
+                        }
+                        if (data && (data.type === 'onlyoffice-request-export' || data.type === 'onRequestPrint' || data.event === 'onRequestPrint')) {
+                            if (data.action === 'print' || !data.action || data.type === 'onRequestPrint' || data.event === 'onRequestPrint') {
+                                openOnlyOfficePrintModal();
+                            } else {
+                                openExportPdfModal();
+                            }
+                        }
+                    });
+
+                    config.events = config.events || {};
+                    const origOnAppReady = config.events.onAppReady;
+                    config.events.onAppReady = function() {
+                        if (typeof origOnAppReady === 'function') origOnAppReady();
+                        restoreScrollIfAutofocused();
+                    };
+                    
+                    const origOnDocumentReady = config.events.onDocumentReady;
+                    config.events.onDocumentReady = function() {
+                        restoreScrollIfAutofocused();
+                        setTimeout(restoreScrollIfAutofocused, 50);
+                        setTimeout(restoreScrollIfAutofocused, 200);
+                        setTimeout(restoreScrollIfAutofocused, 500);
+
+                        if (typeof origOnDocumentReady === 'function') origOnDocumentReady();
+                    };
+
+                    config.events.onRequestPrint = function() {
+                        openOnlyOfficePrintModal();
+                    };
+
+                    config.events.onRequestSaveAs = function() {
+                        openExportPdfModal();
+                    };
+
+                    config.events.onRequestDownloadAs = function() {
+                        openExportPdfModal();
+                    };
+
+                    window.docEditorPreview = new DocsAPI.DocEditor("docx-preview-{{ $version->id }}", config);
+                } catch (e) {
+                    console.error('ONLYOFFICE initialization error:', e);
+                    document.getElementById('docx-preview-{{ $version->id }}').innerHTML =
+                        '<p class="text-error text-sm p-4">' + @json(__('Gagal memuat pratinjau. Silakan unduh dokumen untuk melihat isinya.')) + '</p>';
+                }
+            });
+        </script>
     @else
-        @if(isset($onlyOfficeConfig))
-            <div class="w-full bg-base-100 h-[80vh] sm:h-[88vh] lg:h-[92vh] min-h-[620px] sm:min-h-[750px] lg:min-h-[820px] rounded-2xl overflow-hidden border border-base-300/80 shadow-xs">
-                <div id="docx-preview-{{ $version->id }}" class="w-full h-full"></div>
+        <div id="docx-preview-{{ $version->id }}" class="p-6 sm:p-8 bg-base-100 rounded-2xl border border-base-300" style="min-height: 600px;">
+            <div class="flex items-center justify-center gap-2 text-xs font-semibold text-primary mb-4">
+                <span class="loading loading-spinner loading-xs"></span>
+                <span>{{ __('Memuat isi dokumen...') }}</span>
             </div>
+            <x-shimmer-loader type="document" />
+        </div>
 
-            <script src="{{ rtrim(config('onlyoffice.url'), '/') }}/web-apps/apps/api/documents/api.js?v=9.4.0-cmh-v2"></script>
-            <script>
-                document.addEventListener('DOMContentLoaded', function() {
-                    if (typeof DocsAPI === 'undefined') {
+        <script src="https://cdn.jsdelivr.net/npm/mammoth@1.7.0/mammoth.browser.min.js"></script>
+        <script>
+            (function () {
+                fetch('{{ $fileUrl }}')
+                    .then(function (res) { return res.arrayBuffer(); })
+                    .then(function (buffer) { return mammoth.convertToHtml({ arrayBuffer: buffer }); })
+                    .then(function (result) {
                         document.getElementById('docx-preview-{{ $version->id }}').innerHTML =
-                            '<p class="text-error text-sm p-4">' + @json(__('Gagal memuat editor ONLYOFFICE.')) + '</p>';
-                        return;
-                    }
-                    try {
-                        const config = @json($onlyOfficeConfig);
-                        const isMobileOrTablet = window.innerWidth < 1024;
-
-                        // Always use desktop type to bypass ONLYOFFICE Community Edition mobile license restriction
-                        config.type = 'desktop';
-                        config.editorConfig = config.editorConfig || {};
-                        config.editorConfig.customization = config.editorConfig.customization || {};
-                        config.editorConfig.customization.compactHeader = true;
-                        config.editorConfig.customization.autoFocus = false;
-                        config.editorConfig.customization.mobile = { force: false };
-
-                        if (isMobileOrTablet) {
-                            // Responsive mode for small/shrinking viewports:
-                            config.editorConfig.customization.compactToolbar = true;
-                            config.editorConfig.customization.leftMenu = false;
-                            config.editorConfig.customization.rightMenu = false;
-                            config.editorConfig.customization.ruler = false;
-                            config.editorConfig.customization.toolbarHideFileName = true;
-                            config.editorConfig.customization.zoom = -2; // Fit to Width
-                        } else {
-                            // Desktop screen - preserve standard layout intact
-                            config.editorConfig.customization.compactToolbar = false;
-                            config.editorConfig.customization.leftMenu = true;
-                            config.editorConfig.customization.rightMenu = true;
-                            config.editorConfig.customization.ruler = true;
-                            config.editorConfig.customization.toolbarHideFileName = false;
-                            config.editorConfig.customization.zoom = 100;
-                        }
-
-                        const mainEl = document.querySelector('main') || document.documentElement;
-                        const initialScrollTop = mainEl ? mainEl.scrollTop : 0;
-                        let guardActive = true;
-
-                        // Only actual wheel/touch gestures release the autofocus guard (not button clicks)
-                        const releaseGuard = function() {
-                            guardActive = false;
-                        };
-                        window.addEventListener('wheel', releaseGuard, { passive: true, capture: true });
-                        window.addEventListener('touchmove', releaseGuard, { passive: true, capture: true });
-
-                        function restoreScrollIfAutofocused() {
-                            if (guardActive && mainEl && mainEl.scrollTop !== initialScrollTop) {
-                                mainEl.scrollTop = initialScrollTop;
-                            }
-                        }
-
-                        // Release guard after 4s max so it never interferes with user scrolling
-                        setTimeout(releaseGuard, 4000);
-
-                        let isPrintBypassActive = false;
-                        window.setPrintBypassActive = function(val) {
-                            isPrintBypassActive = !!val;
-                        };
-
-                        const openOnlyOfficePrintModal = function() {
-                            if (isPrintBypassActive) {
-                                return;
-                            }
-                            const modal = document.getElementById('onlyoffice-print-modal') || document.getElementById('export-pdf-modal');
-                            if (modal) {
-                                if (typeof modal.showModal === 'function') {
-                                    modal.showModal();
-                                } else {
-                                    modal.setAttribute('open', '');
-                                }
-                            }
-                        };
-
-                        const openExportPdfModal = function() {
-                            const modal = document.getElementById('export-pdf-modal');
-                            if (modal) {
-                                if (typeof modal.showModal === 'function') {
-                                    modal.showModal();
-                                } else {
-                                    modal.setAttribute('open', '');
-                                }
-                            }
-                        };
-
-                        window.addEventListener('message', function(event) {
-                            let data = event.data;
-                            if (typeof data === 'string') {
-                                try { data = JSON.parse(data); } catch(e) {}
-                            }
-                            if (data && (data.type === 'onlyoffice-request-export' || data.type === 'onRequestPrint' || data.event === 'onRequestPrint')) {
-                                if (data.action === 'print' || !data.action || data.type === 'onRequestPrint' || data.event === 'onRequestPrint') {
-                                    openOnlyOfficePrintModal();
-                                } else {
-                                    openExportPdfModal();
-                                }
-                            }
-                        });
-
-                        config.events = config.events || {};
-                        const origOnAppReady = config.events.onAppReady;
-                        config.events.onAppReady = function() {
-                            if (typeof origOnAppReady === 'function') origOnAppReady();
-                            restoreScrollIfAutofocused();
-                        };
-                        
-                        const origOnDocumentReady = config.events.onDocumentReady;
-                        config.events.onDocumentReady = function() {
-                            restoreScrollIfAutofocused();
-                            setTimeout(restoreScrollIfAutofocused, 50);
-                            setTimeout(restoreScrollIfAutofocused, 200);
-                            setTimeout(restoreScrollIfAutofocused, 500);
-
-                            if (typeof origOnDocumentReady === 'function') origOnDocumentReady();
-                        };
-
-                        config.events.onRequestPrint = function() {
-                            openOnlyOfficePrintModal();
-                        };
-
-                        config.events.onRequestSaveAs = function() {
-                            openExportPdfModal();
-                        };
-
-                        config.events.onRequestDownloadAs = function() {
-                            openExportPdfModal();
-                        };
-
-                        window.docEditorPreview = new DocsAPI.DocEditor("docx-preview-{{ $version->id }}", config);
-                    } catch (e) {
-                        console.error('ONLYOFFICE initialization error:', e);
+                            result.value || ('<p class="text-base-content/50 text-sm">' + @json(__('Dokumen kosong.')) + '</p>');
+                    })
+                    .catch(function () {
                         document.getElementById('docx-preview-{{ $version->id }}').innerHTML =
-                            '<p class="text-error text-sm p-4">' + @json(__('Gagal memuat pratinjau. Silakan unduh dokumen untuk melihat isinya.')) + '</p>';
-                    }
-                });
-            </script>
-        @else
-            <div id="docx-preview-{{ $version->id }}" class="p-6 sm:p-8 bg-base-100 rounded-2xl border border-base-300" style="min-height: 600px;">
-                <div class="flex items-center justify-center gap-2 text-xs font-semibold text-primary mb-4">
-                    <span class="loading loading-spinner loading-xs"></span>
-                    <span>{{ __('Memuat isi dokumen...') }}</span>
-                </div>
-                <x-shimmer-loader type="document" />
-            </div>
-
-            <script src="https://cdn.jsdelivr.net/npm/mammoth@1.7.0/mammoth.browser.min.js"></script>
-            <script>
-                (function () {
-                    fetch('{{ $fileUrl }}')
-                        .then(function (res) { return res.arrayBuffer(); })
-                        .then(function (buffer) { return mammoth.convertToHtml({ arrayBuffer: buffer }); })
-                        .then(function (result) {
-                            document.getElementById('docx-preview-{{ $version->id }}').innerHTML =
-                                result.value || ('<p class="text-base-content/50 text-sm">' + @json(__('Dokumen kosong.')) + '</p>');
-                        })
-                        .catch(function () {
-                            document.getElementById('docx-preview-{{ $version->id }}').innerHTML =
-                                '<p class="text-error text-sm">' + @json(__('Gagal memuat pratinjau. Silakan unduh dokumen untuk melihat isinya.')) + '</p>';
-                        });
-                })();
-            </script>
-        @endif
+                            '<p class="text-error text-sm">' + @json(__('Gagal memuat pratinjau. Silakan unduh dokumen untuk melihat isinya.')) + '</p>';
+                    });
+            })();
+        </script>
     @endif
 </div>

@@ -808,11 +808,19 @@ class VersionService
             $fileMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
             if ($baseVersion && $baseVersion->file_path && Storage::disk($disk)->exists($baseVersion->file_path)) {
-                $storedPath = 'documents/' . $document->id . '/v' . $versionNumber . '.docx';
+                $ext = pathinfo($baseVersion->file_path, PATHINFO_EXTENSION) ?: 'docx';
+                $storedPath = 'documents/' . $document->id . '/v' . $versionNumber . '.' . $ext;
                 $baseContent = Storage::disk($disk)->get($baseVersion->file_path);
                 Storage::disk($disk)->put($storedPath, $baseContent);
-                $fileOriginalName = $baseVersion->file_original_name ?? $fileOriginalName;
-                $fileMime = $baseVersion->file_mime ?? $fileMime;
+                if (strtolower($ext) === 'pdf') {
+                    $oldBaseNoReq = preg_replace('/\.pdf$/i', '.base_no_req.pdf', $baseVersion->file_path);
+                    $newBaseNoReq = preg_replace('/\.pdf$/i', '.base_no_req.pdf', $storedPath);
+                    if (Storage::disk($disk)->exists($oldBaseNoReq)) {
+                        Storage::disk($disk)->copy($oldBaseNoReq, $newBaseNoReq);
+                    }
+                }
+                $fileOriginalName = $baseVersion->file_original_name ?? ($document->title . '.' . $ext);
+                $fileMime = $baseVersion->file_mime ?? ($ext === 'pdf' ? 'application/pdf' : $fileMime);
             }
 
             $newVersion = $document->versions()->create([
@@ -826,9 +834,6 @@ class VersionService
                 'status' => 'draft',
             ]);
 
-            // Revert any previously stamped signatures on this new version to placeholders
-            app(DocumentProcessorService::class)->revertSignaturesToPlaceholders($document, $newVersion);
-
             // Reset all SignatureRequest records on this document to pending/unused for this new revision run
             // (since all placeholders including previously approved and rejected are preserved in the document)
             \App\Models\SignatureRequest::where('document_id', $document->id)->update([
@@ -837,6 +842,9 @@ class VersionService
                 'rejected_reason' => null,
                 'responded_at' => null,
             ]);
+
+            // Revert any previously stamped signatures on this new version to placeholders
+            app(DocumentProcessorService::class)->revertSignaturesToPlaceholders($document, $newVersion);
 
             $document->touch();
             app(OnlyOfficeService::class)->rotateDocumentKey($document, $newVersion);
@@ -876,11 +884,19 @@ class VersionService
             $fileMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
             if ($baseVersion && $baseVersion->file_path && Storage::disk($disk)->exists($baseVersion->file_path)) {
-                $storedPath = 'documents/' . $document->id . '/v' . $versionNumber . '.docx';
+                $ext = pathinfo($baseVersion->file_path, PATHINFO_EXTENSION) ?: 'docx';
+                $storedPath = 'documents/' . $document->id . '/v' . $versionNumber . '.' . $ext;
                 $baseContent = Storage::disk($disk)->get($baseVersion->file_path);
                 Storage::disk($disk)->put($storedPath, $baseContent);
-                $fileOriginalName = $baseVersion->file_original_name ?? $fileOriginalName;
-                $fileMime = $baseVersion->file_mime ?? $fileMime;
+                if (strtolower($ext) === 'pdf') {
+                    $oldBaseNoReq = preg_replace('/\.pdf$/i', '.base_no_req.pdf', $baseVersion->file_path);
+                    $newBaseNoReq = preg_replace('/\.pdf$/i', '.base_no_req.pdf', $storedPath);
+                    if (Storage::disk($disk)->exists($oldBaseNoReq)) {
+                        Storage::disk($disk)->copy($oldBaseNoReq, $newBaseNoReq);
+                    }
+                }
+                $fileOriginalName = $baseVersion->file_original_name ?? ($document->title . '.' . $ext);
+                $fileMime = $baseVersion->file_mime ?? ($ext === 'pdf' ? 'application/pdf' : $fileMime);
             }
 
             $newVersion = $document->versions()->create([
@@ -894,9 +910,6 @@ class VersionService
                 'status' => 'draft',
             ]);
 
-            // Revert any previously stamped signatures on this new version to placeholders
-            app(DocumentProcessorService::class)->revertSignaturesToPlaceholders($document, $newVersion);
-
             // Reset all SignatureRequest records on this document to pending/unused for this new revision run
             // (since all placeholders including previously approved and rejected are preserved in the document)
             \App\Models\SignatureRequest::where('document_id', $document->id)->update([
@@ -905,6 +918,9 @@ class VersionService
                 'rejected_reason' => null,
                 'responded_at' => null,
             ]);
+
+            // Revert any previously stamped signatures on this new version to placeholders
+            app(DocumentProcessorService::class)->revertSignaturesToPlaceholders($document, $newVersion);
 
             $document->touch();
             app(OnlyOfficeService::class)->rotateDocumentKey($document, $newVersion);

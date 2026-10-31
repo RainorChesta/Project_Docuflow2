@@ -499,10 +499,12 @@
 
                                             {{-- Jika Tanpa Kop Surat atau dokumen tidak ada kop: Tombol Unduh Word & Unduh PDF --}}
                                             <div x-show="!hasKopDoc || withKop === '0'" class="flex flex-wrap sm:flex-nowrap items-center gap-2 justify-end">
-                                                <button type="button" @click="downloadDocx()" class="btn btn-outline btn-sm gap-1.5 font-medium shadow-xs" title="{{ __('Unduh file Word DOCX tanpa kop') }}">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                                                    {{ __('Unduh Word') }}
-                                                </button>
+                                                @if(!str_ends_with(strtolower($document->displayVersion()?->file_path ?? ''), '.pdf'))
+                                                    <button type="button" @click="downloadDocx()" class="btn btn-outline btn-sm gap-1.5 font-medium shadow-xs" title="{{ __('Unduh file Word DOCX tanpa kop') }}">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                                        {{ __('Unduh Word') }}
+                                                    </button>
+                                                @endif
                                                 <button type="submit" class="btn btn-primary btn-sm gap-1.5 font-medium shadow-xs" title="{{ __('Unduh file PDF tanpa kop') }}">
                                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                                                     {{ __('Unduh PDF') }}
@@ -554,7 +556,7 @@
                         <div class="alert alert-success mt-3">
                             <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 w-full">
                                 <span>{{ __('PDF berhasil dibuat.') }} <span class="font-medium">{{ session('pdf_export.filename') }}</span></span>
-                                <a href="{{ session('pdf_export.url') }}" target="_blank" rel="noopener" class="btn btn-primary btn-sm shrink-0">
+                                <a href="{{ session('pdf_export.url') }}" download="{{ session('pdf_export.filename') }}" class="btn btn-primary btn-sm shrink-0">
                                     {{ __('Unduh PDF') }}
                                 </a>
                             </div>

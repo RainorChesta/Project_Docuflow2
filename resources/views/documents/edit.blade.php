@@ -299,10 +299,12 @@
 
                     {{-- Jika Tanpa Kop Surat atau dokumen tidak ada kop: Tombol Unduh DOCX & Unduh PDF --}}
                     <div x-show="!hasKopDoc || withKop === '0'" class="flex flex-wrap sm:flex-nowrap items-center gap-2 justify-end">
-                        <button type="button" @click="downloadDocx()" class="btn btn-outline btn-primary btn-sm gap-1.5 font-medium shadow-xs" title="{{ __('Unduh file Word (.docx) tanpa kop') }}">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                            {{ __('Unduh DOCX') }}
-                        </button>
+                        @if(!$isPdf)
+                            <button type="button" @click="downloadDocx()" class="btn btn-outline btn-primary btn-sm gap-1.5 font-medium shadow-xs" title="{{ __('Unduh file Word (.docx) tanpa kop') }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                {{ __('Unduh DOCX') }}
+                            </button>
+                        @endif
                         <button type="submit" class="btn btn-primary btn-sm gap-1.5 font-medium shadow-xs" title="{{ __('Unduh file PDF tanpa kop') }}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                             {{ __('Unduh PDF') }}
@@ -322,6 +324,17 @@
             @if($pending)
                 <div class="mb-4 px-4 py-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-500/30 rounded-xl text-xs text-amber-900 dark:text-amber-200 flex items-center justify-between shadow-xs">
                     <span>{{ __('Terdapat versi pending (v:version) yang menunggu review. Setiap perubahan yang Anda simpan akan memperbarui versi pending ini.', ['version' => $pending->version_number]) }}</span>
+                </div>
+            @endif
+
+            @if(session('pdf_export'))
+                <div class="alert alert-success mb-4">
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 w-full">
+                        <span>{{ __('PDF berhasil dibuat.') }} <span class="font-medium">{{ session('pdf_export.filename') }}</span></span>
+                        <a href="{{ session('pdf_export.url') }}" download="{{ session('pdf_export.filename') }}" class="btn btn-primary btn-sm shrink-0">
+                            Download PDF
+                        </a>
+                    </div>
                 </div>
             @endif
 
@@ -2169,13 +2182,18 @@
                             const title = isStamp ? 'PERMINTAAN STEMPEL DIKIRIM' : 'PERMINTAAN TANDA TANGAN DIKIRIM';
                             const defaultMsg = isStamp ? 'PERMINTAAN PENGGUNAAN STEMPEL PERUSAHAAN BERHASIL DIKIRIM.' : 'PERMINTAAN TANDA TANGAN BERHASIL DIKIRIM.';
                             const autoMsg = isStamp 
-                                ? ' KETIKA DISETUJUI, STEMPEL AKAN OTOMATIS DIBUBUHKAN PADA DOKUMEN PDF SESUAI POSISI & UKURAN YANG TELAH DIATUR.'
-                                : ' KETIKA DISETUJUI, TANDA TANGAN AKAN OTOMATIS DIBUBUHKAN PADA DOKUMEN PDF SESUAI POSISI & UKURAN YANG TELAH DIATUR.';
+                                ? ' PENANDA SEMENTARA TELAH DIBUBUHKAN DAN AKAN OTOMATIS DIGANTI DENGAN STEMPEL ASLI KETIKA DISETUJUI.'
+                                : ' PENANDA SEMENTARA TELAH DIBUBUHKAN DAN AKAN OTOMATIS DIGANTI DENGAN TANDA TANGAN ASLI KETIKA DISETUJUI.';
+                            window._allowIntentionalLeave = true;
+                            if (typeof window.allowIntentionalLeave === 'function') {
+                                window.allowIntentionalLeave();
+                            }
                             showSignatureScreenAlert(
                                 title,
                                 (response.data.message || defaultMsg) + autoMsg,
                                 true
                             );
+                            setTimeout(() => window.location.reload(), 1200);
                         } else {
                             showSignatureScreenAlert('GAGAL MENGIRIM PERMINTAAN', response.data.message || (isStamp ? 'GAGAL MENGIRIM PERMINTAAN STEMPEL.' : 'GAGAL MENGIRIM PERMINTAAN TANDA TANGAN.'), false);
                         }

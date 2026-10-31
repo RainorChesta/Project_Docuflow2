@@ -121,6 +121,13 @@ class SignatureController extends Controller
             }
 
             if ($doc) {
+                $targetVersion = $doc->versions()->whereIn('status', ['draft', 'pending'])->whereNull('discarded_at')->latest('version_number')->first()
+                    ?? $doc->displayVersion();
+
+                if ($targetVersion && (($targetVersion->file_path && str_ends_with(strtolower($targetVersion->file_path), '.pdf')) || ($targetVersion->file_mime && str_contains(strtolower($targetVersion->file_mime), 'pdf')))) {
+                    app(\App\Services\PdfSignatureProcessorService::class)->syncPdfSignatureRequests($doc, $targetVersion);
+                }
+
                 $pendingVersion = $doc->versions()->where('status', 'pending')->latest('id')->first();
                 if ($pendingVersion) {
                     app(\App\Services\ApprovalRoutingService::class)->compileWorkflowFromSignatures($doc, $pendingVersion, $doc->owner ?? Auth::user());

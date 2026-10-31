@@ -594,7 +594,7 @@ class OnlyOfficeService
     public function generateEditorConfig(
         Document $document,
         DocumentVersion $version,
-        User $user,
+        ?User $user = null,
         string $mode = 'edit'
     ): array {
         $fileUrl = $this->getDocumentFileUrl($document, $version);
@@ -620,10 +620,6 @@ class OnlyOfficeService
         };
 
         $canEdit = ($mode === 'edit');
-        if ($extension === 'pdf') {
-            // ONLYOFFICE PDF mode supports editing PDF forms/annotations
-            $canEdit = true;
-        }
 
         $docTitle = trim($document->title ?? '');
         $fileName = $docTitle !== '' ? $docTitle : ($version->file_original_name ?? 'Dokumen');
@@ -655,8 +651,8 @@ class OnlyOfficeService
                 'lang' => app()->getLocale() === 'id' ? 'id-ID' : 'en-US',
                 'callbackUrl' => $callbackUrl,
                 'user' => [
-                    'id' => (string) $user->id,
-                    'name' => $user->name,
+                    'id' => (string) ($user?->id ?? 'guest'),
+                    'name' => $user?->name ?? __('Tamu (Guest)'),
                 ],
                 'customization' => [
                     'autoFocus' => false,
@@ -740,8 +736,8 @@ class OnlyOfficeService
                 'lang' => app()->getLocale() === 'id' ? 'id-ID' : 'en-US',
                 'callbackUrl' => $callbackUrl,
                 'user' => [
-                    'id' => (string) $user->id,
-                    'name' => $user->name,
+                    'id' => (string) ($user?->id ?? 'guest'),
+                    'name' => $user?->name ?? __('Tamu (Guest)'),
                 ],
                 'customization' => [
                     'autoFocus' => false,
@@ -845,8 +841,8 @@ class OnlyOfficeService
                 'canEdit' => false,
                 'lang' => app()->getLocale() === 'id' ? 'id-ID' : 'en-US',
                 'user' => [
-                    'id' => (string) $user->id,
-                    'name' => $user->name,
+                    'id' => (string) ($user?->id ?? 'guest'),
+                    'name' => $user?->name ?? __('Tamu (Guest)'),
                 ],
                 'customization' => [
                     'autoFocus' => false,

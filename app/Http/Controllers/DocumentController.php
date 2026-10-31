@@ -79,7 +79,21 @@ class DocumentController extends Controller
     private function autoApplyApprovedSignatures(Document $document, ?DocumentVersion $version = null): void
     {
         $version = $version ?? $document->displayVersion();
-        if (!$version || !$version->file_path || !str_ends_with(strtolower($version->file_path), '.docx')) {
+        if (!$version || !$version->file_path) {
+            return;
+        }
+
+        if (str_ends_with(strtolower($version->file_path), '.pdf') || ($version->file_mime && str_contains(strtolower($version->file_mime), 'pdf'))) {
+            $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
+            $pdfProcessor = app(\App\Services\PdfSignatureProcessorService::class);
+            $basePath = $pdfProcessor->getBaseNoRequestsFilePath($version->file_path);
+            if (!$disk->exists($basePath) && SignatureRequest::where('document_id', $document->id)->whereIn('status', ['pending', 'approved'])->exists()) {
+                $pdfProcessor->syncPdfSignatureRequests($document, $version);
+            }
+            return;
+        }
+
+        if (!str_ends_with(strtolower($version->file_path), '.docx')) {
             return;
         }
 
@@ -1177,6 +1191,7 @@ class DocumentController extends Controller
         $version = $document->displayVersion();
         $onlyOfficeConfig = null;
         if ($version) {
+            $this->autoApplyApprovedSignatures($document, $version);
             $onlyOfficeConfig = $this->onlyOfficeService->generateEditorConfig(
                 $document,
                 $version,
@@ -1204,6 +1219,8 @@ class DocumentController extends Controller
         $this->authorize('view', $document);
 
         abort_unless($version->document_id === $document->id, 404);
+
+        $this->autoApplyApprovedSignatures($document, $version);
 
         $onlyOfficeConfig = $this->onlyOfficeService->generateEditorConfig(
             $document,
@@ -1585,17 +1602,26 @@ class DocumentController extends Controller
         abort_unless($version->document_id === $document->id, 404);
         abort_unless($version->file_path, 404);
 
+        $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
+        abort_unless($disk->exists($version->file_path), 404);
+
         $docTitle = trim($document->title ?? '');
-        $ext = pathinfo($version->file_path, PATHINFO_EXTENSION) ?: 'docx';
+        $ext = strtolower(pathinfo($version->file_path, PATHINFO_EXTENSION) ?: 'docx');
         $effectiveName = $docTitle !== ''
-            ? (str_ends_with(strtolower($docTitle), '.' . strtolower($ext)) ? $docTitle : $docTitle . '.' . $ext)
+            ? (str_ends_with(strtolower($docTitle), '.' . $ext) ? $docTitle : $docTitle . '.' . $ext)
             : ($version->file_original_name ?? ($document->title . '.' . $ext));
 
-        return Storage::disk(config('onlyoffice.storage_disk', 'local'))->response(
-            $version->file_path,
-            $effectiveName,
-            ['Content-Disposition' => 'inline; filename="' . $effectiveName . '"']
-        );
+        $bytes = $disk->get($version->file_path);
+        $mimeType = $ext === 'pdf'
+            ? 'application/pdf'
+            : ($version->file_mime ?: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+
+        return response($bytes, 200, [
+            'Content-Type' => $mimeType,
+            'Content-Length' => strlen($bytes),
+            'Content-Disposition' => 'inline; filename="' . str_replace('"', '', $effectiveName) . '"',
+            'Accept-Ranges' => 'none',
+        ]);
     }
 
     public function qrCode(Document $document)
@@ -1653,6 +1679,7 @@ class DocumentController extends Controller
         $version = $document->displayVersion();
         $onlyOfficeConfig = null;
         if ($version) {
+            $this->autoApplyApprovedSignatures($document, $version);
             $onlyOfficeConfig = $this->onlyOfficeService->generateEditorConfig(
                 $document,
                 $version,

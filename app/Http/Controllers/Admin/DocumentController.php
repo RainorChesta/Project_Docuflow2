@@ -264,8 +264,9 @@ class DocumentController extends Controller
         abort_unless($disk->exists($version->file_path), 404, 'Physical file not found');
 
         $downloadName = $version->file_original_name ?? $document->title;
+        $ext = strtolower(pathinfo($version->file_path, PATHINFO_EXTENSION) ?: 'docx');
         if (!str_ends_with(strtolower($downloadName), '.docx') && !str_ends_with(strtolower($downloadName), '.pdf')) {
-            $downloadName .= '.docx';
+            $downloadName .= '.' . $ext;
         }
 
         return $disk->download($version->file_path, $downloadName);
