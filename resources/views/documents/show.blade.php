@@ -1122,8 +1122,98 @@
 
                     {{-- Actions Bar --}}
                     @php $isFileBased = $document->displayVersion()?->file_path; @endphp
-                    <div class="mt-3 pt-2.5 border-t border-base-200 w-full overflow-x-auto scrollbar-hide touch-pan-x">
-                        <div class="flex items-center justify-center sm:justify-start gap-2 flex-nowrap min-w-max py-0.5 px-0.5">
+                    <style>
+                        .actions-scrollbar::-webkit-scrollbar {
+                            height: 5px;
+                        }
+                        .actions-scrollbar::-webkit-scrollbar-track {
+                            background: transparent;
+                            border-radius: 9999px;
+                        }
+                        .actions-scrollbar::-webkit-scrollbar-thumb {
+                            background-color: rgba(156, 163, 175, 0.4);
+                            border-radius: 9999px;
+                        }
+                        .actions-scrollbar::-webkit-scrollbar-thumb:hover {
+                            background-color: rgba(156, 163, 175, 0.7);
+                        }
+                        .actions-scrollbar {
+                            scrollbar-width: thin;
+                            scrollbar-color: rgba(156, 163, 175, 0.4) transparent;
+                        }
+                    </style>
+                    <div class="relative mt-3 pt-2.5 border-t border-base-200 w-full group/actions"
+                         x-data="{
+                             canScrollLeft: false,
+                             canScrollRight: false,
+                             updateScroll() {
+                                 const el = this.$refs.scrollContainer;
+                                 if (!el) return;
+                                 this.canScrollLeft = el.scrollLeft > 2;
+                                 this.canScrollRight = Math.ceil(el.scrollLeft + el.clientWidth) < (el.scrollWidth - 2);
+                             },
+                             scroll(direction) {
+                                 const el = this.$refs.scrollContainer;
+                                 if (!el) return;
+                                 const amount = Math.max(160, Math.floor(el.clientWidth * 0.65));
+                                 el.scrollBy({ left: direction * amount, behavior: 'smooth' });
+                                 setTimeout(() => this.updateScroll(), 350);
+                             }
+                         }"
+                         x-init="
+                             $nextTick(() => updateScroll());
+                             window.addEventListener('resize', () => updateScroll());
+                             if (window.ResizeObserver && $refs.scrollContainer) {
+                                 const ro = new ResizeObserver(() => updateScroll());
+                                 ro.observe($refs.scrollContainer);
+                             }
+                         ">
+
+                        {{-- Left Arrow Navigation Button & Edge Gradient --}}
+                        <div x-show="canScrollLeft"
+                             x-transition:enter="transition ease-out duration-200"
+                             x-transition:enter-start="opacity-0 -translate-x-2"
+                             x-transition:enter-end="opacity-100 translate-x-0"
+                             x-transition:leave="transition ease-in duration-150"
+                             x-transition:leave-start="opacity-100 translate-x-0"
+                             x-transition:leave-end="opacity-0 -translate-x-2"
+                             class="absolute left-0 top-0 bottom-2.5 flex items-center z-20 pointer-events-none pr-6 bg-gradient-to-r from-base-100 via-base-100/90 to-transparent">
+                            <button type="button"
+                                    @click="scroll(-1)"
+                                    class="btn btn-circle btn-xs shadow-md bg-base-100 hover:bg-base-200 border border-base-300 text-base-content pointer-events-auto transition-transform hover:scale-105 active:scale-95 ml-0.5"
+                                    title="{{ __('Geser ke kiri') }}"
+                                    aria-label="{{ __('Geser ke kiri') }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {{-- Right Arrow Navigation Button & Edge Gradient --}}
+                        <div x-show="canScrollRight"
+                             x-transition:enter="transition ease-out duration-200"
+                             x-transition:enter-start="opacity-0 translate-x-2"
+                             x-transition:enter-end="opacity-100 translate-x-0"
+                             x-transition:leave="transition ease-in duration-150"
+                             x-transition:leave-start="opacity-100 translate-x-0"
+                             x-transition:leave-end="opacity-0 translate-x-2"
+                             class="absolute right-0 top-0 bottom-2.5 flex items-center justify-end z-20 pointer-events-none pl-6 bg-gradient-to-l from-base-100 via-base-100/90 to-transparent">
+                            <button type="button"
+                                    @click="scroll(1)"
+                                    class="btn btn-circle btn-xs shadow-md bg-base-100 hover:bg-base-200 border border-base-300 text-base-content pointer-events-auto transition-transform hover:scale-105 active:scale-95 mr-0.5"
+                                    title="{{ __('Geser ke kanan') }}"
+                                    aria-label="{{ __('Geser ke kanan') }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {{-- Scrollable Container with custom scrollbar --}}
+                        <div x-ref="scrollContainer"
+                             @scroll.passive="updateScroll()"
+                             class="actions-scrollbar w-full overflow-x-auto touch-pan-x pb-2 scroll-smooth">
+                            <div class="flex items-center justify-start gap-2 flex-nowrap min-w-max py-0.5 px-0.5">
                             @if($document->isLockedForEditing())
                                 <button type="button" class="btn btn-neutral btn-sm gap-1.5 shrink-0 opacity-75 cursor-not-allowed" title="{{ __('Dokumen terkunci karena sedang dalam alur persetujuan') }}" disabled>
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0 text-base-content/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1245,6 +1335,7 @@
                             @endcan
                         </div>
                     </div>
+                </div>
 
                     @if(session('pdf_export'))
                         <div class="alert alert-success mt-3">

@@ -56,8 +56,43 @@ class SignatureController extends Controller
             $height = (float) $request->input('height', 18.0);
             $preset = $request->input('preset_position', 'bottom-right');
 
-            // Check if this request is directly placed on PDF with coordinates
-            $isDirectPdfPlacement = ($preset === 'custom') || ($posX !== null && $posY !== null);
+            $rawPlacements = $request->input('placements');
+            $placements = null;
+            if (!empty($rawPlacements)) {
+                if (is_string($rawPlacements)) {
+                    $decoded = json_decode($rawPlacements, true);
+                    if (is_array($decoded)) {
+                        $rawPlacements = $decoded;
+                    }
+                }
+                if (is_array($rawPlacements)) {
+                    $validPlacements = [];
+                    foreach ($rawPlacements as $item) {
+                        if (is_array($item) && isset($item['page'])) {
+                            $validPlacements[] = [
+                                'page' => (int) $item['page'],
+                                'pos_x' => isset($item['pos_x']) && $item['pos_x'] !== null && $item['pos_x'] !== '' ? (float) $item['pos_x'] : null,
+                                'pos_y' => isset($item['pos_y']) && $item['pos_y'] !== null && $item['pos_y'] !== '' ? (float) $item['pos_y'] : null,
+                                'width' => isset($item['width']) ? (float) $item['width'] : $width,
+                                'height' => isset($item['height']) ? (float) $item['height'] : $height,
+                                'preset_position' => $item['preset_position'] ?? $preset,
+                            ];
+                        }
+                    }
+                    if (!empty($validPlacements)) {
+                        $placements = $validPlacements;
+                        $pageNumber = $placements[0]['page'];
+                        $posX = $placements[0]['pos_x'];
+                        $posY = $placements[0]['pos_y'];
+                        $width = $placements[0]['width'];
+                        $height = $placements[0]['height'];
+                        $preset = $placements[0]['preset_position'];
+                    }
+                }
+            }
+
+            // Check if this request is directly placed on PDF with coordinates or multiple placements
+            $isDirectPdfPlacement = ($preset === 'custom') || ($posX !== null && $posY !== null) || ($placements !== null);
 
             // Find an active pending signature request for this specific signature, or create a new pending request
             $requestRecord = SignatureRequest::where('requester_id', Auth::id())
@@ -101,6 +136,7 @@ class SignatureController extends Controller
                     'width' => $width,
                     'height' => $height,
                     'preset_position' => $preset,
+                    'placements' => $placements,
                     'requested_at' => now(),
                     'notified_at' => $isDirectPdfPlacement ? now() : null,
                 ]);
@@ -115,6 +151,7 @@ class SignatureController extends Controller
                     'width' => $width,
                     'height' => $height,
                     'preset_position' => $preset,
+                    'placements' => $placements,
                     'requested_at' => now(),
                     'notified_at' => $isDirectPdfPlacement ? now() : $requestRecord->notified_at,
                 ]);
@@ -695,6 +732,41 @@ class SignatureController extends Controller
         $width = (float) $request->input('width', 24.0);
         $height = (float) $request->input('height', 24.0);
 
+        $rawPlacements = $request->input('placements');
+        $placements = null;
+        if (!empty($rawPlacements)) {
+            if (is_string($rawPlacements)) {
+                $decoded = json_decode($rawPlacements, true);
+                if (is_array($decoded)) {
+                    $rawPlacements = $decoded;
+                }
+            }
+            if (is_array($rawPlacements)) {
+                $validPlacements = [];
+                foreach ($rawPlacements as $item) {
+                    if (is_array($item) && isset($item['page'])) {
+                        $validPlacements[] = [
+                            'page' => (int) $item['page'],
+                            'pos_x' => isset($item['pos_x']) && $item['pos_x'] !== null && $item['pos_x'] !== '' ? (float) $item['pos_x'] : null,
+                            'pos_y' => isset($item['pos_y']) && $item['pos_y'] !== null && $item['pos_y'] !== '' ? (float) $item['pos_y'] : null,
+                            'width' => isset($item['width']) ? (float) $item['width'] : $width,
+                            'height' => isset($item['height']) ? (float) $item['height'] : $height,
+                            'preset_position' => $item['preset_position'] ?? $preset,
+                        ];
+                    }
+                }
+                if (!empty($validPlacements)) {
+                    $placements = $validPlacements;
+                    $pageNumber = $placements[0]['page'];
+                    $posX = $placements[0]['pos_x'];
+                    $posY = $placements[0]['pos_y'];
+                    $width = $placements[0]['width'];
+                    $height = $placements[0]['height'];
+                    $preset = $placements[0]['preset_position'];
+                }
+            }
+        }
+
         $signaturePath = Storage::disk('public')->path($sig->file_path);
         $pdfProcessor = app(\App\Services\PdfSignatureProcessorService::class);
 
@@ -707,7 +779,9 @@ class SignatureController extends Controller
             $posY,
             $width,
             $height,
-            $preset
+            $preset,
+            null,
+            $placements
         );
 
         if ($result) {
@@ -755,6 +829,41 @@ class SignatureController extends Controller
         $width = (float) $request->input('width', 24.0);
         $height = (float) $request->input('height', 24.0);
 
+        $rawPlacements = $request->input('placements');
+        $placements = null;
+        if (!empty($rawPlacements)) {
+            if (is_string($rawPlacements)) {
+                $decoded = json_decode($rawPlacements, true);
+                if (is_array($decoded)) {
+                    $rawPlacements = $decoded;
+                }
+            }
+            if (is_array($rawPlacements)) {
+                $validPlacements = [];
+                foreach ($rawPlacements as $item) {
+                    if (is_array($item) && isset($item['page'])) {
+                        $validPlacements[] = [
+                            'page' => (int) $item['page'],
+                            'pos_x' => isset($item['pos_x']) && $item['pos_x'] !== null && $item['pos_x'] !== '' ? (float) $item['pos_x'] : null,
+                            'pos_y' => isset($item['pos_y']) && $item['pos_y'] !== null && $item['pos_y'] !== '' ? (float) $item['pos_y'] : null,
+                            'width' => isset($item['width']) ? (float) $item['width'] : $width,
+                            'height' => isset($item['height']) ? (float) $item['height'] : $height,
+                            'preset_position' => $item['preset_position'] ?? $preset,
+                        ];
+                    }
+                }
+                if (!empty($validPlacements)) {
+                    $placements = $validPlacements;
+                    $pageNumber = $placements[0]['page'];
+                    $posX = $placements[0]['pos_x'];
+                    $posY = $placements[0]['pos_y'];
+                    $width = $placements[0]['width'];
+                    $height = $placements[0]['height'];
+                    $preset = $placements[0]['preset_position'];
+                }
+            }
+        }
+
         $qrCodeService = app(\App\Services\QrCodeService::class);
         $qrPngBytes = $qrCodeService->pngBytes($qrCodeService->qrcodeUrl($document));
 
@@ -772,7 +881,9 @@ class SignatureController extends Controller
             $posY,
             $width,
             $height,
-            $preset
+            $preset,
+            null,
+            $placements
         );
 
         @unlink($tempQrPath);

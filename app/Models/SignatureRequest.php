@@ -23,6 +23,7 @@ class SignatureRequest extends Model
         'width',
         'height',
         'preset_position',
+        'placements',
         'rejected_reason',
         'requested_at',
         'notified_at',
@@ -39,6 +40,7 @@ class SignatureRequest extends Model
             'pos_y' => 'float',
             'width' => 'float',
             'height' => 'float',
+            'placements' => 'array',
             'requested_at' => 'datetime',
             'notified_at' => 'datetime',
             'responded_at' => 'datetime',
@@ -175,6 +177,30 @@ class SignatureRequest extends Model
             return $companyName ? "Stempel ({$companyName})" : 'Stempel Perusahaan';
         }
         return 'Tanda Tangan Original';
+    }
+
+    /**
+     * Retrieve all page placements for this signature request.
+     * Fallbacks to single page placement for backwards compatibility.
+     */
+    public function getPlacements(): array
+    {
+        if (!empty($this->placements) && is_array($this->placements)) {
+            return $this->placements;
+        }
+
+        if ($this->page_number !== null) {
+            return [[
+                'page' => (int) $this->page_number,
+                'pos_x' => $this->pos_x !== null ? (float) $this->pos_x : null,
+                'pos_y' => $this->pos_y !== null ? (float) $this->pos_y : null,
+                'width' => (float) ($this->width ?? 24.0),
+                'height' => (float) ($this->height ?? 24.0),
+                'preset_position' => $this->preset_position ?? 'bottom-right',
+            ]];
+        }
+
+        return [];
     }
 }
 

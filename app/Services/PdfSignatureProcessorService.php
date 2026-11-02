@@ -34,6 +34,7 @@ class PdfSignatureProcessorService
      * @param float $height Height in mm (default 25mm)
      * @param string|null $preset Position preset (e.g. 'bottom-right')
      * @param string|null $signerName Optional signer name to print under signature
+     * @param array|null $placements Optional multi-page placement array [['page' => 1, 'pos_x' => ..., ...], ...]
      * @return bool
      */
     public function processPdfSignature(
@@ -46,7 +47,8 @@ class PdfSignatureProcessorService
         float $width = 24.0,
         float $height = 24.0,
         ?string $preset = self::PRESET_BOTTOM_RIGHT,
-        ?string $signerName = null
+        ?string $signerName = null,
+        ?array $placements = null
     ): bool {
         try {
             $disk = Storage::disk(config('onlyoffice.storage_disk', 'local'));
@@ -105,10 +107,27 @@ class PdfSignatureProcessorService
                 $pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
                 $pdf->useTemplate($tplId);
 
-                if ($pageNo === $targetPage) {
-                    $pageWidth = $size['width'];
-                    $pageHeight = $size['height'];
+                $pageWidth = $size['width'];
+                $pageHeight = $size['height'];
 
+                if (!empty($placements) && is_array($placements)) {
+                    foreach ($placements as $pl) {
+                        $plPage = (int) ($pl['page'] ?? 0);
+                        if ($plPage === $pageNo) {
+                            [$finalX, $finalY] = $this->calculateCoordinates(
+                                $pageWidth,
+                                $pageHeight,
+                                (float) ($pl['width'] ?? $width),
+                                (float) ($pl['height'] ?? $height),
+                                isset($pl['pos_x']) && $pl['pos_x'] !== null ? (float) $pl['pos_x'] : $x,
+                                isset($pl['pos_y']) && $pl['pos_y'] !== null ? (float) $pl['pos_y'] : $y,
+                                $pl['preset_position'] ?? $preset
+                            );
+
+                            $pdf->Image($tempSigFile, $finalX, $finalY, (float) ($pl['width'] ?? $width), (float) ($pl['height'] ?? $height), 'PNG');
+                        }
+                    }
+                } elseif ($pageNo === $targetPage) {
                     // Calculate Coordinates if not explicitly provided
                     [$finalX, $finalY] = $this->calculateCoordinates(
                         $pageWidth,
@@ -358,15 +377,29 @@ class PdfSignatureProcessorService
                     file_put_contents($tempImg, $imgBytes);
                     $tempFiles[] = $tempImg;
 
-                    $overlays[] = [
-                        'file' => $tempImg,
-                        'page_number' => $req->page_number,
-                        'pos_x' => $req->pos_x !== null ? (float) $req->pos_x : null,
-                        'pos_y' => $req->pos_y !== null ? (float) $req->pos_y : null,
-                        'width' => (float) ($req->width ?? 24.0),
-                        'height' => (float) ($req->height ?? 24.0),
-                        'preset' => $req->preset_position ?? self::PRESET_BOTTOM_RIGHT,
-                    ];
+                    $reqPlacements = $req->getPlacements();
+                    if (empty($reqPlacements)) {
+                        $reqPlacements = [[
+                            'page' => $req->page_number,
+                            'pos_x' => $req->pos_x !== null ? (float) $req->pos_x : null,
+                            'pos_y' => $req->pos_y !== null ? (float) $req->pos_y : null,
+                            'width' => (float) ($req->width ?? 24.0),
+                            'height' => (float) ($req->height ?? 24.0),
+                            'preset' => $req->preset_position ?? self::PRESET_BOTTOM_RIGHT,
+                        ]];
+                    }
+
+                    foreach ($reqPlacements as $pl) {
+                        $overlays[] = [
+                            'file' => $tempImg,
+                            'page_number' => (int) ($pl['page'] ?? $req->page_number),
+                            'pos_x' => isset($pl['pos_x']) && $pl['pos_x'] !== null && $pl['pos_x'] !== '' ? (float) $pl['pos_x'] : null,
+                            'pos_y' => isset($pl['pos_y']) && $pl['pos_y'] !== null && $pl['pos_y'] !== '' ? (float) $pl['pos_y'] : null,
+                            'width' => (float) ($pl['width'] ?? $req->width ?? 24.0),
+                            'height' => (float) ($pl['height'] ?? $req->height ?? 24.0),
+                            'preset' => $pl['preset_position'] ?? $req->preset_position ?? self::PRESET_BOTTOM_RIGHT,
+                        ];
+                    }
                 }
             }
 

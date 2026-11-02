@@ -456,7 +456,7 @@ class UserController extends Controller
                 \App\Models\DocumentShare::where('user_id', $user->id)->orWhere('invited_by', $user->id)->delete();
                 \App\Models\DocumentUnitKerjaShare::where('invited_by', $user->id)->delete();
 
-                $ownedDocuments = Document::where('owner_id', $user->id)->get();
+                $ownedDocuments = \App\Models\Document::where('owner_id', $user->id)->get();
                 foreach ($ownedDocuments as $doc) {
                     foreach ($doc->versions as $version) {
                         if ($version->file_path && \Illuminate\Support\Facades\Storage::disk('local')->exists($version->file_path)) {

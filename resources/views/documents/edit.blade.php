@@ -733,8 +733,18 @@
                             </svg>
                         </div>
                         <div class="min-w-0 flex-1">
-                            <h3 id="pdf-visual-modal-title" class="font-bold text-sm sm:text-base text-base-content leading-tight truncate">Atur Posisi &amp; Ukuran Tanda Tangan</h3>
-                            <p id="pdf-visual-modal-subtitle" class="text-xs text-base-content/60 truncate hidden sm:block">Geser kotak TTD dan tarik sudut kanan bawah untuk mengatur ukuran.</p>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <h3 id="pdf-visual-modal-title" class="font-bold text-sm sm:text-base text-base-content leading-tight truncate">Atur Posisi &amp; Ukuran Tanda Tangan</h3>
+                                <span class="badge badge-sm border-base-300 font-mono text-[10px] text-base-content/80 hidden lg:inline-flex items-center gap-1 shadow-2xs py-1 px-2 bg-base-200/80">
+                                    <kbd class="kbd kbd-xs text-[9px] font-bold bg-base-100">Ctrl</kbd> {{ __('+ Tarik untuk kunci rasio aspek') }}
+                                </span>
+                            </div>
+                            <div class="flex items-center gap-2 flex-wrap mt-0.5">
+                                <p id="pdf-visual-modal-subtitle" class="text-xs text-base-content/60 truncate hidden sm:block">Geser kotak TTD dan tarik sudut kanan bawah untuk mengatur ukuran.</p>
+                                <span class="text-xs text-base-content/60 hidden sm:inline-flex lg:hidden items-center gap-1">
+                                    • <kbd class="kbd kbd-xs text-[9px] font-bold">Ctrl</kbd> {{ __('kunci rasio aspek') }}
+                                </span>
+                            </div>
                         </div>
                     </div>
 
@@ -758,6 +768,35 @@
                     </div>
                 </div>
 
+                {{-- Multi-Page Selection & Toggle Bar --}}
+                <div class="px-5 py-2.5 bg-base-200/50 border-b border-base-200 flex flex-wrap items-center justify-between gap-2 shrink-0 text-xs">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        {{-- Toggle for current page --}}
+                        <button type="button" id="pdf-toggle-current-page-btn" onclick="toggleCurrentPagePlacement()" class="btn btn-xs gap-1.5 font-bold transition-all shadow-xs btn-outline btn-success">
+                            <span id="pdf-toggle-current-page-icon">✓</span>
+                            <span id="pdf-toggle-current-page-text">{{ __('Terapkan di Halaman Ini') }}</span>
+                        </button>
+
+                        {{-- Quick shortcuts --}}
+                        <div class="join border border-base-300 rounded-lg overflow-hidden bg-base-100 shadow-xs">
+                            <button type="button" onclick="applyPlacementToAllPages()" class="btn btn-xs join-item btn-ghost hover:bg-base-200 text-[11px] font-semibold" title="{{ __('Terapkan tanda tangan ke seluruh halaman dokumen') }}">
+                                {{ __('Pilih Semua Halaman') }}
+                            </button>
+                            <button type="button" onclick="applyPlacementOnlyToCurrentPage()" class="btn btn-xs join-item btn-ghost hover:bg-base-200 text-[11px] font-semibold" title="{{ __('Hanya terapkan pada halaman yang sedang aktif') }}">
+                                {{ __('Hanya Halaman Ini') }}
+                            </button>
+                        </div>
+                    </div>
+
+                    {{-- Selected pages badge & summary --}}
+                    <div class="flex items-center gap-2">
+                        <span class="text-base-content/60 text-[11px] font-medium hidden sm:inline">{{ __('Diterapkan pada:') }}</span>
+                        <span id="pdf-selected-pages-summary" class="badge badge-primary badge-sm font-bold text-[11px] px-2.5 py-1 shadow-xs">
+                            1 halaman
+                        </span>
+                    </div>
+                </div>
+
                 {{-- PDF Canvas Workspace Viewport --}}
                 <div id="pdf-workspace-viewport" class="flex-1 overflow-auto bg-base-300/60 p-4 sm:p-6 flex items-start justify-center relative min-h-[350px]">
                     <div id="pdf-visual-loading" class="absolute inset-0 flex flex-col items-center justify-start bg-base-100/95 backdrop-blur-xs z-20 p-6 overflow-y-auto">
@@ -775,6 +814,27 @@
                         
                         {{-- Interactive Signature Overlay Layer --}}
                         <div id="pdf-interactive-overlay" class="absolute inset-0 z-10 pointer-events-auto">
+                            {{-- Disabled Page Prompt (Shown when current page is not selected) --}}
+                            <div id="pdf-page-disabled-prompt" class="absolute inset-0 flex flex-col items-center justify-center bg-base-100/75 backdrop-blur-[2px] z-20 transition-opacity hidden">
+                                <div class="p-5 rounded-2xl bg-base-100 border border-base-300 shadow-2xl max-w-sm text-center flex flex-col items-center gap-3">
+                                    <div class="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-sm font-bold text-base-content">{{ __('Tanda Tangan Belum Diterapkan') }}</h4>
+                                        <p class="text-xs text-base-content/70 mt-1">{{ __('Klik tombol di bawah untuk menampilkan dan mengatur penanda pada Halaman') }} <span id="pdf-disabled-page-num" class="font-bold text-primary">1</span>.</p>
+                                    </div>
+                                    <button type="button" onclick="toggleCurrentPagePlacement(true)" class="btn btn-sm btn-primary gap-1.5 rounded-xl font-bold uppercase shadow-xs">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                        </svg>
+                                        {{ __('Terapkan di Halaman Ini') }}
+                                    </button>
+                                </div>
+                            </div>
+
                             <div id="pdf-signature-drag-box"
                                  class="absolute border-2 border-primary/90 bg-primary/5 cursor-move shadow-lg select-none touch-none transition-shadow group hover:shadow-2xl hover:border-primary p-0 m-0"
                                  style="left: 40px; top: 40px; width: 140px; height: 85px;">
@@ -788,6 +848,7 @@
                                         <span id="pdf-box-signer-tag-text">{{ __('Geser TTD') }}</span>
                                     </span>
                                     <span class="badge badge-neutral badge-xs font-mono font-bold text-[10px] shadow-xs px-2 py-0.5 opacity-90" id="pdf-box-dim-preview">40×25mm</span>
+                                    <span id="pdf-box-ratio-badge" class="badge badge-xs font-bold text-[10px] shadow-xs px-2 py-0.5 transition-all hidden"></span>
                                 </div>
 
                                 {{-- Exact Image Surface (Fills the entire boundary flush to borders with zero padding) --}}
@@ -802,7 +863,7 @@
                                 {{-- Bottom Resizer Handle (Bottom-Right corner) --}}
                                 <div id="pdf-sig-resize-handle"
                                      class="absolute -right-3 -bottom-3 w-6 h-6 bg-primary text-primary-content rounded-full flex items-center justify-center cursor-nwse-resize shadow-lg hover:scale-110 active:scale-95 transition-transform z-30 ring-2 ring-white"
-                                     title="{{ __('Tarik untuk mengubah ukuran') }}">
+                                     title="{{ __('Tarik sudut untuk ubah ukuran (Tahan Ctrl untuk menjaga rasio aspek)') }}">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                                     </svg>
@@ -813,9 +874,13 @@
                 </div>
 
                 {{-- Modal Footer Actions --}}
-                <div class="px-6 py-4 border-t border-base-200 bg-base-100 flex flex-wrap items-center justify-between gap-3 shrink-0">
-                    <div class="text-xs text-base-content/60 hidden sm:block">
-                        💡 <span class="font-medium">{{ __('Tips:') }}</span> {{ __('Posisikan kotak di atas garis tanda tangan pada dokumen.') }}
+                <div class="px-6 py-3.5 border-t border-base-200 bg-base-100 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                    <div class="text-xs text-base-content/70 flex items-center gap-2 flex-wrap">
+                        <span>💡 <span class="font-medium text-base-content">{{ __('Tips:') }}</span> {{ __('Posisikan kotak di atas garis tanda tangan.') }}</span>
+                        <span class="inline-flex items-center gap-1.5 text-[11px] font-medium text-base-content/85 bg-base-200/80 border border-base-300 px-2 py-0.5 rounded-md shadow-2xs">
+                            <kbd class="kbd kbd-xs font-bold bg-base-100 shadow-2xs">Ctrl</kbd>
+                            <span>{{ __('+ Tarik sudut untuk menjaga rasio aspek (proporsional)') }}</span>
+                        </span>
                     </div>
                     <div class="flex items-center gap-2 ml-auto">
                         <button type="button" onclick="closePdfVisualPlacementModal()" class="btn btn-ghost btn-sm rounded-xl">{{ __('Batal') }}</button>
@@ -934,6 +999,7 @@
                 hMm: 25,
                 isCustom: false
             };
+            let pagePlacementsMap = {};
 
             const mainScrollContainer = document.querySelector('main') || document.documentElement;
 
@@ -1648,6 +1714,9 @@
                 activeVisualSignatureType = signatureType;
                 activeVisualCompanyName = companyName;
 
+                // Reset multi-page placements
+                pagePlacementsMap = {};
+
                 const titleEl = document.getElementById('pdf-visual-modal-title');
                 const subTitleEl = document.getElementById('pdf-visual-modal-subtitle');
                 const tagBadgeEl = document.getElementById('pdf-box-signer-tag');
@@ -1843,6 +1912,23 @@
                     
                     const totalEl = document.getElementById('pdf-visual-total-page-num');
                     if (totalEl) totalEl.textContent = totalVisualPdfPages;
+
+                    // Initialize multi-page placement for initial page if not yet populated
+                    if (Object.keys(pagePlacementsMap).length === 0) {
+                        const isStamp = (activeVisualSignatureType === 'company_stamp');
+                        const isQr = (activeVisualType === 'qrcode');
+                        const defaultW = isQr ? 18 : (isStamp ? 25 : 35);
+                        const defaultH = isQr ? 18 : (isStamp ? 25 : 20);
+
+                        pagePlacementsMap[currentVisualPdfPage] = {
+                            page: currentVisualPdfPage,
+                            pos_x: null,
+                            pos_y: null,
+                            width: defaultW,
+                            height: defaultH,
+                            preset_position: 'custom'
+                        };
+                    }
                     
                     setTimeout(() => {
                         renderVisualPdfPage(currentVisualPdfPage);
@@ -1854,6 +1940,125 @@
                         loadingEl.innerHTML = '<p class="text-xs text-error font-bold uppercase">{{ __("Gagal memuat pratinjau PDF.") }}</p>';
                     }
                 });
+            }
+
+            function updateMultiPageSummary() {
+                const summaryEl = document.getElementById('pdf-selected-pages-summary');
+                const actionBtnText = document.getElementById('pdf-visual-action-btn-text');
+                const actionBtn = document.getElementById('pdf-visual-action-btn');
+                if (!summaryEl) return;
+
+                const appliedPages = Object.keys(pagePlacementsMap).map(Number).sort((a,b) => a - b);
+                const count = appliedPages.length;
+
+                if (count === 0) {
+                    summaryEl.className = "badge badge-error badge-sm font-bold text-[11px] px-2.5 py-1 shadow-xs text-white";
+                    summaryEl.textContent = "{{ __('0 halaman dipilih') }}";
+                    if (actionBtn) actionBtn.disabled = true;
+                } else if (totalVisualPdfPages > 1 && count === totalVisualPdfPages) {
+                    summaryEl.className = "badge badge-success badge-sm font-bold text-[11px] px-2.5 py-1 shadow-xs text-white";
+                    summaryEl.textContent = `{{ __('Semua Halaman') }} (${count})`;
+                    if (actionBtn) actionBtn.disabled = false;
+                } else {
+                    summaryEl.className = "badge badge-primary badge-sm font-bold text-[11px] px-2.5 py-1 shadow-xs";
+                    const pagesStr = count <= 4 ? appliedPages.join(', ') : `${appliedPages.slice(0, 3).join(', ')}... (+${count - 3})`;
+                    summaryEl.textContent = `${count} {{ __('halaman') }} (Hal ${pagesStr})`;
+                    if (actionBtn) actionBtn.disabled = false;
+                }
+
+                if (actionBtnText) {
+                    const isStamp = (activeVisualSignatureType === 'company_stamp');
+                    const isQr = (activeVisualType === 'qrcode');
+                    let baseText = '';
+                    if (isQr) {
+                        baseText = '{{ __("Bubuhkan QR Code Di Sini") }}';
+                    } else if (activeVisualTargetUserId && activeVisualTargetUserName) {
+                        baseText = isStamp ? '{{ __("Kirim Permintaan Stempel") }}' : '{{ __("Kirim Permintaan Tanda Tangan") }}';
+                    } else {
+                        baseText = isStamp ? '{{ __("Bubuhkan Stempel Di Sini") }}' : (activeVisualSignatureId ? '{{ __("Bubuhkan TTD Di Sini") }}' : '{{ __("Bubuhkan TTD Saya Di Sini") }}');
+                    }
+
+                    if (count > 1) {
+                        actionBtnText.textContent = `${baseText} (${count} Halaman)`;
+                    } else if (count === 1) {
+                        actionBtnText.textContent = `${baseText} (Hal ${appliedPages[0]})`;
+                    } else {
+                        actionBtnText.textContent = baseText;
+                    }
+                }
+            }
+
+            function toggleCurrentPagePlacement(forceEnable = false) {
+                const page = currentVisualPdfPage;
+                if (pagePlacementsMap[page] && !forceEnable) {
+                    delete pagePlacementsMap[page];
+                } else {
+                    const existingKeys = Object.keys(pagePlacementsMap);
+                    let refPlacement = existingKeys.length > 0 ? pagePlacementsMap[existingKeys[existingKeys.length - 1]] : null;
+
+                    const isStamp = (activeVisualSignatureType === 'company_stamp');
+                    const isQr = (activeVisualType === 'qrcode');
+                    const defaultW = isQr ? 18 : (isStamp ? 25 : 35);
+                    const defaultH = isQr ? 18 : (isStamp ? 25 : 20);
+
+                    pagePlacementsMap[page] = {
+                        page: page,
+                        pos_x: refPlacement?.pos_x ?? null,
+                        pos_y: refPlacement?.pos_y ?? null,
+                        width: refPlacement?.width ?? defaultW,
+                        height: refPlacement?.height ?? defaultH,
+                        preset_position: 'custom'
+                    };
+                }
+                renderVisualPdfPage(page);
+            }
+
+            function applyPlacementToAllPages() {
+                if (!pdfDocInstance || totalVisualPdfPages < 1) return;
+                const page = currentVisualPdfPage;
+                const currentPl = pagePlacementsMap[page];
+                const isStamp = (activeVisualSignatureType === 'company_stamp');
+                const isQr = (activeVisualType === 'qrcode');
+                const defaultW = isQr ? 18 : (isStamp ? 25 : 35);
+                const defaultH = isQr ? 18 : (isStamp ? 25 : 20);
+
+                const refX = currentPl?.pos_x ?? null;
+                const refY = currentPl?.pos_y ?? null;
+                const refW = currentPl?.width ?? defaultW;
+                const refH = currentPl?.height ?? defaultH;
+
+                for (let p = 1; p <= totalVisualPdfPages; p++) {
+                    pagePlacementsMap[p] = {
+                        page: p,
+                        pos_x: pagePlacementsMap[p]?.pos_x ?? refX,
+                        pos_y: pagePlacementsMap[p]?.pos_y ?? refY,
+                        width: pagePlacementsMap[p]?.width ?? refW,
+                        height: pagePlacementsMap[p]?.height ?? refH,
+                        preset_position: 'custom'
+                    };
+                }
+                renderVisualPdfPage(page);
+            }
+
+            function applyPlacementOnlyToCurrentPage() {
+                const page = currentVisualPdfPage;
+                const currentPl = pagePlacementsMap[page];
+                const isStamp = (activeVisualSignatureType === 'company_stamp');
+                const isQr = (activeVisualType === 'qrcode');
+                const defaultW = isQr ? 18 : (isStamp ? 25 : 35);
+                const defaultH = isQr ? 18 : (isStamp ? 25 : 20);
+
+                pagePlacementsMap = {
+                    [page]: {
+                        page: page,
+                        pos_x: currentPl?.pos_x ?? null,
+                        pos_y: currentPl?.pos_y ?? null,
+                        width: currentPl?.width ?? defaultW,
+                        height: currentPl?.height ?? defaultH,
+                        preset_position: 'custom'
+                    }
+                };
+                renderVisualPdfPage(page);
             }
 
             function renderVisualPdfPage(pageNumber) {
@@ -1892,40 +2097,75 @@
                         if (loadingEl) loadingEl.classList.add('hidden');
                         
                         const dragBox = document.getElementById('pdf-signature-drag-box');
-                        if (dragBox && (!dragBox.dataset.positioned || dragBox.dataset.page != currentVisualPdfPage)) {
-                            const mmPerPt = 25.4 / 72;
-                            const unscaledW = pdfViewport.width / pdfPageScale;
-                            const unscaledH = pdfViewport.height / pdfPageScale;
-                            const pdfWidthMm = unscaledW * mmPerPt;
-                            const pdfHeightMm = unscaledH * mmPerPt;
-                            const pxPerMmX = canvas.width / pdfWidthMm;
-                            const pxPerMmY = canvas.height / pdfHeightMm;
+                        const promptEl = document.getElementById('pdf-page-disabled-prompt');
+                        const toggleBtn = document.getElementById('pdf-toggle-current-page-btn');
+                        const toggleIcon = document.getElementById('pdf-toggle-current-page-icon');
+                        const toggleText = document.getElementById('pdf-toggle-current-page-text');
+                        const disabledPageNum = document.getElementById('pdf-disabled-page-num');
 
-                            const isStamp = (activeVisualSignatureType === 'company_stamp');
-                            const isQr = (activeVisualType === 'qrcode');
-                            let defaultWMm = 35;
-                            let defaultHMm = 20;
-                            if (isQr) {
-                                defaultWMm = 18;
-                                defaultHMm = 18;
-                            } else if (isStamp) {
-                                defaultWMm = 25;
-                                defaultHMm = 25;
+                        const mmPerPt = 25.4 / 72;
+                        const unscaledW = pdfViewport.width / pdfPageScale;
+                        const unscaledH = pdfViewport.height / pdfPageScale;
+                        const pdfWidthMm = unscaledW * mmPerPt;
+                        const pdfHeightMm = unscaledH * mmPerPt;
+                        const pxPerMmX = canvas.width / pdfWidthMm;
+                        const pxPerMmY = canvas.height / pdfHeightMm;
+
+                        const isApplied = !!pagePlacementsMap[currentVisualPdfPage];
+
+                        if (isApplied) {
+                            if (dragBox) dragBox.classList.remove('hidden');
+                            if (promptEl) promptEl.classList.add('hidden');
+                            if (toggleBtn) {
+                                toggleBtn.className = "btn btn-xs gap-1.5 font-bold transition-all shadow-xs btn-success text-success-content";
+                                if (toggleIcon) toggleIcon.textContent = "✓";
+                                if (toggleText) toggleText.textContent = "{{ __('Terapkan di Halaman Ini') }}";
                             }
 
-                            const boxW = Math.round(defaultWMm * pxPerMmX);
-                            const boxH = Math.round(defaultHMm * pxPerMmY);
-                            const initLeft = pdfViewport.width - boxW - Math.round(15 * pxPerMmX);
-                            const initTop = pdfViewport.height - boxH - Math.round(20 * pxPerMmY);
+                            const pl = pagePlacementsMap[currentVisualPdfPage];
+                            const isStamp = (activeVisualSignatureType === 'company_stamp');
+                            const isQr = (activeVisualType === 'qrcode');
+                            let defaultWMm = isQr ? 18 : (isStamp ? 25 : 35);
+                            let defaultHMm = isQr ? 18 : (isStamp ? 25 : 20);
 
-                            dragBox.style.width = boxW + 'px';
-                            dragBox.style.height = boxH + 'px';
-                            dragBox.style.left = Math.max(15, initLeft) + 'px';
-                            dragBox.style.top = Math.max(15, initTop) + 'px';
-                            dragBox.dataset.positioned = "true";
-                            dragBox.dataset.page = currentVisualPdfPage;
+                            let boxWMm = pl.width || defaultWMm;
+                            let boxHMm = pl.height || defaultHMm;
+
+                            let boxW = Math.round(boxWMm * pxPerMmX);
+                            let boxH = Math.round(boxHMm * pxPerMmY);
+
+                            let boxLeft, boxTop;
+                            if (pl.pos_x !== null && pl.pos_y !== null) {
+                                boxLeft = Math.round(pl.pos_x * pxPerMmX);
+                                boxTop = Math.round(pl.pos_y * pxPerMmY);
+                            } else {
+                                boxLeft = pdfViewport.width - boxW - Math.round(15 * pxPerMmX);
+                                boxTop = pdfViewport.height - boxH - Math.round(20 * pxPerMmY);
+                            }
+
+                            if (dragBox) {
+                                dragBox.style.width = boxW + 'px';
+                                dragBox.style.height = boxH + 'px';
+                                dragBox.style.left = Math.max(5, boxLeft) + 'px';
+                                dragBox.style.top = Math.max(5, boxTop) + 'px';
+                                dragBox.dataset.positioned = "true";
+                                dragBox.dataset.page = currentVisualPdfPage;
+                            }
+                            updateCoordinateMetrics();
+                        } else {
+                            if (dragBox) dragBox.classList.add('hidden');
+                            if (promptEl) {
+                                promptEl.classList.remove('hidden');
+                                if (disabledPageNum) disabledPageNum.textContent = currentVisualPdfPage;
+                            }
+                            if (toggleBtn) {
+                                toggleBtn.className = "btn btn-xs gap-1.5 font-bold transition-all shadow-xs btn-ghost border border-base-300 text-base-content/70 hover:btn-primary";
+                                if (toggleIcon) toggleIcon.textContent = "+";
+                                if (toggleText) toggleText.textContent = "{{ __('Terapkan di Halaman Ini') }}";
+                            }
                         }
-                        updateCoordinateMetrics();
+
+                        updateMultiPageSummary();
                     });
                 });
             }
@@ -1971,6 +2211,14 @@
                     isCustom: true
                 };
 
+                if (pagePlacementsMap[currentVisualPdfPage]) {
+                    pagePlacementsMap[currentVisualPdfPage].pos_x = finalXMm;
+                    pagePlacementsMap[currentVisualPdfPage].pos_y = finalYMm;
+                    pagePlacementsMap[currentVisualPdfPage].width = finalWMm;
+                    pagePlacementsMap[currentVisualPdfPage].height = finalHMm;
+                    pagePlacementsMap[currentVisualPdfPage].preset_position = 'custom';
+                }
+
                 const elX = document.getElementById('pdf-coord-x');
                 const elY = document.getElementById('pdf-coord-y');
                 const elW = document.getElementById('pdf-coord-w');
@@ -1988,6 +2236,7 @@
                 const dragBox = document.getElementById('pdf-signature-drag-box');
                 const resizeHandle = document.getElementById('pdf-sig-resize-handle');
                 const overlay = document.getElementById('pdf-interactive-overlay');
+                const ratioBadge = document.getElementById('pdf-box-ratio-badge');
                 if (!dragBox || !resizeHandle || !overlay) return;
 
                 let isDragging = false;
@@ -1998,6 +2247,74 @@
                 let startTop = 0;
                 let startWidth = 0;
                 let startHeight = 0;
+                let startAspectRatio = 1;
+                let lastPointerMoveEvent = null;
+
+                function updateResizeBadge(isLocked) {
+                    if (!ratioBadge) return;
+                    if (!isResizing) {
+                        ratioBadge.classList.add('hidden');
+                        return;
+                    }
+                    ratioBadge.classList.remove('hidden');
+                    if (isLocked) {
+                        ratioBadge.className = 'badge badge-warning badge-xs font-bold text-[10px] shadow-xs px-2 py-0.5 flex items-center gap-1 animate-pulse';
+                        ratioBadge.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg> <span>{{ __('Rasio Terkunci (Ctrl)') }}</span>`;
+                    } else {
+                        ratioBadge.className = 'badge badge-neutral badge-xs font-medium text-[10px] shadow-xs px-2 py-0.5 bg-base-100/90 text-base-content border border-base-300 flex items-center gap-1';
+                        ratioBadge.innerHTML = `<kbd class="kbd kbd-xs text-[9px] font-bold">Ctrl</kbd> <span>{{ __('Kunci Rasio') }}</span>`;
+                    }
+                }
+
+                function performResize(e) {
+                    const dx = e.clientX - startX;
+                    const dy = e.clientY - startY;
+                    const overlayW = overlay.clientWidth;
+                    const overlayH = overlay.clientHeight;
+                    const boxLeft = parseFloat(dragBox.style.left) || 0;
+                    const boxTop = parseFloat(dragBox.style.top) || 0;
+
+                    const maxAvailableW = Math.max(30, overlayW - boxLeft);
+                    const maxAvailableH = Math.max(20, overlayH - boxTop);
+
+                    const isRatioLocked = Boolean(e.ctrlKey || e.metaKey || e.shiftKey);
+                    updateResizeBadge(isRatioLocked);
+
+                    let newW, newH;
+
+                    if (isRatioLocked && startAspectRatio > 0) {
+                        // Project cursor displacement along the start dimension vector to scale smoothly in 2D
+                        const denom = (startWidth * startWidth) + (startHeight * startHeight);
+                        const deltaProj = denom > 0 ? ((dx * startWidth + dy * startHeight) / denom) : 0;
+                        newW = startWidth * (1 + deltaProj);
+                        newH = startHeight * (1 + deltaProj);
+
+                        // Clamp to boundary limits while strictly preserving aspect ratio
+                        if (newW > maxAvailableW) {
+                            newW = maxAvailableW;
+                            newH = newW / startAspectRatio;
+                        }
+                        if (newH > maxAvailableH) {
+                            newH = maxAvailableH;
+                            newW = newH * startAspectRatio;
+                        }
+                        if (newW < 30) {
+                            newW = 30;
+                            newH = newW / startAspectRatio;
+                        }
+                        if (newH < 20) {
+                            newH = 20;
+                            newW = newH * startAspectRatio;
+                        }
+                    } else {
+                        newW = Math.max(30, Math.min(startWidth + dx, maxAvailableW));
+                        newH = Math.max(20, Math.min(startHeight + dy, maxAvailableH));
+                    }
+
+                    dragBox.style.width = Math.round(newW) + 'px';
+                    dragBox.style.height = Math.round(newH) + 'px';
+                    updateCoordinateMetrics();
+                }
 
                 dragBox.addEventListener('pointerdown', function(e) {
                     if (e.target === resizeHandle || resizeHandle.contains(e.target)) return;
@@ -2017,7 +2334,10 @@
                     startY = e.clientY;
                     startWidth = parseFloat(dragBox.style.width) || 120;
                     startHeight = parseFloat(dragBox.style.height) || 70;
+                    startAspectRatio = (startWidth > 0 && startHeight > 0) ? (startWidth / startHeight) : 1;
+                    lastPointerMoveEvent = { clientX: e.clientX, clientY: e.clientY, ctrlKey: e.ctrlKey, metaKey: e.metaKey, shiftKey: e.shiftKey };
                     resizeHandle.setPointerCapture(e.pointerId);
+                    updateResizeBadge(Boolean(e.ctrlKey || e.metaKey || e.shiftKey));
                     e.stopPropagation();
                     e.preventDefault();
                 });
@@ -2041,24 +2361,21 @@
                         dragBox.style.top = newTop + 'px';
                         updateCoordinateMetrics();
                     } else if (isResizing) {
-                        const dx = e.clientX - startX;
-                        const dy = e.clientY - startY;
-                        const overlayW = overlay.clientWidth;
-                        const overlayH = overlay.clientHeight;
-                        const boxLeft = parseFloat(dragBox.style.left) || 0;
-                        const boxTop = parseFloat(dragBox.style.top) || 0;
-
-                        let newW = Math.max(30, startWidth + dx);
-                        let newH = Math.max(20, startHeight + dy);
-
-                        newW = Math.min(newW, overlayW - boxLeft);
-                        newH = Math.min(newH, overlayH - boxTop);
-
-                        dragBox.style.width = newW + 'px';
-                        dragBox.style.height = newH + 'px';
-                        updateCoordinateMetrics();
+                        lastPointerMoveEvent = { clientX: e.clientX, clientY: e.clientY, ctrlKey: e.ctrlKey, metaKey: e.metaKey, shiftKey: e.shiftKey };
+                        performResize(e);
                     }
                 });
+
+                function handleResizeKeyEvent(e) {
+                    if (isResizing && lastPointerMoveEvent) {
+                        lastPointerMoveEvent.ctrlKey = e.ctrlKey;
+                        lastPointerMoveEvent.metaKey = e.metaKey;
+                        lastPointerMoveEvent.shiftKey = e.shiftKey;
+                        performResize(lastPointerMoveEvent);
+                    }
+                }
+                window.addEventListener('keydown', handleResizeKeyEvent);
+                window.addEventListener('keyup', handleResizeKeyEvent);
 
                 window.addEventListener('pointerup', function(e) {
                     if (isDragging) {
@@ -2067,6 +2384,8 @@
                     }
                     if (isResizing) {
                         isResizing = false;
+                        lastPointerMoveEvent = null;
+                        updateResizeBadge(false);
                     }
                 });
 
@@ -2083,27 +2402,42 @@
             }
 
             function submitActiveVisualAction() {
-                if (!visualPlacementCoords.isCustom) {
+                const appliedPages = Object.keys(pagePlacementsMap).map(Number).sort((a,b) => a - b);
+                if (appliedPages.length === 0) {
+                    showSignatureScreenAlert('PERINGATAN', 'PILIH MINIMAL SATU HALAMAN UNTUK MEMBUBUHKAN TANDA TANGAN / STEMPEL.', false);
+                    return;
+                }
+
+                if (!visualPlacementCoords.isCustom && pagePlacementsMap[currentVisualPdfPage]) {
                     updateCoordinateMetrics();
                 }
 
+                const placements = appliedPages.map(p => pagePlacementsMap[p]);
+
                 if (activeVisualType === 'qrcode') {
-                    stampMyVisualQrCode();
+                    stampMyVisualQrCode(placements);
                 } else if (activeVisualTargetUserId) {
-                    submitVisualSignatureRequest(activeVisualTargetUserId, activeVisualTargetUserName);
+                    submitVisualSignatureRequest(activeVisualTargetUserId, activeVisualTargetUserName, placements);
                 } else {
-                    stampMyVisualSignature();
+                    stampMyVisualSignature(placements);
                 }
             }
 
-            function stampMyVisualQrCode() {
+            function stampMyVisualQrCode(placements = null) {
+                if (!placements || placements.length === 0) {
+                    const appliedPages = Object.keys(pagePlacementsMap).map(Number).sort((a,b) => a - b);
+                    placements = appliedPages.map(p => pagePlacementsMap[p]);
+                }
+                const primaryPl = (placements && placements.length > 0) ? placements[0] : { page: 1, pos_x: null, pos_y: null, width: 24, height: 24, preset_position: 'custom' };
+
                 const payload = {
-                    page_number: visualPlacementCoords.page,
-                    pos_x: visualPlacementCoords.xMm,
-                    pos_y: visualPlacementCoords.yMm,
-                    width: visualPlacementCoords.wMm,
-                    height: visualPlacementCoords.hMm,
-                    preset_position: 'custom'
+                    page_number: primaryPl.page,
+                    pos_x: primaryPl.pos_x,
+                    pos_y: primaryPl.pos_y,
+                    width: primaryPl.width,
+                    height: primaryPl.height,
+                    preset_position: 'custom',
+                    placements: placements
                 };
 
                 const btn = document.getElementById('pdf-visual-action-btn');
@@ -2151,7 +2485,7 @@
                 });
             }
 
-            function submitVisualSignatureRequest(userId, userName) {
+            function submitVisualSignatureRequest(userId, userName, placements = null) {
                 const btn = document.getElementById('pdf-visual-action-btn');
                 const isStamp = (activeVisualSignatureType === 'company_stamp');
                 if (btn) {
@@ -2166,8 +2500,15 @@
                     );
                 }
 
+                if (!placements || placements.length === 0) {
+                    const appliedPages = Object.keys(pagePlacementsMap).map(Number).sort((a,b) => a - b);
+                    placements = appliedPages.map(p => pagePlacementsMap[p]);
+                }
+                const primaryPl = (placements && placements.length > 0) ? placements[0] : { page: 1, pos_x: null, pos_y: null, width: 24, height: 24, preset_position: 'custom' };
+
                 const sigParam = activeVisualSignatureId ? `&signature_id=${activeVisualSignatureId}` : '';
-                const queryStr = `&page_number=${visualPlacementCoords.page}&preset_position=custom&pos_x=${visualPlacementCoords.xMm}&pos_y=${visualPlacementCoords.yMm}&width=${visualPlacementCoords.wMm}&height=${visualPlacementCoords.hMm}${sigParam}`;
+                const placementsParam = `&placements=${encodeURIComponent(JSON.stringify(placements))}`;
+                const queryStr = `&page_number=${primaryPl.page}&preset_position=custom&pos_x=${primaryPl.pos_x ?? ''}&pos_y=${primaryPl.pos_y ?? ''}&width=${primaryPl.width}&height=${primaryPl.height}${sigParam}${placementsParam}`;
 
                 fetch(`/profile/signature?user_id=${userId}&document_id={{ $document->id }}${queryStr}`)
                     .then(res => res.json().then(data => ({ status: res.status, data: data })))
@@ -2181,9 +2522,11 @@
                         if (response.status === 200 && response.data.success) {
                             const title = isStamp ? 'PERMINTAAN STEMPEL DIKIRIM' : 'PERMINTAAN TANDA TANGAN DIKIRIM';
                             const defaultMsg = isStamp ? 'PERMINTAAN PENGGUNAAN STEMPEL PERUSAHAAN BERHASIL DIKIRIM.' : 'PERMINTAAN TANDA TANGAN BERHASIL DIKIRIM.';
+                            const count = placements.length;
+                            const countText = count > 1 ? ` (${count} HALAMAN)` : '';
                             const autoMsg = isStamp 
-                                ? ' PENANDA SEMENTARA TELAH DIBUBUHKAN DAN AKAN OTOMATIS DIGANTI DENGAN STEMPEL ASLI KETIKA DISETUJUI.'
-                                : ' PENANDA SEMENTARA TELAH DIBUBUHKAN DAN AKAN OTOMATIS DIGANTI DENGAN TANDA TANGAN ASLI KETIKA DISETUJUI.';
+                                ? ` PENANDA SEMENTARA TELAH DIBUBUHKAN${countText} DAN AKAN OTOMATIS DIGANTI DENGAN STEMPEL ASLI KETIKA DISETUJUI.`
+                                : ` PENANDA SEMENTARA TELAH DIBUBUHKAN${countText} DAN AKAN OTOMATIS DIGANTI DENGAN TANDA TANGAN ASLI KETIKA DISETUJUI.`;
                             window._allowIntentionalLeave = true;
                             if (typeof window.allowIntentionalLeave === 'function') {
                                 window.allowIntentionalLeave();
@@ -2209,21 +2552,28 @@
                     });
             }
 
-            function stampMyVisualSignature() {
-                if (!visualPlacementCoords.isCustom) {
+            function stampMyVisualSignature(placements = null) {
+                if (!visualPlacementCoords.isCustom && pagePlacementsMap[currentVisualPdfPage]) {
                     updateCoordinateMetrics();
                 }
+
+                if (!placements || placements.length === 0) {
+                    const appliedPages = Object.keys(pagePlacementsMap).map(Number).sort((a,b) => a - b);
+                    placements = appliedPages.map(p => pagePlacementsMap[p]);
+                }
+                const primaryPl = (placements && placements.length > 0) ? placements[0] : { page: 1, pos_x: null, pos_y: null, width: 24, height: 24, preset_position: 'custom' };
 
                 const isStamp = (activeVisualSignatureType === 'company_stamp');
 
                 const payload = {
-                    page_number: visualPlacementCoords.page,
-                    pos_x: visualPlacementCoords.xMm,
-                    pos_y: visualPlacementCoords.yMm,
-                    width: visualPlacementCoords.wMm,
-                    height: visualPlacementCoords.hMm,
+                    page_number: primaryPl.page,
+                    pos_x: primaryPl.pos_x,
+                    pos_y: primaryPl.pos_y,
+                    width: primaryPl.width,
+                    height: primaryPl.height,
                     preset_position: 'custom',
-                    signature_id: activeVisualSignatureId
+                    signature_id: activeVisualSignatureId,
+                    placements: placements
                 };
 
                 const btn = document.getElementById('pdf-visual-action-btn');

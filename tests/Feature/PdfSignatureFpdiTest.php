@@ -42,6 +42,22 @@ class PdfSignatureFpdiTest extends TestCase
     }
 
     /**
+     * Helper to create a valid multi-page PDF in local storage.
+     */
+    protected function createMultiPagePdf(string $storagePath, int $pageCount = 3): void
+    {
+        $fpdf = new Fpdi();
+        for ($i = 1; $i <= $pageCount; $i++) {
+            $fpdf->AddPage();
+            $fpdf->SetFont('Helvetica', 'B', 16);
+            $fpdf->Cell(40, 10, 'Page ' . $i . ' Content for MultiPage Testing');
+        }
+        $pdfContent = $fpdf->Output('S');
+
+        Storage::disk('local')->put($storagePath, $pdfContent);
+    }
+
+    /**
      * Helper to create a valid PNG signature file in public storage.
      */
     protected function createValidSignaturePng(string $storagePath): string
@@ -794,5 +810,140 @@ class PdfSignatureFpdiTest extends TestCase
 
         $this->assertEquals('approved', $stampItem2['request_status']);
         $this->assertTrue($stampItem2['is_available_to_replace']);
+    }
+
+    public function test_signature_request_with_multi_page_placements_stamps_all_pages_upon_approval(): void
+    {
+        $requester = User::factory()->create(['name' => 'Requester']);
+        $signer = User::factory()->create(['name' => 'Director']);
+
+        $this->createValidSignaturePng('signatures/sig_director.png');
+        Signature::create([
+            'user_id' => $signer->id,
+            'file_path' => 'signatures/sig_director.png',
+        ]);
+
+        $docType = DocumentType::create(['name' => 'Surat Keputusan', 'code' => 'SK']);
+        $document = Document::create([
+            'document_number' => '009/SK/2026',
+            'title' => 'Multi-Page Signature Test Document',
+            'document_type_id' => $docType->id,
+            'owner_id' => $requester->id,
+            'visibility' => 'general',
+        ]);
+
+        $pdfPath = 'documents/' . $document->id . '/v1.pdf';
+        $this->createMultiPagePdf($pdfPath, 3);
+
+        DocumentVersion::create([
+            'document_id' => $document->id,
+            'version_number' => 1,
+            'content' => '',
+            'author_id' => $requester->id,
+            'author_name' => $requester->name,
+            'status' => 'draft',
+            'file_path' => $pdfPath,
+            'file_mime' => 'application/pdf',
+            'file_original_name' => 'multipage.pdf',
+        ]);
+
+        $placements = [
+            ['page' => 1, 'pos_x' => 20.0, 'pos_y' => 250.0, 'width' => 30.0, 'height' => 20.0, 'preset_position' => 'custom'],
+            ['page' => 3, 'pos_x' => 140.0, 'pos_y' => 220.0, 'width' => 40.0, 'height' => 25.0, 'preset_position' => 'custom'],
+        ];
+
+        // 1. Requester requests signature with multi-page placements
+        $reqResponse = $this->actingAs($requester)->getJson(
+            route('profile.signature.show', [
+                'user_id' => $signer->id,
+                'document_id' => $document->id,
+                'page_number' => 1,
+                'placements' => json_encode($placements),
+            ])
+        );
+
+        $reqResponse->assertStatus(200)->assertJson(['is_pending' => true]);
+
+        $sigRequest = SignatureRequest::where('requester_id', $requester->id)
+            ->where('target_user_id', $signer->id)
+            ->where('document_id', $document->id)
+            ->first();
+
+        $this->assertNotNull($sigRequest);
+        $this->assertCount(2, $sigRequest->getPlacements());
+        $this->assertEquals(1, $sigRequest->page_number);
+
+        // 2. Signer approves signature request
+        $approveResponse = $this->actingAs($signer)->post(
+            route('signatures.requests.approve', $sigRequest)
+        );
+
+        $approveResponse->assertRedirect();
+        $this->assertTrue($sigRequest->fresh()->isApproved());
+
+        // 3. Verify PDF is valid and has 3 pages
+        $fpdi = new Fpdi();
+        $tempFile = tempnam(sys_get_temp_dir(), 'test_mp_') . '.pdf';
+        file_put_contents($tempFile, Storage::disk('local')->get($pdfPath));
+        $pageCount = $fpdi->setSourceFile($tempFile);
+        $this->assertEquals(3, $pageCount);
+        @unlink($tempFile);
+    }
+
+    public function test_user_can_stamp_pdf_on_multiple_pages_at_once(): void
+    {
+        $user = User::factory()->create();
+        $this->createValidSignaturePng('signatures/sig_' . $user->id . '.png');
+
+        $sig = Signature::create([
+            'user_id' => $user->id,
+            'file_path' => 'signatures/sig_' . $user->id . '.png',
+            'type' => 'original',
+        ]);
+
+        $docType = DocumentType::create(['name' => 'Perjanjian', 'code' => 'PJJ']);
+        $document = Document::create([
+            'document_number' => '010/PJJ/2026',
+            'title' => 'Multi-Page Direct Stamp Test',
+            'document_type_id' => $docType->id,
+            'owner_id' => $user->id,
+            'visibility' => 'general',
+        ]);
+
+        $pdfPath = 'documents/' . $document->id . '/v1.pdf';
+        $this->createMultiPagePdf($pdfPath, 3);
+
+        DocumentVersion::create([
+            'document_id' => $document->id,
+            'version_number' => 1,
+            'content' => '',
+            'author_id' => $user->id,
+            'author_name' => $user->name,
+            'status' => 'draft',
+            'file_path' => $pdfPath,
+            'file_mime' => 'application/pdf',
+            'file_original_name' => 'multipage_direct.pdf',
+        ]);
+
+        $placements = [
+            ['page' => 1, 'pos_x' => 10.0, 'pos_y' => 20.0, 'width' => 25.0, 'height' => 25.0, 'preset_position' => 'custom'],
+            ['page' => 2, 'pos_x' => 10.0, 'pos_y' => 20.0, 'width' => 25.0, 'height' => 25.0, 'preset_position' => 'custom'],
+            ['page' => 3, 'pos_x' => 150.0, 'pos_y' => 230.0, 'width' => 35.0, 'height' => 20.0, 'preset_position' => 'custom'],
+        ];
+
+        $response = $this->actingAs($user)->postJson(route('documents.stamp-signature', $document), [
+            'signature_id' => $sig->id,
+            'placements' => $placements,
+        ]);
+
+        $response->assertStatus(200)->assertJson(['success' => true]);
+
+        // Verify PDF retains 3 pages
+        $fpdi = new Fpdi();
+        $tempFile = tempnam(sys_get_temp_dir(), 'test_mp_direct_') . '.pdf';
+        file_put_contents($tempFile, Storage::disk('local')->get($pdfPath));
+        $pageCount = $fpdi->setSourceFile($tempFile);
+        $this->assertEquals(3, $pageCount);
+        @unlink($tempFile);
     }
 }
