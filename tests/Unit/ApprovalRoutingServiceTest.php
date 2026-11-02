@@ -124,4 +124,49 @@ class ApprovalRoutingServiceTest extends TestCase
         $this->assertEquals('direktur', $result['role']);
         $this->assertTrue($result['approvers']->contains($direktur));
     }
+
+    public function test_it_does_not_resolve_head_from_different_company()
+    {
+        $companyOther = Company::create(['name' => 'PT Other', 'code' => 'OTH']);
+        $branchOther = Branch::create(['name' => 'Branch Other', 'company_id' => $companyOther->id]);
+
+        $headOtherCompany = User::create([
+            'name' => 'Head Other Company',
+            'email' => 'head_other@example.com',
+            'password' => bcrypt('password'),
+            'system_role' => 'head',
+            'unit_kerja_id' => $this->unitKerja->id,
+            'is_active' => true,
+        ]);
+        $headOtherCompany->companies()->attach($companyOther->id);
+        $headOtherCompany->branches()->attach($branchOther->id);
+
+        $creator = User::create([
+            'name' => 'Staff Test',
+            'email' => 'staff_test@example.com',
+            'password' => bcrypt('password'),
+            'system_role' => 'user',
+            'unit_kerja_id' => $this->unitKerja->id,
+            'is_active' => true,
+        ]);
+        $creator->companies()->attach($this->company->id);
+        $creator->branches()->attach($this->branch->id);
+
+        $documentType = DocumentType::create(['name' => 'SOP 4', 'code' => 'SOP4', 'category' => 'akreditasi']);
+
+        $document = Document::create([
+            'title' => 'Test',
+            'document_number' => '126',
+            'owner_id' => $creator->id,
+            'document_type_id' => $documentType->id,
+            'company_id' => $this->company->id,
+            'branch_id' => $this->branch->id,
+            'unit_kerja_id' => $this->unitKerja->id,
+        ]);
+
+        [$originUnit, $originHead] = $this->service->resolveOriginUnitAndHead($document, $creator);
+
+        // Head from the other company MUST NOT be chosen
+        $this->assertNull($originHead);
+    }
 }

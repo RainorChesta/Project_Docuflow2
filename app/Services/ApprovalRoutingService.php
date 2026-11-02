@@ -735,6 +735,8 @@ class ApprovalRoutingService
         $originUnitHead = null;
 
         if ($originUnit) {
+            $companyId = $document->company_id ?? $document->branch?->company_id;
+
             // 1. First priority: Check for an active user with role 'head' assigned to this unit and matching document branch/company
             $headQuery = User::where('system_role', 'head')
                 ->where('is_active', true)
@@ -744,37 +746,44 @@ class ApprovalRoutingService
                 });
 
             if ($document->branch_id) {
-                $headQuery->where(function ($q) use ($document) {
+                $headQuery->where(function ($q) use ($document, $companyId) {
                     $q->whereHas('branches', fn($bq) => $bq->where('branches.id', $document->branch_id));
-                    if ($document->company_id) {
-                        $q->orWhere(function ($cq) use ($document) {
-                            $cq->whereHas('companies', fn($c) => $c->where('companies.id', $document->company_id))
+                    if ($companyId) {
+                        $q->orWhere(function ($cq) use ($companyId) {
+                            $cq->whereHas('companies', fn($c) => $c->where('companies.id', $companyId))
                                ->whereDoesntHave('branches');
                         });
                     }
                 });
-            } elseif ($document->company_id) {
-                $headQuery->whereHas('companies', fn($cq) => $cq->where('companies.id', $document->company_id));
+            } elseif ($companyId) {
+                $headQuery->whereHas('companies', fn($cq) => $cq->where('companies.id', $companyId));
             }
 
             $originUnitHead = $headQuery->first();
 
-            // 2. Second priority: If no branch-scoped head found, try broader search for any active head assigned to this unit
+            // 2. Second priority: If no branch-scoped head found, try broader search for any active head assigned to this unit WITHIN the same company
             if (!$originUnitHead) {
-                $originUnitHead = User::where('system_role', 'head')
+                $headQueryCompany = User::where('system_role', 'head')
                     ->where('is_active', true)
                     ->where(function ($q) use ($originUnit) {
                         $q->where('unit_kerja_id', $originUnit->id)
                           ->orWhereHas('unitKerjas', fn($uq) => $uq->where('unit_kerjas.id', $originUnit->id));
-                    })
-                    ->first();
+                    });
+
+                if ($companyId) {
+                    $headQueryCompany->whereHas('companies', fn($cq) => $cq->where('companies.id', $companyId));
+                }
+
+                $originUnitHead = $headQueryCompany->first();
             }
 
             // 3. Third priority: If unit has pic_user_id and that user is active and has head / pic role (and is NOT an admin)
             if (!$originUnitHead && $originUnit->pic_user_id) {
                 $picUser = $originUnit->picUser;
                 if ($picUser && $picUser->is_active && ($picUser->isHead() || $picUser->isPicUnitKerja()) && !$picUser->isAdmin()) {
-                    $originUnitHead = $picUser;
+                    if (!$companyId || $picUser->companies()->where('companies.id', $companyId)->exists()) {
+                        $originUnitHead = $picUser;
+                    }
                 }
             }
         } else {
