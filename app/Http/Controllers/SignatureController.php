@@ -110,6 +110,10 @@ class SignatureController extends Controller
                 ->first();
 
             $doc = Document::find($documentId);
+            $hasDraftOrPendingVersion = $doc
+                ? $doc->versions()->whereIn('status', ['draft', 'pending'])->whereNull('discarded_at')->exists()
+                : false;
+
             if (!$requestRecord) {
                 // Invalidate any older requests for this signature on this document so they cannot be reused
                 SignatureRequest::where('requester_id', Auth::id())
@@ -138,7 +142,7 @@ class SignatureController extends Controller
                     'preset_position' => $preset,
                     'placements' => $placements,
                     'requested_at' => now(),
-                    'notified_at' => $isDirectPdfPlacement ? now() : null,
+                    'notified_at' => ($isDirectPdfPlacement && !$hasDraftOrPendingVersion) ? now() : null,
                 ]);
             } else {
                 $requestRecord->update([
@@ -153,7 +157,7 @@ class SignatureController extends Controller
                     'preset_position' => $preset,
                     'placements' => $placements,
                     'requested_at' => now(),
-                    'notified_at' => $isDirectPdfPlacement ? now() : $requestRecord->notified_at,
+                    'notified_at' => ($isDirectPdfPlacement && !$hasDraftOrPendingVersion) ? now() : $requestRecord->notified_at,
                 ]);
             }
 
@@ -165,10 +169,10 @@ class SignatureController extends Controller
                     app(\App\Services\PdfSignatureProcessorService::class)->syncPdfSignatureRequests($doc, $targetVersion);
                 }
 
-                $pendingVersion = $doc->versions()->where('status', 'pending')->latest('id')->first();
+                $pendingVersion = $doc->versions()->where('status', 'pending')->whereNull('discarded_at')->latest('id')->first();
                 if ($pendingVersion) {
                     app(\App\Services\ApprovalRoutingService::class)->compileWorkflowFromSignatures($doc, $pendingVersion, $doc->owner ?? Auth::user());
-                } elseif ($isDirectPdfPlacement) {
+                } elseif ($isDirectPdfPlacement && !$hasDraftOrPendingVersion) {
                     $requestRecord->sendNotification();
                 }
             } elseif ($isDirectPdfPlacement) {

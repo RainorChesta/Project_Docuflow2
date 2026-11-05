@@ -334,6 +334,15 @@ class ApprovalRoutingService
 
                 // Notify active approver / signer with unified DocumentApprovalRequested (prevent duplicate dispatch)
                 if ($firstActiveStep->assignedUser) {
+                    // Remove any premature standalone SignatureRequested notifications for this document
+                    $firstActiveStep->assignedUser->notifications()
+                        ->where('type', \App\Notifications\SignatureRequested::class)
+                        ->where(function ($q) use ($document) {
+                            $q->where('data->document_id', (string) $document->id)
+                              ->orWhere('data->document_id', (int) $document->id);
+                        })
+                        ->delete();
+
                     $hasUnreadNotif = $firstActiveStep->assignedUser->unreadNotifications()
                         ->where('type', DocumentApprovalRequested::class)
                         ->where(function ($q) use ($document, $version) {

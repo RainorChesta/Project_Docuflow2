@@ -4,9 +4,7 @@
 @endphp
 
 <div class="w-full">
-    @if($isPdf)
-        <iframe src="{{ $fileUrl }}" class="w-full border-0 h-[80vh] sm:h-[88vh] lg:h-[92vh] min-h-[620px] sm:min-h-[750px] lg:min-h-[820px] block rounded-2xl shadow-xs" title="{{ __('Pratinjau dokumen') }}"></iframe>
-    @elseif(isset($onlyOfficeConfig))
+    @if(isset($onlyOfficeConfig))
         <div class="w-full bg-base-100 h-[80vh] sm:h-[88vh] lg:h-[92vh] min-h-[620px] sm:min-h-[750px] lg:min-h-[820px] rounded-2xl overflow-hidden border border-base-300/80 shadow-xs">
             <div id="docx-preview-{{ $version->id }}" class="w-full h-full"></div>
         </div>
@@ -150,6 +148,8 @@
                 }
             });
         </script>
+    @elseif($isPdf)
+        <iframe src="{{ $fileUrl }}" class="w-full border-0 h-[80vh] sm:h-[88vh] lg:h-[92vh] min-h-[620px] sm:min-h-[750px] lg:min-h-[820px] block rounded-2xl shadow-xs" title="{{ __('Pratinjau dokumen') }}"></iframe>
     @else
         <div id="docx-preview-{{ $version->id }}" class="p-6 sm:p-8 bg-base-100 rounded-2xl border border-base-300" style="min-height: 600px;">
             <div class="flex items-center justify-center gap-2 text-xs font-semibold text-primary mb-4">
