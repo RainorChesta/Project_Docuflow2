@@ -25,6 +25,7 @@ Route::get('/', function () {
 // Public QR Code verification routes
 Route::get('/d/{token}', [DocumentController::class, 'viewByHash'])->name('documents.hash');
 Route::get('/d/{token}/preview', [DocumentController::class, 'previewByHash'])->name('documents.hash.preview');
+Route::get('/archives/verify/{token}', [\App\Http\Controllers\ArchiveController::class, 'verifyByToken'])->name('archives.verify');
 
 use App\Http\Controllers\SignatureController;
 
@@ -40,11 +41,15 @@ Route::middleware('auth')->group(function () {
     // Global Document Search (respects visibility)
     Route::get('/search', [SearchController::class, 'search'])->name('search');
 
-    // Notifications API
+    // Notifications (Page + API)
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
-    Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read');
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
+    Route::post('/notifications/bulk-read', [NotificationController::class, 'bulkMarkAsRead'])->name('notifications.bulk-read');
+    Route::delete('/notifications/bulk-delete', [NotificationController::class, 'bulkDestroy'])->name('notifications.bulk-delete');
+    Route::delete('/notifications/delete-all', [NotificationController::class, 'destroyAll'])->name('notifications.delete-all');
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read');
+    Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
 
     // Signatures
     Route::get('/profile/signature', [SignatureController::class, 'show'])->name('profile.signature.show');
@@ -91,6 +96,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/documents/{document}/rename', [DocumentController::class, 'rename'])->name('documents.rename');
     Route::post('/documents/{document}/request-rename', [DocumentController::class, 'requestRename'])->name('documents.request-rename');
     Route::post('/documents/{document}/cancel-rename', [DocumentController::class, 'cancelRenameRequest'])->name('documents.cancel-rename');
+    Route::post('/documents/{document}/request-deletion', [DocumentController::class, 'requestDeletion'])->name('documents.request-deletion');
+    Route::post('/documents/{document}/cancel-deletion-request', [DocumentController::class, 'cancelDeletionRequest'])->name('documents.cancel-deletion-request');
+    Route::post('/documents/{document}/approve-deletion', [DocumentController::class, 'approveDeletion'])->name('documents.approve-deletion');
+    Route::post('/documents/{document}/reject-deletion', [DocumentController::class, 'rejectDeletion'])->name('documents.reject-deletion');
     Route::get('/documents/{document}/corporate-soft-files', [DocumentController::class, 'corporateSoftFiles'])->name('documents.corporate-soft-files');
     Route::post('/documents/{document}/corporate-soft-files/{corporateSoftFile}/apply', [DocumentController::class, 'applyCorporateSoftFile'])->name('documents.corporate-soft-files.apply');
     Route::post('/documents/{document}/corporate-soft-files/remove', [DocumentController::class, 'removeCorporateSoftFile'])->name('documents.corporate-soft-files.remove');
@@ -101,6 +110,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/approvals/signatures', [SignatureController::class, 'requestsIndex'])->name('approvals.signatures');
     Route::get('/approvals/renames', [ApprovalController::class, 'renames'])->name('approvals.renames');
     Route::get('/approvals/rollbacks', [ApprovalController::class, 'rollbacks'])->name('approvals.rollbacks');
+    Route::get('/approvals/deletions', [ApprovalController::class, 'deletions'])->name('approvals.deletions');
     Route::post('/approvals/bulk-approve-versions', [ApprovalController::class, 'bulkApproveVersions'])->name('approvals.bulk-approve-versions');
     Route::post('/approvals/bulk-reject-versions', [ApprovalController::class, 'bulkRejectVersions'])->name('approvals.bulk-reject-versions');
     Route::post('/documents/{document}/versions/{version}/approve', [ApprovalController::class, 'approve'])->name('approvals.approve');
@@ -110,6 +120,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/documents/{document}/rollback-request/reject', [ApprovalController::class, 'rejectRollback'])->name('approvals.rollback-request.reject');
     Route::post('/documents/{document}/rename-request/approve', [ApprovalController::class, 'approveRename'])->name('approvals.rename-request.approve');
     Route::post('/documents/{document}/rename-request/reject', [ApprovalController::class, 'rejectRename'])->name('approvals.rename-request.reject');
+    Route::post('/documents/{document}/deletion-request/approve', [ApprovalController::class, 'approveDeletion'])->name('approvals.deletion-request.approve');
+    Route::post('/documents/{document}/deletion-request/reject', [ApprovalController::class, 'rejectDeletion'])->name('approvals.deletion-request.reject');
 
     // Document Shares (Google Docs model)
     Route::post('/documents/{document}/shares', [DocumentShareController::class, 'store'])->name('shares.store');
@@ -149,6 +161,40 @@ Route::middleware('auth')->group(function () {
     Route::post('/trash/{id}/restore', [\App\Http\Controllers\TrashController::class, 'restore'])->name('trash.restore');
     Route::delete('/trash/{id}/force-delete', [\App\Http\Controllers\TrashController::class, 'forceDelete'])->name('trash.force-delete');
     Route::delete('/trash/empty', [\App\Http\Controllers\TrashController::class, 'emptyTrash'])->name('trash.empty');
+
+    // Archiving & Records Management (Arsip)
+    Route::get('/archives', [\App\Http\Controllers\ArchiveController::class, 'index'])->name('archives.index');
+    Route::get('/archives/export', [\App\Http\Controllers\ArchiveController::class, 'export'])->name('archives.export');
+    Route::get('/archives/{archive}', [\App\Http\Controllers\ArchiveController::class, 'show'])->name('archives.show');
+    Route::get('/archives/{archive}/download', [\App\Http\Controllers\ArchiveController::class, 'download'])->name('archives.download');
+    Route::get('/archives/{archive}/preview', [\App\Http\Controllers\ArchiveController::class, 'preview'])->name('archives.preview');
+    Route::post('/archives/{archive}/verify-integrity', [\App\Http\Controllers\ArchiveController::class, 'verifyIntegrity'])->name('archives.verify-integrity');
+    Route::patch('/archives/{archive}/metadata', [\App\Http\Controllers\ArchiveController::class, 'correctMetadata'])->name('archives.correct-metadata');
+    Route::post('/archives/{archive}/reactivate', [\App\Http\Controllers\ArchiveController::class, 'reactivate'])->name('archives.reactivate');
+    Route::post('/archives/{archive}/void', [\App\Http\Controllers\ArchiveController::class, 'void'])->name('archives.void');
+
+    // Archive Requests & Approvals
+    Route::get('/archive-requests', [\App\Http\Controllers\ArchiveRequestController::class, 'index'])->name('archive-requests.index');
+    Route::get('/archive-requests/create', [\App\Http\Controllers\ArchiveRequestController::class, 'create'])->name('archive-requests.create');
+    Route::post('/archive-requests', [\App\Http\Controllers\ArchiveRequestController::class, 'store'])->name('archive-requests.store');
+    Route::get('/archive-requests/preview-number', [\App\Http\Controllers\ArchiveRequestController::class, 'previewNumber'])->name('archive-requests.preview-number');
+    Route::get('/archive-requests/{archiveRequest}', [\App\Http\Controllers\ArchiveRequestController::class, 'show'])->name('archive-requests.show');
+    Route::post('/archive-requests/{archiveRequest}/submit', [\App\Http\Controllers\ArchiveRequestController::class, 'submit'])->name('archive-requests.submit');
+    Route::post('/archive-requests/{archiveRequest}/approve', [\App\Http\Controllers\ArchiveRequestController::class, 'approve'])->name('archive-requests.approve');
+    Route::post('/archive-requests/{archiveRequest}/reject', [\App\Http\Controllers\ArchiveRequestController::class, 'reject'])->name('archive-requests.reject');
+    Route::post('/archive-requests/{archiveRequest}/return', [\App\Http\Controllers\ArchiveRequestController::class, 'returnForCorrection'])->name('archive-requests.return');
+    Route::post('/archive-requests/{archiveRequest}/cancel', [\App\Http\Controllers\ArchiveRequestController::class, 'cancel'])->name('archive-requests.cancel');
+    Route::delete('/archive-requests/{archiveRequest}', [\App\Http\Controllers\ArchiveRequestController::class, 'destroy'])->name('archive-requests.destroy');
+    Route::post('/archive-requests/{archiveRequest}/finalize', [\App\Http\Controllers\ArchiveRequestController::class, 'finalize'])->name('archive-requests.finalize');
+
+    // Archive Governance & Legal Holds
+    Route::get('/archive-governance', [\App\Http\Controllers\ArchiveGovernanceController::class, 'index'])->name('archive-governance.index');
+    Route::post('/archives/{archive}/holds', [\App\Http\Controllers\ArchiveGovernanceController::class, 'storeHold'])->name('archives.holds.store');
+    Route::post('/archive-holds/{hold}/release', [\App\Http\Controllers\ArchiveGovernanceController::class, 'releaseHold'])->name('archives.holds.release');
+    Route::post('/archives/{archive}/dispositions', [\App\Http\Controllers\ArchiveGovernanceController::class, 'storeDisposition'])->name('archives.dispositions.store');
+    Route::post('/archive-dispositions/{disposition}/approve', [\App\Http\Controllers\ArchiveGovernanceController::class, 'approveDisposition'])->name('archives.dispositions.approve');
+    Route::post('/archive-dispositions/{disposition}/reject', [\App\Http\Controllers\ArchiveGovernanceController::class, 'rejectDisposition'])->name('archives.dispositions.reject');
+    Route::get('/archive-dispositions/{disposition}/certificate', [\App\Http\Controllers\ArchiveGovernanceController::class, 'certificate'])->name('archives.dispositions.certificate');
 
     // Admin
     Route::prefix('admin')->name('admin.')->group(function () {
@@ -194,6 +240,13 @@ Route::middleware('auth')->group(function () {
         Route::post('/trash/{id}/restore', [\App\Http\Controllers\TrashController::class, 'restore'])->name('trash.restore');
         Route::delete('/trash/{id}/force-delete', [\App\Http\Controllers\TrashController::class, 'forceDelete'])->name('trash.force-delete');
         Route::delete('/trash/empty', [\App\Http\Controllers\TrashController::class, 'emptyTrash'])->name('trash.empty');
+
+        // Archive Configuration (Klasifikasi, Penomoran, JRA)
+        Route::get('/archive-settings', [\App\Http\Controllers\Admin\ArchiveSettingController::class, 'index'])->name('archive-settings.index');
+        Route::post('/archive-settings/classifications', [\App\Http\Controllers\Admin\ArchiveSettingController::class, 'storeClassification'])->name('archive-settings.classifications.store');
+        Route::post('/archive-settings/numbering', [\App\Http\Controllers\Admin\ArchiveSettingController::class, 'storeScheme'])->name('archive-settings.numbering.store');
+        Route::post('/archive-settings/numbering/preview', [\App\Http\Controllers\Admin\ArchiveSettingController::class, 'previewScheme'])->name('archive-settings.numbering.preview');
+        Route::post('/archive-settings/retention', [\App\Http\Controllers\Admin\ArchiveSettingController::class, 'storeRetentionPolicy'])->name('archive-settings.retention.store');
     });
 
     // Profile

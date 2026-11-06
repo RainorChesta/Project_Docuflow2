@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             DocumentTypeSeeder::class,
             InitialMasterDataSeeder::class,
             CompanyBranchSeeder::class,
+            ArchiveMasterDataSeeder::class,
         ]);
 
         // User::factory(10)->create();

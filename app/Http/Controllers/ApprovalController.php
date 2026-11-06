@@ -31,6 +31,9 @@ class ApprovalController extends Controller
         if ($tab === 'rollbacks') {
             return $this->rollbacks($request);
         }
+        if ($tab === 'deletions') {
+            return $this->deletions($request);
+        }
 
         return $this->versions($request);
     }
@@ -55,8 +58,9 @@ class ApprovalController extends Controller
             'signatures' => $user->receivedSignatureRequests()->where('status', 'pending')->count(),
             'renames' => $this->getPendingRenamesQuery($user)->count(),
             'rollbacks' => $this->getPendingRollbacksQuery($user)->count(),
+            'deletions' => $this->getPendingDeletionsQuery($user)->count(),
         ];
-        $counts['total'] = $counts['versions'] + $counts['signatures'] + $counts['renames'] + $counts['rollbacks'];
+        $counts['total'] = $counts['versions'] + $counts['signatures'] + $counts['renames'] + $counts['rollbacks'] + $counts['deletions'];
 
         $pendingVersions = $versionsQuery
             ->with(['document.branch', 'document.company', 'document.unitKerja', 'author'])
@@ -92,8 +96,9 @@ class ApprovalController extends Controller
             'signatures' => $user->receivedSignatureRequests()->where('status', 'pending')->count(),
             'renames' => (clone $renamesQuery)->count(),
             'rollbacks' => $this->getPendingRollbacksQuery($user)->count(),
+            'deletions' => $this->getPendingDeletionsQuery($user)->count(),
         ];
-        $counts['total'] = $counts['versions'] + $counts['signatures'] + $counts['renames'] + $counts['rollbacks'];
+        $counts['total'] = $counts['versions'] + $counts['signatures'] + $counts['renames'] + $counts['rollbacks'] + $counts['deletions'];
 
         $pendingRenames = $renamesQuery
             ->with(['renameRequestedBy', 'unitKerja', 'branch', 'company'])
@@ -130,8 +135,9 @@ class ApprovalController extends Controller
             'signatures' => $user->receivedSignatureRequests()->where('status', 'pending')->count(),
             'renames' => $this->getPendingRenamesQuery($user)->count(),
             'rollbacks' => (clone $rollbacksQuery)->count(),
+            'deletions' => $this->getPendingDeletionsQuery($user)->count(),
         ];
-        $counts['total'] = $counts['versions'] + $counts['signatures'] + $counts['renames'] + $counts['rollbacks'];
+        $counts['total'] = $counts['versions'] + $counts['signatures'] + $counts['renames'] + $counts['rollbacks'] + $counts['deletions'];
 
         $pendingRollbacks = $rollbacksQuery
             ->with(['rollbackRequestedBy', 'pendingRollbackVersion', 'unitKerja', 'branch', 'company', 'currentVersion'])
@@ -142,6 +148,49 @@ class ApprovalController extends Controller
 
         return view('approvals.rollbacks', compact(
             'pendingRollbacks',
+            'counts',
+            'search',
+            'perPage'
+        ));
+    }
+
+    public function deletions(Request $request): \Illuminate\View\View|\Illuminate\Http\RedirectResponse
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return redirect()->route('login');
+        }
+
+        if (!$user->isAdmin()) {
+            abort(403, __('Hanya Administrator yang memiliki akses ke persetujuan penghapusan dokumen.'));
+        }
+
+        $search = trim((string) $request->query('search', ''));
+        $perPage = (int) $request->query('per_page', 15);
+        if (!in_array($perPage, [10, 15, 25, 50, 100], true)) {
+            $perPage = 15;
+        }
+
+        $deletionsQuery = $this->getPendingDeletionsQuery($user, $search);
+
+        $counts = [
+            'versions' => $this->getPendingVersionsQuery($user)->count(),
+            'signatures' => $user->receivedSignatureRequests()->where('status', 'pending')->count(),
+            'renames' => $this->getPendingRenamesQuery($user)->count(),
+            'rollbacks' => $this->getPendingRollbacksQuery($user)->count(),
+            'deletions' => (clone $deletionsQuery)->count(),
+        ];
+        $counts['total'] = $counts['versions'] + $counts['signatures'] + $counts['renames'] + $counts['rollbacks'] + $counts['deletions'];
+
+        $pendingDeletions = $deletionsQuery
+            ->with(['deletionRequestedBy', 'unitKerja', 'branch', 'company', 'currentVersion'])
+            ->latest('deletion_requested_at')
+            ->latest('id')
+            ->paginate($perPage, ['*'], 'deletion_page')
+            ->withQueryString();
+
+        return view('approvals.deletions', compact(
+            'pendingDeletions',
             'counts',
             'search',
             'perPage'
@@ -382,6 +431,26 @@ class ApprovalController extends Controller
         }
 
         return $pendingRollbacksQuery;
+    }
+
+    protected function getPendingDeletionsQuery($user, string $search = '')
+    {
+        if (!$user->isAdmin()) {
+            return Document::whereRaw('1 = 0');
+        }
+
+        $query = Document::whereNotNull('deletion_requested_by_id');
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                  ->orWhere('document_number', 'like', "%{$search}%")
+                  ->orWhere('deletion_request_notes', 'like', "%{$search}%")
+                  ->orWhereHas('deletionRequestedBy', fn($uq) => $uq->where('name', 'like', "%{$search}%"));
+            });
+        }
+
+        return $query;
     }
 
     /**
@@ -909,5 +978,15 @@ class ApprovalController extends Controller
                 $action,
             ));
         }
+    }
+
+    public function approveDeletion(Request $request, Document $document): RedirectResponse|\Illuminate\Http\JsonResponse
+    {
+        return app(DocumentController::class)->approveDeletion($request, $document);
+    }
+
+    public function rejectDeletion(Request $request, Document $document): RedirectResponse
+    {
+        return app(DocumentController::class)->rejectDeletion($request, $document);
     }
 }

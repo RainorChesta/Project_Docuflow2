@@ -406,8 +406,6 @@
         </div>
 
         <!-- Footer -->
-        <footer class="w-full text-center text-xs text-base-content/40 shrink-0 mt-4 sm:mt-6 pb-2">
-            &copy; {{ date('Y') }} {{ config('app.name', 'DokuFlow') }} &bull; Enterprise Document Workflow System
-        </footer>
+        <x-footer class="w-full shrink-0 mt-4 sm:mt-6 pb-2" />
     </body>
 </html>

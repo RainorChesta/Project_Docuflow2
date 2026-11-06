@@ -42,6 +42,17 @@ class PruneTrashedDocuments extends Command
             $this->info("Scanning all soft-deleted documents...");
         }
 
+        // Protect documents with active in-flight archive requests
+        $query->whereDoesntHave('archiveRequests', function ($q) {
+            $q->whereIn('state', [
+                \App\Models\ArchiveRequest::STATE_DRAFT,
+                \App\Models\ArchiveRequest::STATE_PENDING_APPROVAL,
+                \App\Models\ArchiveRequest::STATE_APPROVED,
+                \App\Models\ArchiveRequest::STATE_PREPARING_SNAPSHOT,
+                \App\Models\ArchiveRequest::STATE_READY_TO_REGISTER,
+            ]);
+        });
+
         $trashedDocuments = $query->get();
         $count = $trashedDocuments->count();
 

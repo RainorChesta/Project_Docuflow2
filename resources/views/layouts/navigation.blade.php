@@ -205,12 +205,14 @@
             $sharedDocsCount = $navUser ? $navUser->sharedDocumentsCount() : 0;
             $pendingVersionsCount = $navUser ? $navUser->pendingVersionApprovalsCount() : 0;
             $pendingRollbacksCount = $navUser ? $navUser->pendingRollbackApprovalsCount() : 0;
-            $totalApprovalCount = $pendingVersionsCount + $pendingRollbacksCount;
+            $pendingDeletionsCount = ($navUser && $navUser->isAdmin()) ? \App\Models\Document::whereNotNull('deletion_requested_by_id')->count() : 0;
+            $totalApprovalCount = $pendingVersionsCount + $pendingRollbacksCount + $pendingDeletionsCount;
             $isApprovalActive = request()->routeIs('approvals.*');
             $canSeeApproval = $navUser && ($navUser->isHead() || $navUser->isPicKlinik() || $navUser->isDirector() || $navUser->isAdmin() || $totalApprovalCount > 0);
             $unseenActiveDirectorDocsCount = ($navUser && ($navUser->isDirector() || $navUser->isAdmin()))
                 ? \App\Models\Document::whereHas('currentVersion', fn($q) => $q->where('status', 'active'))->where('is_expired', false)->whereNull('director_read_at')->count()
                 : 0;
+            $unreadNotificationsCount = $navUser ? app(\App\Http\Controllers\NotificationController::class)->getUnreadCount($navUser) : 0;
         @endphp
         
         <span class="px-2 text-[10px] font-extrabold text-base-content/40 uppercase tracking-[0.2em] whitespace-nowrap" :class="open ? 'block' : 'lg:hidden'">{{ __('Menu') }}</span>
@@ -447,6 +449,25 @@
                         </span>
                     @endif
                 </a>
+
+                {{-- Sub-menu 3: Deletion Approval (Admin only) --}}
+                @if($navUser && $navUser->isAdmin())
+                <a href="{{ route('approvals.deletions') }}"
+                   class="flex items-center justify-between gap-1.5 px-2 py-2 rounded-xl text-[12.5px] font-medium transition-all duration-200
+                          {{ request()->routeIs('approvals.deletions') || (request()->routeIs('approvals.index') && request('tab') === 'deletions') ? 'bg-error/15 text-error font-bold shadow-xs' : 'text-base-content/60 hover:text-base-content hover:bg-base-200/60' }}"
+                   {{ (request()->routeIs('approvals.deletions') || (request()->routeIs('approvals.index') && request('tab') === 'deletions')) ? 'data-nav-active=true aria-current=page' : '' }}
+                   title="{{ __('Persetujuan Hapus') }}">
+                    <span class="flex items-center gap-2 min-w-0 flex-1">
+                        <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ request()->routeIs('approvals.deletions') || (request()->routeIs('approvals.index') && request('tab') === 'deletions') ? 'bg-error' : 'bg-base-content/30' }}"></span>
+                        <span class="leading-tight break-words">{{ __('Persetujuan Hapus') }}</span>
+                    </span>
+                    @if($pendingDeletionsCount > 0)
+                        <span class="badge badge-error font-bold text-white badge-xs px-1.5 py-2 shrink-0 self-center ml-1">
+                            {{ $pendingDeletionsCount }}
+                        </span>
+                    @endif
+                </a>
+                @endif
             </div>
         </div>
         @endif
@@ -477,6 +498,109 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
             </div>
             <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Sampah') }}</span>
+        </a>
+        @endif
+
+        {{-- Dedicated Notification Menu Item --}}
+        <div x-data="{
+            unreadCount: {{ $unreadNotificationsCount }},
+            init() {
+                window.addEventListener('notifications-updated', (e) => {
+                    if (e.detail && typeof e.detail.unread_count !== 'undefined') {
+                        this.unreadCount = e.detail.unread_count;
+                    }
+                });
+                window.addEventListener('notifications-read', (e) => {
+                    if (e.detail && typeof e.detail.unread_count !== 'undefined') {
+                        this.unreadCount = e.detail.unread_count;
+                    }
+                });
+            }
+        }">
+            <a href="{{ route('notifications.index') }}"
+               class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+                      {{ request()->routeIs('notifications.*') ? 'nav-item-new-active' : '' }}"
+               {{ request()->routeIs('notifications.*') ? 'data-nav-active=true aria-current=page' : '' }}
+               :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
+               :title="open ? '' : '{{ __('Notifikasi') }}'">
+                <div class="icon-wrapper shrink-0 relative">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    </svg>
+                    <span x-show="unreadCount > 0" class="absolute -top-1 -right-1 flex h-3 w-3" x-cloak>
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-3 w-3 border-2 border-base-100 bg-error"></span>
+                    </span>
+                </div>
+                <span class="text-label min-w-0 flex-1 flex items-center justify-between gap-2" :class="open ? '' : 'lg:hidden'">
+                    <span class="truncate">{{ __('Notifikasi') }}</span>
+                    <span x-show="unreadCount > 0"
+                          class="badge badge-error badge-sm font-bold text-white px-1.5 shrink-0 shadow-sm shadow-error/50"
+                          x-text="unreadCount > 99 ? '99+' : unreadCount"
+                          x-cloak>
+                    </span>
+                </span>
+            </a>
+        </div>
+
+        {{-- Kearsipan & Rekaman Section --}}
+        <div class="pt-6 pb-2 px-2 flex items-center justify-between">
+            <span class="text-[10px] font-extrabold text-base-content/40 uppercase tracking-[0.2em] whitespace-nowrap" :class="open ? 'block' : 'lg:hidden'">{{ __('Kearsipan') }}</span>
+            <button type="button" 
+                    onclick="event.preventDefault(); event.stopPropagation(); document.getElementById('archive-info-modal').showModal()"
+                    class="btn btn-ghost btn-2xs btn-circle text-base-content/40 hover:text-primary hover:bg-base-200 transition-colors"
+                    :class="open ? 'inline-flex' : 'lg:hidden'"
+                    title="{{ __('Apa fungsi pengarsipan dokumen?') }}">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </button>
+        </div>
+
+        {{-- Buku Induk Arsip --}}
+        <a href="{{ route('archives.index') }}"
+           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+                  {{ request()->routeIs('archives.*') && !request()->routeIs('archives.holds.*') && !request()->routeIs('archives.dispositions.*') ? 'nav-item-new-active' : '' }}"
+           {{ (request()->routeIs('archives.*') && !request()->routeIs('archives.holds.*') && !request()->routeIs('archives.dispositions.*')) ? 'data-nav-active=true aria-current=page' : '' }}
+           :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
+           :title="open ? '' : '{{ __('Buku Induk Arsip') }}'">
+            <div class="icon-wrapper shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                </svg>
+            </div>
+            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Buku Induk Arsip') }}</span>
+        </a>
+
+        {{-- Permohonan Arsip --}}
+        <a href="{{ route('archive-requests.index') }}"
+           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+                  {{ request()->routeIs('archive-requests.*') ? 'nav-item-new-active' : '' }}"
+           {{ request()->routeIs('archive-requests.*') ? 'data-nav-active=true aria-current=page' : '' }}
+           :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
+           :title="open ? '' : '{{ __('Permohonan Arsip') }}'">
+            <div class="icon-wrapper shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                </svg>
+            </div>
+            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Permohonan Arsip') }}</span>
+        </a>
+
+        {{-- Tata Kelola & Retensi (Admin / Direktur / PIC Klinik) --}}
+        @if(auth()->user()->isAdmin() || auth()->user()->isDirector() || auth()->user()->isPicKlinik())
+        <a href="{{ route('archive-governance.index') }}"
+           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+                  {{ request()->routeIs('archive-governance.*') ? 'nav-item-new-active' : '' }}"
+           {{ request()->routeIs('archive-governance.*') ? 'data-nav-active=true aria-current=page' : '' }}
+           :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
+           :title="open ? '' : '{{ __('Tata Kelola & Retensi') }}'">
+            <div class="icon-wrapper shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+            </div>
+            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Tata Kelola & Retensi') }}</span>
         </a>
         @endif
 
@@ -543,6 +667,21 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
             </div>
             <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Sampah') }}</span>
+        </a>
+
+        <a href="{{ route('admin.archive-settings.index') }}"
+           class="nav-item-new flex items-center gap-3.5 px-2 py-2 rounded-xl text-[14px] font-semibold text-base-content/60
+                  {{ request()->routeIs('admin.archive-settings.*') ? 'nav-item-new-active' : '' }}"
+           {{ request()->routeIs('admin.archive-settings.*') ? 'data-nav-active=true aria-current=page' : '' }}
+           :class="open ? '' : 'lg:justify-center lg:px-0 lg:py-3'"
+           :title="open ? '' : '{{ __('Pengaturan Arsip') }}'">
+            <div class="icon-wrapper shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+            </div>
+            <span class="text-label min-w-0 flex-1 truncate" :class="open ? '' : 'lg:hidden'">{{ __('Pengaturan Arsip') }}</span>
         </a>
 
         <a href="{{ route('admin.document-types.index') }}"

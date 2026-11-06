@@ -18,7 +18,32 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
             </span>
         @endif
-        @can('delete', $doc)
+        @if($doc->isArchived())
+            @php $gridArchive = $doc->latestArchiveEntry; @endphp
+            @if($gridArchive)
+                <span onclick="event.preventDefault(); event.stopPropagation(); window.location='{{ route('archives.show', $gridArchive) }}'" class="btn btn-ghost btn-xs btn-square text-success hover:bg-success/10" title="{{ __('Lihat Arsip: ') . $gridArchive->archive_number }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                    </svg>
+                </span>
+            @endif
+        @elseif($doc->hasPendingArchiveRequest())
+            @php $gridPendingArchive = $doc->pendingArchiveRequest(); @endphp
+            @if($gridPendingArchive)
+                <span onclick="event.preventDefault(); event.stopPropagation(); window.location='{{ route('archive-requests.show', $gridPendingArchive) }}'" class="btn btn-ghost btn-xs btn-square text-warning hover:bg-warning/10" title="{{ __('Proses Arsip Sedang Berjalan') }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </span>
+            @endif
+        @elseif($doc->hasActiveVersion() && !$doc->trashed())
+            <span onclick="event.preventDefault(); event.stopPropagation(); window.location='{{ route('archive-requests.create', ['document_id' => $doc->id]) }}'" class="btn btn-ghost btn-xs btn-square text-amber-600 dark:text-amber-400 hover:bg-amber-500/10" title="{{ __('Arsipkan Dokumen') }}">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                </svg>
+            </span>
+        @endif
+        @if(auth()->user()->can('delete', $doc))
             <button type="button" onclick="event.preventDefault(); event.stopPropagation(); document.getElementById('delete-doc-modal-{{ $doc->id }}').showModal()" class="btn btn-ghost btn-xs btn-square text-error" title="{{ __('Hapus Dokumen') }}">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
             </button>
@@ -65,7 +90,70 @@
                     <button>{{ __('Batal') }}</button>
                 </form>
             </dialog>
-        @endcan
+        @elseif($doc->owner_id === auth()->id() && $doc->versions()->where('status', 'active')->exists())
+            @if($doc->hasPendingDeletion())
+                <span onclick="event.preventDefault(); event.stopPropagation();" class="btn btn-ghost btn-xs btn-square text-error/60 cursor-not-allowed" title="{{ __('Menunggu persetujuan hapus') }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </span>
+            @else
+                <button type="button" onclick="event.preventDefault(); event.stopPropagation(); document.getElementById('request-delete-doc-modal-{{ $doc->id }}').showModal()" class="btn btn-ghost btn-xs btn-square text-error" title="{{ __('Ajukan Hapus Dokumen') }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                </button>
+
+                <dialog id="request-delete-doc-modal-{{ $doc->id }}" onclick="event.stopPropagation();" class="modal modal-bottom sm:modal-middle text-left whitespace-normal backdrop-blur-xs">
+                    <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-md">
+                        <form method="POST" action="{{ route('documents.request-deletion', $doc) }}">
+                            @csrf
+                            <div class="p-6 pb-4">
+                                <div class="flex items-start justify-between gap-4">
+                                    <div class="flex items-center gap-3.5">
+                                        <div class="w-11 h-11 rounded-2xl bg-error/10 text-error flex items-center justify-center shrink-0 ring-4 ring-error/5 shadow-xs">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <h3 class="font-bold text-lg text-base-content leading-snug">{{ __('Penghapusan Dokumen Aktif') }}</h3>
+                                            <p class="text-xs text-base-content/60 mt-0.5">{{ __('Memerlukan persetujuan Administrator') }}</p>
+                                        </div>
+                                    </div>
+                                    <button type="button" onclick="document.getElementById('request-delete-doc-modal-{{ $doc->id }}').close()" class="btn btn-ghost btn-sm btn-circle text-base-content/50 hover:text-base-content hover:bg-base-200">
+                                        ✕
+                                    </button>
+                                </div>
+
+                                <div class="mt-3 p-3 rounded-xl bg-base-200/60 border border-base-300/60 text-xs text-base-content/80 space-y-1.5">
+                                    <p class="leading-relaxed">
+                                        {{ __('Dokumen aktif \":title\" (:number) telah memiliki pengesahan resmi. Sesuai tata kelola, penghapusan memerlukan permohonan ke Administrator.', ['title' => $doc->title, 'number' => $doc->document_number ?: 'Resmi']) }}
+                                    </p>
+                                </div>
+
+                                <div class="mt-3.5">
+                                    <label class="label text-xs font-semibold text-base-content/80">
+                                        <span>{{ __('Alasan Penghapusan') }} <span class="text-error">*</span></span>
+                                    </label>
+                                    <textarea name="notes" rows="2" required class="textarea textarea-bordered w-full text-xs rounded-xl bg-base-200/50 focus:bg-base-100" placeholder="{{ __('Tuliskan alasan mengapa dokumen ini perlu dihapus...') }}"></textarea>
+                                </div>
+                            </div>
+                            <div class="bg-base-200/40 px-6 py-4 border-t border-base-200 flex items-center justify-end gap-2.5">
+                                <button type="button" onclick="document.getElementById('request-delete-doc-modal-{{ $doc->id }}').close()" class="btn btn-ghost btn-sm rounded-xl font-medium text-base-content/70 hover:text-base-content px-4">
+                                    {{ __('Batal') }}
+                                </button>
+                                <button type="submit" class="btn btn-error btn-sm text-white font-semibold rounded-xl px-5 shadow-xs flex items-center gap-1.5">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                    </svg>
+                                    {{ __('Ajukan Hapus') }}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    <form method="dialog" class="modal-backdrop">
+                        <button>{{ __('Batal') }}</button>
+                    </form>
+                </dialog>
+            @endif
+        @endif
     </div>
 
     {{-- Document icon --}}
@@ -121,6 +209,17 @@
         @if($doc->documentType)
             <span class="badge badge-ghost badge-xs max-w-[110px] inline-flex items-center text-base-content/70 border border-base-300/40 shrink-0" title="{{ $doc->documentType->name ?? $doc->documentType->code }}">
                 <span class="truncate">{{ $doc->documentType->code }}</span>
+            </span>
+        @endif
+        @if($doc->isArchived())
+            <span class="badge badge-success badge-xs text-[9px] text-white font-semibold inline-flex items-center gap-0.5 border border-success/40 shrink-0" title="{{ __('Terdaftar di Arsip: ') . ($doc->latestArchiveEntry?->archive_number ?? '') }}">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
+                <span>{{ __('Arsip') }}</span>
+            </span>
+        @elseif($doc->hasPendingArchiveRequest())
+            <span class="badge badge-warning badge-xs text-[9px] text-base-content font-medium inline-flex items-center gap-0.5 border border-warning/40 shrink-0" title="{{ __('Proses Arsip') }}">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <span>{{ __('Proses Arsip') }}</span>
             </span>
         @endif
         @if($doc->isDirectorRead())

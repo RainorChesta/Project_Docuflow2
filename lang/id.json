@@ -1219,5 +1219,14 @@
     ":count dokumen aktif": ":count dokumen aktif",
     "Tidak ada dokumen yang aktif pada tanggal :date.": "Tidak ada dokumen yang aktif pada tanggal :date.",
     "Dokumen yang telah aktif sebelum hari ini, dikelompokkan berdasarkan tanggal aktif.": "Dokumen yang telah aktif sebelum hari ini, dikelompokkan berdasarkan tanggal aktif.",
-    "Kemarin": "Kemarin"
+    "Kemarin": "Kemarin",
+    "Buku Induk & Registrasi Arsip": "Buku Induk & Registrasi Arsip",
+    "Buku Induk Arsip": "Buku Induk Arsip",
+    "Permohonan Arsip": "Permohonan Arsip",
+    "Tata Kelola & Retensi": "Tata Kelola & Retensi",
+    "Pengaturan Arsip": "Pengaturan Arsip",
+    "Arsipkan Dokumen": "Arsipkan Dokumen",
+    "Arsip": "Arsip",
+    "Kearsipan": "Kearsipan",
+    "Terdaftar di Arsip": "Terdaftar di Arsip"
 }

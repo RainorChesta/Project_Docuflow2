@@ -29,6 +29,10 @@ class Company extends Model
     protected static function booted(): void
     {
         static::deleting(function (Company $company) {
+            if ($company->archiveEntries()->where('status', '!=', ArchiveEntry::STATUS_VOIDED)->exists()) {
+                throw new \RuntimeException(__('Cannot delete company with active registered archives.'));
+            }
+
             Document::withTrashed()->where('company_id', $company->id)->update([
                 'company_id' => null,
                 'branch_id' => null,
@@ -59,5 +63,25 @@ class Company extends Model
     public function corporateSoftFiles(): BelongsToMany
     {
         return $this->belongsToMany(CorporateSoftFile::class, 'company_corporate_soft_file')->withTimestamps();
+    }
+
+    public function archiveEntries(): HasMany
+    {
+        return $this->hasMany(ArchiveEntry::class);
+    }
+
+    public function archiveNumberingSchemes(): HasMany
+    {
+        return $this->hasMany(ArchiveNumberingScheme::class);
+    }
+
+    public function archiveRetentionPolicies(): HasMany
+    {
+        return $this->hasMany(ArchiveRetentionPolicy::class);
+    }
+
+    public function archiveClassifications(): HasMany
+    {
+        return $this->hasMany(ArchiveClassification::class);
     }
 }

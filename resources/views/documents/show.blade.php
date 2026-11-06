@@ -159,6 +159,212 @@
                 @endif
             @endif
 
+            <!-- Pending Deletion Approval Banner -->
+            @if($document->hasPendingDeletion())
+                <div class="alert alert-error/15 border border-error/30 mb-3 sm:mb-4 rounded-2xl shadow-xs print:hidden">
+                    <div class="flex flex-col gap-3 w-full">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div class="flex items-start sm:items-center gap-3 min-w-0">
+                                <div class="w-10 h-10 rounded-xl bg-error/20 text-error flex items-center justify-center shrink-0">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="font-bold text-sm text-base-content flex items-center gap-2">
+                                        {{ __('Permohonan Penghapusan Dokumen Aktif') }}
+                                        <span class="badge badge-error badge-xs font-semibold text-white">{{ __('Menunggu Persetujuan') }}</span>
+                                    </p>
+                                    <p class="text-xs text-base-content/70 mt-0.5">
+                                        {{ __('Diajukan oleh') }} <strong class="text-base-content font-medium">{{ $document->deletionRequestedBy?->name ?? '—' }}</strong>
+                                        @if($document->deletion_requested_at)
+                                            ({{ $document->deletion_requested_at->diffForHumans() }})
+                                        @endif
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center gap-2 self-end sm:self-center shrink-0">
+                                @if(auth()->user()->isAdmin())
+                                    <button type="button" onclick="document.getElementById('reject-deletion-banner-modal-{{ $document->id }}').showModal()" class="btn btn-outline btn-sm rounded-xl text-xs">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                        {{ __('Tolak') }}
+                                    </button>
+                                    <button type="button" onclick="document.getElementById('approve-deletion-banner-modal-{{ $document->id }}').showModal()" class="btn btn-error btn-sm rounded-xl text-white font-semibold text-xs shadow-xs gap-1.5">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                        {{ __('Setujui & Hapus') }}
+                                    </button>
+                                @elseif($document->deletion_requested_by_id === auth()->id() || $document->owner_id === auth()->id())
+                                    <form method="POST" action="{{ route('documents.cancel-deletion-request', $document) }}">
+                                        @csrf
+                                        <button type="submit" class="btn btn-ghost btn-sm border border-base-300 rounded-xl text-xs text-base-content/70 hover:text-base-content gap-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                            {{ __('Batalkan Permohonan') }}
+                                        </button>
+                                    </form>
+                                @endif
+                            </div>
+                        </div>
+
+                        {{-- Requester Reason Notes --}}
+                        @if($document->deletion_request_notes)
+                            <div class="text-xs bg-base-100/80 p-3 rounded-xl border border-base-200">
+                                <span class="font-semibold text-base-content/70 block mb-1">{{ __('Alasan Penghapusan dari Pemohon:') }}</span>
+                                <p class="text-base-content italic">"{{ $document->deletion_request_notes }}"</p>
+                            </div>
+                        @endif
+
+                        {{-- Numbering Consideration Info for Admin --}}
+                        @if(auth()->user()->isAdmin() && isset($numberingContext))
+                            <div class="mt-1 p-3.5 rounded-xl bg-base-100/90 border border-base-200/80 text-xs space-y-2.5">
+                                <div class="flex items-center justify-between border-b border-base-200 pb-2">
+                                    <span class="font-bold text-base-content flex items-center gap-1.5">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+                                        </svg>
+                                        {{ __('Pertimbangan Penomoran Seri Dokumen') }}
+                                    </span>
+                                    <span class="badge badge-ghost badge-xs font-mono font-medium">
+                                        {{ $numberingContext['current_number'] ?? $document->document_number }}
+                                    </span>
+                                </div>
+
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                                    <div class="p-2.5 rounded-lg bg-base-200/50 border border-base-200">
+                                        <span class="text-base-content/50 block text-[11px] mb-1">{{ __('Dokumen Sebelum:') }}</span>
+                                        @if($numberingContext['previous_document'])
+                                            <div class="font-mono font-bold text-base-content truncate">{{ $numberingContext['previous_document']['document_number'] }}</div>
+                                            <div class="text-[11px] text-base-content/60 truncate" title="{{ $numberingContext['previous_document']['title'] }}">{{ $numberingContext['previous_document']['title'] }}</div>
+                                        @else
+                                            <div class="text-base-content/40 italic">{{ __('Tidak ada (nomor pertama)') }}</div>
+                                        @endif
+                                    </div>
+
+                                    <div class="p-2.5 rounded-lg bg-error/10 border border-error/20">
+                                        <span class="text-error font-medium block text-[11px] mb-1">{{ __('Dokumen Ini (Target Hapus):') }}</span>
+                                        <div class="font-mono font-bold text-base-content truncate">{{ $numberingContext['current_number'] ?? $document->document_number }}</div>
+                                        <div class="text-[11px] text-base-content/70 truncate" title="{{ $document->title }}">{{ $document->title }}</div>
+                                    </div>
+
+                                    <div class="p-2.5 rounded-lg bg-base-200/50 border border-base-200">
+                                        <span class="text-base-content/50 block text-[11px] mb-1">{{ __('Dokumen Sesudah:') }}</span>
+                                        @if($numberingContext['next_document'])
+                                            <div class="font-mono font-bold text-base-content truncate">{{ $numberingContext['next_document']['document_number'] }}</div>
+                                            <div class="text-[11px] text-base-content/60 truncate" title="{{ $numberingContext['next_document']['title'] }}">{{ $numberingContext['next_document']['title'] }}</div>
+                                        @else
+                                            <div class="text-base-content/40 italic">{{ __('Tidak ada (nomor terakhir)') }}</div>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                {{-- Gap warning banner --}}
+                                <div class="p-2.5 rounded-lg {{ $numberingContext['has_gap_risk'] ? 'bg-warning/15 text-amber-950 dark:text-amber-200 border border-warning/30' : 'bg-success/10 text-success border border-success/20' }} flex items-start gap-2">
+                                    @if($numberingContext['has_gap_risk'])
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-amber-900 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                        </svg>
+                                    @else
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-success shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                        </svg>
+                                    @endif
+                                    <div class="leading-relaxed">
+                                        {{ $numberingContext['warning_message'] }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- Admin Approve Modal from Banner --}}
+                            <dialog id="approve-deletion-banner-modal-{{ $document->id }}" class="modal modal-bottom sm:modal-middle text-left whitespace-normal backdrop-blur-xs text-base-content">
+                                <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-md">
+                                    <div class="p-6 pb-4">
+                                        <div class="flex items-center gap-3.5 mb-3">
+                                            <div class="w-11 h-11 rounded-2xl bg-error/10 text-error flex items-center justify-center shrink-0 ring-4 ring-error/5 shadow-xs">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <h3 class="font-bold text-lg leading-snug">{{ __('Setujui Penghapusan Dokumen?') }}</h3>
+                                                <p class="text-xs text-base-content/60">{{ __('Dokumen akan dipindahkan ke tempat sampah.') }}</p>
+                                            </div>
+                                        </div>
+                                        <p class="text-sm text-base-content/70">
+                                            {{ __('Apakah Anda yakin ingin menyetujui penghapusan dokumen \":title\" (:number)?', ['title' => $document->title, 'number' => $document->document_number ?: 'DRAFT']) }}
+                                        </p>
+                                        @if($numberingContext['has_gap_risk'])
+                                            <div class="mt-3 p-2.5 rounded-lg bg-warning/15 text-amber-950 dark:text-amber-200 border border-warning/30 text-xs">
+                                                <strong>{{ __('Peringatan:') }}</strong> {{ $numberingContext['warning_message'] }}
+                                            </div>
+                                        @endif
+                                    </div>
+                                    <form method="POST" action="{{ route('approvals.deletion-request.approve', $document) }}">
+                                        @csrf
+                                        <div class="bg-base-200/40 px-6 py-4 border-t border-base-200 flex items-center justify-end gap-2.5">
+                                            <button type="button" onclick="document.getElementById('approve-deletion-banner-modal-{{ $document->id }}').close()" class="btn btn-ghost btn-sm rounded-xl font-medium text-base-content/70 hover:text-base-content px-4">
+                                                {{ __('Batal') }}
+                                            </button>
+                                            <button type="submit" class="btn btn-error btn-sm text-white font-semibold rounded-xl px-5 shadow-xs flex items-center gap-1.5">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                                {{ __('Setujui & Hapus') }}
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                                <form method="dialog" class="modal-backdrop">
+                                    <button>{{ __('Batal') }}</button>
+                                </form>
+                            </dialog>
+
+                            {{-- Admin Reject Modal from Banner --}}
+                            <dialog id="reject-deletion-banner-modal-{{ $document->id }}" class="modal modal-bottom sm:modal-middle text-left whitespace-normal backdrop-blur-xs text-base-content">
+                                <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-md">
+                                    <form method="POST" action="{{ route('approvals.deletion-request.reject', $document) }}">
+                                        @csrf
+                                        <div class="p-6 pb-4">
+                                            <div class="flex items-center gap-3.5 mb-3">
+                                                <div class="w-11 h-11 rounded-2xl bg-warning/10 text-warning flex items-center justify-center shrink-0 ring-4 ring-warning/5 shadow-xs">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                </div>
+                                                <div>
+                                                    <h3 class="font-bold text-lg leading-snug">{{ __('Tolak Permohonan Hapus') }}</h3>
+                                                    <p class="text-xs text-base-content/60">{{ __('Dokumen akan tetap aktif.') }}</p>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label class="label text-xs font-semibold text-base-content/80">
+                                                    <span>{{ __('Alasan Penolakan') }}</span>
+                                                    <span class="label-text-alt text-base-content/50">{{ __('Opsional') }}</span>
+                                                </label>
+                                                <textarea name="notes" rows="3" class="textarea textarea-bordered w-full text-xs rounded-xl bg-base-200/50 focus:bg-base-100" placeholder="{{ __('Tuliskan alasan penolakan permohonan penghapusan...') }}"></textarea>
+                                            </div>
+                                        </div>
+                                        <div class="bg-base-200/40 px-6 py-4 border-t border-base-200 flex items-center justify-end gap-2.5">
+                                            <button type="button" onclick="document.getElementById('reject-deletion-banner-modal-{{ $document->id }}').close()" class="btn btn-ghost btn-sm rounded-xl font-medium text-base-content/70 hover:text-base-content px-4">
+                                                {{ __('Batal') }}
+                                            </button>
+                                            <button type="submit" class="btn btn-warning btn-sm font-semibold rounded-xl px-5 shadow-xs flex items-center gap-1.5">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                                {{ __('Tolak Permohonan') }}
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                                <form method="dialog" class="modal-backdrop">
+                                    <button>{{ __('Batal') }}</button>
+                                </form>
+                            </dialog>
+                        @endif
+                    </div>
+                </div>
+            @endif
+
             <!-- Pending Rollback Approval Banner -->
             @if($document->hasPendingRollback())
                 <div class="alert alert-warning mb-3 sm:mb-4 rounded-2xl shadow-xs print:hidden">
@@ -1322,7 +1528,43 @@
                                 </form>
                             @endif
 
-                            @can('delete', $document)
+                            {{-- Archive Action Button / Status Badge --}}
+                            @if($document->isArchived())
+                                @php $archiveEntry = $document->latestArchiveEntry; @endphp
+                                @if($archiveEntry)
+                                    <a href="{{ route('archives.show', $archiveEntry) }}" 
+                                       class="btn btn-sm btn-ghost border border-success/30 text-success hover:bg-success/10 gap-1.5 shrink-0" 
+                                       title="{{ __('Dokumen telah resmi terdaftar di Arsip: ') . $archiveEntry->archive_number }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                                        </svg>
+                                        <span class="hidden sm:inline">{{ __('Lihat Arsip') }}</span>
+                                    </a>
+                                @endif
+                            @elseif($document->hasPendingArchiveRequest())
+                                @php $pendingArchiveReq = $document->pendingArchiveRequest(); @endphp
+                                @if($pendingArchiveReq)
+                                    <a href="{{ route('archive-requests.show', $pendingArchiveReq) }}" 
+                                       class="btn btn-sm btn-ghost border border-warning/40 text-warning hover:bg-warning/10 gap-1.5 shrink-0" 
+                                       title="{{ __('Permohonan pendaftaran arsip sedang diproses') }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <span class="hidden sm:inline">{{ __('Proses Arsip') }}</span>
+                                    </a>
+                                @endif
+                            @elseif($document->hasActiveVersion() && !$document->trashed())
+                                <a href="{{ route('archive-requests.create', ['document_id' => $document->id]) }}" 
+                                   class="btn btn-ghost btn-sm border border-base-300 text-base-content/80 hover:bg-base-200 hover:text-base-content gap-1.5 shrink-0" 
+                                   title="{{ __('Arsipkan Dokumen') }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                                    </svg>
+                                    <span class="hidden sm:inline">{{ __('Arsipkan') }}</span>
+                                </a>
+                            @endif
+
+                            @if(auth()->user()->can('delete', $document))
                                 <button type="button" 
                                         onclick="window.dispatchEvent(new CustomEvent('open-modal', { detail: 'confirm-delete-{{ $document->id }}' }))" 
                                         class="btn btn-ghost btn-sm border border-error/30 text-error hover:bg-error hover:text-white gap-1.5 shrink-0" 
@@ -1332,7 +1574,24 @@
                                     </svg>
                                     <span class="hidden sm:inline">{{ __('Hapus') }}</span>
                                 </button>
-                            @endcan
+                            @elseif($document->owner_id === auth()->id() && $document->versions()->where('status', 'active')->exists())
+                                @if($document->hasPendingDeletion())
+                                    <div class="badge badge-error/15 text-error border border-error/30 gap-1.5 py-3 px-3 text-xs shrink-0 font-medium">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                        {{ __('Menunggu Persetujuan Hapus') }}
+                                    </div>
+                                @else
+                                    <button type="button" 
+                                            onclick="document.getElementById('request-delete-modal-{{ $document->id }}').showModal()" 
+                                            class="btn btn-ghost btn-sm border border-error/30 text-error hover:bg-error hover:text-white gap-1.5 shrink-0" 
+                                            title="{{ __('Hapus Dokumen') }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                        <span class="hidden sm:inline">{{ __('Hapus') }}</span>
+                                    </button>
+                                @endif
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -3100,6 +3359,79 @@
             </form>
         </dialog>
     @endcan
+
+    {{-- Modal Permohonan Penghapusan Dokumen Aktif (Untuk Non-Admin Owner) --}}
+    @if($document->owner_id === auth()->id() && $document->versions()->where('status', 'active')->exists() && !auth()->user()->isAdmin())
+        <dialog id="request-delete-modal-{{ $document->id }}" class="modal modal-bottom sm:modal-middle text-left whitespace-normal backdrop-blur-xs text-base-content">
+            <div class="modal-box p-0 overflow-hidden rounded-2xl sm:rounded-3xl border border-base-content/10 shadow-2xl bg-base-100 max-w-lg">
+                <form method="POST" action="{{ route('documents.request-deletion', $document) }}">
+                    @csrf
+                    <div class="p-6 pb-4">
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="flex items-center gap-3.5">
+                                <div class="w-11 h-11 rounded-2xl bg-error/10 text-error flex items-center justify-center shrink-0 ring-4 ring-error/5 shadow-xs">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-lg text-base-content leading-snug">{{ __('Penghapusan Dokumen Aktif') }}</h3>
+                                    <p class="text-xs text-base-content/60 mt-0.5">{{ __('Dokumen resmi memerlukan persetujuan Administrator') }}</p>
+                                </div>
+                            </div>
+                            <button type="button" onclick="document.getElementById('request-delete-modal-{{ $document->id }}').close()" class="btn btn-ghost btn-sm btn-circle text-base-content/50 hover:text-base-content hover:bg-base-200">
+                                ✕
+                            </button>
+                        </div>
+
+                        {{-- Instruction Box (Point 2) --}}
+                        <div class="mt-4 p-4 rounded-xl bg-base-200/60 border border-base-300/60 text-xs text-base-content/80 space-y-2.5">
+                            <div class="font-semibold text-base-content flex items-center gap-1.5">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-warning shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                                </svg>
+                                {{ __('Tata Kelola Dokumen Korporat') }}
+                            </div>
+                            <p class="leading-relaxed">
+                                {{ __('Dokumen ini telah disahkan dan berstatus Aktif (:number). Sesuai tata kelola dan audit trail korporat, penghapusan dokumen aktif harus melalui persetujuan Administrator.', ['number' => $document->document_number ?: 'Resmi']) }}
+                            </p>
+                            <div class="p-2.5 bg-base-100 rounded-lg border border-base-200 space-y-1">
+                                <div class="font-medium text-base-content">{{ __('Alur Penghapusan:') }}</div>
+                                <ol class="list-decimal list-inside space-y-0.5 text-base-content/70">
+                                    <li>{{ __('Tuliskan alasan permohonan penghapusan.') }}</li>
+                                    <li>{{ __('Ajukan permohonan ke Administrator.') }}</li>
+                                    <li>{{ __('Setelah disetujui, dokumen akan masuk ke Tempat Sampah (Trash) dan Anda dapat menghapus permanen.') }}</li>
+                                </ol>
+                            </div>
+                        </div>
+
+                        {{-- Reason input --}}
+                        <div class="mt-4">
+                            <label class="label text-xs font-semibold text-base-content/80">
+                                <span>{{ __('Alasan Penghapusan') }} <span class="text-error">*</span></span>
+                            </label>
+                            <textarea name="notes" rows="3" required class="textarea textarea-bordered w-full text-xs rounded-xl bg-base-200/50 focus:bg-base-100" placeholder="{{ __('Tuliskan alasan mengapa dokumen ini perlu dihapus...') }}"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="bg-base-200/40 px-6 py-4 border-t border-base-200 flex items-center justify-end gap-2.5">
+                        <button type="button" onclick="document.getElementById('request-delete-modal-{{ $document->id }}').close()" class="btn btn-ghost btn-sm rounded-xl font-medium text-base-content/70 hover:text-base-content px-4">
+                            {{ __('Batal') }}
+                        </button>
+                        <button type="submit" class="btn btn-error btn-sm text-white font-semibold rounded-xl px-5 shadow-xs flex items-center gap-1.5">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                            </svg>
+                            {{ __('Ajukan Permohonan Penghapusan') }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <form method="dialog" class="modal-backdrop">
+                <button type="button" onclick="document.getElementById('request-delete-modal-{{ $document->id }}').close()">{{ __('Batal') }}</button>
+            </form>
+        </dialog>
+    @endif
 
     {{-- Include Audit Trail Modal --}}
     @include('documents._audit_trail_modal')

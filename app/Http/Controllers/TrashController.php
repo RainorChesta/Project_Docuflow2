@@ -165,6 +165,17 @@ class TrashController extends Controller
                 ->with('error', __('Anda tidak memiliki izin untuk menghapus permanen dokumen ":title".', ['title' => $document->title]));
         }
 
+        if ($document->archiveRequests()->whereIn('state', [
+            \App\Models\ArchiveRequest::STATE_DRAFT,
+            \App\Models\ArchiveRequest::STATE_PENDING_APPROVAL,
+            \App\Models\ArchiveRequest::STATE_APPROVED,
+            \App\Models\ArchiveRequest::STATE_PREPARING_SNAPSHOT,
+            \App\Models\ArchiveRequest::STATE_READY_TO_REGISTER,
+        ])->exists()) {
+            return redirect()->route('trash.index')
+                ->with('error', __('Dokumen ":title" memiliki permohonan arsip aktif dan tidak dapat dihapus permanen.', ['title' => $document->title]));
+        }
+
         $this->permanentlyDeleteDocument($document);
 
         return redirect()->route('trash.index')

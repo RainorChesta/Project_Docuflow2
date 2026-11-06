@@ -94,4 +94,19 @@ class DocumentVersion extends Model
     {
         return $this->belongsTo(User::class, 'reviewer_id');
     }
+
+    public function archiveEntry(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(ArchiveEntry::class, 'document_version_id');
+    }
+
+    public function archiveRequests(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ArchiveRequest::class, 'requested_version_id');
+    }
+
+    public function isArchived(): bool
+    {
+        return $this->archiveEntry()->where('status', '!=', ArchiveEntry::STATUS_VOIDED)->exists();
+    }
 }

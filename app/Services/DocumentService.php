@@ -256,6 +256,143 @@ class DocumentService
         );
     }
 
+    /**
+     * Inspect surrounding document numbers (preceding and succeeding) in the same series
+     * to provide administrator consideration context before approving deletion.
+     *
+     * @return array{has_sequence: bool, current_number: ?string, current_seq: ?int, previous_document: ?array, next_document: ?array, total_peers: int, is_latest: bool, has_gap_risk: bool, warning_message: string}
+     */
+    public function getNumberingSequenceContext(Document $document): array
+    {
+        $docNumber = $document->document_number;
+        if (empty($docNumber)) {
+            return [
+                'has_sequence' => false,
+                'current_number' => null,
+                'current_seq' => null,
+                'previous_document' => null,
+                'next_document' => null,
+                'total_peers' => 0,
+                'is_latest' => false,
+                'has_gap_risk' => false,
+                'warning_message' => __('Dokumen belum memiliki nomor resmi definitif.'),
+            ];
+        }
+
+        $parts = explode('/', $docNumber);
+        $seq = null;
+        $suffix = null;
+        $prefix = null;
+
+        // Pattern 1: Sequence at the start (e.g. "002/BA/CMH/XI/2026")
+        if (is_numeric($parts[0])) {
+            $seq = (int) $parts[0];
+            $suffix = implode('/', array_slice($parts, 1));
+        }
+        // Pattern 2: Sequence at the end (e.g. "ARC/.../000001" or "MED/2026/001")
+        elseif (is_numeric(end($parts))) {
+            $lastIndex = count($parts) - 1;
+            $seq = (int) $parts[$lastIndex];
+            $prefix = implode('/', array_slice($parts, 0, $lastIndex));
+        }
+
+        // Query peer documents in the same numbering series
+        $query = Document::withTrashed()
+            ->where('id', '!=', $document->id);
+
+        if ($document->document_type_id) {
+            $query->where('document_type_id', $document->document_type_id);
+        }
+        if ($document->company_id) {
+            $query->where('company_id', $document->company_id);
+        }
+        if ($document->branch_id) {
+            $query->where('branch_id', $document->branch_id);
+        }
+
+        if ($suffix !== null) {
+            $query->where('document_number', 'like', "%/{$suffix}");
+        } elseif ($prefix !== null) {
+            $query->where('document_number', 'like', "{$prefix}/%");
+        }
+
+        $peerDocs = $query->select(['id', 'document_number', 'title', 'owner_id', 'created_at', 'deleted_at'])->get();
+
+        $previousDoc = null;
+        $nextDoc = null;
+
+        if ($seq !== null) {
+            $prevSeqCandidate = null;
+            $nextSeqCandidate = null;
+
+            foreach ($peerDocs as $peer) {
+                if (empty($peer->document_number)) {
+                    continue;
+                }
+                $peerParts = explode('/', $peer->document_number);
+                $peerSeq = null;
+
+                if ($suffix !== null && is_numeric($peerParts[0])) {
+                    $peerSeq = (int) $peerParts[0];
+                } elseif ($prefix !== null && is_numeric(end($peerParts))) {
+                    $peerSeq = (int) end($peerParts);
+                }
+
+                if ($peerSeq === null) {
+                    continue;
+                }
+
+                // Previous candidate: largest peer number < current number
+                if ($peerSeq < $seq) {
+                    if ($prevSeqCandidate === null || $peerSeq > $prevSeqCandidate) {
+                        $prevSeqCandidate = $peerSeq;
+                        $previousDoc = $peer;
+                    }
+                }
+
+                // Next candidate: smallest peer number > current number
+                if ($peerSeq > $seq) {
+                    if ($nextSeqCandidate === null || $peerSeq < $nextSeqCandidate) {
+                        $nextSeqCandidate = $peerSeq;
+                        $nextDoc = $peer;
+                    }
+                }
+            }
+        }
+
+        $isLatest = ($nextDoc === null);
+        $hasGapRisk = ($nextDoc !== null);
+
+        $warningMessage = $hasGapRisk
+            ? __('Perhatian: Dokumen sesudahnya (:next_num) telah terbit. Menghapus dokumen ini akan menyebabkan celah penomoran (nomor lompat) dalam urutan penomoran.', ['next_num' => $nextDoc->document_number])
+            : ($isLatest
+                ? __('Ini adalah nomor urut terakhir dalam seri penomoran saat ini. Menghapus dokumen ini tidak menimbulkan nomor kosong di tengah seri penomoran.', [])
+                : __('Tidak ditemukan dokumen berurutan langsung sebelum atau sesudah nomor ini.')
+            );
+
+        return [
+            'has_sequence' => true,
+            'current_number' => $docNumber,
+            'current_seq' => $seq,
+            'previous_document' => $previousDoc ? [
+                'id' => $previousDoc->id,
+                'document_number' => $previousDoc->document_number,
+                'title' => $previousDoc->title,
+                'is_trashed' => $previousDoc->trashed(),
+            ] : null,
+            'next_document' => $nextDoc ? [
+                'id' => $nextDoc->id,
+                'document_number' => $nextDoc->document_number,
+                'title' => $nextDoc->title,
+                'is_trashed' => $nextDoc->trashed(),
+            ] : null,
+            'total_peers' => $peerDocs->count(),
+            'is_latest' => $isLatest,
+            'has_gap_risk' => $hasGapRisk,
+            'warning_message' => $warningMessage,
+        ];
+    }
+
     public function create(array $data, int $ownerId): Document
     {
         $unitKerja = !empty($data['unit_kerja_id']) ? UnitKerja::find($data['unit_kerja_id']) : null;

@@ -9,7 +9,7 @@
             <div id="docx-preview-{{ $version->id }}" class="w-full h-full"></div>
         </div>
 
-        <script src="{{ rtrim(config('onlyoffice.url'), '/') }}/web-apps/apps/api/documents/api.js?v=9.4.0-cmh-v2"></script>
+        <script src="{{ rtrim(config('onlyoffice.url'), '/') }}/web-apps/apps/api/documents/api.js?v=9.4.0-cmh-v3"></script>
         <script>
             document.addEventListener('DOMContentLoaded', function() {
                 if (typeof DocsAPI === 'undefined') {
@@ -55,8 +55,36 @@
                     const releaseGuard = function() {
                         guardActive = false;
                     };
+                    window._releaseOnlyOfficeScrollGuard = releaseGuard;
                     window.addEventListener('wheel', releaseGuard, { passive: true, capture: true });
                     window.addEventListener('touchmove', releaseGuard, { passive: true, capture: true });
+
+                    if (!window._dokuflowOverscrollBound) {
+                        window._dokuflowOverscrollBound = true;
+                        window.addEventListener('message', function(e) {
+                            if (!e.data || e.data.type !== 'onlyoffice-overscroll') return;
+
+                            if (typeof window._releaseOnlyOfficeScrollGuard === 'function') {
+                                window._releaseOnlyOfficeScrollGuard();
+                            }
+
+                            var deltaY = typeof e.data.deltaY === 'number' ? e.data.deltaY : 0;
+                            if (!deltaY) return;
+
+                            var scrollContainer = document.querySelector('main');
+                            var isMainScrollable = scrollContainer && (scrollContainer.scrollHeight > scrollContainer.clientHeight);
+
+                            if (isMainScrollable) {
+                                var prevTop = scrollContainer.scrollTop;
+                                scrollContainer.scrollTop = Math.max(0, scrollContainer.scrollTop + deltaY);
+                                if (scrollContainer.scrollTop === prevTop && (document.documentElement.scrollTop > 0 || document.body.scrollTop > 0 || deltaY > 0)) {
+                                    window.scrollBy({ top: deltaY, behavior: 'auto' });
+                                }
+                            } else {
+                                window.scrollBy({ top: deltaY, behavior: 'auto' });
+                            }
+                        });
+                    }
 
                     function restoreScrollIfAutofocused() {
                         if (guardActive && mainEl && mainEl.scrollTop !== initialScrollTop) {

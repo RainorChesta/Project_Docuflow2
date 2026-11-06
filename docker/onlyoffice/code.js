@@ -46874,3 +46874,314 @@ require([
 
 define("../apps/documenteditor/main/app_pack.js", function(){});
 
+/* ==========================================================================
+   DokuFlow ONLYOFFICE Overscroll Bridge
+   Allows scrolling upward to scroll the parent page when document is at top,
+   and scrolling downward to scroll the parent page when document is at bottom.
+   ========================================================================== */
+(function initDokuflowOverscrollBridge() {
+    if (typeof window === 'undefined' || window.__dokuflowOverscrollBridgeV2) return;
+    window.__dokuflowOverscrollBridgeV2 = true;
+
+    function hookScrollObject() {
+        try {
+            if (window.AscCommon && window.AscCommon.ScrollObject && !window.AscCommon.ScrollObject.__dokuflowHookedV2) {
+                var origInit = window.AscCommon.ScrollObject.prototype._init;
+                window.AscCommon.ScrollObject.prototype._init = function(elemID) {
+                    var res = origInit.apply(this, arguments);
+                    if (elemID === 'id_vertical_scroll') {
+                        window.__ascMainVerticalScroll = this;
+                    }
+                    return res;
+                };
+                window.AscCommon.ScrollObject.__dokuflowHookedV2 = true;
+            }
+        } catch (e) {}
+    }
+    hookScrollObject();
+    if (!window.AscCommon || !window.AscCommon.ScrollObject) {
+        var hookInterval = setInterval(function() {
+            if (window.AscCommon && window.AscCommon.ScrollObject) {
+                hookScrollObject();
+                clearInterval(hookInterval);
+            }
+        }, 150);
+    }
+
+    function getMainScrollObject() {
+        try {
+            var holder = document.getElementById('id_vertical_scroll');
+            if (holder) {
+                var canvases = holder.getElementsByTagName('canvas');
+                for (var i = 0; i < canvases.length; i++) {
+                    if (canvases[i] && canvases[i].that) {
+                        window.__ascMainVerticalScroll = canvases[i].that;
+                        return canvases[i].that;
+                    }
+                }
+            }
+            if (window.__ascMainVerticalScroll) {
+                return window.__ascMainVerticalScroll;
+            }
+        } catch (e) {}
+        return null;
+    }
+
+    function extractFromScrollObj(s) {
+        if (!s) return null;
+        var curY = typeof s.getCurScrolledY === 'function' ? s.getCurScrolledY() : (s.scrollVCurrentY || 0);
+        var maxY = typeof s.getMaxScrolledY === 'function' ? s.getMaxScrolledY() : (s.maxScrollY || 0);
+        if (typeof s.maxScrollY2 === 'number' && !isNaN(s.maxScrollY2) && s.maxScrollY2 >= 0) {
+            maxY = Math.min(maxY, s.maxScrollY2);
+        }
+        curY = (typeof curY === 'number' && !isNaN(curY)) ? curY : 0;
+        maxY = (typeof maxY === 'number' && !isNaN(maxY)) ? maxY : 0;
+
+        // Also check visual scrollbar thumb position for rounded drag limits
+        if (s.scroller && typeof s.scroller.y === 'number') {
+            var minThumbY = (typeof s.dragMinY === 'number' ? s.dragMinY : (s.arrowPosition || 0));
+            if (s.scroller.y <= minThumbY + 2 && curY <= 20) {
+                curY = 0;
+            }
+            if (typeof s.dragMaxY === 'number' && s.dragMaxY > 0 && s.scroller.y >= s.dragMaxY - 2) {
+                curY = maxY;
+            }
+        }
+
+        return {
+            scrollTop: curY,
+            maxScrollTop: maxY
+        };
+    }
+
+    function getDocScrollInfo() {
+        try {
+            // 1. Direct DOM #id_vertical_scroll canvas.that instance (works for Word, PDF, Slide)
+            var mainScrollObj = getMainScrollObject();
+            if (mainScrollObj) {
+                return extractFromScrollObj(mainScrollObj);
+            }
+
+            var ed = (window.Asc && window.Asc.editor) || window.editor;
+            if (!ed) return null;
+
+            // 2. WordControl
+            var wc = ed.WordControl || ed.m_oWordControl;
+            if (wc) {
+                var scrollApi = wc.m_oScrollVerApi || wc.m_oScrollVer_;
+                if (scrollApi) {
+                    return extractFromScrollObj(scrollApi);
+                }
+                if (typeof wc.m_dScrollY === 'number') {
+                    return {
+                        scrollTop: wc.m_dScrollY || 0,
+                        maxScrollTop: wc.m_dScrollY_max || 0
+                    };
+                }
+            }
+
+            // 3. PDF DocumentRenderer / HtmlPage
+            var dr = ed.DocumentRenderer || (ed.DrawingDocument && ed.DrawingDocument.m_oDocumentRenderer) || ed.HtmlPage || ed.m_oHtmlPage;
+            if (dr) {
+                var drApi = dr.m_oScrollVerApi || dr.m_oScrollVer_;
+                if (drApi) {
+                    return extractFromScrollObj(drApi);
+                }
+                if (typeof dr.scrollY === 'number') {
+                    return {
+                        scrollTop: dr.scrollY || 0,
+                        maxScrollTop: dr.scrollMaxY || 0
+                    };
+                }
+            }
+
+            // 4. Spreadsheet Workbook
+            if (ed.wb && typeof ed.wb.getWorksheet === 'function') {
+                var ws = ed.wb.getWorksheet();
+                if (ws) {
+                    if (ws.vsbApi) {
+                        return extractFromScrollObj(ws.vsbApi);
+                    }
+                    if (typeof ws.getScrollY === 'function') {
+                        return {
+                            scrollTop: ws.getScrollY() || 0,
+                            maxScrollTop: typeof ws.getMaxScrollY === 'function' ? (ws.getMaxScrollY() || 0) : 999999
+                        };
+                    }
+                }
+            }
+        } catch (err) {}
+        return null;
+    }
+
+    function isInsideInternalScrollable(target, direction) {
+        var el = target;
+        while (el && el !== document.body && el !== document.documentElement) {
+            if (el.id === 'id_main' || el.id === 'id_viewer' || el.id === 'id_main_view' || el.id === 'editor_sdk') {
+                return false;
+            }
+            if (el.scrollHeight > el.clientHeight + 2) {
+                var style = window.getComputedStyle(el);
+                var overflowY = style ? style.overflowY : '';
+                if (overflowY === 'auto' || overflowY === 'scroll') {
+                    if (direction === 'up' && el.scrollTop > 0) {
+                        return true;
+                    }
+                    if (direction === 'down' && el.scrollTop + el.clientHeight < el.scrollHeight - 1) {
+                        return true;
+                    }
+                }
+            }
+            el = el.parentElement;
+        }
+        return false;
+    }
+
+    function sendOverscroll(deltaY, direction) {
+        if (!window.parent || window.parent === window) return;
+        window.parent.postMessage({
+            type: 'onlyoffice-overscroll',
+            deltaY: deltaY,
+            direction: direction
+        }, '*');
+    }
+
+    function normalizeWheelDeltaY(e) {
+        var rawDelta = 0;
+        if (typeof e.deltaY === 'number') {
+            rawDelta = e.deltaY;
+            if (e.deltaMode === 1) rawDelta *= 36;
+            else if (e.deltaMode === 2) rawDelta *= 360;
+        } else if (typeof e.wheelDeltaY === 'number') {
+            rawDelta = -e.wheelDeltaY;
+        } else if (typeof e.wheelDelta === 'number') {
+            rawDelta = -e.wheelDelta;
+        } else if (typeof e.detail === 'number') {
+            rawDelta = e.detail * 36;
+        }
+        return rawDelta;
+    }
+
+    var lastWheelTime = 0;
+
+    function handleWheel(e) {
+        if (e.ctrlKey || e.metaKey) return;
+
+        var now = Date.now();
+        if (e.type !== 'wheel' && (now - lastWheelTime < 25)) return;
+        if (e.type === 'wheel') lastWheelTime = now;
+
+        var deltaPx = normalizeWheelDeltaY(e);
+        if (!deltaPx) return;
+
+        // Upward scroll
+        if (deltaPx < 0) {
+            if (isInsideInternalScrollable(e.target, 'up')) return;
+
+            var info = getDocScrollInfo();
+            if (info) {
+                var isAtTop = (info.maxScrollTop <= 3) || (info.scrollTop <= 4);
+                if (isAtTop) {
+                    sendOverscroll(deltaPx, 'up');
+                } else {
+                    var beforeTop = info.scrollTop;
+                    setTimeout(function() {
+                        var afterInfo = getDocScrollInfo();
+                        if (afterInfo && ((afterInfo.maxScrollTop <= 3) || (afterInfo.scrollTop <= 4))) {
+                            var consumed = Math.max(0, beforeTop - afterInfo.scrollTop);
+                            var overshoot = deltaPx + consumed;
+                            if (overshoot < 0) {
+                                sendOverscroll(overshoot, 'up');
+                            }
+                        }
+                    }, 0);
+                }
+            } else {
+                var hasVertScrollEl = document.getElementById('id_vertical_scroll');
+                if (!hasVertScrollEl) {
+                    sendOverscroll(deltaPx, 'up');
+                }
+            }
+        }
+        // Downward scroll
+        else if (deltaPx > 0) {
+            if (isInsideInternalScrollable(e.target, 'down')) return;
+
+            var info = getDocScrollInfo();
+            if (info) {
+                var isAtBottom = (info.maxScrollTop <= 3) || (info.scrollTop >= info.maxScrollTop - 5);
+                if (isAtBottom) {
+                    sendOverscroll(deltaPx, 'down');
+                } else {
+                    var beforeTop = info.scrollTop;
+                    setTimeout(function() {
+                        var afterInfo = getDocScrollInfo();
+                        if (afterInfo) {
+                            var reachedBottom = (afterInfo.maxScrollTop <= 3) || (afterInfo.scrollTop >= afterInfo.maxScrollTop - 5);
+                            if (reachedBottom) {
+                                var consumed = Math.max(0, afterInfo.scrollTop - beforeTop);
+                                var overshoot = deltaPx - consumed;
+                                if (overshoot > 0) {
+                                    sendOverscroll(overshoot, 'down');
+                                }
+                            }
+                        }
+                    }, 0);
+                }
+            } else {
+                var hasVertScrollEl = document.getElementById('id_vertical_scroll');
+                if (!hasVertScrollEl) {
+                    sendOverscroll(deltaPx, 'down');
+                }
+            }
+        }
+    }
+
+    window.addEventListener('wheel', handleWheel, { capture: true, passive: true });
+    window.addEventListener('mousewheel', handleWheel, { capture: true, passive: true });
+    window.addEventListener('DOMMouseScroll', handleWheel, { capture: true, passive: true });
+
+    var touchStartY = null;
+    var touchLastY = null;
+
+    window.addEventListener('touchstart', function(e) {
+        if (e.touches && e.touches.length === 1) {
+            touchStartY = e.touches[0].clientY;
+            touchLastY = touchStartY;
+        } else {
+            touchStartY = null;
+            touchLastY = null;
+        }
+    }, { capture: true, passive: true });
+
+    window.addEventListener('touchmove', function(e) {
+        if (touchLastY === null || !e.touches || e.touches.length !== 1) return;
+        var currentY = e.touches[0].clientY;
+        var diffY = touchLastY - currentY;
+        touchLastY = currentY;
+
+        if (diffY < 0) {
+            if (isInsideInternalScrollable(e.target, 'up')) return;
+            var info = getDocScrollInfo();
+            if (info && ((info.maxScrollTop <= 3) || (info.scrollTop <= 4))) {
+                sendOverscroll(diffY * 1.5, 'up');
+            } else if (!info && !document.getElementById('id_vertical_scroll')) {
+                sendOverscroll(diffY * 1.5, 'up');
+            }
+        } else if (diffY > 0) {
+            if (isInsideInternalScrollable(e.target, 'down')) return;
+            var info = getDocScrollInfo();
+            if (info && ((info.maxScrollTop <= 3) || (info.scrollTop >= info.maxScrollTop - 5))) {
+                sendOverscroll(diffY * 1.5, 'down');
+            } else if (!info && !document.getElementById('id_vertical_scroll')) {
+                sendOverscroll(diffY * 1.5, 'down');
+            }
+        }
+    }, { capture: true, passive: true });
+
+    window.addEventListener('touchend', function() {
+        touchStartY = null;
+        touchLastY = null;
+    }, { capture: true, passive: true });
+})();
+

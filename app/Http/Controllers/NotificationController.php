@@ -3,7 +3,10 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\View\View;
 
 class NotificationController extends Controller
 {
@@ -158,11 +161,21 @@ class NotificationController extends Controller
 
     /**
      * Get recent notifications for the authenticated user.
+     * Supports JSON API (for topbar bell / toast polling) and full HTML page view.
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request): JsonResponse|View
     {
-        $rawNotifications = $request->user()->notifications()->latest()->limit(100)->get();
-        $filtered = $this->filterNotifications($request->user(), $rawNotifications);
+        $user = $request->user();
+        $isJson = $request->expectsJson() || $request->ajax();
+
+        // For JSON API (Bell dropdown & Toast), load up to 100 recent notifications.
+        // For HTML page view, fetch full user notifications.
+        $notificationQuery = $user->notifications()->latest();
+        if ($isJson) {
+            $notificationQuery->limit(100);
+        }
+        $rawNotifications = $notificationQuery->get();
+        $filtered = $this->filterNotifications($user, $rawNotifications);
 
         // Deduplicate unread notifications of the same type/action for the same document/version so user never sees duplicate alerts
         $seen = [];
@@ -218,81 +231,139 @@ class NotificationController extends Controller
             ? \App\Models\Document::withTrashed()->with('versions')->whereIn('id', array_unique(array_values($docIds)))->get()->keyBy('id')
             : collect();
 
-        $notifications = $uniqueFiltered->take(20)->map(function ($n) use ($docIds, $documents) {
-            $docId = $docIds[$n->id] ?? ($n->data['document_id'] ?? null);
-            $doc = $docId ? $documents->get($docId) : null;
-            $type = $n->data['type'] ?? 'general';
-            $icon = $n->data['icon'] ?? 'bell';
+        $unreadCount = $this->getUnreadCount($user);
 
-            $status = 'info';
-            if ($icon === 'rejected' || str_contains($type, 'reject') || str_contains($type, 'revoked')) {
-                $status = 'rejected';
-            } elseif ($type === 'document_expired' || $icon === 'expired' || str_contains($type, 'expired') || str_contains($type, 'expir')) {
-                $status = 'expired';
-                $icon = 'expired';
-            } elseif (str_contains($type, 'approved') || $icon === 'success') {
-                $status = 'approved';
-            } elseif (str_contains($type, 'request')) {
-                $status = 'pending';
-            }
+        // Return JSON response for API / polling requests
+        if ($isJson) {
+            $notifications = $uniqueFiltered->take(20)->map(function ($n) use ($docIds, $documents) {
+                return $this->formatNotificationItem($n, $docIds, $documents);
+            })->values();
 
-            $title = $n->data['title'] ?? '';
-            $message = $n->data['message'] ?? '';
-            $documentTitle = $n->data['document_title'] ?? ($doc?->title ?? null);
+            return response()->json([
+                'notifications' => $notifications,
+                'unread_count'  => $unreadCount,
+            ]);
+        }
 
-            // Dynamically refresh approval request notifications if document title was updated while pending
-            if ($type === 'approval_request' && $doc) {
-                $pendingVer = $doc->versions->firstWhere('status', 'pending');
-                if ($pendingVer) {
-                    $documentTitle = $doc->title;
-                    $authorName = $n->data['actor_name'] ?? ($n->data['author'] ?? ($pendingVer->author_name ?? 'Pengguna'));
-                    if ($pendingVer->isRename() && $pendingVer->old_title) {
-                        $title = __('Permintaan Persetujuan Perubahan Nama Dokumen');
-                        $message = __(':author mengajukan perubahan nama dokumen dari ":old" menjadi ":doc" (v:ver)', [
-                            'author' => $authorName,
-                            'old' => $pendingVer->old_title,
-                            'doc' => $doc->title,
-                            'ver' => $pendingVer->version_number,
-                        ]);
-                    }
+        // Full Page HTML View: apply search and read/unread filtering
+        $filter = $request->get('filter', 'all'); // all, unread, read
+        $search = trim((string) $request->get('search', ''));
+
+        $pageItems = $uniqueFiltered->map(function ($n) use ($docIds, $documents) {
+            return $this->formatNotificationItem($n, $docIds, $documents);
+        });
+
+        if ($filter === 'unread') {
+            $pageItems = $pageItems->where('read', false);
+        } elseif ($filter === 'read') {
+            $pageItems = $pageItems->where('read', true);
+        }
+
+        if ($search !== '') {
+            $searchLower = mb_strtolower($search);
+            $pageItems = $pageItems->filter(function ($item) use ($searchLower) {
+                return str_contains(mb_strtolower($item['title'] ?? ''), $searchLower)
+                    || str_contains(mb_strtolower($item['message'] ?? ''), $searchLower)
+                    || str_contains(mb_strtolower($item['document_title'] ?? ''), $searchLower)
+                    || str_contains(mb_strtolower($item['document_number'] ?? ''), $searchLower)
+                    || str_contains(mb_strtolower($item['actor_name'] ?? ''), $searchLower);
+            });
+        }
+
+        $totalFiltered = $pageItems->count();
+        $perPage = 15;
+        $currentPage = LengthAwarePaginator::resolveCurrentPage();
+        $currentItems = $pageItems->slice(($currentPage - 1) * $perPage, $perPage)->values();
+
+        $notifications = new LengthAwarePaginator(
+            $currentItems,
+            $totalFiltered,
+            $perPage,
+            $currentPage,
+            ['path' => LengthAwarePaginator::resolveCurrentPath(), 'query' => $request->query()]
+        );
+
+        return view('notifications.index', [
+            'notifications' => $notifications,
+            'unreadCount'   => $unreadCount,
+            'filter'        => $filter,
+            'search'        => $search,
+            'totalCount'    => $uniqueFiltered->count(),
+        ]);
+    }
+
+    /**
+     * Format a single database notification into a standard array.
+     */
+    private function formatNotificationItem($n, array $docIds, $documents): array
+    {
+        $docId = $docIds[$n->id] ?? ($n->data['document_id'] ?? null);
+        $doc = $docId ? $documents->get($docId) : null;
+        $type = $n->data['type'] ?? 'general';
+        $icon = $n->data['icon'] ?? 'bell';
+
+        $status = 'info';
+        if ($icon === 'rejected' || str_contains($type, 'reject') || str_contains($type, 'revoked')) {
+            $status = 'rejected';
+        } elseif ($type === 'document_expired' || $icon === 'expired' || str_contains($type, 'expired') || str_contains($type, 'expir')) {
+            $status = 'expired';
+            $icon = 'expired';
+        } elseif (str_contains($type, 'approved') || $icon === 'success') {
+            $status = 'approved';
+        } elseif (str_contains($type, 'request')) {
+            $status = 'pending';
+        }
+
+        $title = $n->data['title'] ?? '';
+        $message = $n->data['message'] ?? '';
+        $documentTitle = $n->data['document_title'] ?? ($doc?->title ?? null);
+
+        // Dynamically refresh approval request notifications if document title was updated while pending
+        if ($type === 'approval_request' && $doc) {
+            $pendingVer = $doc->versions->firstWhere('status', 'pending');
+            if ($pendingVer) {
+                $documentTitle = $doc->title;
+                $authorName = $n->data['actor_name'] ?? ($n->data['author'] ?? ($pendingVer->author_name ?? 'Pengguna'));
+                if ($pendingVer->isRename() && $pendingVer->old_title) {
+                    $title = __('Permintaan Persetujuan Perubahan Nama Dokumen');
+                    $message = __(':author mengajukan perubahan nama dokumen dari ":old" menjadi ":doc" (v:ver)', [
+                        'author' => $authorName,
+                        'old' => $pendingVer->old_title,
+                        'doc' => $doc->title,
+                        'ver' => $pendingVer->version_number,
+                    ]);
                 }
             }
+        }
 
-            return [
-                'id'              => $n->id,
-                'type'            => $type,
-                'title'           => $title,
-                'message'         => $message,
-                'url'             => $this->normalizeNotificationUrl($n->data['url'] ?? '#'),
-                'icon'            => $icon,
-                'status'          => $status,
-                'read'            => !is_null($n->read_at),
-                'time'            => $n->created_at->diffForHumans(),
-                'reason'          => $n->data['reason'] ?? ($n->data['notes'] ?? null),
-                'document_id'     => $docId,
-                'document_title'  => $documentTitle,
-                'document_number'      => $n->data['document_number'] ?? ($doc?->document_number ?? null),
-                'request_type'         => $n->data['request_type'] ?? null,
-                'company_name'         => $n->data['company_name'] ?? null,
-                'signature_request_id' => $n->data['signature_request_id'] ?? null,
-                'has_signature'        => (bool) ($n->data['has_signature'] ?? false),
-                'is_stamp'             => (bool) ($n->data['is_stamp'] ?? false),
-                'actor_name'           => $n->data['actor_name'] ?? ($n->data['author'] ?? ($n->data['reviewer'] ?? ($n->data['requester_name'] ?? ($n->data['shared_by'] ?? null)))),
-            ];
-        })->values();
-
-        $unreadCount = $this->getUnreadCount($request->user());
-
-        return response()->json([
-            'notifications' => $notifications,
-            'unread_count'  => $unreadCount,
-        ]);
+        return [
+            'id'                   => $n->id,
+            'type'                 => $type,
+            'title'                => $title,
+            'message'              => $message,
+            'url'                  => $this->normalizeNotificationUrl($n->data['url'] ?? '#'),
+            'icon'                 => $icon,
+            'status'               => $status,
+            'read'                 => !is_null($n->read_at),
+            'time'                 => $n->created_at->diffForHumans(),
+            'created_at'           => $n->created_at,
+            'reason'               => $n->data['reason'] ?? ($n->data['notes'] ?? null),
+            'document_id'          => $docId,
+            'document_title'       => $documentTitle,
+            'document_number'      => $n->data['document_number'] ?? ($doc?->document_number ?? null),
+            'request_type'         => $n->data['request_type'] ?? null,
+            'company_name'         => $n->data['company_name'] ?? null,
+            'signature_request_id' => $n->data['signature_request_id'] ?? null,
+            'has_signature'        => (bool) ($n->data['has_signature'] ?? false),
+            'is_stamp'             => (bool) ($n->data['is_stamp'] ?? false),
+            'actor_name'           => $n->data['actor_name'] ?? ($n->data['author'] ?? ($n->data['reviewer'] ?? ($n->data['requester_name'] ?? ($n->data['shared_by'] ?? null)))),
+        ];
     }
 
     /**
      * Mark a specific notification as read.
      */
-    public function markAsRead(Request $request, string $id): JsonResponse
+    public function markAsRead(Request $request, string $id): JsonResponse|RedirectResponse
     {
         $notification = $request->user()
             ->notifications()
@@ -300,23 +371,122 @@ class NotificationController extends Controller
 
         $notification->markAsRead();
 
-        return response()->json([
-            'success' => true,
-            'unread_count' => $this->getUnreadCount($request->user()),
-        ]);
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'unread_count' => $this->getUnreadCount($request->user()),
+            ]);
+        }
+
+        return back()->with('success', __('Notifikasi berhasil ditandai sebagai telah dibaca.'));
     }
 
     /**
      * Mark all notifications as read.
      */
-    public function markAllAsRead(Request $request): JsonResponse
+    public function markAllAsRead(Request $request): JsonResponse|RedirectResponse
     {
         $request->user()->unreadNotifications()->update(['read_at' => now()]);
 
-        return response()->json([
-            'success' => true,
-            'unread_count' => 0,
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'unread_count' => 0,
+            ]);
+        }
+
+        return back()->with('success', __('Semua notifikasi berhasil ditandai sebagai telah dibaca.'));
+    }
+
+    /**
+     * Mark selected notifications as read.
+     */
+    public function bulkMarkAsRead(Request $request): JsonResponse|RedirectResponse
+    {
+        $validated = $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'string',
         ]);
+
+        $count = $request->user()
+            ->unreadNotifications()
+            ->whereIn('id', $validated['ids'])
+            ->update(['read_at' => now()]);
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'count' => $count,
+                'unread_count' => $this->getUnreadCount($request->user()),
+            ]);
+        }
+
+        return back()->with('success', __(':count notifikasi terpilih berhasil ditandai sebagai telah dibaca.', ['count' => $count]));
+    }
+
+    /**
+     * Delete a single notification.
+     */
+    public function destroy(Request $request, string $id): JsonResponse|RedirectResponse
+    {
+        $notification = $request->user()
+            ->notifications()
+            ->findOrFail($id);
+
+        $notification->delete();
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'unread_count' => $this->getUnreadCount($request->user()),
+            ]);
+        }
+
+        return back()->with('success', __('Notifikasi berhasil dihapus.'));
+    }
+
+    /**
+     * Delete selected notifications.
+     */
+    public function bulkDestroy(Request $request): JsonResponse|RedirectResponse
+    {
+        $validated = $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'string',
+        ]);
+
+        $count = $request->user()
+            ->notifications()
+            ->whereIn('id', $validated['ids'])
+            ->delete();
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'count' => $count,
+                'unread_count' => $this->getUnreadCount($request->user()),
+            ]);
+        }
+
+        return back()->with('success', __(':count notifikasi terpilih berhasil dihapus.', ['count' => $count]));
+    }
+
+    /**
+     * Delete all notifications for the user.
+     */
+    public function destroyAll(Request $request): JsonResponse|RedirectResponse
+    {
+        $count = $request->user()->notifications()->delete();
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'count' => $count,
+                'unread_count' => 0,
+            ]);
+        }
+
+        return back()->with('success', __('Semua notifikasi berhasil dihapus.'));
     }
 
     /**
@@ -336,7 +506,7 @@ class NotificationController extends Controller
         ]);
     }
 
-    private function getUnreadCount($user): int
+    public function getUnreadCount($user): int
     {
         $rawUnread = $user->unreadNotifications()->latest()->limit(100)->get();
         $filtered = $this->filterNotifications($user, $rawUnread);

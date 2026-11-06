@@ -224,6 +224,8 @@
                                 }
                             } elseif (str_starts_with($name, 'profile.')) {
                                 $crumbs[] = ['label' => __('Profil'), 'url' => null];
+                            } elseif (str_starts_with($name, 'notifications.')) {
+                                $crumbs[] = ['label' => __('Notifikasi'), 'url' => null];
                             } elseif (str_starts_with($name, 'signatures.requests.')) {
                                 $crumbs[] = ['label' => __('Approval'), 'url' => route('approvals.versions')];
                                 $crumbs[] = ['label' => __('Persetujuan Tanda Tangan'), 'url' => null];
@@ -244,6 +246,8 @@
                     </div>
 
                     {{ $slot }}
+
+                    <x-footer class="mt-8 pt-4 pb-2" />
                 </main>
             </div>
         </div>
@@ -252,6 +256,40 @@
         <x-navigation-guard />
         <x-toast-notification />
         <x-loading-blur />
+        <x-archive-info-modal />
+
+        <script>
+            (function initDokuflowOverscrollListener() {
+                if (window._dokuflowOverscrollBound) return;
+                window._dokuflowOverscrollBound = true;
+
+                window.addEventListener('message', function(e) {
+                    if (!e.data || e.data.type !== 'onlyoffice-overscroll') return;
+
+                    // Release initial autofocus guard if active
+                    if (typeof window._releaseOnlyOfficeScrollGuard === 'function') {
+                        window._releaseOnlyOfficeScrollGuard();
+                    }
+
+                    var deltaY = typeof e.data.deltaY === 'number' ? e.data.deltaY : 0;
+                    if (!deltaY) return;
+
+                    var mainEl = document.querySelector('main');
+                    var isMainScrollable = mainEl && (mainEl.scrollHeight > mainEl.clientHeight + 1);
+
+                    if (isMainScrollable) {
+                        var prevTop = mainEl.scrollTop;
+                        mainEl.scrollTop = Math.max(0, mainEl.scrollTop + deltaY);
+                        if (mainEl.scrollTop === prevTop && (document.documentElement.scrollTop > 0 || document.body.scrollTop > 0 || deltaY > 0)) {
+                            window.scrollBy({ top: deltaY, behavior: 'auto' });
+                        }
+                    } else {
+                        window.scrollBy({ top: deltaY, behavior: 'auto' });
+                    }
+                });
+            })();
+        </script>
+
         @stack('scripts')
     </body>
 </html>

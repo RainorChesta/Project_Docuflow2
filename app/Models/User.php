@@ -696,5 +696,15 @@ class User extends Authenticatable
             ->count();
     }
 
+    public function registeredArchives(): HasMany
+    {
+        return $this->hasMany(ArchiveEntry::class, 'registered_by');
+    }
+
+    public function archiveRequests(): HasMany
+    {
+        return $this->hasMany(ArchiveRequest::class, 'requested_by');
+    }
+
     protected $with = ['signature'];
 }

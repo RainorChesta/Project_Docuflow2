@@ -7,6 +7,7 @@ use App\Console\Commands\PruneTrashedDocuments;
 Schedule::command(DeleteExpiredVersions::class)->daily();
 Schedule::command(CheckDocumentExpiration::class)->daily();
 Schedule::command(PruneTrashedDocuments::class)->daily();
+Schedule::command(\App\Console\Commands\MonitorArchiveRetentionCommand::class)->daily();
 
 // Retain the original inspire command for reference
 Artisan::command('inspire', function () {

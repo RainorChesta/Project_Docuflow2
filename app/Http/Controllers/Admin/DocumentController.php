@@ -415,6 +415,15 @@ class DocumentController extends Controller
 
         foreach ($documents as $document) {
             if ($isForce) {
+                if ($document->archiveRequests()->whereIn('state', [
+                    \App\Models\ArchiveRequest::STATE_DRAFT,
+                    \App\Models\ArchiveRequest::STATE_PENDING_APPROVAL,
+                    \App\Models\ArchiveRequest::STATE_APPROVED,
+                    \App\Models\ArchiveRequest::STATE_PREPARING_SNAPSHOT,
+                    \App\Models\ArchiveRequest::STATE_READY_TO_REGISTER,
+                ])->exists()) {
+                    continue;
+                }
                 $this->permanentlyDeleteDocument($document);
             } else {
                 $document->delete();

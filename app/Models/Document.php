@@ -18,6 +18,7 @@ class Document extends Model
         'document_type_id', 'template_id', 'corporate_soft_file_id', 'is_public', 'current_version_id',
         'pending_rollback_version_id', 'rollback_requested_by_id', 'rollback_requested_at',
         'pending_title', 'rename_requested_by_id', 'rename_requested_at', 'rename_request_notes',
+        'deletion_requested_by_id', 'deletion_requested_at', 'deletion_request_notes',
         'paper_size', 'paper_margin',
         'general_access', 'link_role', 'share_token',
         'expiration_date', 'is_expired', 'is_expiration_notified', 'expiration_notif_status',
@@ -34,6 +35,7 @@ class Document extends Model
             'is_expiration_notified' => 'boolean',
             'rollback_requested_at' => 'datetime',
             'rename_requested_at' => 'datetime',
+            'deletion_requested_at' => 'datetime',
             'summary_started_at' => 'datetime',
             'summary_completed_at' => 'datetime',
             'expiration_date' => 'date',
@@ -326,6 +328,16 @@ class Document extends Model
     public function hasPendingRename(): bool
     {
         return !empty(trim($this->pending_title ?? ''));
+    }
+
+    public function deletionRequestedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'deletion_requested_by_id');
+    }
+
+    public function hasPendingDeletion(): bool
+    {
+        return !is_null($this->deletion_requested_by_id);
     }
 
     /**
@@ -794,5 +806,101 @@ class Document extends Model
         }
 
         return false;
+    }
+
+    /**
+     * Archive entries associated with this document.
+     */
+    public function archiveEntries(): HasMany
+    {
+        return $this->hasMany(ArchiveEntry::class, 'document_id');
+    }
+
+    /**
+     * The latest registered archive entry for this document.
+     */
+    public function latestArchiveEntry(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(ArchiveEntry::class, 'document_id')->latestOfMany();
+    }
+
+    /**
+     * Archive requests created for this document.
+     */
+    public function archiveRequests(): HasMany
+    {
+        return $this->hasMany(ArchiveRequest::class, 'document_id');
+    }
+
+    /**
+     * Check if this document has at least one active archive entry.
+     */
+    public function isArchived(): bool
+    {
+        if ($this->relationLoaded('archiveEntries')) {
+            return $this->archiveEntries->contains(fn($e) => $e->status !== ArchiveEntry::STATUS_VOIDED);
+        }
+
+        return $this->archiveEntries()->where('status', '!=', ArchiveEntry::STATUS_VOIDED)->exists();
+    }
+
+    /**
+     * Determine if this document has an active, non-discarded version.
+     */
+    public function hasActiveVersion(): bool
+    {
+        if ($this->relationLoaded('versions')) {
+            return $this->versions->contains(fn($v) => $v->status === 'active' && is_null($v->discarded_at));
+        }
+
+        return $this->versions()->where('status', 'active')->whereNull('discarded_at')->exists();
+    }
+
+    /**
+     * Get the latest in-flight archive request if any.
+     */
+    public function pendingArchiveRequest(): ?ArchiveRequest
+    {
+        $inFlightStates = [
+            ArchiveRequest::STATE_DRAFT,
+            ArchiveRequest::STATE_PENDING_APPROVAL,
+            ArchiveRequest::STATE_APPROVED,
+            ArchiveRequest::STATE_PREPARING_SNAPSHOT,
+            ArchiveRequest::STATE_READY_TO_REGISTER,
+        ];
+
+        if ($this->relationLoaded('archiveRequests')) {
+            return $this->archiveRequests
+                ->filter(fn($r) => in_array($r->state, $inFlightStates, true))
+                ->sortByDesc('id')
+                ->first();
+        }
+
+        return $this->archiveRequests()
+            ->whereIn('state', $inFlightStates)
+            ->latest('id')
+            ->first();
+    }
+
+    /**
+     * Determine if this document has an active in-flight archive request.
+     */
+    public function hasPendingArchiveRequest(): bool
+    {
+        $inFlightStates = [
+            ArchiveRequest::STATE_DRAFT,
+            ArchiveRequest::STATE_PENDING_APPROVAL,
+            ArchiveRequest::STATE_APPROVED,
+            ArchiveRequest::STATE_PREPARING_SNAPSHOT,
+            ArchiveRequest::STATE_READY_TO_REGISTER,
+        ];
+
+        if ($this->relationLoaded('archiveRequests')) {
+            return $this->archiveRequests->contains(fn($r) => in_array($r->state, $inFlightStates, true));
+        }
+
+        return $this->archiveRequests()
+            ->whereIn('state', $inFlightStates)
+            ->exists();
     }
 }

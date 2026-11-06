@@ -163,7 +163,7 @@ class DocumentController extends Controller
             $type = 'unit_kerja';
         }
 
-        $query = Document::with('owner', 'unitKerja', 'company', 'branch', 'currentVersion', 'versions');
+        $query = Document::with('owner', 'unitKerja', 'company', 'branch', 'currentVersion', 'versions', 'latestArchiveEntry', 'archiveEntries', 'archiveRequests');
 
         $contextService = app(CompanyContextService::class);
         $activeBranchId = $contextService->getActiveBranchId($user);
@@ -706,7 +706,7 @@ class DocumentController extends Controller
             }
         }
 
-        $document->load('owner', 'unitKerja', 'documentType', 'currentVersion', 'corporateSoftFile', 'versions.author', 'shares.user', 'unitKerjaShares.unitKerja', 'rollbackRequestedBy', 'pendingRollbackVersion');
+        $document->load('owner', 'unitKerja', 'documentType', 'currentVersion', 'corporateSoftFile', 'versions.author', 'shares.user', 'unitKerjaShares.unitKerja', 'rollbackRequestedBy', 'pendingRollbackVersion', 'deletionRequestedBy');
 
         $unitKerjas = auth()->user()->isAdmin()
             ? UnitKerja::orderBy('kode_unit_kerja')->get()
@@ -737,8 +737,9 @@ class DocumentController extends Controller
         }
 
         $auditTrail = $this->auditService->getDocumentAuditTrail($document);
+        $numberingContext = $this->documentService->getNumberingSequenceContext($document);
 
-        return view('documents.show', compact('document', 'unitKerjas', 'onlyOfficeConfig', 'version', 'approvedSignatures', 'companies', 'auditTrail'));
+        return view('documents.show', compact('document', 'unitKerjas', 'onlyOfficeConfig', 'version', 'approvedSignatures', 'companies', 'auditTrail', 'numberingContext'));
     }
 
     public function summarize(Request $request, Document $document): JsonResponse
@@ -1968,5 +1969,188 @@ class DocumentController extends Controller
         ]);
 
         return back()->with('success', __('Permintaan perubahan nama dokumen berhasil dibatalkan.'));
+    }
+
+    public function requestDeletion(Request $request, Document $document): RedirectResponse
+    {
+        $user = auth()->user();
+
+        if ($document->owner_id !== $user->id && !$user->isAdmin()) {
+            abort(403, __('Hanya pemilik dokumen atau Administrator yang dapat mengajukan permohonan penghapusan.'));
+        }
+
+        if ($document->hasPendingDeletion()) {
+            return back()->with('error', __('Dokumen ini sudah memiliki permohonan penghapusan yang menunggu persetujuan Administrator.'));
+        }
+
+        $validated = $request->validate([
+            'notes' => ['required', 'string', 'max:1000'],
+        ]);
+
+        $notes = trim($validated['notes']);
+
+        $document->update([
+            'deletion_requested_by_id' => $user->id,
+            'deletion_requested_at' => now(),
+            'deletion_request_notes' => $notes,
+        ]);
+
+        $this->auditService->log($user, 'document.deletion_requested', 'document', $document->id, [
+            'title' => $document->title,
+            'document_number' => $document->document_number,
+            'notes' => $notes,
+        ]);
+
+        $admins = User::where('system_role', 'admin')
+            ->where('is_active', true)
+            ->where('id', '!=', $user->id)
+            ->get();
+
+        foreach ($admins as $admin) {
+            $admin->notify(new \App\Notifications\DocumentDeletionRequested(
+                $document,
+                $user->name,
+                $notes
+            ));
+        }
+
+        return redirect()->route('documents.show', $document)->with(
+            'success',
+            __('Permohonan penghapusan dokumen telah diajukan ke Administrator.')
+        );
+    }
+
+    public function cancelDeletionRequest(Document $document): RedirectResponse
+    {
+        $user = auth()->user();
+
+        if (!$document->hasPendingDeletion()) {
+            return back()->with('error', __('Tidak ada permohonan penghapusan yang menunggu.'));
+        }
+
+        $isRequester = $document->deletion_requested_by_id === $user->id;
+        $isOwner = $document->owner_id === $user->id;
+
+        if (!$isRequester && !$isOwner && !$user->isAdmin()) {
+            abort(403, __('Anda tidak berhak membatalkan permohonan ini.'));
+        }
+
+        $document->update([
+            'deletion_requested_by_id' => null,
+            'deletion_requested_at' => null,
+            'deletion_request_notes' => null,
+        ]);
+
+        $this->auditService->log($user, 'document.deletion_request_cancelled', 'document', $document->id, [
+            'title' => $document->title,
+        ]);
+
+        return redirect()->route('documents.show', $document)->with(
+            'success',
+            __('Permohonan penghapusan dokumen berhasil dibatalkan.')
+        );
+    }
+
+    public function approveDeletion(Request $request, Document $document): RedirectResponse|JsonResponse
+    {
+        $user = auth()->user();
+
+        if (!$user->isAdmin()) {
+            abort(403, __('Hanya Administrator yang dapat menyetujui penghapusan dokumen aktif.'));
+        }
+
+        if (!$document->hasPendingDeletion()) {
+            return back()->with('error', __('Tidak ada permohonan penghapusan yang menunggu.'));
+        }
+
+        $requester = $document->deletionRequestedBy;
+        $notes = $request->input('notes') ?? $request->input('reason') ?? $document->deletion_request_notes;
+        $title = $document->title;
+        $number = $document->document_number;
+
+        Cache::put('ignore_onlyoffice_save_' . $document->id, true, now()->addSeconds(30));
+
+        $document->update([
+            'deletion_requested_by_id' => null,
+            'deletion_requested_at' => null,
+            'deletion_request_notes' => null,
+        ]);
+
+        $document->delete();
+
+        $this->auditService->log($user, 'document.deletion_approved', 'document', $document->id, [
+            'title' => $title,
+            'document_number' => $number,
+            'requester_id' => $requester?->id,
+            'notes' => $notes,
+        ]);
+
+        if ($requester && $requester->id !== $user->id) {
+            $requester->notify(new \App\Notifications\DocumentDeletionResult(
+                $document,
+                'approved',
+                $user->name,
+                $notes
+            ));
+        }
+
+        $message = __('Permohonan penghapusan disetujui. Dokumen \":title\" telah dipindahkan ke tempat sampah.', ['title' => $title]);
+
+        if ($request->expectsJson() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+            ]);
+        }
+
+        $referer = $request->header('referer');
+        if ($referer && str_contains($referer, '/approvals/deletions')) {
+            return redirect()->to($referer)->with('success', $message);
+        }
+
+        return redirect()->route('documents.index', ['type' => 'mine'])->with('success', $message);
+    }
+
+    public function rejectDeletion(Request $request, Document $document): RedirectResponse
+    {
+        $user = auth()->user();
+
+        if (!$user->isAdmin()) {
+            abort(403, __('Hanya Administrator yang dapat menolak permohonan penghapusan dokumen.'));
+        }
+
+        if (!$document->hasPendingDeletion()) {
+            return back()->with('error', __('Tidak ada permohonan penghapusan yang menunggu.'));
+        }
+
+        $requester = $document->deletionRequestedBy;
+        $notes = $request->input('notes') ?? $request->input('reason');
+
+        $document->update([
+            'deletion_requested_by_id' => null,
+            'deletion_requested_at' => null,
+            'deletion_request_notes' => null,
+        ]);
+
+        $this->auditService->log($user, 'document.deletion_rejected', 'document', $document->id, [
+            'title' => $document->title,
+            'document_number' => $document->document_number,
+            'requester_id' => $requester?->id,
+            'notes' => $notes,
+        ]);
+
+        if ($requester && $requester->id !== $user->id) {
+            $requester->notify(new \App\Notifications\DocumentDeletionResult(
+                $document,
+                'rejected',
+                $user->name,
+                $notes
+            ));
+        }
+
+        return redirect()->route('documents.show', $document)->with(
+            'success',
+            __('Permohonan penghapusan dokumen telah ditolak.')
+        );
     }
 }

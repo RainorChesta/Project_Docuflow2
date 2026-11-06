@@ -109,9 +109,7 @@
     </main>
 
     <!-- Footer -->
-    <footer class="py-6 sm:py-8 text-center text-xs sm:text-sm font-medium text-base-content/50 border-t border-base-200 bg-base-100 z-10 relative px-4">
-        &copy; {{ date('Y') }} {{ config('app.name', 'DokuFlow') }}. {{ __('All rights reserved.') }}
-    </footer>
+    <x-footer class="py-6 sm:py-8 sm:text-sm font-medium border-t border-base-200 bg-base-100 z-10 relative px-4" />
 
     <script>
         document.addEventListener("DOMContentLoaded", () => {

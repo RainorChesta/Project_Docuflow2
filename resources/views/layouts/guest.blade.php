@@ -41,9 +41,7 @@
 
                 {{ $slot }}
 
-                <p class="text-center text-xs text-base-content/30 {{ $size === 'sm' ? 'mt-4 scale-90' : 'mt-6' }}">
-                    &copy; {{ date('Y') }} {{ config('app.name', 'DokuFlow') }}
-                </p>
+                <x-footer class="mt-6 text-base-content/40" />
             </div>
         </div>
         <x-loading-blur />

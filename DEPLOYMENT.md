@@ -333,8 +333,14 @@ docker run -d -p 8884:80 \
   -v /opt/onlyoffice/custom_assets/common/img/header/header-logo_s.svg.gz:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/header/header-logo_s.svg.gz:rw \
   -v /opt/onlyoffice/custom_assets/common/lib/view/Header.js:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/lib/view/Header.js:rw \
   -v /opt/onlyoffice/custom_assets/common/lib/view/Header.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/lib/view/Header.js.gz:rw \
+  -v /opt/onlyoffice/custom_assets/documenteditor/main/index.html:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/index.html:rw \
+  -v /opt/onlyoffice/custom_assets/documenteditor/main/index.html.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/index.html.gz:rw \
   -v /opt/onlyoffice/custom_assets/documenteditor/main/index_loader.html:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/index_loader.html:rw \
   -v /opt/onlyoffice/custom_assets/documenteditor/main/index_loader.html.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/index_loader.html.gz:rw \
+  -v /opt/onlyoffice/custom_assets/pdfeditor/main/index.html:/var/www/onlyoffice/documentserver/web-apps/apps/pdfeditor/main/index.html:rw \
+  -v /opt/onlyoffice/custom_assets/pdfeditor/main/index.html.gz:/var/www/onlyoffice/documentserver/web-apps/apps/pdfeditor/main/index.html.gz:rw \
+  -v /opt/onlyoffice/custom_assets/pdfeditor/main/code.js:/var/www/onlyoffice/documentserver/web-apps/apps/pdfeditor/main/code.js:rw \
+  -v /opt/onlyoffice/custom_assets/pdfeditor/main/code.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/pdfeditor/main/code.js.gz:rw \
   onlyoffice/documentserver:latest
 
 # 3. Allow Private IP addresses for downloading docs from DokuFlow:
@@ -344,17 +350,46 @@ docker exec -it dokuflow-onlyoffice supervisorctl restart all
 
 ---
 
-#### 4.3.3 Method 2: Live In-Container Patching (Zero-Downtime Script)
+#### 4.3.3 Method 2: Live In-Container Patching on Production (`202.10.46.4`) — F4 Preset, CMHGROUP Logo & Bidirectional Overscroll Bridge
 
-If you already have `dokuflow-onlyoffice` running and do not want to restart or recreate the container, run the automated Python patch script directly inside the container:
+If you already have `dokuflow-onlyoffice` running on **`202.10.46.4`** and do not want to restart or recreate the container, run the unified `patch_onlyoffice_f4.py` script. This script automatically:
+- Injects **F4 (21 x 33 cm)** paper presets and default print selection.
+- Injects the **CMHGROUP** header logo and click redirection (`https://cmhgroup.id`).
+- Injects the **Bidirectional Overscroll Bridge (Top & Bottom)** across `documenteditor`, `pdfeditor`, `spreadsheeteditor`, and `presentationeditor` (`code.js`, `Main.js`, `index.html`, `index_loader.html`).
+- Injects the parent-window `onlyoffice-overscroll` message receiver directly into `api.js`, updates cache-busters (`_dc=...`), regenerates all `.gz` files for Nginx `gzip_static`, and reloads Nginx.
 
+Choose **one** of the following options to apply the patch to **`202.10.46.4`**:
+
+##### Option A — Using the Remote Setup Script (from your local project folder)
 ```bash
-# Option A: Run directly in RumahWeb server terminal
-docker exec -i dokuflow-onlyoffice python3 - < patch_onlyoffice_f4.py
+./setup-onlyoffice-f4-remote.sh 202.10.46.4 wito_general 22 dokuflow-onlyoffice
+```
+*(Replace `wito_general` with `root` depending on your SSH user for `202.10.46.4`; if your SSH user requires `sudo` to run `docker` on `202.10.46.4`, use Option B below).*
 
-# Option B: Run via Artisan command from web server (hyu.cmhgroup.id)
+##### Option B — Copy & Run Directly on `202.10.46.4` (Supports `sudo docker`)
+```bash
+# 1. Copy the updated patch script from your local machine (or web server) to 202.10.46.4
+scp patch_onlyoffice_f4.py wito_general@202.10.46.4:~/patch_onlyoffice_f4.py
+
+# 2. SSH into 202.10.46.4 and inject into the dokuflow-onlyoffice container
+ssh wito_general@202.10.46.4 "sudo docker exec -i dokuflow-onlyoffice python3 - < ~/patch_onlyoffice_f4.py"
+```
+*(Or if you are already logged into the `202.10.46.4` server terminal directly):*
+```bash
+sudo docker exec -i dokuflow-onlyoffice python3 - < ~/patch_onlyoffice_f4.py
+```
+
+##### Option C — Deploy Updated Blade Views to Web Server (`hyu.cmhgroup.id`) & Run via Artisan
+```bash
+# 1. Deploy updated Blade views (layouts/app.blade.php & _file-preview.blade.php) to web server
+./deploy.sh --skip-composer
+
+# 2. (Optional) Trigger remote ONLYOFFICE patching via Artisan from local or web server
 php artisan onlyoffice:setup-f4 --ssh-host=202.10.46.4 --ssh-user=root
 ```
+
+> [!TIP]
+> After patching `202.10.46.4`, perform a **Hard Refresh (`Ctrl + F5` / `Cmd + Shift + R`)** in your browser so it loads the newly cache-busted `api.js`, `index.html`, and `code.js` assets.
 
 ---
 
@@ -397,8 +432,14 @@ services:
       - /opt/onlyoffice/custom_assets/common/img/header/header-logo_s.svg.gz:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/resources/img/header/header-logo_s.svg.gz:rw
       - /opt/onlyoffice/custom_assets/common/lib/view/Header.js:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/lib/view/Header.js:rw
       - /opt/onlyoffice/custom_assets/common/lib/view/Header.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/common/main/lib/view/Header.js.gz:rw
+      - /opt/onlyoffice/custom_assets/documenteditor/main/index.html:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/index.html:rw
+      - /opt/onlyoffice/custom_assets/documenteditor/main/index.html.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/index.html.gz:rw
       - /opt/onlyoffice/custom_assets/documenteditor/main/index_loader.html:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/index_loader.html:rw
       - /opt/onlyoffice/custom_assets/documenteditor/main/index_loader.html.gz:/var/www/onlyoffice/documentserver/web-apps/apps/documenteditor/main/index_loader.html.gz:rw
+      - /opt/onlyoffice/custom_assets/pdfeditor/main/index.html:/var/www/onlyoffice/documentserver/web-apps/apps/pdfeditor/main/index.html:rw
+      - /opt/onlyoffice/custom_assets/pdfeditor/main/index.html.gz:/var/www/onlyoffice/documentserver/web-apps/apps/pdfeditor/main/index.html.gz:rw
+      - /opt/onlyoffice/custom_assets/pdfeditor/main/code.js:/var/www/onlyoffice/documentserver/web-apps/apps/pdfeditor/main/code.js:rw
+      - /opt/onlyoffice/custom_assets/pdfeditor/main/code.js.gz:/var/www/onlyoffice/documentserver/web-apps/apps/pdfeditor/main/code.js.gz:rw
 ```
 
 Launch the service:

@@ -22,6 +22,8 @@ class DeleteExpiredVersions extends Command
 
         $deleted = DocumentVersion::where('status', '!=', 'active')
             ->where('created_at', '<', $retentionDate)
+            ->whereDoesntHave('archiveEntry')
+            ->whereDoesntHave('archiveRequests')
             ->delete();
 
         DB::table('audit_logs')->insert([

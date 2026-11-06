@@ -77,6 +77,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('admin', fn(User $user) => $user->isAdmin());
 
         Gate::policy(Document::class, DocumentPolicy::class);
+        Gate::policy(\App\Models\ArchiveEntry::class, \App\Policies\ArchivePolicy::class);
+        Gate::policy(\App\Models\ArchiveRequest::class, \App\Policies\ArchiveRequestPolicy::class);
 
         // Observers
         \App\Models\SignatureRequest::observe(\App\Observers\SignatureRequestObserver::class);

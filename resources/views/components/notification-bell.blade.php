@@ -360,6 +360,16 @@
                     <span class="text-sm font-medium">{{ __('Belum ada notifikasi') }}</span>
                 </div>
             </template>
+        {{-- Footer: View All Notifications Link --}}
+        <div class="px-4 py-2.5 bg-base-200/50 border-t border-base-200 shrink-0 text-center">
+            <a href="{{ route('notifications.index') }}"
+               @click="open = false"
+               class="inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/80 transition-colors w-full py-1">
+                <span>{{ __('Lihat Semua Notifikasi') }}</span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+            </a>
         </div>
     </div>
 </div>
